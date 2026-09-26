@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../receipt_import/scan_page.dart';
+import '../receipts/receipts_overview.dart';
 
 /// Rahmen mit Navigation. Die Inhalte der Tabs kommen in spaeteren Phasen (siehe Roadmap).
 class HomeShell extends StatefulWidget {
@@ -62,7 +63,9 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: _index == 2
+      body: _index == 0
+          ? const ReceiptsOverview()
+          : _index == 2
           ? const ScanPage()
           : Center(
               child: Padding(

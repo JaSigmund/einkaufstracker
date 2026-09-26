@@ -52,6 +52,10 @@ class ReceiptRepository {
         ..orderBy([(r) => OrderingTerm.desc(r.purchasedAt)]))
       .watch();
 
+  Stream<Receipt?> watchReceipt(String id) => (_db.select(_db.receipts)..where((r) => r.id.equals(id))).watchSingleOrNull();
+
+  Stream<List<Store>> watchStores() => (_db.select(_db.stores)..where((s) => s.deletedAt.isNull())).watch();
+
   Stream<List<ReceiptItem>> watchItems(String receiptId) => (_db.select(_db.receiptItems)
         ..where((i) => i.receiptId.equals(receiptId) & i.deletedAt.isNull())
         ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))

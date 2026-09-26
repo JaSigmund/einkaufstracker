@@ -1,0 +1,208 @@
+import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
+import 'package:einkaufstracker/domain/receipt/month_summary.dart';
+import 'package:einkaufstracker/features/receipts/receipt_detail_page.dart';
+import 'package:einkaufstracker/features/receipts/receipts_overview.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+
+import 'support/fakes.dart';
+
+Receipt _receipt(String id, DateTime utc, int cents, {String? store = 's1', bool mismatch = false, DateTime? deleted}) => Receipt(
+      id: id,
+      householdId: 'h',
+      storeId: store,
+      purchasedAt: utc,
+      totalCents: cents,
+      status: 'confirmed',
+      source: 'pdf_text',
+      sumMismatch: mismatch,
+      updatedAt: DateTime.utc(2026),
+      deletedAt: deleted,
+    );
+
+final _store = Store(id: 's1', householdId: 'h', chain: 'Billa', branch: '0643', updatedAt: DateTime.utc(2026));
+
+ReceiptItem _item(String id, int no, String text, int cents, {String kind = 'article', double qty = 1, int? unit}) => ReceiptItem(
+      id: id,
+      householdId: 'h',
+      receiptId: 'r1',
+      lineNo: no,
+      kind: kind,
+      rawText: text,
+      quantity: qty,
+      quantityUnit: 'piece',
+      unitPriceCents: unit,
+      lineTotalCents: cents,
+      needsReview: false,
+      updatedAt: DateTime.utc(2026),
+    );
+
+void main() {
+  group('Monatssumme (Wiener Zeit)', () {
+    PurchaseRecord p(DateTime utc, int cents) => (purchasedAtUtc: utc, totalCents: cents);
+
+    test('summiert nur den gewaehlten Monat', () {
+      final m = summarizeMonth([
+        p(DateTime.utc(2026, 9, 5, 10), 1000),
+        p(DateTime.utc(2026, 9, 20, 10), 2500),
+        p(DateTime.utc(2026, 8, 30, 10), 9999), // Vormonat
+      ], year: 2026, month: 9);
+      expect(m.totalCents, 3500);
+      expect(m.receiptCount, 2);
+    });
+
+    test('Einkauf 30.09. 23:30 UTC ist in Wien schon Oktober (FR-07)', () {
+      final list = [p(DateTime.utc(2026, 9, 30, 23, 30), 1000)];
+      expect(summarizeMonth(list, year: 2026, month: 10).totalCents, 1000);
+      expect(summarizeMonth(list, year: 2026, month: 9).totalCents, 0);
+    });
+
+    test('Einkauf 31.10. 23:30 UTC (Winterzeit) ist in Wien schon November', () {
+      final list = [p(DateTime.utc(2026, 10, 31, 23, 30), 500)];
+      expect(summarizeMonth(list, year: 2026, month: 11).receiptCount, 1);
+    });
+
+    test('Leere Liste ergibt 0', () {
+      final m = summarizeMonth(const [], year: 2026, month: 9);
+      expect((m.totalCents, m.receiptCount), (0, 0));
+    });
+  });
+
+  group('Uebersicht', () {
+    Widget host(List<Receipt> list, {DateTime? now}) => ProviderScope(
+          overrides: [
+            receiptsStreamProvider.overrideWith((ref) => Stream.value(list)),
+            storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
+          ],
+          child: MaterialApp.router(
+            routerConfig: GoRouter(routes: [
+              GoRoute(path: '/', builder: (_, _) => Scaffold(body: ReceiptsOverview(now: now ?? DateTime.utc(2026, 9, 26, 12)))),
+              GoRoute(path: '/receipt/:id', builder: (_, s) => Scaffold(body: Text('DETAIL ${s.pathParameters['id']}'))),
+            ]),
+          ),
+        );
+
+    testWidgets('zeigt Monatssumme des aktuellen Monats und die Bons, neueste zuerst', (tester) async {
+      await tester.pumpWidget(host([
+        _receipt('a', DateTime.utc(2026, 9, 24, 12, 42), 2319),
+        _receipt('b', DateTime.utc(2026, 9, 26, 14, 38), 2638, mismatch: true),
+        _receipt('c', DateTime.utc(2026, 8, 12, 16, 10), 632),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('September 2026'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '49,57 €');
+      expect(find.text('2 Einkäufe'), findsOneWidget);
+      expect(find.text('Billa, Filiale 0643'), findsNWidgets(3));
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget); // Bon mit Abweichung markiert
+    });
+
+    testWidgets('ohne Bons: Hinweis auf den Import und Monatssumme 0', (tester) async {
+      await tester.pumpWidget(host(const []));
+      await tester.pumpAndSettle();
+      expect(find.text('Noch keine Bons'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '0,00 €');
+    });
+
+    testWidgets('Tippen auf einen Bon oeffnet die Detailseite', (tester) async {
+      await tester.pumpWidget(host([_receipt('a', DateTime.utc(2026, 9, 24, 12, 42), 2319)]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Billa, Filiale 0643'));
+      await tester.pumpAndSettle();
+      expect(find.text('DETAIL a'), findsOneWidget);
+    });
+  });
+
+  group('Detailseite', () {
+    Widget host(AppDatabaseHolder h, {required Receipt receipt, required List<ReceiptItem> items}) => ProviderScope(
+          overrides: [
+            receiptProvider('r1').overrideWith((ref) => Stream.value(receipt)),
+            receiptItemsProvider('r1').overrideWith((ref) => Stream.value(items)),
+            storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
+            receiptRepositoryProvider.overrideWithValue(h.repo),
+          ],
+          child: MaterialApp.router(
+            routerConfig: GoRouter(initialLocation: '/', routes: [
+              GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('LISTE')), routes: [
+                GoRoute(path: 'receipt', builder: (_, _) => const ReceiptDetailPage(receiptId: 'r1')),
+              ]),
+            ]),
+          ),
+        );
+
+    testWidgets('zeigt Positionen mit Menge, Rabatt und Pfand und die Summe', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final holder = AppDatabaseHolder(db);
+      final items = [
+        _item('i1', 1, 'DKIH Cherrytomaten Sophie', 570, qty: 2, unit: 285),
+        _item('i2', 2, 'EXTREM AKTION', -134, kind: 'discount'),
+        _item('i3', 3, 'PFANDARTIKEL', 25, kind: 'deposit'),
+      ];
+      await tester.pumpWidget(host(holder, receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 461), items: items));
+      final router = GoRouter.of(tester.element(find.text('LISTE')));
+      router.go('/receipt');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Billa, Filiale 0643'), findsOneWidget);
+      expect(find.text('02.07.2026, 19:51 Uhr'), findsOneWidget);
+      expect(find.text('2 × 2,85 €'), findsOneWidget);
+      expect(find.text('Rabatt'), findsOneWidget);
+      expect(find.text('Pfand'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('items-sum'))).data, '4,61 €');
+      expect(tester.widget<Text>(find.byKey(const Key('receipt-total'))).data, '4,61 €');
+    });
+
+    testWidgets('Loeschen mit Rueckfrage: Abbrechen loescht nichts, Bestaetigen entfernt den Bon', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      // echter Bon in der Datenbank, damit softDelete etwas tut
+      final repo = receiptRepo(db);
+      await db.into(db.receipts).insert(_receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100).toCompanion(false));
+      final holder = AppDatabaseHolder(db, repo: repo);
+
+      await tester.pumpWidget(host(holder, receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: const []));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Löschen'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bon löschen?'), findsOneWidget);
+
+      await tester.tap(find.text('Abbrechen'));
+      await tester.pumpAndSettle();
+      expect((await db.select(db.receipts).getSingle()).deletedAt, isNull);
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+      await tester.pumpAndSettle();
+
+      expect((await db.select(db.receipts).getSingle()).deletedAt, isNotNull);
+      expect(find.text('LISTE'), findsOneWidget); // zurueck auf der Liste
+    });
+
+    testWidgets('Bon mit Abweichung zeigt einen Hinweis', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      await tester.pumpWidget(host(AppDatabaseHolder(db), receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100, mismatch: true), items: const []));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('nicht alle Prüfungen'), findsOneWidget);
+    });
+  });
+}
+
+/// Haelt Datenbank und Repository fuer die Detailseiten-Tests zusammen.
+class AppDatabaseHolder {
+  AppDatabaseHolder(AppDatabase db, {ReceiptRepository? repo}) : repo = repo ?? receiptRepo(db);
+  final ReceiptRepository repo;
+}
