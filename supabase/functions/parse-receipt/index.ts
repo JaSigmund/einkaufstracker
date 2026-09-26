@@ -1,0 +1,319 @@
+// Edge Function: parse-receipt
+// STATUS: deployt und in Phase 0 gegen echte Bons getestet (siehe Doku 05 Bon-Erkennung §8).
+//
+// Ablauf: JWT pruefen -> Einwilligung pruefen -> Bild an Claude Vision mit erzwungenem Tool-Schema
+//         -> Ergebnis serverseitig validieren (Summencheck) -> optional Nachfrage bei Abweichung (v3)
+//         -> Nutzung in llm_usage protokollieren -> JSON zurueck.
+//
+// Varianten (Body-Feld "variant"):
+//   v1  urspruengliche, ausfuehrliche Ausgabe (nur noch als Vergleichswert)
+//   v2  knappe Ausgabe + praezisere Regeln (Mengenzeilen sind keine Positionen, Rabatt/Pfand, Ziffern exakt)
+//   v3  wie v2, bei Summenabweichung eine Nachfrage an das Modell (max. 1)
+// Modell (Body-Feld "model") nur aus der Allowlist; Standard aus Secret RECEIPT_MODEL.
+//
+// Benoetigte Secrets:  ANTHROPIC_API_KEY, optional RECEIPT_MODEL
+// Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+// Preise in Mikro-USD je Token (= USD je Million Tokens). Quelle: Preisvergleichsseiten, Stand 2026-09;
+// vor Produktivbetrieb gegen die offizielle Preisliste pruefen.
+const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-haiku-4-5-20251001": { in: 1, out: 5 },
+  "claude-sonnet-5": { in: 2, out: 10 },
+};
+const DEFAULT_MODEL = Deno.env.get("RECEIPT_MODEL") ?? "claude-haiku-4-5-20251001";
+const MAX_IMAGE_BYTES = 1_500_000; // ~1,5 MB je Bild nach base64-Decode
+
+// ---------------------------------------------------------------------------
+// v1 (Vergleichswert)
+// ---------------------------------------------------------------------------
+const SYSTEM_V1 = `Du liest oesterreichische Einkaufsbons (Billa, Hofer u.a.) und gibst sie strukturiert wieder.
+Regeln:
+- Gib nur Zeilen wieder, die auf dem Bon stehen. Nichts erfinden. Bei unleserlichen Stellen: uncertain=true.
+- Betraege als ganze Cent (2,49 EUR = 249). Rabatte negativ mit kind="discount". Pfand mit kind="deposit".
+- Keine Zahlungs-, Steuer- oder Bonus-Club-Zeilen als Positionen.
+- Mengenzeilen (z.B. "2 x 1,29" oder "0,534 kg x 3,99") gehoeren zur Position darueber: quantity, quantity_unit, unit_price_cents setzen.
+- Wiegeware: quantity in kg, unit_price_cents je kg.
+- category_hint: exakt einen Namen aus der uebergebenen Kategorieliste waehlen, sonst null.
+- purchased_at als ISO-8601 (Europe/Vienna), total_cents = Endsumme "Zu zahlen".`;
+
+const TOOL_V1 = {
+  name: "submit_receipt",
+  description: "Uebergibt den gelesenen Kassenbon.",
+  input_schema: {
+    type: "object",
+    properties: {
+      store_name: { type: ["string", "null"] },
+      purchased_at: { type: ["string", "null"] },
+      total_cents: { type: ["integer", "null"] },
+      items: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            raw_text: { type: "string" },
+            kind: { type: "string", enum: ["article", "deposit", "discount"] },
+            quantity: { type: "number" },
+            quantity_unit: { type: "string", enum: ["piece", "kg", "l"] },
+            unit_price_cents: { type: ["integer", "null"] },
+            line_total_cents: { type: "integer" },
+            category_hint: { type: ["string", "null"] },
+            uncertain: { type: "boolean" },
+          },
+          required: ["raw_text", "kind", "quantity", "quantity_unit", "line_total_cents", "uncertain"],
+        },
+      },
+      notes: { type: ["string", "null"] },
+    },
+    required: ["items"],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// v2 / v3: knappes Format, praezisere Regeln
+// ---------------------------------------------------------------------------
+const SYSTEM_V2 = `Du liest oesterreichische Einkaufsbons (Billa, Hofer u.a.) von Fotos und gibst die Positionen exakt wieder.
+
+Umfang: Nur der Positionsbereich zwischen der Zeile mit Datum/Zeit und der Zeile "Summe". Kopf, Kundenbeleg/Zahlungsblock, Steuerblock, QR-Codes und Fussbereich ignorieren.
+
+Regeln:
+1. Eine Position je gedruckter Artikelzeile, die mit einem Betrag endet (rechts steht oft ein Steuerbuchstabe wie B, C, D, H vor dem Betrag).
+2. MENGENZEILEN sind KEINE Positionen. Zeilen wie "2 x 1.19", "-2 x 0.25" oder "0.986 kg (N) x 4.99 EUR/kg" stehen VOR der Artikelzeile, haben keinen Zeilenbetrag und gehoeren zur Artikelzeile darunter. Nutze sie nur fuer qty (Menge) und unit ("kg" oder "l" bei Wiegeware), gib sie nie als eigene Position aus.
+3. Rabattzeilen (z.B. "EXTREM AKTION", "NIMM MEHR", "Rabatt 25%", "Rabattsammler") haben einen negativen Betrag: kind="discount". Pfand-Zeilen (PFAND, LEERGUT, EINWEGPFAND, FLASCHENKASSEN): kind="deposit" (Rueckgaben sind negativ). Alles andere: kind="article".
+4. Zeilen ohne Betrag (z.B. nur "EXTREM AKTION" als Hinweis) sind keine Positionen.
+5. Betraege in ganzen Cent, so wie gedruckt: 3.89 = 389, -0.86 = -86. Ziffern EXAKT abschreiben, nicht raten oder runden. Ist eine Ziffer nicht sicher lesbar, setze unsure=true.
+6. text = Artikelname genau wie gedruckt (inkl. Praefixe wie "IC").
+7. Kontrolle: Die Summe aller total-Werte muss dem Betrag in der Zeile "Summe" (total_cents) entsprechen. Stimmt sie nicht, lies die Preise noch einmal genau, bevor du antwortest.
+8. purchased_at als ISO-8601 (Europe/Vienna) aus Datum und Zeit des Bons.`;
+
+const TOOL_V2 = {
+  name: "submit_receipt",
+  description: "Uebergibt den gelesenen Kassenbon.",
+  input_schema: {
+    type: "object",
+    properties: {
+      store: { type: "string" },
+      purchased_at: { type: "string" },
+      total_cents: { type: "integer", description: "Betrag der Zeile Summe in Cent" },
+      items: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            text: { type: "string" },
+            kind: { type: "string", enum: ["article", "deposit", "discount"] },
+            total: { type: "integer", description: "Zeilenbetrag in Cent" },
+            qty: { type: "number", description: "Menge, nur wenn nicht 1" },
+            unit: { type: "string", enum: ["kg", "l"], description: "nur bei Wiegeware" },
+            unsure: { type: "boolean", description: "nur setzen wenn true" },
+          },
+          required: ["text", "kind", "total"],
+        },
+      },
+    },
+    required: ["total_cents", "items"],
+  },
+};
+
+type Item = {
+  raw_text: string;
+  kind: string;
+  quantity: number;
+  quantity_unit: string;
+  line_total_cents: number | null;
+  uncertain: boolean;
+  category_hint?: string | null;
+  unit_price_cents?: number | null;
+};
+type Receipt = { store_name: string | null; purchased_at: string | null; total_cents: number | null; items: Item[] };
+
+// v2-Ausgabe auf das gemeinsame Format abbilden
+function normalize(variant: string, input: any): Receipt {
+  if (variant === "v1") {
+    return {
+      store_name: input.store_name ?? null,
+      purchased_at: input.purchased_at ?? null,
+      total_cents: input.total_cents ?? null,
+      items: input.items ?? [],
+    };
+  }
+  return {
+    store_name: input.store ?? null,
+    purchased_at: input.purchased_at ?? null,
+    total_cents: input.total_cents ?? null,
+    items: (input.items ?? []).map((i: any): Item => ({
+      raw_text: i.text,
+      kind: i.kind,
+      quantity: i.qty ?? 1,
+      quantity_unit: i.unit ?? "piece",
+      line_total_cents: Number.isInteger(i.total) ? i.total : null,
+      uncertain: i.unsure === true,
+    })),
+  };
+}
+
+const sumCents = (r: Receipt) => r.items.reduce((s, i) => s + (Number.isInteger(i.line_total_cents) ? i.line_total_cents! : 0), 0);
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+async function callClaude(model: string, system: string, tool: unknown, messages: unknown[]) {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system,
+      tools: [tool],
+      tool_choice: { type: "tool", name: "submit_receipt" },
+      messages,
+    }),
+  });
+  if (!resp.ok) {
+    console.error("anthropic_error", resp.status, await resp.text());
+    return null;
+  }
+  const result = await resp.json();
+  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
+  if (!toolUse) return null;
+  return { toolUse, usage: result.usage ?? { input_tokens: 0, output_tokens: 0 } };
+}
+
+Deno.serve(async (req) => {
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  // 1) Nutzer aus JWT
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) return json({ error: "unauthorized" }, 401);
+
+  // 2) Eingabe
+  let body: {
+    household_id: string;
+    images: string[];
+    categories?: string[];
+    store_hint?: string;
+    receipt_id?: string;
+    variant?: string;
+    model?: string;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
+  if (!body.household_id || !Array.isArray(body.images) || body.images.length < 1 || body.images.length > 4) {
+    return json({ error: "invalid_input" }, 400);
+  }
+  const variant = body.variant ?? "v3";
+  if (!["v1", "v2", "v3"].includes(variant)) return json({ error: "invalid_variant" }, 400);
+  const model = body.model ?? DEFAULT_MODEL;
+  if (!(model in PRICES)) return json({ error: "model_not_allowed", allowed: Object.keys(PRICES) }, 400);
+
+  // 3) Mitgliedschaft + Einwilligung ueber RLS des Aufrufers pruefen
+  const { data: settings, error: setErr } = await userClient
+    .from("household_settings")
+    .select("allow_cloud_ocr")
+    .eq("household_id", body.household_id)
+    .maybeSingle();
+  if (setErr || !settings) return json({ error: "forbidden" }, 403);
+  if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
+
+  // 4) Groessenlimit
+  for (const img of body.images) {
+    if (img.length * 0.75 > MAX_IMAGE_BYTES) return json({ error: "image_too_large" }, 413);
+  }
+
+  // 5) Claude Vision
+  const system = variant === "v1" ? SYSTEM_V1 : SYSTEM_V2;
+  const tool = variant === "v1" ? TOOL_V1 : TOOL_V2;
+  const content: unknown[] = body.images.map((data) => ({
+    type: "image",
+    source: { type: "base64", media_type: "image/jpeg", data },
+  }));
+  content.push({
+    type: "text",
+    text: variant === "v1"
+      ? `Kategorieliste: ${JSON.stringify(body.categories ?? [])}\nHaendler-Hinweis: ${body.store_hint ?? "unbekannt"}\nLies den Bon (ggf. mehrere Fotos in Lesereihenfolge) und rufe submit_receipt auf.`
+      : `Haendler-Hinweis: ${body.store_hint ?? "unbekannt"}. Lies den Bon (ggf. mehrere Fotos in Lesereihenfolge) und rufe submit_receipt auf.`,
+  });
+  const messages: unknown[] = [{ role: "user", content }];
+
+  const started = Date.now();
+  let totalIn = 0, totalOut = 0, attempts = 0;
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const price = PRICES[model];
+
+  const logUsage = async (usage: { input_tokens: number; output_tokens: number }, ms: number) => {
+    await admin.from("llm_usage").insert({
+      household_id: body.household_id,
+      receipt_id: body.receipt_id ?? null,
+      model,
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      cost_micro_usd: usage.input_tokens * price.in + usage.output_tokens * price.out,
+      duration_ms: ms,
+    });
+  };
+
+  let t0 = Date.now();
+  let r = await callClaude(model, system, tool, messages);
+  attempts++;
+  if (!r) return json({ error: "llm_failed" }, 502);
+  totalIn += r.usage.input_tokens; totalOut += r.usage.output_tokens;
+  await logUsage(r.usage, Date.now() - t0);
+  let receipt = normalize(variant, r.toolUse.input);
+  let sum = sumCents(receipt);
+
+  // v3: eine Nachfrage, wenn die Summe nicht passt
+  if (variant === "v3" && receipt.total_cents != null && receipt.total_cents !== sum) {
+    const diff = receipt.total_cents - sum;
+    messages.push({ role: "assistant", content: [r.toolUse] });
+    messages.push({
+      role: "user",
+      content: [{
+        type: "tool_result",
+        tool_use_id: r.toolUse.id,
+        content:
+          `Kontrolle fehlgeschlagen: Deine Positionen ergeben ${sum} Cent, die Zeile "Summe" nennt ${receipt.total_cents} Cent (Differenz ${diff} Cent). ` +
+          `Pruefe genau: (a) sind Mengenzeilen wie "2 x 1.19" faelschlich als eigene Position ausgegeben, (b) sind Ziffern falsch gelesen, (c) fehlt eine Zeile oder ist eine doppelt? ` +
+          `Lies die betroffenen Zeilen noch einmal im Bild und rufe submit_receipt mit der korrigierten vollstaendigen Liste erneut auf.`,
+      }],
+    });
+    t0 = Date.now();
+    const r2 = await callClaude(model, system, tool, messages);
+    attempts++;
+    if (r2) {
+      totalIn += r2.usage.input_tokens; totalOut += r2.usage.output_tokens;
+      await logUsage(r2.usage, Date.now() - t0);
+      const receipt2 = normalize(variant, r2.toolUse.input);
+      const sum2 = sumCents(receipt2);
+      // Nur uebernehmen, wenn es nicht schlechter wird
+      const better = receipt2.total_cents != null && Math.abs(receipt2.total_cents - sum2) <= Math.abs(receipt.total_cents - sum);
+      if (better) {
+        receipt = receipt2;
+        sum = sum2;
+      }
+    }
+  }
+
+  return json({
+    receipt,
+    computed_sum_cents: sum,
+    sum_mismatch: receipt.total_cents != null && receipt.total_cents !== sum,
+    model,
+    variant,
+    attempts,
+    usage: { input_tokens: totalIn, output_tokens: totalOut, cost_micro_usd: totalIn * price.in + totalOut * price.out },
+    duration_ms: Date.now() - started,
+  });
+});
