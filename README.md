@@ -15,9 +15,10 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 | `supabase/functions/parse-receipt` | deployt, mit Deno typgeprüft, gegen echte Bons getestet (Sonnet 5 exakt, `tools/test_parse_receipt.py`); Standardmodell per Secret `RECEIPT_MODEL` |
 | `spikes/spike_scanner` | Android-Spike auf dem Handy getestet, 17 Unit-Tests (inkl. 3 echte Billa-Bons als Regression, lokal) |
 | `tools/test_parse_receipt.py` | Vergleichstest der Cloud-Erkennung (Modelle x Varianten x Fotos), Soll-Werte in `testdata/receipts/truth/` |
+| `tools/metrics.py` | Kennzahlen aus dem Testkonzept (Bons je Quelle, Summenstimmigkeit, Fallback-Quote, Kosten, Kategorisierung) aus den Live-Daten, nur lesend: `python tools/metrics.py` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 1 fertig: Anmeldung, Offline-Sync (drift + Outbox, automatisch bei Netzrückkehr), Kategorien, Einstellungen, 19 Tests, signierter Release-Build läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| Flutter-App (`app/`) | Phase 2 (Code) fertig: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF digital, Teilen aus der jö-App, Foto mit lokaler OCR und Cloud-Fallback ohne Zahlungsblock), Bearbeiten vor dem Speichern, lernende Kategorisierung, Monatsauswertung mit Erklärung und „Gespart“, Übersicht mit Filter, Originalbelege. 287 Tests, signierter Release-Build läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
 | CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
 
 ## Struktur
@@ -25,20 +26,22 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 ```
 Einkaufstracker/
   supabase/
-    migrations/        0001_init, 0002_default_categories, 0003_inventory_movements
+    migrations/        0001 bis 0008 (Schema, Kategorien, Ledger, Haushalt-Fix, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege)
     planned/           meal_diary_draft.sql (Phase 7, noch nicht produktiv)
     tests/             run_schema_tests.py (Schema + RLS ohne Docker)
     functions/
       parse-receipt/   Edge Function (Claude Vision)
   tools/               Prototypen (parse_digital_billa.py)
   spikes/spike_scanner Phase-0-Messapp (Scanner, OCR, Barcode, Open Food Facts)
-  app/                 Flutter-App (Phase 1, per `flutter create app`)
+  app/                 Flutter-App (Phase 2)
   testdata/receipts/   Golden Set (Bon-Fotos, OCR-Rohdaten, digital/*.pdf, NICHT einchecken, siehe .gitignore)
 ```
 
 ## Nächste Schritte
 
-Phase 0 und Phase 1 sind abgeschlossen (Go/No-Go-Bericht M0 und Roadmap im Vault unter `02 Projekte/Einkaufstracker/`; Meilenstein M1 auf dem Handy bestätigt). Als Nächstes Phase 2: PDF-Import digitaler Billa-Bons (Branch `feat/pdf-import`), danach Foto-Pfad mit lokaler OCR und Cloud-Fallback. Offen und ohne Eile: Eintrag des Zertifikat-Fingerabdrucks in der Android Developer Console.
+Phase 0, 1 und 2 (Code) sind abgeschlossen (Go/No-Go-Bericht M0 und Roadmap im Vault unter `02 Projekte/Einkaufstracker/`; Tag `m2-phase2-code`). **Offen aus Phase 2, läuft parallel:** zwei Wochen echte Bons sammeln und mit `tools/metrics.py` gegen die Ziele prüfen (Meilenstein M2), Hofer-Bons, weitere jö-PDFs, Diagnose der lokalen Foto-Erkennung. **Als Nächstes Phase 3:** Barcode-Inventar mit Haltbarkeit und Einkaufsliste.
+
+**Migrationen anwenden:** `npx supabase db push --dry-run`, dann `npx supabase db push --yes` (gegen das Live-Projekt, verknüpft per `supabase link`). Neue Migrationen müssen live sein, **bevor** die App-Version mit dem neuen Schema installiert wird.
 
 ## Schema testen (ohne Docker)
 
@@ -93,7 +96,7 @@ Ein Projekt mit einer Person, aber mit den Regeln eines Teams, damit der Verlauf
 
 1. Der Release-Keystore liegt **außerhalb** des Repos (`C:\Users\jakob\keys\einkaufstracker-release.jks`, Alias `einkaufstracker`), das Passwort im Passwortmanager. Java verlangt für Schlüsselpasswörter reines **ASCII** (keine Umlaute, kein ß, kein Eurozeichen).
 2. `app/android/key.properties` nach der Vorlage `key.properties.example` anlegen. `storePassword` und `keyPassword` müssen **identisch** sein (der Schlüssel nutzt das Keystore-Passwort). Die Datei steht in `.gitignore`.
-3. Bauen (im Ordner `app`): `flutter build apk --release --dart-define-from-file=dart_defines.local.json`
+3. Bauen (im Ordner `app`): `flutter build apk --release --split-per-abi --dart-define-from-file=dart_defines.local.json`. Das erzeugt je Prozessor-Architektur eine APK (`app-arm64-v8a-release.apk`, ca. 41 MB, für moderne Handys; ohne `--split-per-abi` ca. 113 MB). Installieren mit `adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 4. Signatur prüfen: `apksigner verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk`. Der Fingerabdruck muss dem des Keystores entsprechen (`keytool -list -v -keystore ... -alias einkaufstracker`, das Passwort gibst du dort selbst ein).
 
 Öffentlicher Zertifikat-Fingerabdruck (SHA-256) der Release-Signatur:
