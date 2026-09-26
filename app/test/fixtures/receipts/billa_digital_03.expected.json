@@ -1,0 +1,220 @@
+{
+ "date": "11.07.2026",
+ "time": "17:58",
+ "total": 4879,
+ "subtotal": 5330,
+ "reNr": "0643-20260711-03-2021",
+ "branch": "0643",
+ "items": [
+  {
+   "name": "Clever Champignon weiß",
+   "tax": "H",
+   "cents": 189,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "DKIH Zwiebel gelb 1kg",
+   "tax": "H",
+   "cents": 123,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "DKIH Cherrytomaten Sophie",
+   "tax": "H",
+   "cents": 570,
+   "kind": "article",
+   "qty": [
+    "2",
+    "Stk",
+    "2.85"
+   ]
+  },
+  {
+   "name": "DKIH Paprika Tricolore",
+   "tax": "H",
+   "cents": 380,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "EXTREM AKTION",
+   "tax": "H",
+   "cents": -134,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "SG RUCOLA SALAT 125G",
+   "tax": "H",
+   "cents": 170,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Farmer Soft Sandwich",
+   "tax": "B",
+   "cents": 399,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Srd Berghof Vollmilch",
+   "tax": "H",
+   "cents": 157,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "PFANDFLASCHE 1L",
+   "tax": "H",
+   "cents": 21,
+   "kind": "deposit",
+   "qty": null
+  },
+  {
+   "name": "Clever Hirtenkäse",
+   "tax": "B",
+   "cents": 249,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Grillselektion",
+   "tax": "B",
+   "cents": 699,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "CV FASCHIERTES GEM.500G",
+   "tax": "B",
+   "cents": 499,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "NIMM MEHR",
+   "tax": "B",
+   "cents": -50,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "CV FASCHIERTES GEM.500G",
+   "tax": "B",
+   "cents": 499,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "NIMM MEHR",
+   "tax": "B",
+   "cents": -50,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "CV FASCHIERTES GEM.500G",
+   "tax": "B",
+   "cents": 499,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "NIMM MEHR",
+   "tax": "B",
+   "cents": -50,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "Eskimo Cornetto Classico",
+   "tax": "B",
+   "cents": 220,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "CLEVER PESTO GENOVESE",
+   "tax": "B",
+   "cents": 149,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Clever Pesto Rosso Vegan",
+   "tax": "B",
+   "cents": 149,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "TAFELESSIG",
+   "tax": "B",
+   "cents": 169,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Billa Immer Gut Erdnüsse",
+   "tax": "B",
+   "cents": 199,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Coca-Cola Flasche",
+   "tax": "C",
+   "cents": 249,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "PFANDARTIKEL",
+   "tax": "D",
+   "cents": 25,
+   "kind": "deposit",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [
+  {
+   "name": "jö Rabattsammler",
+   "pct": "20",
+   "cents": -451
+  }
+ ],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 3075,
+   "vat": 308,
+   "gross": 3383
+  },
+  "C": {
+   "rate": "20.00",
+   "net": 166,
+   "vat": 33,
+   "gross": 199
+  },
+  "D": {
+   "rate": null,
+   "gross": 25
+  },
+  "H": {
+   "rate": "4.90",
+   "net": 1213,
+   "vat": 59,
+   "gross": 1272
+  }
+ },
+ "labels": [
+  "EXTREM AKTION"
+ ],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

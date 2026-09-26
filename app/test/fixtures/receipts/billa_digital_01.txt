@@ -1,0 +1,83 @@
+                      Billa AG
+                     1070 WIEN
+             MARIAHILFER STR.38-48
+                TEL: 059915-00143
+                   ATU 15255907
+--------------------------------------
+Datum: 08.08.2026          Zeit: 17:32
+
+     2 x    1.13
+Bio Mohnstriezerl         B       2.26
+Preiskorrektur        30% B      -0.68
+Olivenbrot                B       2.00
+Preiskorrektur        30% B      -0.60
+Mini Babybel Mix          B       3.99
+Billa Himb-Straccia Torte B       6.99
+Hitschies brizzl UFO Pops B       2.29
+--------------------------------------
+Summe                  EUR       16.25
+======================================
+Gegeben   KK Visa                16.25
+
+* *  Kundenbeleg  * *
+Datum:                        08.08.2026
+Uhrzeit:                    17:34:54 Uhr
+Beleg-Nr.                           0000
+Trace-Nr.                         0000
+Bezahlung
+Contactless
+VISA
+Nr.                ############0000 0000
+VU-Nr.                   000000000000000
+Terminal-ID                     00000000
+Pos-Info                       00 075 00
+AS-Zeit 08.08.                 17:34 Uhr
+AS-Proc-Code = 00 075 00
+Capt.-Ref.= 0000
+Betrag EUR                         16,25
+Zahlung erfolgt
+
+Betrag dankend erhalten
+
+B: 10.00% MwSt von     14.77 =    1.48
+
+
+
+
+
+
+
+
+
+
+
+Filiale: 00143  Kassa: 2  Bon-Nr: 7319
+Pos:6   Kassier:in: SCO-Bediener2   /902
+Re-Nr: 0143-20260808-02-7319
+--------------------------------------
+  ---------------------------------------
+        Vielen Dank für Ihren Einkauf!
+           Mit diesem QR Code in nur
+            1 Minute Feedback geben!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ---------------------------------------
+                 Mein Ö Guthaben
+Mitglieds-Nr: 00000000
+Ös bisher:                         0
+Jetzt gesammelt:                     0
+Jetzt eingelöst:                     0
+Ös gesamt:                         0
+----------------------------------------

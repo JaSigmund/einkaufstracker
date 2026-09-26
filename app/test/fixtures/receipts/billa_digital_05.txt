@@ -1,0 +1,81 @@
+                      Billa AG
+                     1060 WIEN
+               BRUECKENGASSE 10-12
+                TEL: 059915-00643
+                   ATU 15255907
+--------------------------------------
+Datum: 12.08.2026          Zeit: 18:10
+
+Currywurst Zimbo          B       2.99
+Airwaves Cherry Menthol S B       1.49
+EWP RED BULL ORG. MINT. B C       1.59
+PFANDARTIKEL              D       0.25
+--------------------------------------
+Summe                  EUR        6.32
+======================================
+Gegeben   KK Visa                 6.32
+
+* *  Kundenbeleg  * *
+Datum:                        12.08.2026
+Uhrzeit:                    18:11:29 Uhr
+Beleg-Nr.                           0000
+Trace-Nr.                         0000
+Bezahlung
+Contactless
+Visa DEBIT
+Nr.                ############0000 0000
+VU-Nr.                   000000000000000
+Terminal-ID                     00000000
+Pos-Info                       00 075 00
+AS-Zeit 12.08.                 18:11 Uhr
+AS-Proc-Code = 00 075 00
+Capt.-Ref.= 0000
+Betrag EUR                          6,32
+Zahlung erfolgt
+
+Betrag dankend erhalten
+
+B: 10.00% MwSt von      4.07 =    0.41
+C: 20.00% MwSt von      1.33 =    0.26
+D : nicht steuerbar     0.25
+
+
+
+
+
+
+
+
+
+
+
+Filiale: 00643  Kassa: 3  Bon-Nr: 5007
+Pos:3   Kassier:in: Fr. Muster        /400
+Re-Nr: 0643-20260812-03-5007
+--------------------------------------
+  ---------------------------------------
+        Vielen Dank für Ihren Einkauf!
+           Mit diesem QR Code in nur
+            1 Minute Feedback geben!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ---------------------------------------
+                 Mein Ö Guthaben
+Mitglieds-Nr: 00000000
+Ös bisher:                         0
+Jetzt gesammelt:                     0
+Jetzt eingelöst:                     0
+Ös gesamt:                         0
+----------------------------------------
