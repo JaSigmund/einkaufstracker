@@ -9,6 +9,7 @@ import '../data/remote/remote_store.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/repositories/category_repository.dart';
+import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
@@ -154,6 +155,8 @@ final receiptProvider =
 
 final receiptItemsProvider =
     StreamProvider.family((ref, String id) => ref.watch(receiptRepositoryProvider).watchItems(id));
+
+final sharedPdfSourceProvider = Provider<SharedPdfSource>((ref) => AndroidSharedPdfSource());
 
 final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextReader());
 
