@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
@@ -9,6 +10,7 @@ import 'data/local/database.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  pdfrxFlutterInitialize(); // PDFium fuer das Lesen digitaler Bons
 
   if (!AppConfig.isConfigured) {
     runApp(const _ConfigMissingApp());

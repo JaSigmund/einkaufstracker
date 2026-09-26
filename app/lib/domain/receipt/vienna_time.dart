@@ -24,3 +24,12 @@ DateTime viennaLocalToUtc(int year, int month, int day, int hour, int minute) {
   if (isViennaDst(summer)) return summer;
   return asIfUtc.subtract(const Duration(hours: 1));
 }
+
+/// UTC-Zeitpunkt als Wiener Ortszeit (zur Anzeige). Das Ergebnis ist ein "naives" DateTime ohne Zeitzone,
+/// dessen Kalenderfelder der Wanduhr in Wien entsprechen.
+DateTime utcToViennaLocal(DateTime utc) {
+  final u = utc.toUtc();
+  final local = u.add(Duration(hours: isViennaDst(u) ? 2 : 1));
+  return DateTime(local.year, local.month, local.day, local.hour, local.minute, local.second);
+}
+

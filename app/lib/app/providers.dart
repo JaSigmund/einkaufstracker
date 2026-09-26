@@ -7,7 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/local/database.dart';
 import '../data/remote/remote_store.dart';
 import '../data/repositories/auth_repository.dart';
+import '../data/pdf/pdf_text_reader.dart';
 import '../data/repositories/category_repository.dart';
+import '../data/repositories/receipt_repository.dart';
+import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
 import '../data/sync/sync_engine.dart';
 
@@ -124,3 +127,23 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
 });
 
 final categoriesStreamProvider = StreamProvider((ref) => ref.watch(categoryRepositoryProvider).watchAll());
+
+final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
+  return ReceiptRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final receiptsStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchAll());
+
+final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextReader());
+
+final receiptImportServiceProvider = Provider<ReceiptImportService>(
+  (ref) => ReceiptImportService(ref.watch(pdfTextReaderProvider), ref.watch(receiptRepositoryProvider)),
+);
