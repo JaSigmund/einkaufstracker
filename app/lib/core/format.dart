@@ -10,6 +10,18 @@ String formatEuro(int cents) {
   return '${neg ? '-' : ''}$grouped,$rest €';
 }
 
+/// Liest eine Eingabe wie "2,49", "-0.86", "1.234,56 €" oder "3" als ganze Cent. Null bei ungueltiger Eingabe.
+int? parseEuroCents(String input) {
+  var s = input.replaceAll('€', '').replaceAll(' ', '').trim();
+  if (s.isEmpty) return null;
+  // "1.234,56": Punkt als Tausendertrenner, wenn ein Komma folgt
+  if (s.contains(',')) s = s.replaceAll('.', '').replaceAll(',', '.');
+  final m = RegExp(r'^(-)?(\d+)(?:\.(\d{1,2}))?$').firstMatch(s);
+  if (m == null) return null;
+  final cents = int.parse(m.group(2)!) * 100 + int.parse((m.group(3) ?? '').padRight(2, '0'));
+  return m.group(1) == null ? cents : -cents;
+}
+
 /// UTC-Zeitpunkt als "02.07.2026, 19:51 Uhr" in Wiener Ortszeit.
 String formatViennaDateTime(DateTime utc) {
   final d = utcToViennaLocal(utc);

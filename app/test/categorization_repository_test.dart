@@ -181,6 +181,38 @@ void main() {
       expect(await repo0.categorizeMissing(), 0);
     });
 
+    test('Regression: Bon-Rabatt erbt nie die Kategorie des letzten Artikels (Coca-Cola war im Monat negativ)', () async {
+      final repo = receiptRepo(db);
+      await repo.saveParsed(_parse('billa_digital_03'));
+      await repo.categorizeMissing(); // der Backfill lief frueher ueber den Bon-Rabatt und gab ihm "Getraenke"
+      final bon = (await db.select(db.receiptItems).get()).singleWhere((i) => i.rawText.contains('Rabattsammler'));
+      expect(bon.kind, 'bill_discount');
+      expect(bon.categoryId, isNull);
+      expect(bon.needsReview, isFalse);
+    });
+
+    test('Altbestand: als normaler Rabatt gespeicherter Bon-Rabatt (ohne Steuerbuchstaben) wird repariert', () async {
+      final repo = receiptRepo(db);
+      final result = await repo.saveParsed(_parse('billa_digital_03'));
+      // Zustand vor der Korrektur nachstellen: Art 'discount' und die geerbte Kategorie
+      final bon = (await db.select(db.receiptItems).get()).singleWhere((i) => i.rawText.contains('Rabattsammler'));
+      await (db.update(db.receiptItems)..where((i) => i.id.equals(bon.id)))
+          .write(ReceiptItemsCompanion(kind: const Value('discount'), categoryId: Value(cat['Getränke'])));
+      await db.delete(db.outbox).go();
+
+      final changed = await repo.categorizeMissing();
+      expect(changed, 1);
+      final fixed = await (db.select(db.receiptItems)..where((i) => i.id.equals(bon.id))).getSingle();
+      expect(fixed.kind, 'bill_discount');
+      expect(fixed.categoryId, isNull);
+      expect((await db.select(db.outbox).get()).map((o) => o.remoteTable), ['receipt_items']); // wird synchronisiert
+
+      // Artikel-Rabatte mit Steuerbuchstaben bleiben unberuehrt
+      final items = await (db.select(db.receiptItems)..where((i) => i.receiptId.equals(result.receiptId))).get();
+      expect(items.where((i) => i.kind == 'discount' && i.taxCode != null), isNotEmpty);
+      expect(await repo.categorizeMissing(), 0); // zweiter Lauf: nichts mehr zu tun
+    });
+
     test('Bereits vom Nutzer gesetzte Kategorien bleiben unangetastet', () async {
       final repo = receiptRepo(db);
       await repo.saveParsed(_parse('billa_digital_04'));

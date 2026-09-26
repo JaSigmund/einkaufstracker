@@ -183,14 +183,15 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
   (ref) => PhotoReceiptService(
     repo: ref.watch(receiptRepositoryProvider),
     cloud: ref.watch(cloudReceiptReaderProvider),
-    // Einwilligung liegt beim Server (household_settings); ohne Netz gilt sie als nicht abrufbar
+    // Einwilligung liegt beim Server (household_settings)
     cloudAllowed: () async {
       try {
         final id = await ref.read(householdIdProvider.future);
         if (id == null) return false;
         return (await ref.read(settingsRepositoryProvider).load(id)).allowCloudOcr;
       } catch (_) {
-        return false;
+        // Einwilligung nicht abrufbar = kein Netz: das ist etwas anderes als "ausgeschaltet"
+        throw const CloudUnavailable('kein Netz');
       }
     },
     prepare: prepareForCloud,

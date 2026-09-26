@@ -8,6 +8,7 @@ import '../features/auth/login_page.dart';
 import '../features/categories/categories_page.dart';
 import '../features/home/home_shell.dart';
 import '../features/receipt_import/import_review_page.dart';
+import '../features/receipt_import/receipt_edit_page.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../features/receipts/receipt_detail_page.dart';
 import '../features/settings/settings_page.dart';
@@ -47,6 +48,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/categories', builder: (_, _) => const CategoriesPage()),
       GoRoute(path: '/receipt/:id', builder: (_, state) => ReceiptDetailPage(receiptId: state.pathParameters['id']!)),
+      GoRoute(
+        path: '/import-edit',
+        builder: (_, state) => ReceiptEditPage(preview: state.extra as ImportPreview),
+        redirect: (_, state) => state.extra is ImportPreview ? null : '/',
+      ),
       GoRoute(
         path: '/import-review',
         builder: (_, state) => ImportReviewPage(preview: state.extra as ImportPreview),

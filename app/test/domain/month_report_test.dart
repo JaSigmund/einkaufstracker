@@ -9,24 +9,6 @@ ReportReceipt _r(String id, DateTime utc) => (id: id, purchasedAtUtc: utc);
 int _total(MonthReport r, String cat) => r.categories.firstWhere((c) => c.categoryId == cat).totalCents;
 
 void main() {
-  group('allocateProportionally (groesster Rest)', () {
-    test('Summe stimmt immer exakt', () {
-      final a = allocateProportionally(-100, [333, 333, 334]);
-      expect(a.fold<int>(0, (s, x) => s + x), -100);
-      expect(a, [-33, -33, -34]);
-    });
-
-    test('Gleichstand: fruehester Eintrag bekommt den Rest', () {
-      expect(allocateProportionally(-1, [1, 1]), [-1, 0]);
-    });
-
-    test('positive Betraege, ein Gewicht 0, leere Liste', () {
-      expect(allocateProportionally(10, [1, 0, 1]), [5, 0, 5]);
-      expect(allocateProportionally(5, []), <int>[]);
-      expect(allocateProportionally(5, [0, 0]), [0, 0]);
-    });
-  });
-
   group('buildMonthReport', () {
     final sep = DateTime.utc(2026, 9, 10, 10);
 
@@ -72,38 +54,73 @@ void main() {
       expect(items.single.purchases, 1);
     });
 
-    test('Bon-Rabatt wird anteilig verteilt, Summe bleibt exakt', () {
+    test('Bon-Rabatt steht getrennt und wird NICHT auf Kategorien verteilt', () {
       final rep = buildMonthReport(
         [_r('a', sep)],
         [
           _i('a', 1, 'Tomaten', 600, cat: 'g'),
           _i('a', 2, 'Käse', 300, cat: 'k'),
-          _i('a', 3, 'Hack', 100, cat: 'f'),
-          _i('a', 4, 'Rabattsammler', -101, kind: 'discount'), // 60,6 / 30,3 / 10,1 -> 61 / 30 / 10 (Summe 101)
+          _i('a', 3, 'Coca-Cola Flasche', 249, cat: 'd'),
+          _i('a', 4, 'jö Rabattsammler 20%', -451, kind: 'bill_discount'),
         ],
         year: 2026,
         month: 9,
       );
-      expect(rep.totalCents, 899);
-      expect(_total(rep, 'g'), 600 - 61);
-      expect(_total(rep, 'k'), 300 - 30);
-      expect(_total(rep, 'f'), 100 - 10);
-      expect(rep.categories.expand((c) => c.items).where((a) => a.label == billDiscountLabel), hasLength(3));
+      expect(_total(rep, 'g'), 600);
+      expect(_total(rep, 'k'), 300);
+      expect(_total(rep, 'd'), 249); // Regression: war durch den Bon-Rabatt negativ
+      expect(_total(rep, billDiscountKey), -451);
+      expect(rep.category(billDiscountKey)!.isBillDiscount, isTrue);
+      expect(rep.totalCents, 698);
     });
 
-    test('Bon-Rabatt bezieht auch nicht zugeordnete Artikel ein', () {
+    test('Durch Rabatte gespart: Artikel-Rabatte und Bon-Rabatte zusammen', () {
       final rep = buildMonthReport(
         [_r('a', sep)],
         [
-          _i('a', 1, 'Tomaten', 500, cat: 'g'),
-          _i('a', 2, 'unbekannt', 500),
-          _i('a', 3, 'Rabattsammler', -100, kind: 'discount'),
+          _i('a', 1, 'Paprika', 380, cat: 'g'),
+          _i('a', 2, 'EXTREM AKTION', -134, kind: 'discount', cat: 'g'),
+          _i('a', 3, 'Faschiertes', 499, cat: 'f'),
+          _i('a', 4, 'NIMM MEHR', -50, kind: 'discount', cat: 'f'),
+          _i('a', 5, 'Rabattsammler', -451, kind: 'bill_discount'),
+          _i('a', 6, 'PFANDARTIKEL', 25, kind: 'deposit', cat: 'p'),
+          _i('a', 7, 'LEERGUT-RET.', -20, kind: 'deposit', cat: 'p'), // Pfand-Rueckgabe ist kein Rabatt
         ],
         year: 2026,
         month: 9,
       );
-      expect(_total(rep, 'g'), 450);
-      expect(_total(rep, unassignedKey), 450);
+      expect(rep.savedCents, 134 + 50 + 451);
+      expect(rep.discountLines, hasLength(3));
+      expect(rep.discountLines.map((l) => l.cents).reduce((a, b) => a + b), -635);
+    });
+
+    test('Zeilen einer Kategorie verweisen auf ihre Bons (fuer die Erklaerung)', () {
+      final rep = buildMonthReport(
+        [_r('b', DateTime.utc(2026, 9, 20)), _r('a', sep)],
+        [
+          _i('a', 1, 'Tomaten', 300, cat: 'g'),
+          _i('a', 2, 'AKTION', -100, kind: 'discount', cat: 'g'),
+          _i('b', 1, 'Paprika', 200, cat: 'g'),
+        ],
+        year: 2026,
+        month: 9,
+      );
+      final g = rep.category('g')!;
+      expect(g.totalCents, 400);
+      expect(g.lines.map((l) => (l.receiptId, l.label, l.cents)), [('a', 'Tomaten', 300), ('a', 'AKTION', -100), ('b', 'Paprika', 200)]);
+      expect(g.lines.fold<int>(0, (s, l) => s + l.cents), g.totalCents);
+      expect(g.lines.first.purchasedAtUtc, sep);
+    });
+
+    test('Rabatt nach einem nicht zugeordneten Artikel bleibt bei diesem Artikel', () {
+      final rep = buildMonthReport(
+        [_r('a', sep)],
+        [_i('a', 1, 'unbekannt', 500), _i('a', 2, 'AKTION', -100, kind: 'discount')],
+        year: 2026,
+        month: 9,
+      );
+      expect(_total(rep, unassignedKey), 400);
+      expect(rep.category(billDiscountKey), isNull);
     });
 
     test('Pfand ist eine eigene Kategorie und hat keinen Einfluss auf die Summe', () {

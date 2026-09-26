@@ -21,7 +21,27 @@ class ReceiptSources {
 
 /// Vorschau eines Imports: der gelesene Bon und, falls er schon gespeichert ist, dessen ID.
 class ImportPreview {
-  const ImportPreview({required this.receipt, this.duplicateOfReceiptId, this.error, this.source = ReceiptSources.pdfText, this.note});
+  const ImportPreview({
+    required this.receipt,
+    this.duplicateOfReceiptId,
+    this.error,
+    this.source = ReceiptSources.pdfText,
+    this.note,
+    this.edited = false,
+  });
+
+  /// Vom Nutzer in der Bearbeitungsansicht veraendert.
+  final bool edited;
+
+  ImportPreview copyWith({ParsedReceipt? receipt, bool? edited, bool clearError = false}) =>
+      ImportPreview(
+        receipt: receipt ?? this.receipt,
+        duplicateOfReceiptId: duplicateOfReceiptId,
+        error: clearError ? null : error,
+        source: source,
+        note: note,
+        edited: edited ?? this.edited,
+      );
 
   final ParsedReceipt receipt;
 
@@ -66,6 +86,19 @@ class ReceiptImportService {
     }
     final existing = await _repo.findDuplicate(parsed);
     return ImportPreview(receipt: parsed, duplicateOfReceiptId: existing?.id);
+  }
+
+  /// Prueft nach einer Bearbeitung erneut, ob der Einkauf schon gespeichert ist (Summe oder Zeit koennen sich geaendert haben).
+  Future<ImportPreview> recheckDuplicate(ImportPreview preview) async {
+    final existing = await _repo.findDuplicate(preview.receipt);
+    return ImportPreview(
+      receipt: preview.receipt,
+      duplicateOfReceiptId: existing?.id,
+      error: preview.error,
+      source: preview.source,
+      note: preview.note,
+      edited: preview.edited,
+    );
   }
 
   /// Speichert die Vorschau als bestaetigten Bon. Wirft, wenn sie nicht importierbar ist.

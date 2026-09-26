@@ -41,7 +41,9 @@ class PhotoReceiptService {
   final ImagePreparer prepare;
   final BillaTextParser parser;
 
-  Future<ImportPreview> read(List<ScannedPage> pages) async {
+  /// [onStatus] meldet die Schritte fuer die Oberflaeche ("lokal lesen", "Cloud liest mit").
+  Future<ImportPreview> read(List<ScannedPage> pages, {void Function(String status)? onStatus}) async {
+    onStatus?.call('Bon wird auf dem Handy gelesen …');
     final local = _readLocal(pages);
     if (local.isParsed && local.isTrustworthy) return _preview(local, ReceiptSources.photoLocal);
 
@@ -50,20 +52,22 @@ class PhotoReceiptService {
     ParsedReceipt? remote;
     try {
       if (!await cloudAllowed()) {
-        note = 'Die Cloud-Erkennung ist ausgeschaltet oder nicht erreichbar. Das Ergebnis stammt nur aus der lokalen Erkennung.';
+        note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet. Das Ergebnis stammt nur aus der lokalen Erkennung.';
       } else {
+        onStatus?.call('Bilder werden vorbereitet …');
         final images = await _cloudImages(pages);
         if (images == null) {
           note = 'Zur Sicherheit wurde nichts hochgeladen: Die Zeile "Summe" wurde nicht erkannt, deshalb ließ sich der '
               'Zahlungsblock nicht abschneiden. Bitte den Bon neu fotografieren, mit der Zeile "Summe" gut lesbar.';
         } else {
+          onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
           remote = await cloud.read(images);
         }
       }
     } on CloudNotAllowed {
       note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet.';
     } on CloudUnavailable catch (e) {
-      note = 'Die Cloud war nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
+      note = 'Die Cloud ist nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
     }
 
     if (remote != null && remote.isParsed) {
@@ -80,7 +84,8 @@ class PhotoReceiptService {
       return ImportPreview(
         receipt: local,
         source: ReceiptSources.photoLocal,
-        error: 'Der Bon konnte nicht gelesen werden. ${local.warnings.join(' ')} ${note ?? ''}'.trim(),
+        error: 'Auf dem Handy konnte der Bon nicht gelesen werden, und die Cloud konnte nicht helfen. '
+            '${note ?? ''} Du kannst den Bon später erneut scannen oder die Positionen von Hand eingeben.'.replaceAll('  ', ' '),
       );
     }
     return _preview(local, ReceiptSources.photoLocal, note: note);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -28,6 +29,13 @@ class _FakeScanner implements ReceiptScanner {
     if (fail) throw StateError('Scanner nicht verfuegbar');
     return result;
   }
+}
+
+class _SlowScanner implements ReceiptScanner {
+  final completer = Completer<List<ScannedPage>?>();
+
+  @override
+  Future<List<ScannedPage>?> scan() => completer.future;
 }
 
 class _NoCloud implements CloudReceiptReader {
@@ -117,5 +125,26 @@ void main() {
     expect(find.text('Bon prüfen'), findsOneWidget);
     expect(find.byKey(const Key('review-note')), findsOneWidget);
     expect(find.text('Trotzdem speichern'), findsOneWidget);
+  });
+
+  testWidgets('Ladekreis nur an "Papierbon fotografieren" (nicht am PDF-Import), dazu ein Statustext', (tester) async {
+    final scanner = _SlowScanner();
+    await tester.pumpWidget(app(scanner));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('scan-status')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('scan-paper')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('scan-status')), findsOneWidget);
+    expect(find.textContaining('Scanner wird geöffnet'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('scan-paper')), matching: find.byType(CircularProgressIndicator)), findsOneWidget);
+    final pdfCard = find.ancestor(of: find.text('Digitalen Bon importieren'), matching: find.byType(ListTile));
+    expect(find.descendant(of: pdfCard, matching: find.byType(CircularProgressIndicator)), findsNothing);
+
+    scanner.completer.complete(null); // Abbruch im Scanner
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('scan-status')), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 }

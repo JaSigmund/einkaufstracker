@@ -20,8 +20,20 @@ class ImportReviewPage extends ConsumerStatefulWidget {
 
 class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   bool _saving = false;
+  late ImportPreview _preview = widget.preview;
 
-  ImportPreview get p => widget.preview;
+  ImportPreview get p => _preview;
+
+  /// Oeffnet den Editor. Bei einem nicht lesbaren Bon startet er leer (manuelle Eingabe).
+  Future<void> _edit() async {
+    final start = p.error == null
+        ? p
+        : ImportPreview(receipt: ParsedReceipt.manual(purchasedAtUtc: DateTime.now().toUtc()), source: p.source, note: p.note);
+    final edited = await context.push<ImportPreview>('/import-edit', extra: start);
+    if (edited == null || !mounted) return;
+    final checked = await ref.read(receiptImportServiceProvider).recheckDuplicate(edited);
+    if (mounted) setState(() => _preview = checked);
+  }
 
   Future<void> _save() async {
     final trustworthy = p.receipt.isTrustworthy;
@@ -57,7 +69,13 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Bon prüfen')),
+      appBar: AppBar(
+        title: const Text('Bon prüfen'),
+        actions: [
+          if (p.error == null && !p.isDuplicate)
+            IconButton(key: const Key('review-edit'), tooltip: 'Bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: _saving ? null : _edit),
+        ],
+      ),
       body: _body(context),
       bottomNavigationBar: p.canImport
           ? SafeArea(
@@ -89,7 +107,20 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   Widget _body(BuildContext context) {
     final t = Theme.of(context);
     if (p.error != null) {
-      return _Message(icon: Icons.error_outline, color: t.colorScheme.error, title: 'Der Bon konnte nicht gelesen werden', text: p.error!);
+      return _Message(
+        icon: Icons.error_outline,
+        color: t.colorScheme.error,
+        title: 'Der Bon konnte nicht gelesen werden',
+        text: p.error!,
+        extra: p.source == ReceiptSources.pdfText
+            ? null
+            : OutlinedButton.icon(
+                key: const Key('review-manual'),
+                onPressed: _edit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Manuell eingeben'),
+              ),
+      );
     }
     if (p.isDuplicate) {
       return _Message(
@@ -111,6 +142,7 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
           subtitle: Text([
             if (r.purchasedAtUtc != null) formatViennaDateTime(r.purchasedAtUtc!),
             ReceiptSources.label(p.source),
+            if (p.edited) 'von dir bearbeitet',
           ].join(' · ')),
           trailing: Text(formatEuro(r.totalCents!), style: t.textTheme.titleMedium),
         ),
@@ -146,7 +178,8 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.color, required this.title, required this.text});
+  const _Message({required this.icon, required this.color, required this.title, required this.text, this.extra});
+  final Widget? extra;
   final IconData icon;
   final Color color;
   final String title;
@@ -163,6 +196,7 @@ class _Message extends StatelessWidget {
             const SizedBox(height: 8),
             Text(text, textAlign: TextAlign.center),
             const SizedBox(height: 24),
+            if (extra != null) ...[extra!, const SizedBox(height: 12)],
             FilledButton(onPressed: () => context.pop(), child: const Text('Zurück')),
           ]),
         ),
