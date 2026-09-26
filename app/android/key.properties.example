@@ -1,0 +1,6 @@
+# Vorlage fuer app/android/key.properties (die echte Datei NICHT einchecken, sie steht in .gitignore).
+# Passwoerter stammen aus dem Passwortmanager und werden nie im Chat geteilt.
+storeFile=C:/Users/jakob/keys/einkaufstracker-release.jks
+storePassword=HIER_KEYSTORE_PASSWORT
+keyAlias=einkaufstracker
+keyPassword=HIER_KEYSTORE_PASSWORT
