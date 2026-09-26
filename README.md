@@ -5,19 +5,20 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 **Die vollständige Dokumentation liegt im Obsidian-Vault:**
 `C:\Users\jakob\Documents\ClaudeBrain\02 Projekte\Einkaufstracker\` (Einstieg: `Einkaufstracker.md`, Anforderungen: `01 Lastenheft.md`)
 
-## Stand (Phase 0, 2026-09-26)
+## Stand (Phase 1 abgeschlossen, 2026-09-26)
 
 | Teil | Status |
 |---|---|
 | Doku (Lastenheft bis Roadmap) | Erstfassung fertig |
-| `supabase/migrations` | 0001 bis 0003 (inkl. Inventar-Ledger): 46 Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`) **und** in das echte Supabase-Projekt (Frankfurt) eingespielt, RLS dort geprüft |
+| `supabase/migrations` | 0001 bis 0004 (inkl. Inventar-Ledger): 50 Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`) **und** in das echte Supabase-Projekt (Frankfurt) eingespielt, RLS dort geprüft |
 | `supabase/planned` | Entwurf Essenstagebuch (Phase 7), wird nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
 | `supabase/functions/parse-receipt` | deployt, mit Deno typgeprüft, gegen echte Bons getestet (Sonnet 5 exakt, `tools/test_parse_receipt.py`); Standardmodell per Secret `RECEIPT_MODEL` |
 | `spikes/spike_scanner` | Android-Spike auf dem Handy getestet, 17 Unit-Tests (inkl. 3 echte Billa-Bons als Regression, lokal) |
 | `tools/test_parse_receipt.py` | Vergleichstest der Cloud-Erkennung (Modelle x Varianten x Fotos), Soll-Werte in `testdata/receipts/truth/` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 1: Anmeldung, Offline-Sync (drift + Outbox), Kategorien, Einstellungen, 19 Tests, läuft auf dem Handy. Bauen: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json` |
+| Flutter-App (`app/`) | Phase 1 fertig: Anmeldung, Offline-Sync (drift + Outbox, automatisch bei Netzrückkehr), Kategorien, Einstellungen, 19 Tests, signierter Release-Build läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
 
 ## Struktur
 
@@ -37,7 +38,7 @@ Einkaufstracker/
 
 ## Nächste Schritte
 
-Phase 0 läuft in Schritten S1 bis S8, siehe `11 Roadmap und Meilensteine.md` im Vault. Phase 0 ist abgeschlossen (Go/No-Go-Bericht: `16 Go-No-Go-Bericht M0.md` im Vault, Ergebnis Go mit 4 Bedingungen). Phase 1 läuft (Meilenstein M1 auf dem Handy geprüft). Offen: signierter Release-Build (`app/android/key.properties`), CI, danach Phase 2 mit dem PDF-Import.
+Phase 0 und Phase 1 sind abgeschlossen (Go/No-Go-Bericht M0 und Roadmap im Vault unter `02 Projekte/Einkaufstracker/`; Meilenstein M1 auf dem Handy bestätigt). Als Nächstes Phase 2: PDF-Import digitaler Billa-Bons (Branch `feat/pdf-import`), danach Foto-Pfad mit lokaler OCR und Cloud-Fallback. Offen und ohne Eile: Eintrag des Zertifikat-Fingerabdrucks in der Android Developer Console.
 
 ## Schema testen (ohne Docker)
 
