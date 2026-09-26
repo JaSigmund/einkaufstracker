@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
 import 'package:einkaufstracker/data/repositories/auth_repository.dart';
 import 'package:einkaufstracker/data/repositories/category_repository.dart';
@@ -82,3 +84,16 @@ CategoryRepository categoryRepo(AppDatabase db, {String household = 'h1', void F
 
 ReceiptRepository receiptRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     ReceiptRepository(db, householdId: () async => household, onChanged: onChanged);
+
+/// PDF-Leser-Attrappe: liefert den Text einer Fixture oder wirft.
+class FakePdfReader implements PdfTextReader {
+  FakePdfReader({this.text, this.error});
+  final String? text;
+  final PdfReadException? error;
+
+  @override
+  Future<String> readText(Uint8List bytes) async {
+    if (error != null) throw error!;
+    return text!;
+  }
+}

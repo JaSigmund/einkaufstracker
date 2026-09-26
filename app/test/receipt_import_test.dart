@@ -15,19 +15,6 @@ import 'package:go_router/go_router.dart';
 
 import 'support/fakes.dart';
 
-/// PDF-Leser-Attrappe: liefert den Text einer Fixture oder wirft.
-class FakePdfReader implements PdfTextReader {
-  FakePdfReader({this.text, this.error});
-  final String? text;
-  final PdfReadException? error;
-
-  @override
-  Future<String> readText(Uint8List bytes) async {
-    if (error != null) throw error!;
-    return text!;
-  }
-}
-
 String _fixture(String name) => File('test/fixtures/receipts/$name.txt').readAsStringSync();
 final _bytes = Uint8List.fromList([1, 2, 3]);
 
