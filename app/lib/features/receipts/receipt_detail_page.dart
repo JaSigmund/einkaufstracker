@@ -37,6 +37,8 @@ class ReceiptDetailPage extends ConsumerWidget {
     final receipt = ref.watch(receiptProvider(receiptId)).value;
     final items = ref.watch(receiptItemsProvider(receiptId)).value ?? const <ReceiptItem>[];
     final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
+    final categories = (ref.watch(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
+    final categoryName = {for (final c in categories) c.id: c.name};
     final t = Theme.of(context);
 
     if (receipt == null || receipt.deletedAt != null) {
@@ -80,7 +82,9 @@ class ReceiptDetailPage extends ConsumerWidget {
             ListTile(
               dense: true,
               title: Text(i.rawText),
-              subtitle: _sub(i) == null ? null : Text(_sub(i)!),
+              subtitle: _sub(i, categoryName) == null ? null : Text(_sub(i, categoryName)!),
+              // Rabatte auf Bon-Ebene haben keine Kategorie und werden anteilig verrechnet
+              onTap: i.kind == 'discount' && i.categoryId == null ? null : () => _pickCategory(context, ref, i, categories),
               trailing: Text(formatEuro(i.lineTotalCents), style: TextStyle(color: i.lineTotalCents < 0 ? t.colorScheme.primary : null)),
             ),
           const Divider(height: 1),
@@ -93,8 +97,39 @@ class ReceiptDetailPage extends ConsumerWidget {
     );
   }
 
-  String? _sub(ReceiptItem i) {
+  Future<void> _pickCategory(BuildContext context, WidgetRef ref, ReceiptItem item, List<Category> categories) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(title: Text(item.rawText, style: Theme.of(ctx).textTheme.titleMedium), subtitle: const Text('Kategorie wählen. Die App merkt sich die Zuordnung für gleiche Artikel.')),
+              for (final c in categories)
+                ListTile(
+                  key: Key('pick-${c.name}'),
+                  title: Text(c.name),
+                  trailing: c.id == item.categoryId ? const Icon(Icons.check) : null,
+                  onTap: () => Navigator.pop(ctx, c.id),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (picked == null) return;
+    final n = await ref.read(receiptRepositoryProvider).setItemCategory(item.id, picked);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(n > 1 ? 'Zugeordnet, $n gleiche Artikel aktualisiert' : 'Zugeordnet')));
+    }
+  }
+
+  String? _sub(ReceiptItem i, Map<String, String> categoryName) {
     final parts = <String>[
+      if (i.kind == 'article') categoryName[i.categoryId] ?? 'Nicht zugeordnet',
       if (i.quantity != 1 && i.unitPriceCents != null)
         '${formatQuantity(i.quantity)}${i.quantityUnit == 'piece' ? ' ×' : ' ${i.quantityUnit} ×'} ${formatEuro(i.unitPriceCents!)}',
       if (i.kind == 'discount') 'Rabatt',

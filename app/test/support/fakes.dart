@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
@@ -96,4 +96,28 @@ class FakePdfReader implements PdfTextReader {
     if (error != null) throw error!;
     return text!;
   }
+}
+
+/// Die 17 Standardkategorien mit festen IDs ("cat:NAME"), damit mehrere Test-Geraete dieselben IDs haben.
+const defaultCategoryNames = [
+  'Obst', 'Gemüse', 'Fleisch & Wurst', 'Fisch', 'Milch & Milchprodukte', 'Eier', 'Brot & Backwaren', 'Käse',
+  'Getränke', 'Tiefkühl', 'Konserven & Trockenware', 'Öle, Gewürze & Saucen', 'Süßes & Snacks', 'Fertiggerichte',
+  'Haushalt & Drogerie', 'Pfand', 'Sonstiges',
+];
+
+Future<Map<String, String>> seedCategories(AppDatabase db, {String household = 'h1'}) async {
+  final ids = <String, String>{};
+  var order = 0;
+  for (final name in defaultCategoryNames) {
+    final id = 'cat:$name';
+    ids[name] = id;
+    await db.into(db.categories).insert(CategoriesCompanion.insert(
+          id: id,
+          householdId: household,
+          name: name,
+          updatedAt: DateTime.utc(2026),
+          sortOrder: Value(order += 10),
+        ));
+  }
+  return ids;
 }

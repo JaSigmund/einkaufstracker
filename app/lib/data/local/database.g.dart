@@ -3196,6 +3196,476 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
   }
 }
 
+class $CategoryAliasesTable extends CategoryAliases
+    with TableInfo<$CategoryAliasesTable, CategoryAlias> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CategoryAliasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _aliasTextMeta = const VerificationMeta(
+    'aliasText',
+  );
+  @override
+  late final GeneratedColumn<String> aliasText = GeneratedColumn<String>(
+    'alias_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'category_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hitsMeta = const VerificationMeta('hits');
+  @override
+  late final GeneratedColumn<int> hits = GeneratedColumn<int>(
+    'hits',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    aliasText,
+    categoryId,
+    hits,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'category_aliases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CategoryAlias> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('alias_text')) {
+      context.handle(
+        _aliasTextMeta,
+        aliasText.isAcceptableOrUnknown(data['alias_text']!, _aliasTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_aliasTextMeta);
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('hits')) {
+      context.handle(
+        _hitsMeta,
+        hits.isAcceptableOrUnknown(data['hits']!, _hitsMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CategoryAlias map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CategoryAlias(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      aliasText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alias_text'],
+      )!,
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_id'],
+      )!,
+      hits: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hits'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $CategoryAliasesTable createAlias(String alias) {
+    return $CategoryAliasesTable(attachedDatabase, alias);
+  }
+}
+
+class CategoryAlias extends DataClass implements Insertable<CategoryAlias> {
+  final String id;
+  final String householdId;
+
+  /// Ergebnis von normalizeItemName, z.B. "dkih paprika tricolore".
+  final String aliasText;
+  final String categoryId;
+  final int hits;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const CategoryAlias({
+    required this.id,
+    required this.householdId,
+    required this.aliasText,
+    required this.categoryId,
+    required this.hits,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['alias_text'] = Variable<String>(aliasText);
+    map['category_id'] = Variable<String>(categoryId);
+    map['hits'] = Variable<int>(hits);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  CategoryAliasesCompanion toCompanion(bool nullToAbsent) {
+    return CategoryAliasesCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      aliasText: Value(aliasText),
+      categoryId: Value(categoryId),
+      hits: Value(hits),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory CategoryAlias.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CategoryAlias(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      aliasText: serializer.fromJson<String>(json['aliasText']),
+      categoryId: serializer.fromJson<String>(json['categoryId']),
+      hits: serializer.fromJson<int>(json['hits']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'aliasText': serializer.toJson<String>(aliasText),
+      'categoryId': serializer.toJson<String>(categoryId),
+      'hits': serializer.toJson<int>(hits),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  CategoryAlias copyWith({
+    String? id,
+    String? householdId,
+    String? aliasText,
+    String? categoryId,
+    int? hits,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => CategoryAlias(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    aliasText: aliasText ?? this.aliasText,
+    categoryId: categoryId ?? this.categoryId,
+    hits: hits ?? this.hits,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  CategoryAlias copyWithCompanion(CategoryAliasesCompanion data) {
+    return CategoryAlias(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      aliasText: data.aliasText.present ? data.aliasText.value : this.aliasText,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      hits: data.hits.present ? data.hits.value : this.hits,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoryAlias(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('aliasText: $aliasText, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('hits: $hits, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    aliasText,
+    categoryId,
+    hits,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CategoryAlias &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.aliasText == this.aliasText &&
+          other.categoryId == this.categoryId &&
+          other.hits == this.hits &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class CategoryAliasesCompanion extends UpdateCompanion<CategoryAlias> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> aliasText;
+  final Value<String> categoryId;
+  final Value<int> hits;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const CategoryAliasesCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.aliasText = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.hits = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CategoryAliasesCompanion.insert({
+    required String id,
+    required String householdId,
+    required String aliasText,
+    required String categoryId,
+    this.hits = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       aliasText = Value(aliasText),
+       categoryId = Value(categoryId),
+       updatedAt = Value(updatedAt);
+  static Insertable<CategoryAlias> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? aliasText,
+    Expression<String>? categoryId,
+    Expression<int>? hits,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (aliasText != null) 'alias_text': aliasText,
+      if (categoryId != null) 'category_id': categoryId,
+      if (hits != null) 'hits': hits,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CategoryAliasesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? aliasText,
+    Value<String>? categoryId,
+    Value<int>? hits,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return CategoryAliasesCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      aliasText: aliasText ?? this.aliasText,
+      categoryId: categoryId ?? this.categoryId,
+      hits: hits ?? this.hits,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (aliasText.present) {
+      map['alias_text'] = Variable<String>(aliasText.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
+    if (hits.present) {
+      map['hits'] = Variable<int>(hits.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoryAliasesCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('aliasText: $aliasText, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('hits: $hits, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -4102,6 +4572,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StoresTable stores = $StoresTable(this);
   late final $ReceiptsTable receipts = $ReceiptsTable(this);
   late final $ReceiptItemsTable receiptItems = $ReceiptItemsTable(this);
+  late final $CategoryAliasesTable categoryAliases = $CategoryAliasesTable(
+    this,
+  );
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -4115,6 +4588,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     stores,
     receipts,
     receiptItems,
+    categoryAliases,
     outbox,
     syncStates,
     keyValues,
@@ -5684,6 +6158,259 @@ typedef $$ReceiptItemsTableProcessedTableManager =
       ReceiptItem,
       PrefetchHooks Function()
     >;
+typedef $$CategoryAliasesTableCreateCompanionBuilder =
+    CategoryAliasesCompanion Function({
+      required String id,
+      required String householdId,
+      required String aliasText,
+      required String categoryId,
+      Value<int> hits,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$CategoryAliasesTableUpdateCompanionBuilder =
+    CategoryAliasesCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> aliasText,
+      Value<String> categoryId,
+      Value<int> hits,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$CategoryAliasesTableFilterComposer
+    extends Composer<_$AppDatabase, $CategoryAliasesTable> {
+  $$CategoryAliasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get aliasText => $composableBuilder(
+    column: $table.aliasText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hits => $composableBuilder(
+    column: $table.hits,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CategoryAliasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CategoryAliasesTable> {
+  $$CategoryAliasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get aliasText => $composableBuilder(
+    column: $table.aliasText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hits => $composableBuilder(
+    column: $table.hits,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CategoryAliasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CategoryAliasesTable> {
+  $$CategoryAliasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get aliasText =>
+      $composableBuilder(column: $table.aliasText, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hits =>
+      $composableBuilder(column: $table.hits, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$CategoryAliasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CategoryAliasesTable,
+          CategoryAlias,
+          $$CategoryAliasesTableFilterComposer,
+          $$CategoryAliasesTableOrderingComposer,
+          $$CategoryAliasesTableAnnotationComposer,
+          $$CategoryAliasesTableCreateCompanionBuilder,
+          $$CategoryAliasesTableUpdateCompanionBuilder,
+          (
+            CategoryAlias,
+            BaseReferences<_$AppDatabase, $CategoryAliasesTable, CategoryAlias>,
+          ),
+          CategoryAlias,
+          PrefetchHooks Function()
+        > {
+  $$CategoryAliasesTableTableManager(
+    _$AppDatabase db,
+    $CategoryAliasesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CategoryAliasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CategoryAliasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CategoryAliasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> aliasText = const Value.absent(),
+                Value<String> categoryId = const Value.absent(),
+                Value<int> hits = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CategoryAliasesCompanion(
+                id: id,
+                householdId: householdId,
+                aliasText: aliasText,
+                categoryId: categoryId,
+                hits: hits,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String aliasText,
+                required String categoryId,
+                Value<int> hits = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CategoryAliasesCompanion.insert(
+                id: id,
+                householdId: householdId,
+                aliasText: aliasText,
+                categoryId: categoryId,
+                hits: hits,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CategoryAliasesTable, CategoryAlias>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CategoryAliasesTable,
+                    CategoryAlias
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CategoryAliasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CategoryAliasesTable,
+      CategoryAlias,
+      $$CategoryAliasesTableFilterComposer,
+      $$CategoryAliasesTableOrderingComposer,
+      $$CategoryAliasesTableAnnotationComposer,
+      $$CategoryAliasesTableCreateCompanionBuilder,
+      $$CategoryAliasesTableUpdateCompanionBuilder,
+      (
+        CategoryAlias,
+        BaseReferences<_$AppDatabase, $CategoryAliasesTable, CategoryAlias>,
+      ),
+      CategoryAlias,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -6230,6 +6957,8 @@ class $AppDatabaseManager {
       $$ReceiptsTableTableManager(_db, _db.receipts);
   $$ReceiptItemsTableTableManager get receiptItems =>
       $$ReceiptItemsTableTableManager(_db, _db.receiptItems);
+  $$CategoryAliasesTableTableManager get categoryAliases =>
+      $$CategoryAliasesTableTableManager(_db, _db.categoryAliases);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

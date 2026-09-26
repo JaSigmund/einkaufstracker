@@ -102,6 +102,23 @@ class ReceiptItems extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Gelernte Zuordnung "normalisierter Artikelname -> Kategorie" (Spiegel von public.category_aliases).
+@DataClassName('CategoryAlias')
+class CategoryAliases extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+
+  /// Ergebnis von normalizeItemName, z.B. "dkih paprika tricolore".
+  TextColumn get aliasText => text()();
+  TextColumn get categoryId => text()();
+  IntColumn get hits => integer().withDefault(const Constant(1))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -138,7 +155,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, CategoryAliases, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -146,7 +163,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -157,6 +174,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(stores);
             await m.createTable(receipts);
             await m.createTable(receiptItems);
+          }
+          // 2 -> 3: gelernte Kategorie-Zuordnungen
+          if (from < 3) {
+            await m.createTable(categoryAliases);
           }
         },
       );

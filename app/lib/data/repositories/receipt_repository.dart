@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/categorization/categorizer.dart';
+import '../../domain/categorization/normalize_name.dart';
 import '../../domain/receipt/parsed_receipt.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
@@ -38,6 +40,20 @@ class ReceiptRepository {
 
   String _itemId(String receiptId, int lineNo) => _uuid.v5(Namespace.url.value, 'einkaufstracker:item:$receiptId:$lineNo');
 
+  String _aliasId(String hid, String key) => _uuid.v5(Namespace.url.value, 'einkaufstracker:alias:$hid:$key');
+
+  /// Kategorisierer aus den Kategorien und den gelernten Zuordnungen des Haushalts.
+  Future<Categorizer> _buildCategorizer(String hid) async {
+    final cats = await (_db.select(_db.categories)..where((c) => c.householdId.equals(hid) & c.deletedAt.isNull())).get();
+    final ids = {for (final c in cats) c.id};
+    final aliases = await (_db.select(_db.categoryAliases)..where((a) => a.householdId.equals(hid) & a.deletedAt.isNull())).get();
+    return Categorizer(
+      categoryIdByName: {for (final c in cats) c.name: c.id},
+      // nur Zuordnungen auf noch vorhandene Kategorien
+      aliasCategoryIdByKey: {for (final a in aliases.where((a) => ids.contains(a.categoryId))) a.aliasText: a.categoryId},
+    );
+  }
+
   /// Bereits gespeicherter (nicht geloeschter) Bon mit dieser Re-Nr, sonst null.
   Future<Receipt?> findByExternalId(String externalId) async {
     final hid = await householdId();
@@ -71,6 +87,7 @@ class ReceiptRepository {
     }
     final hid = await householdId();
     final now = DateTime.now().toUtc();
+    final categorizer = await _buildCategorizer(hid);
     final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : _uuid.v4();
 
     if (r.externalId != null) {
@@ -116,8 +133,20 @@ class ReceiptRepository {
       Future<void> putItem(ReceiptItem item) => _put('receipt_items', item.id, receiptItemToRemote(item),
           () => _db.into(_db.receiptItems).insertOnConflictUpdate(item.toCompanion(false)));
 
+      // Rabatte uebernehmen die Kategorie des Artikels darueber (Doku 02 FR-02), Pfand bekommt "Pfand"
+      String? lastArticleCategory;
       for (final i in r.items) {
         lineNo++;
+        final CategorySuggestion suggestion;
+        switch (i.kind) {
+          case ReceiptItemKind.deposit:
+            suggestion = categorizer.categorize(i.rawText, isDeposit: true);
+          case ReceiptItemKind.discount:
+            suggestion = CategorySuggestion(lastArticleCategory, lastArticleCategory == null ? CategorySource.none : CategorySource.inherited);
+          case ReceiptItemKind.article:
+            suggestion = categorizer.categorize(i.rawText);
+            lastArticleCategory = suggestion.categoryId;
+        }
         await putItem(ReceiptItem(
           id: _itemId(receiptId, lineNo),
           householdId: hid,
@@ -130,7 +159,8 @@ class ReceiptRepository {
           unitPriceCents: i.unitPriceCents,
           lineTotalCents: i.lineTotalCents,
           taxCode: i.taxCode,
-          needsReview: false,
+          categoryId: suggestion.categoryId,
+          needsReview: i.kind == ReceiptItemKind.article && suggestion.categoryId == null,
           updatedAt: now,
         ));
       }
@@ -156,6 +186,98 @@ class ReceiptRepository {
 
     onChanged?.call();
     return ReceiptSaveResult(ReceiptSaveOutcome.saved, receiptId);
+  }
+
+  /// Der Nutzer ordnet eine Position einer Kategorie zu. Die App lernt daraus: Der normalisierte Name wird als
+  /// Alias gemerkt, und alle Artikel mit demselben Namen (auch auf anderen Bons) bekommen dieselbe Kategorie.
+  /// Rueckgabe: Anzahl der geaenderten Positionen.
+  Future<int> setItemCategory(String itemId, String categoryId) async {
+    final hid = await householdId();
+    final now = DateTime.now().toUtc();
+    var changed = 0;
+    await _db.transaction(() async {
+      final item = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(itemId))).getSingle();
+      final key = normalizeItemName(item.rawText);
+
+      Future<void> assign(ReceiptItem it) async {
+        final updated = it.copyWith(categoryId: Value(categoryId), needsReview: false, updatedAt: now);
+        await _put('receipt_items', it.id, receiptItemToRemote(updated),
+            () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
+        changed++;
+      }
+
+      await assign(item);
+
+      if (key.isNotEmpty && item.kind == 'article') {
+        // Alias lernen (oder bestaetigen)
+        final aliasId = _aliasId(hid, key);
+        final existing = await (_db.select(_db.categoryAliases)..where((a) => a.id.equals(aliasId))).getSingleOrNull();
+        final alias = CategoryAlias(
+          id: aliasId,
+          householdId: hid,
+          aliasText: key,
+          categoryId: categoryId,
+          hits: (existing != null && existing.deletedAt == null && existing.categoryId == categoryId) ? existing.hits + 1 : 1,
+          updatedAt: now,
+        );
+        await _put('category_aliases', aliasId, categoryAliasToRemote(alias),
+            () => _db.into(_db.categoryAliases).insertOnConflictUpdate(alias.toCompanion(false)));
+
+        // Gleiche Artikel auf anderen (oder demselben) Bons nachziehen
+        final others = await (_db.select(_db.receiptItems)
+              ..where((i) => i.householdId.equals(hid) & i.kind.equals('article') & i.deletedAt.isNull() & i.id.equals(itemId).not()))
+            .get();
+        for (final o in others) {
+          if (normalizeItemName(o.rawText) == key && o.categoryId != categoryId) await assign(o);
+        }
+      }
+    });
+    onChanged?.call();
+    return changed;
+  }
+
+  /// Ordnet alle noch unzugeordneten Positionen zu (Stichwortregeln und gelernte Zuordnungen), z.B. fuer Bons,
+  /// die vor der Kategorisierung importiert wurden. Rabatte uebernehmen die Kategorie des Artikels darueber.
+  /// Rueckgabe: Anzahl der geaenderten Positionen.
+  Future<int> categorizeMissing() async {
+    final hid = await householdId();
+    final now = DateTime.now().toUtc();
+    final categorizer = await _buildCategorizer(hid);
+    var changed = 0;
+    await _db.transaction(() async {
+      final receipts = await (_db.select(_db.receipts)..where((r) => r.householdId.equals(hid) & r.deletedAt.isNull())).get();
+      for (final r in receipts) {
+        final items = await (_db.select(_db.receiptItems)
+              ..where((i) => i.receiptId.equals(r.id) & i.deletedAt.isNull())
+              ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
+            .get();
+        String? lastArticleCategory;
+        for (final i in items) {
+          String? category = i.categoryId;
+          if (category == null) {
+            final CategorySuggestion s;
+            switch (i.kind) {
+              case 'deposit':
+                s = categorizer.categorize(i.rawText, isDeposit: true);
+              case 'discount':
+                s = CategorySuggestion(lastArticleCategory, CategorySource.inherited);
+              default:
+                s = categorizer.categorize(i.rawText);
+            }
+            if (s.categoryId != null) {
+              category = s.categoryId;
+              final updated = i.copyWith(categoryId: Value(category), needsReview: false, updatedAt: now);
+              await _put('receipt_items', i.id, receiptItemToRemote(updated),
+                  () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
+              changed++;
+            }
+          }
+          if (i.kind == 'article') lastArticleCategory = category;
+        }
+      }
+    });
+    if (changed > 0) onChanged?.call();
+    return changed;
   }
 
   /// Loescht einen Bon samt Positionen (Soft-Delete, wird mit dem Server synchronisiert).

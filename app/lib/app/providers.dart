@@ -91,6 +91,9 @@ class SyncController extends Notifier<SyncStatus> {
     try {
       await engine.sync();
       state = SyncStatus(lastSync: DateTime.now());
+      // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
+      // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
+      await ref.read(receiptRepositoryProvider).categorizeMissing();
     } catch (e) {
       state = SyncStatus(lastSync: state.lastSync, error: _friendly(e));
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
