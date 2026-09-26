@@ -147,6 +147,8 @@ final receiptsStreamProvider = StreamProvider((ref) => ref.watch(receiptReposito
 
 final storesStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchStores());
 
+final allItemsStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchAllItems());
+
 final receiptProvider =
     StreamProvider.family((ref, String id) => ref.watch(receiptRepositoryProvider).watchReceipt(id));
 
