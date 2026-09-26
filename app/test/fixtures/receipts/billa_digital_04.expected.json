@@ -1,0 +1,100 @@
+{
+ "date": "02.07.2026",
+ "time": "19:51",
+ "total": 2900,
+ "subtotal": null,
+ "reNr": "0643-20260702-03-4852",
+ "branch": "0643",
+ "items": [
+  {
+   "name": "Clever Champignon weiß",
+   "tax": "H",
+   "cents": 189,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "DKIH Cherrytomaten Sophie",
+   "tax": "H",
+   "cents": 285,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "SG RUCOLA SALAT 125G",
+   "tax": "H",
+   "cents": 170,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Farmer Soft Sandwich",
+   "tax": "B",
+   "cents": 399,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Clever Hirtenkäse",
+   "tax": "B",
+   "cents": 249,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Clever Ung. Salami",
+   "tax": "B",
+   "cents": 199,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Nestlé Pirulo Kaktus Box",
+   "tax": "B",
+   "cents": 549,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Clever Blütenhonig",
+   "tax": "B",
+   "cents": 349,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Billa Spaghetti Bronze",
+   "tax": "H",
+   "cents": 142,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "BARILLA PESTO RUSTICO BAS",
+   "tax": "B",
+   "cents": 369,
+   "kind": "article",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 1922,
+   "vat": 192,
+   "gross": 2114
+  },
+  "H": {
+   "rate": "4.90",
+   "net": 749,
+   "vat": 37,
+   "gross": 786
+  }
+ },
+ "labels": [],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

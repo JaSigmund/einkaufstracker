@@ -1,0 +1,77 @@
+{
+ "date": "08.08.2026",
+ "time": "17:32",
+ "total": 1625,
+ "subtotal": null,
+ "reNr": "0143-20260808-02-7319",
+ "branch": "0143",
+ "items": [
+  {
+   "name": "Bio Mohnstriezerl",
+   "tax": "B",
+   "cents": 226,
+   "kind": "article",
+   "qty": [
+    "2",
+    "Stk",
+    "1.13"
+   ]
+  },
+  {
+   "name": "Preiskorrektur        30%",
+   "tax": "B",
+   "cents": -68,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "Olivenbrot",
+   "tax": "B",
+   "cents": 200,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Preiskorrektur        30%",
+   "tax": "B",
+   "cents": -60,
+   "kind": "discount",
+   "qty": null
+  },
+  {
+   "name": "Mini Babybel Mix",
+   "tax": "B",
+   "cents": 399,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Billa Himb-Straccia Torte",
+   "tax": "B",
+   "cents": 699,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Hitschies brizzl UFO Pops",
+   "tax": "B",
+   "cents": 229,
+   "kind": "article",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 1477,
+   "vat": 148,
+   "gross": 1625
+  }
+ },
+ "labels": [],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

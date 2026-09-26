@@ -1,0 +1,68 @@
+{
+ "date": "07.08.2026",
+ "time": "09:24",
+ "total": 585,
+ "subtotal": 622,
+ "reNr": "0143-20260807-09-0713",
+ "branch": "0143",
+ "items": [
+  {
+   "name": "Protein Sandwich Thunfisc",
+   "tax": "B",
+   "cents": 299,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Snickers Creamy Single",
+   "tax": "B",
+   "cents": 149,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Vöslauer Balance",
+   "tax": "C",
+   "cents": 149,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "PFANDARTIKEL",
+   "tax": "D",
+   "cents": 25,
+   "kind": "deposit",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [
+  {
+   "name": "Mineralwasser Rabatt",
+   "pct": "25",
+   "cents": -37
+  }
+ ],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 407,
+   "vat": 41,
+   "gross": 448
+  },
+  "C": {
+   "rate": "20.00",
+   "net": 93,
+   "vat": 19,
+   "gross": 112
+  },
+  "D": {
+   "rate": null,
+   "gross": 25
+  }
+ },
+ "labels": [],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

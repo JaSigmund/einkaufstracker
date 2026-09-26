@@ -1,0 +1,109 @@
+                      Billa AG
+                     1070 WIEN
+             MARIAHILFER STR.38-48
+                TEL: 059915-00143
+                   ATU 15255907
+--------------------------------------
+Datum: 07.08.2026          Zeit: 09:24
+
+Protein Sandwich Thunfisc B       2.99
+Snickers Creamy Single    B       1.49
+Vöslauer Balance          C       1.49
+PFANDARTIKEL              D       0.25
+Zwischensumme          EUR        6.22
+
+Mineralwasser Rabatt  25%        -0.37
+--------------------------------------
+Summe                  EUR        5.85
+======================================
+Gegeben   KK Visa                 5.85
+
+* *  Kundenbeleg  * *
+Datum:                        07.08.2026
+Uhrzeit:                    09:24:41 Uhr
+Beleg-Nr.                           0000
+Trace-Nr.                         0000
+Bezahlung
+Contactless
+VISA
+Nr.                ############0000 0000
+VU-Nr.                   000000000000000
+Terminal-ID                     00000000
+Pos-Info                       00 075 00
+AS-Zeit 07.08.                 09:24 Uhr
+AS-Proc-Code = 00 075 00
+Capt.-Ref.= 0000
+Betrag EUR                          5,85
+Zahlung erfolgt
+
+Betrag dankend erhalten
+
+B: 10.00% MwSt von      4.07 =    0.41
+C: 20.00% MwSt von      0.93 =    0.19
+D : nicht steuerbar     0.25
+
+
+
+
+
+
+
+
+
+
+
+Filiale: 00143  Kassa: 9  Bon-Nr:  713
+Pos:3   Kassier:in: SCO-Bediener9   /909
+Re-Nr: 0143-20260807-09-0713
+--------------------------------------
+  ---------------------------------------
+        Vielen Dank für Ihren Einkauf!
+           Mit diesem QR Code in nur
+            1 Minute Feedback geben!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ---------------------------------------
+                 Mein Ö Guthaben
+Mitglieds-Nr: 00000000
+Ös bisher:                         0
+Jetzt gesammelt:                     0
+                            Jetzt eingelöst:                     0
+                            Ös gesamt:                         0
+                            ----------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+                                              Die Datenschutzerklärung des
+                                          jö Bonus Clubs wurden aktualisiert.
+                                        Die Neuerungen sind in Abschnitt IV. zu
+                                             finden. Die Ergänzung betrifft
+                                              ausschließlich jö Mitglieder,
+                                             die ihre mein ELBA App mit der
+                                           jö Mitgliedschaft verknüpft haben.
+                                            Dadurch gibt es jetzt noch mehr
+                                              Möglichkeiten, Ös zu sammeln.
+                                                   Nähere Infos unter:
+                                        www.joe-club.at/datenschutz-uebersicht
+                                                    und in der jö äpp.
+                                       Für Rückfragen: datenschutz@joe-club.at,
+                                              telefonisch unter 01 386-5000
+                                                    oder per Post an:
+                                                Unser Ö-Bonus Club GmbH,
+                                            IZ NÖ-Süd, Straße 3, Objekt 16,
+                                                  A-2355 Wiener Neudorf
+                                       *****************************************

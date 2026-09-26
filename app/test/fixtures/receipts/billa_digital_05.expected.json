@@ -1,0 +1,62 @@
+{
+ "date": "12.08.2026",
+ "time": "18:10",
+ "total": 632,
+ "subtotal": null,
+ "reNr": "0643-20260812-03-5007",
+ "branch": "0643",
+ "items": [
+  {
+   "name": "Currywurst Zimbo",
+   "tax": "B",
+   "cents": 299,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Airwaves Cherry Menthol S",
+   "tax": "B",
+   "cents": 149,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "EWP RED BULL ORG. MINT. B",
+   "tax": "C",
+   "cents": 159,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "PFANDARTIKEL",
+   "tax": "D",
+   "cents": 25,
+   "kind": "deposit",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 407,
+   "vat": 41,
+   "gross": 448
+  },
+  "C": {
+   "rate": "20.00",
+   "net": 133,
+   "vat": 26,
+   "gross": 159
+  },
+  "D": {
+   "rate": null,
+   "gross": 25
+  }
+ },
+ "labels": [],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

@@ -1,0 +1,75 @@
+{
+ "date": "08.07.2026",
+ "time": "15:12",
+ "total": 658,
+ "subtotal": null,
+ "reNr": "0943-20260708-03-0070",
+ "branch": "0943",
+ "items": [
+  {
+   "name": "Onigiri Wakame 100g",
+   "tax": "B",
+   "cents": 299,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Clever Laugenbreze",
+   "tax": "H",
+   "cents": 46,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Knoppers Nussriegel",
+   "tax": "B",
+   "cents": 129,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "Pfanner Pure Tea",
+   "tax": "C",
+   "cents": 159,
+   "kind": "article",
+   "qty": null
+  },
+  {
+   "name": "PFANDARTIKEL",
+   "tax": "D",
+   "cents": 25,
+   "kind": "deposit",
+   "qty": null
+  }
+ ],
+ "bon_discounts": [],
+ "tax": {
+  "B": {
+   "rate": "10.00",
+   "net": 389,
+   "vat": 39,
+   "gross": 428
+  },
+  "C": {
+   "rate": "20.00",
+   "net": 133,
+   "vat": 26,
+   "gross": 159
+  },
+  "D": {
+   "rate": null,
+   "gross": 25
+  },
+  "H": {
+   "rate": "4.90",
+   "net": 44,
+   "vat": 2,
+   "gross": 46
+  }
+ },
+ "labels": [],
+ "checks": {
+  "total": true,
+  "tax": true
+ }
+}

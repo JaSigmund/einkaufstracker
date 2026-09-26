@@ -1,0 +1,83 @@
+                      Billa AG
+                     1090 WIEN
+                 ALSER STRASSE 4
+                TEL: 059915-00943
+                   ATU 15255907
+--------------------------------------
+Datum: 08.07.2026          Zeit: 15:12
+
+Onigiri Wakame 100g       B       2.99
+Clever Laugenbreze        H       0.46
+Knoppers Nussriegel       B       1.29
+Pfanner Pure Tea          C       1.59
+PFANDARTIKEL              D       0.25
+--------------------------------------
+Summe                  EUR        6.58
+======================================
+Gegeben   KK Visa                 6.58
+
+* *  Kundenbeleg  * *
+Datum:                        08.07.2026
+Uhrzeit:                    15:12:54 Uhr
+Beleg-Nr.                           0000
+Trace-Nr.                         0000
+Bezahlung
+Contactless
+VISA
+Nr.                ############0000 0000
+VU-Nr.                   000000000000000
+Terminal-ID                     00000000
+Pos-Info                       00 075 00
+AS-Zeit 08.07.                 15:12 Uhr
+AS-Proc-Code = 00 075 00
+Capt.-Ref.= 0000
+Betrag EUR                          6,58
+Zahlung erfolgt
+
+Betrag dankend erhalten
+
+B: 10.00% MwSt von      3.89 =    0.39
+C: 20.00% MwSt von      1.33 =    0.26
+D : nicht steuerbar     0.25
+H:  4.90% MwSt von      0.44 =    0.02
+
+
+
+
+
+
+
+
+
+
+
+Filiale: 00943  Kassa: 3  Bon-Nr:   70
+Pos:4   Kassier:in: SCO-Bediener 3  /903
+Re-Nr: 0943-20260708-03-0070
+--------------------------------------
+  ---------------------------------------
+        Vielen Dank für Ihren Einkauf!
+           Mit diesem QR Code in nur
+            1 Minute Feedback geben!
+  ---------------------------------------
+                 Mein Ö Guthaben
+Mitglieds-Nr: 00000000
+Ös bisher:                        0
+Jetzt gesammelt:                     0
+Jetzt eingelöst:                     0
+Ös gesamt:                        0
+----------------------------------------
+
+
+
+
+
+--------------------------------------------------------------------------------
+                       BILLA.
+                EINFACH MITREDEN.
+       Du möchtest das Einkaufserlebnis
+        bei BILLA aktiv mitgestalten?
+                  Dann rede mit!
+ Und bewirb dich bis 26.07.2026
+für das BILLA Kund:innengespräch.
+   www.billa.at/einfachmitreden
