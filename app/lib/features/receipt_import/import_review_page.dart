@@ -20,8 +20,20 @@ class ImportReviewPage extends ConsumerStatefulWidget {
 
 class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   bool _saving = false;
+  late ImportPreview _preview = widget.preview;
 
-  ImportPreview get p => widget.preview;
+  ImportPreview get p => _preview;
+
+  /// Oeffnet den Editor. Bei einem nicht lesbaren Bon startet er leer (manuelle Eingabe).
+  Future<void> _edit() async {
+    final start = p.error == null
+        ? p
+        : ImportPreview(receipt: ParsedReceipt.manual(purchasedAtUtc: DateTime.now().toUtc()), source: p.source, note: p.note);
+    final edited = await context.push<ImportPreview>('/import-edit', extra: start);
+    if (edited == null || !mounted) return;
+    final checked = await ref.read(receiptImportServiceProvider).recheckDuplicate(edited);
+    if (mounted) setState(() => _preview = checked);
+  }
 
   Future<void> _save() async {
     final trustworthy = p.receipt.isTrustworthy;
@@ -57,7 +69,13 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Bon prüfen')),
+      appBar: AppBar(
+        title: const Text('Bon prüfen'),
+        actions: [
+          if (p.error == null && !p.isDuplicate)
+            IconButton(key: const Key('review-edit'), tooltip: 'Bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: _saving ? null : _edit),
+        ],
+      ),
       body: _body(context),
       bottomNavigationBar: p.canImport
           ? SafeArea(
@@ -89,14 +107,27 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   Widget _body(BuildContext context) {
     final t = Theme.of(context);
     if (p.error != null) {
-      return _Message(icon: Icons.error_outline, color: t.colorScheme.error, title: 'Der Bon konnte nicht gelesen werden', text: p.error!);
+      return _Message(
+        icon: Icons.error_outline,
+        color: t.colorScheme.error,
+        title: 'Der Bon konnte nicht gelesen werden',
+        text: p.error!,
+        extra: p.source == ReceiptSources.pdfText
+            ? null
+            : OutlinedButton.icon(
+                key: const Key('review-manual'),
+                onPressed: _edit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Manuell eingeben'),
+              ),
+      );
     }
     if (p.isDuplicate) {
       return _Message(
         icon: Icons.copy_all_outlined,
         color: t.colorScheme.tertiary,
         title: 'Dieser Bon ist schon gespeichert',
-        text: 'Ein Bon mit derselben Rechnungsnummer (${p.receipt.externalId}) ist bereits vorhanden. Es wird nichts doppelt angelegt.',
+        text: 'Derselbe Einkauf (gleiche Rechnungsnummer, oder gleiche Summe und Uhrzeit) ist bereits vorhanden. Es wird nichts doppelt angelegt.',
       );
     }
 
@@ -108,9 +139,18 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
         ListTile(
           leading: const Icon(Icons.store_outlined),
           title: Text('${r.chain}${r.branchCode == null ? '' : ', Filiale ${r.branchCode}'}'),
-          subtitle: Text(r.purchasedAtUtc == null ? '' : formatViennaDateTime(r.purchasedAtUtc!)),
+          subtitle: Text([
+            if (r.purchasedAtUtc != null) formatViennaDateTime(r.purchasedAtUtc!),
+            ReceiptSources.label(p.source),
+            if (p.edited) 'von dir bearbeitet',
+          ].join(' · ')),
           trailing: Text(formatEuro(r.totalCents!), style: t.textTheme.titleMedium),
         ),
+        if (p.note != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(p.note!, key: const Key('review-note'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          ),
         _CheckBanner(checks: c),
         const Divider(height: 1),
         for (final i in r.items) _ItemTile(item: i),
@@ -138,7 +178,8 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.color, required this.title, required this.text});
+  const _Message({required this.icon, required this.color, required this.title, required this.text, this.extra});
+  final Widget? extra;
   final IconData icon;
   final Color color;
   final String title;
@@ -155,6 +196,7 @@ class _Message extends StatelessWidget {
             const SizedBox(height: 8),
             Text(text, textAlign: TextAlign.center),
             const SizedBox(height: 24),
+            if (extra != null) ...[extra!, const SizedBox(height: 12)],
             FilledButton(onPressed: () => context.pop(), child: const Text('Zurück')),
           ]),
         ),
@@ -181,6 +223,11 @@ class _CheckBanner extends StatelessWidget {
     if (!checks.taxMatches) {
       if (checks.missingTaxClasses.isNotEmpty) lines.add('Steuerklasse ${checks.missingTaxClasses.join(', ')} fehlt im Steuerblock.');
       checks.classDifferences.forEach((code, diff) => lines.add('Steuerklasse $code weicht um ${formatEuro(diff)} vom Steuerblock ab.'));
+      if (checks.unlabeledItems > 0 && checks.missingTaxClasses.isEmpty && checks.classDifferences.isEmpty) {
+        lines.add(checks.taxBlockGrossSumCents == 0
+            ? 'Der Steuerblock wurde nicht gelesen, die Steuerprüfung ist nicht möglich.'
+            : 'Der Steuerblock ergibt ${formatEuro(checks.taxBlockGrossSumCents)}, der Bon nennt ${formatEuro(checks.totalCents ?? 0)}.');
+      }
     }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -196,7 +243,9 @@ class _CheckBanner extends StatelessWidget {
         Expanded(
           child: Text(
             ok
-                ? 'Alles stimmig: Die Summe der Positionen entspricht der Bon-Summe, und der Steuerblock geht auf.'
+                ? (checks.taxBlockGrossSumCents == 0
+                    ? 'Die Summe der Positionen entspricht der Bon-Summe.'
+                    : 'Alles stimmig: Die Summe der Positionen entspricht der Bon-Summe, und der Steuerblock geht auf.')
                 : lines.join('\n'),
             key: const Key('check-text'),
             style: TextStyle(color: ok ? t.colorScheme.onPrimaryContainer : t.colorScheme.onErrorContainer),

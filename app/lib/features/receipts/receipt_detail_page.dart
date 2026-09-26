@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../receipt_import/receipt_import_service.dart';
 
 /// Einzelner gespeicherter Bon mit allen Positionen. Loeschen ueber das Menue oben rechts.
 class ReceiptDetailPage extends ConsumerWidget {
@@ -64,7 +65,7 @@ class ReceiptDetailPage extends ConsumerWidget {
         children: [
           ListTile(
             title: Text(formatViennaDateTime(receipt.purchasedAt)),
-            subtitle: Text(receipt.source == 'pdf_text' ? 'Digitaler Bon (PDF)' : 'Quelle: ${receipt.source}'),
+            subtitle: Text(ReceiptSources.label(receipt.source)),
             trailing: Text(formatEuro(receipt.totalCents), style: t.textTheme.titleLarge, key: const Key('receipt-total')),
           ),
           if (receipt.sumMismatch)
@@ -84,7 +85,7 @@ class ReceiptDetailPage extends ConsumerWidget {
               title: Text(i.rawText),
               subtitle: _sub(i, categoryName) == null ? null : Text(_sub(i, categoryName)!),
               // Rabatte auf Bon-Ebene haben keine Kategorie und werden anteilig verrechnet
-              onTap: i.kind == 'discount' && i.categoryId == null ? null : () => _pickCategory(context, ref, i, categories),
+              onTap: i.kind == 'bill_discount' || (i.kind == 'discount' && i.categoryId == null) ? null : () => _pickCategory(context, ref, i, categories),
               trailing: Text(formatEuro(i.lineTotalCents), style: TextStyle(color: i.lineTotalCents < 0 ? t.colorScheme.primary : null)),
             ),
           const Divider(height: 1),
@@ -133,6 +134,7 @@ class ReceiptDetailPage extends ConsumerWidget {
       if (i.quantity != 1 && i.unitPriceCents != null)
         '${formatQuantity(i.quantity)}${i.quantityUnit == 'piece' ? ' ×' : ' ${i.quantityUnit} ×'} ${formatEuro(i.unitPriceCents!)}',
       if (i.kind == 'discount') 'Rabatt',
+      if (i.kind == 'bill_discount') 'Rabatt auf den ganzen Bon',
       if (i.kind == 'deposit') 'Pfand',
     ];
     return parts.isEmpty ? null : parts.join(' · ');

@@ -5,12 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/local/database.dart';
+import '../data/cloud/cloud_receipt.dart';
+import '../data/cloud/supabase_cloud_receipt_reader.dart';
+import '../data/ocr/image_prep.dart';
+import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/repositories/category_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
+import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
 import '../data/sync/sync_engine.dart';
@@ -162,4 +167,33 @@ final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextRe
 
 final receiptImportServiceProvider = Provider<ReceiptImportService>(
   (ref) => ReceiptImportService(ref.watch(pdfTextReaderProvider), ref.watch(receiptRepositoryProvider)),
+);
+
+final receiptScannerProvider = Provider<ReceiptScanner>((ref) => MlKitReceiptScanner());
+
+final cloudReceiptReaderProvider = Provider<CloudReceiptReader>(
+  (ref) => SupabaseCloudReceiptReader(ref.watch(supabaseClientProvider), () async {
+    final id = await ref.read(householdIdProvider.future);
+    if (id == null) throw const CloudUnavailable('kein Haushalt');
+    return id;
+  }),
+);
+
+final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
+  (ref) => PhotoReceiptService(
+    repo: ref.watch(receiptRepositoryProvider),
+    cloud: ref.watch(cloudReceiptReaderProvider),
+    // Einwilligung liegt beim Server (household_settings)
+    cloudAllowed: () async {
+      try {
+        final id = await ref.read(householdIdProvider.future);
+        if (id == null) return false;
+        return (await ref.read(settingsRepositoryProvider).load(id)).allowCloudOcr;
+      } catch (_) {
+        // Einwilligung nicht abrufbar = kein Netz: das ist etwas anderes als "ausgeschaltet"
+        throw const CloudUnavailable('kein Netz');
+      }
+    },
+    prepare: prepareForCloud,
+  ),
 );

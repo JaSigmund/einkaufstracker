@@ -221,6 +221,12 @@ def main():
     check("Bon-Import: nach dem Loeschen (Soft-Delete) darf die Re-Nr erneut importiert werden",
           not raises(rec_sql, (ha, store, "2026-07-02 17:51+00", "0643-20260702-03-4852")))
 
+    # --- Bon-Rabatt als eigene Positionsart (0007) ------------------------------------------
+    rid2 = one("select id from receipts where external_id='0643-20260702-03-4852' and household_id=%s and deleted_at is null", (ha,))
+    check("Bon-Rabatt: Positionsart bill_discount ist speicherbar",
+          not raises("insert into receipt_items (household_id, receipt_id, line_no, raw_text, kind, line_total_cents) "
+                     "values (%s,%s,2,'jö Rabattsammler 20%%','bill_discount',-451)", (ha, rid2)))
+
     # --- Lernende Kategorisierung (0006) ---------------------------------------------------
     cat_a = one("select id from categories where household_id=%s and name='Gemüse'", (ha,))
     alias_sql = "insert into category_aliases (household_id, alias_text, category_id) values (%s,%s,%s)"

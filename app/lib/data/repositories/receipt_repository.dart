@@ -24,6 +24,9 @@ class ReceiptSaveResult {
 /// (UUID v5 aus Haushalt, Filiale bzw. Re-Nr, Zeilennummer). Importieren zwei Geraete denselben Bon,
 /// entsteht dieselbe Zeile und kein Konflikt, und ein wieder importierter, zuvor geloeschter Bon
 /// wird reaktiviert statt doppelt angelegt.
+/// Positionsart fuer Rabatte, die sich auf den ganzen Bon beziehen (Migration 0007).
+const billDiscountKind = 'bill_discount';
+
 class ReceiptRepository {
   ReceiptRepository(this._db, {required this.householdId, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
@@ -62,6 +65,28 @@ class ReceiptRepository {
         .getSingleOrNull();
   }
 
+  /// Bereits gespeicherter Bon zum selben Einkauf: gleiche Re-Nr, oder (ohne Re-Nr, z.B. Cloud-Lesung eines
+  /// Fotos) gleiche Summe und Kaufzeit auf zwei Minuten genau. So wird ein Papierbon nicht doppelt erfasst,
+  /// wenn derselbe Einkauf schon als digitaler Bon vorliegt.
+  Future<Receipt?> findDuplicate(ParsedReceipt r) async {
+    if (r.externalId != null) {
+      final byId = await findByExternalId(r.externalId!);
+      if (byId != null) return byId;
+    }
+    if (r.purchasedAtUtc == null || r.totalCents == null) return null;
+    final hid = await householdId();
+    final from = r.purchasedAtUtc!.subtract(const Duration(minutes: 2));
+    final to = r.purchasedAtUtc!.add(const Duration(minutes: 2));
+    final candidates = await (_db.select(_db.receipts)
+          ..where((x) =>
+              x.householdId.equals(hid) &
+              x.deletedAt.isNull() &
+              x.totalCents.equals(r.totalCents!) &
+              x.purchasedAt.isBetweenValues(from, to)))
+        .get();
+    return candidates.firstOrNull;
+  }
+
   /// Nicht geloeschte, bestaetigte Bons, neueste zuerst.
   Stream<List<Receipt>> watchAll() => (_db.select(_db.receipts)
         ..where((r) => r.deletedAt.isNull() & r.status.equals('confirmed'))
@@ -95,12 +120,8 @@ class ReceiptRepository {
     final categorizer = await _buildCategorizer(hid);
     final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : _uuid.v4();
 
-    if (r.externalId != null) {
-      final existing = await (_db.select(_db.receipts)
-            ..where((x) => x.householdId.equals(hid) & x.externalId.equals(r.externalId!) & x.deletedAt.isNull()))
-          .getSingleOrNull();
-      if (existing != null) return ReceiptSaveResult(ReceiptSaveOutcome.duplicate, existing.id);
-    }
+    final existing = await findDuplicate(r);
+    if (existing != null) return ReceiptSaveResult(ReceiptSaveOutcome.duplicate, existing.id);
 
     await _db.transaction(() async {
       // Filiale finden oder anlegen
@@ -178,7 +199,7 @@ class ReceiptRepository {
           householdId: hid,
           receiptId: receiptId,
           lineNo: lineNo,
-          kind: ReceiptItemKind.discount.name,
+          kind: billDiscountKind,
           rawText: d.percent == null ? d.name : '${d.name} ${d.percent}%',
           quantity: 1,
           quantityUnit: 'piece',
@@ -248,7 +269,7 @@ class ReceiptRepository {
     final hid = await householdId();
     final now = DateTime.now().toUtc();
     final categorizer = await _buildCategorizer(hid);
-    var changed = 0;
+    var changed = await _repairBillDiscounts(hid);
     await _db.transaction(() async {
       final receipts = await (_db.select(_db.receipts)..where((r) => r.householdId.equals(hid) & r.deletedAt.isNull())).get();
       for (final r in receipts) {
@@ -259,7 +280,7 @@ class ReceiptRepository {
         String? lastArticleCategory;
         for (final i in items) {
           String? category = i.categoryId;
-          if (category == null) {
+          if (category == null && i.kind != billDiscountKind) {
             final CategorySuggestion s;
             switch (i.kind) {
               case 'deposit':
@@ -283,6 +304,27 @@ class ReceiptRepository {
     });
     if (changed > 0) onChanged?.call();
     return changed;
+  }
+
+  /// Aeltere Bons haben Bon-Rabatte (jö Rabattsammler) als normalen Rabatt gespeichert, der dann per Backfill die
+  /// Kategorie des Artikels darueber erbte (z.B. Getraenke). Bei digitalen Bons haben alle Artikel-Rabatte einen
+  /// Steuerbuchstaben, ein Rabatt ohne ist daher ein Bon-Rabatt: Art korrigieren, Kategorie entfernen.
+  Future<int> _repairBillDiscounts(String hid) async {
+    final pdfReceipts = await (_db.select(_db.receipts)
+          ..where((r) => r.householdId.equals(hid) & r.deletedAt.isNull() & r.source.equals('pdf_text')))
+        .get();
+    if (pdfReceipts.isEmpty) return 0;
+    final legacy = await (_db.select(_db.receiptItems)
+          ..where((i) =>
+              i.receiptId.isIn(pdfReceipts.map((r) => r.id)) & i.kind.equals('discount') & i.taxCode.isNull() & i.deletedAt.isNull()))
+        .get();
+    final now = DateTime.now().toUtc();
+    for (final i in legacy) {
+      final fixed = i.copyWith(kind: billDiscountKind, categoryId: const Value(null), needsReview: false, updatedAt: now);
+      await _put('receipt_items', i.id, receiptItemToRemote(fixed),
+          () => _db.into(_db.receiptItems).insertOnConflictUpdate(fixed.toCompanion(false)));
+    }
+    return legacy.length;
   }
 
   /// Loescht einen Bon samt Positionen (Soft-Delete, wird mit dem Server synchronisiert).

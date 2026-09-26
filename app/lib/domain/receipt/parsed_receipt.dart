@@ -71,6 +71,7 @@ class ReceiptChecks {
     required this.taxBlockGrossSumCents,
     required this.classDifferences,
     required this.missingTaxClasses,
+    this.unlabeledItems = 0,
   });
 
   final int itemsSumCents;
@@ -85,6 +86,10 @@ class ReceiptChecks {
   /// Steuerklassen, die bei Positionen vorkommen, aber im Steuerblock fehlen.
   final List<String> missingTaxClasses;
 
+  /// Positionen ohne gelesenen Steuerbuchstaben (nur bei OCR von Fotos). Dann ist die Steuerpruefung je Klasse
+  /// nicht vollstaendig und es zaehlt die Gesamtsumme des Steuerblocks.
+  final int unlabeledItems;
+
   /// Summe der Positionen plus Bon-Rabatte entspricht der Bon-Summe.
   bool get totalMatches => totalCents != null && itemsSumCents + bonDiscountSumCents == totalCents;
 
@@ -93,7 +98,8 @@ class ReceiptChecks {
 
   bool get taxMatches {
     if (missingTaxClasses.isNotEmpty) return false;
-    if (bonDiscountSumCents != 0) {
+    if (unlabeledItems > 0 && taxBlockGrossSumCents == 0) return false; // Steuerblock gar nicht gelesen
+    if (bonDiscountSumCents != 0 || unlabeledItems > 0) {
       // Bon-Rabatte werden vom Bon anteilig auf die Klassen verteilt: nur die Gesamtsumme laesst sich pruefen
       return totalCents != null && taxBlockGrossSumCents == totalCents;
     }
@@ -149,6 +155,48 @@ class ParsedReceipt {
   final Map<String, TaxBlockEntry> taxBlock;
   final List<String> warnings;
   final ReceiptChecks? checks;
+
+  /// Leerer Bon zum manuellen Erfassen (wenn nichts gelesen werden konnte).
+  factory ParsedReceipt.manual({required DateTime purchasedAtUtc, String? chain}) => ParsedReceipt.edited(
+        base: null,
+        chain: chain,
+        items: const [],
+        bonDiscounts: const [],
+        totalCents: 0,
+        purchasedAtUtc: purchasedAtUtc,
+      );
+
+  /// Vom Nutzer bearbeitete Fassung. Die Pruefungen werden neu gerechnet: Positionen plus Bon-Rabatte gegen die
+  /// Summe. Der Steuerblock wird nicht mehr geprueft, weil sich die Steuerbuchstaben der Positionen geaendert haben
+  /// koennen. Re-Nr und Filiale bleiben erhalten.
+  factory ParsedReceipt.edited({
+    required ParsedReceipt? base,
+    String? chain,
+    required List<ParsedItem> items,
+    required List<BonDiscount> bonDiscounts,
+    required int totalCents,
+    required DateTime purchasedAtUtc,
+  }) =>
+      ParsedReceipt(
+        chain: chain ?? base?.chain,
+        branchCode: base?.branchCode,
+        externalId: base?.externalId,
+        purchasedAtUtc: purchasedAtUtc,
+        totalCents: totalCents,
+        items: items,
+        bonDiscounts: bonDiscounts,
+        taxBlock: const {},
+        warnings: const [],
+        checks: ReceiptChecks(
+          itemsSumCents: items.fold<int>(0, (s, i) => s + i.lineTotalCents),
+          bonDiscountSumCents: bonDiscounts.fold<int>(0, (s, d) => s + d.cents),
+          totalCents: totalCents,
+          subtotalCents: null,
+          taxBlockGrossSumCents: 0,
+          classDifferences: const {},
+          missingTaxClasses: const [],
+        ),
+      );
 
   /// Konnte der Bon ueberhaupt gelesen werden (Datum und Summe gefunden)?
   bool get isParsed => checks != null;

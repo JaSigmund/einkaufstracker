@@ -85,7 +85,7 @@ void main() {
       final items = await (db.select(db.receiptItems)..where((i) => i.receiptId.equals(result.receiptId))).get();
       expect(items.length, 25); // 24 Positionen + 1 Bon-Rabatt
       final bon = items.firstWhere((i) => i.rawText.contains('Rabattsammler'));
-      expect(bon.kind, 'discount');
+      expect(bon.kind, 'bill_discount');
       expect(bon.taxCode, isNull);
       expect(bon.lineTotalCents, -451);
       expect(bon.rawText, contains('20%'));
