@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (analyze und test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  db:
+    name: Datenbank (Schema- und RLS-Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pgserver "psycopg[binary]" tzdata
+      - run: python supabase/tests/run_schema_tests.py
+
+  function:
+    name: Edge Function (Typpruefung)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert
+      - run: |
+          mkdir /tmp/fncheck
+          cp supabase/functions/parse-receipt/index.ts /tmp/fncheck/index.ts
+          cd /tmp/fncheck
+          deno check index.ts
