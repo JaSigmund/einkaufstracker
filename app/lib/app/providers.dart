@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
 import '../data/cloud/supabase_cloud_receipt_reader.dart';
@@ -100,6 +102,8 @@ class SyncController extends Notifier<SyncStatus> {
       // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
       // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
       await ref.read(receiptRepositoryProvider).categorizeMissing();
+      // Wartende Belege (Fotos, PDFs) hochladen, jetzt wo das Netz da ist
+      await ref.read(receiptFileServiceProvider).uploadPending();
     } catch (e) {
       state = SyncStatus(lastSync: state.lastSync, error: _friendly(e));
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
@@ -165,8 +169,42 @@ final sharedPdfSourceProvider = Provider<SharedPdfSource>((ref) => AndroidShared
 
 final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextReader());
 
+final remoteFileStoreProvider = Provider<RemoteFileStore>((ref) => SupabaseFileStore(ref.watch(supabaseClientProvider)));
+
+/// Originalbelege (Foto ohne Zahlungsblock, PDF): lokal ablegen, danach in den Storage hochladen.
+final receiptFileServiceProvider = Provider<ReceiptFileService>((ref) {
+  final db = ref.watch(databaseProvider);
+  return ReceiptFileService(
+    db: db,
+    repo: ref.watch(receiptRepositoryProvider),
+    remote: ref.watch(remoteFileStoreProvider),
+    baseDir: getApplicationDocumentsDirectory,
+    // Einstellung "Bon-Fotos speichern" liegt auf dem Server. Offline gilt der zuletzt bekannte Wert (Standard: an).
+    keepFiles: () async {
+      const key = 'keep_receipt_files';
+      try {
+        final id = await ref.read(householdIdProvider.future);
+        if (id == null) return true;
+        final keep = (await ref.read(settingsRepositoryProvider).load(id)).keepReceiptImages;
+        await db.setKv(key, keep.toString());
+        return keep;
+      } catch (_) {
+        return (await db.getKv(key)) != 'false';
+      }
+    },
+  );
+});
+
+final receiptFilesStreamProvider =
+    StreamProvider.family((ref, String receiptId) => ref.watch(receiptRepositoryProvider).watchFiles(receiptId));
+
 final receiptImportServiceProvider = Provider<ReceiptImportService>(
-  (ref) => ReceiptImportService(ref.watch(pdfTextReaderProvider), ref.watch(receiptRepositoryProvider)),
+  (ref) => ReceiptImportService(
+    ref.watch(pdfTextReaderProvider),
+    ref.watch(receiptRepositoryProvider),
+    files: ref.watch(receiptFileServiceProvider),
+    prepareImage: prepareForStorage,
+  ),
 );
 
 final receiptScannerProvider = Provider<ReceiptScanner>((ref) => MlKitReceiptScanner());

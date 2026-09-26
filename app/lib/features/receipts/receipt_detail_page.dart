@@ -26,7 +26,11 @@ class ReceiptDetailPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
-    await ref.read(receiptRepositoryProvider).softDelete(receiptId);
+    final repo = ref.read(receiptRepositoryProvider);
+    final files = await repo.filesOf(receiptId);
+    await repo.softDelete(receiptId);
+    // Originalbelege mitloeschen (lokal und, soweit online, im Storage)
+    await ref.read(receiptFileServiceProvider).purge(files);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bon gelöscht')));
       context.pop();
@@ -38,6 +42,7 @@ class ReceiptDetailPage extends ConsumerWidget {
     final receipt = ref.watch(receiptProvider(receiptId)).value;
     final items = ref.watch(receiptItemsProvider(receiptId)).value ?? const <ReceiptItem>[];
     final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
+    final files = ref.watch(receiptFilesStreamProvider(receiptId)).value ?? const <ReceiptFile>[];
     final categories = (ref.watch(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
     final categoryName = {for (final c in categories) c.id: c.name};
     final t = Theme.of(context);
@@ -77,6 +82,14 @@ class ReceiptDetailPage extends ConsumerWidget {
                 'Beim Import stimmten nicht alle Prüfungen. Die Positionen sollten mit dem Original verglichen werden.',
                 style: TextStyle(color: t.colorScheme.onErrorContainer),
               ),
+            ),
+          for (final f in files)
+            ListTile(
+              key: Key('file-${f.pageNo}-${f.kind}'),
+              leading: Icon(f.kind == 'pdf' ? Icons.picture_as_pdf_outlined : Icons.photo_outlined),
+              title: Text(f.kind == 'pdf' ? 'Originalbeleg ansehen (PDF)' : 'Originalbeleg ansehen (Foto, Seite ${f.pageNo})'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/receipt-file', extra: f),
             ),
           const Divider(height: 1),
           for (final i in items)

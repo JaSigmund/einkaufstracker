@@ -45,7 +45,8 @@ class PhotoReceiptService {
   Future<ImportPreview> read(List<ScannedPage> pages, {void Function(String status)? onStatus}) async {
     onStatus?.call('Bon wird auf dem Handy gelesen …');
     final local = _readLocal(pages);
-    if (local.isParsed && local.isTrustworthy) return _preview(local, ReceiptSources.photoLocal);
+    final attachments = _attachments(pages);
+    if (local.isParsed && local.isTrustworthy) return _preview(local, ReceiptSources.photoLocal, attachments: attachments);
 
     // Lokal nicht sicher genug: Cloud fragen, soweit erlaubt und moeglich
     String? note;
@@ -75,7 +76,7 @@ class PhotoReceiptService {
       // weil lokale Lesefehler bei Namen haeufiger sind
       final useRemote = remote.isTrustworthy || !local.isParsed || _gap(remote) < _gap(local);
       if (useRemote) {
-        return _preview(remote, ReceiptSources.photoCloud, note: 'Die lokale Erkennung war nicht sicher genug, die Cloud hat mitgelesen.');
+        return _preview(remote, ReceiptSources.photoCloud, attachments: attachments, note: 'Die lokale Erkennung war nicht sicher genug, die Cloud hat mitgelesen.');
       }
       note = 'Auch die Cloud hat die Summe nicht getroffen. Angezeigt wird das genauere Ergebnis, bitte prüfen.';
     }
@@ -84,18 +85,34 @@ class PhotoReceiptService {
       return ImportPreview(
         receipt: local,
         source: ReceiptSources.photoLocal,
+        attachments: attachments,
         error: 'Auf dem Handy konnte der Bon nicht gelesen werden, und die Cloud konnte nicht helfen. '
             '${note ?? ''} Du kannst den Bon später erneut scannen oder die Positionen von Hand eingeben.'.replaceAll('  ', ' '),
       );
     }
-    return _preview(local, ReceiptSources.photoLocal, note: note);
+    return _preview(local, ReceiptSources.photoLocal, attachments: attachments, note: note);
   }
 
   int _gap(ParsedReceipt r) => (r.checks?.differenceCents ?? 1 << 30).abs();
 
-  Future<ImportPreview> _preview(ParsedReceipt r, String source, {String? note}) async {
+  Future<ImportPreview> _preview(ParsedReceipt r, String source, {String? note, List<AttachmentSource> attachments = const []}) async {
     final existing = await repo.findDuplicate(r);
-    return ImportPreview(receipt: r, source: source, note: note, duplicateOfReceiptId: existing?.id);
+    return ImportPreview(receipt: r, source: source, note: note, duplicateOfReceiptId: existing?.id, attachments: attachments);
+  }
+
+  /// Fotos zum Ablegen: alle Seiten bis zur Seite mit "Summe" bzw. den Zahlungsdaten, diese abgeschnitten, spaetere
+  /// Seiten (Kundenbeleg) entfallen. Ohne sicheren Schnitt wird kein Foto abgelegt (wie beim Cloud-Upload, B4).
+  List<AttachmentSource> _attachments(List<ScannedPage> pages) {
+    for (var i = 0; i < pages.length; i++) {
+      final cut = paymentCutY(pages[i].lines, slope: estimateSlope(pages[i].lines));
+      if (cut != null) {
+        return [
+          for (var j = 0; j < i; j++) AttachmentSource.image(pages[j].imagePath, cutY: null, pageNo: j + 1),
+          AttachmentSource.image(pages[i].imagePath, cutY: cut, pageNo: i + 1),
+        ];
+      }
+    }
+    return const [];
   }
 
   ParsedReceipt _readLocal(List<ScannedPage> pages) {

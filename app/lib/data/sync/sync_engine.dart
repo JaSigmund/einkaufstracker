@@ -21,6 +21,7 @@ final syncTables = <SyncTableDef>[
   SyncTableDef('stores', (db, j) => db.into(db.stores).insertOnConflictUpdate(storeFromRemote(j))),
   SyncTableDef('receipts', (db, j) => db.into(db.receipts).insertOnConflictUpdate(receiptFromRemote(j))),
   SyncTableDef('receipt_items', (db, j) => db.into(db.receiptItems).insertOnConflictUpdate(receiptItemFromRemote(j))),
+  SyncTableDef('receipt_files', (db, j) => db.into(db.receiptFiles).insertOnConflictUpdate(receiptFileFromRemote(j))),
 ];
 
 class SyncResult {

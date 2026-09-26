@@ -227,6 +227,16 @@ def main():
           not raises("insert into receipt_items (household_id, receipt_id, line_no, raw_text, kind, line_total_cents) "
                      "values (%s,%s,2,'jö Rabattsammler 20%%','bill_discount',-451)", (ha, rid2)))
 
+    # --- Originalbelege (0008) ----------------------------------------------------------------
+    file_sql = ("insert into receipt_files (household_id, receipt_id, kind, storage_path) values (%s,%s,%s,%s)")
+    db(file_sql, (ha, rid2, "pdf", f"{ha}/{rid2}/x.pdf"))
+    check("Beleg: unbekannte Art wird abgelehnt", raises(file_sql, (ha, rid2, "video", "x")))
+    check("RLS: B sieht keine Belege von A", one("select count(*) from receipt_files", user=B) == 0)
+    check("RLS: A sieht eigene Belege", one("select count(*) from receipt_files", user=A) == 1)
+    check("RLS: B kann keinen Beleg in Haushalt A anlegen", raises(file_sql, (ha, rid2, "pdf", "fremd"), user=B))
+    db("delete from receipts where id=%s", (rid2,))
+    check("Beleg wird mit seinem Bon geloescht (Kaskade)", one("select count(*) from receipt_files") == 0)
+
     # --- Lernende Kategorisierung (0006) ---------------------------------------------------
     cat_a = one("select id from categories where household_id=%s and name='Gemüse'", (ha,))
     alias_sql = "insert into category_aliases (household_id, alias_text, category_id) values (%s,%s,%s)"

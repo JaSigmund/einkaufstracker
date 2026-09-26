@@ -1,5 +1,8 @@
 import 'package:drift/drift.dart' show Value;
+import 'dart:io';
+
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 import 'package:einkaufstracker/domain/receipt/month_summary.dart';
@@ -177,11 +180,13 @@ void main() {
   });
 
   group('Detailseite', () {
-    Widget host(AppDatabaseHolder h, {required Receipt receipt, required List<ReceiptItem> items, List<Category> categories = const []}) => ProviderScope(
+    Widget host(AppDatabaseHolder h, {required Receipt receipt, required List<ReceiptItem> items, List<Category> categories = const [], List<ReceiptFile> files = const []}) => ProviderScope(
           overrides: [
             categoriesStreamProvider.overrideWith((ref) => Stream.value(categories)),
             receiptProvider('r1').overrideWith((ref) => Stream.value(receipt)),
             receiptItemsProvider('r1').overrideWith((ref) => Stream.value(items)),
+            receiptFilesStreamProvider('r1').overrideWith((ref) => Stream.value(files)),
+            receiptFileServiceProvider.overrideWithValue(h.files),
             storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
             receiptRepositoryProvider.overrideWithValue(h.repo),
           ],
@@ -291,6 +296,29 @@ void main() {
       expect(find.text('Gemüse'), findsOneWidget);
     });
 
+    testWidgets('Abgelegte Originalbelege erscheinen als Eintraege, Foto und PDF', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final files = [
+        ReceiptFile(id: 'f1', householdId: 'h', receiptId: 'r1', kind: 'image', pageNo: 1, storagePath: 'h/r1/f1.jpg', updatedAt: DateTime.utc(2026)),
+        ReceiptFile(id: 'f2', householdId: 'h', receiptId: 'r1', kind: 'pdf', pageNo: 1, storagePath: 'h/r1/f2.pdf', updatedAt: DateTime.utc(2026)),
+      ];
+      await tester.pumpWidget(host(AppDatabaseHolder(db), receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: const [], files: files));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+      expect(find.text('Originalbeleg ansehen (Foto, Seite 1)'), findsOneWidget);
+      expect(find.text('Originalbeleg ansehen (PDF)'), findsOneWidget);
+    });
+
+    testWidgets('Ohne abgelegte Belege gibt es keinen Eintrag', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      await tester.pumpWidget(host(AppDatabaseHolder(db), receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: const []));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Originalbeleg'), findsNothing);
+    });
+
     testWidgets('Bon mit Abweichung zeigt einen Hinweis', (tester) async {
       final db = memoryDb();
       addTearDown(db.close);
@@ -304,6 +332,9 @@ void main() {
 
 /// Haelt Datenbank und Repository fuer die Detailseiten-Tests zusammen.
 class AppDatabaseHolder {
-  AppDatabaseHolder(AppDatabase db, {ReceiptRepository? repo}) : repo = repo ?? receiptRepo(db);
+  AppDatabaseHolder(AppDatabase db, {ReceiptRepository? repo})
+      : repo = repo ?? receiptRepo(db),
+        files = fileService(db, FakeRemoteFileStore(), Directory.systemTemp.createTempSync('rf'), repo: repo ?? receiptRepo(db));
   final ReceiptRepository repo;
+  final ReceiptFileService files;
 }

@@ -158,3 +158,26 @@ CategoryAliasesCompanion categoryAliasFromRemote(Map<String, dynamic> j) => Cate
       deletedAt: Value(_dt(j['deleted_at'])),
     );
 
+Map<String, dynamic> receiptFileToRemote(ReceiptFile f) => {
+      'id': f.id,
+      'household_id': f.householdId,
+      'receipt_id': f.receiptId,
+      'kind': f.kind,
+      'page_no': f.pageNo,
+      'storage_path': f.storagePath,
+      'size_bytes': f.sizeBytes,
+      'updated_at': f.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': f.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ReceiptFilesCompanion receiptFileFromRemote(Map<String, dynamic> j) => ReceiptFilesCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      receiptId: Value(j['receipt_id'] as String),
+      kind: Value(j['kind'] as String),
+      pageNo: Value((j['page_no'] as num?)?.toInt() ?? 1),
+      storagePath: Value(j['storage_path'] as String),
+      sizeBytes: Value((j['size_bytes'] as num?)?.toInt()),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
