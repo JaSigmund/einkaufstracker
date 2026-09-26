@@ -35,6 +35,73 @@ class Products extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Haendler/Filialen (Spiegel von public.stores). Je Kette und Filialnummer eine Zeile.
+class Stores extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get chain => text()();
+
+  /// Filialkennung, z.B. "0643"
+  TextColumn get branch => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Bons (Teilspiegel von public.receipts).
+class Receipts extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get storeId => text().nullable()();
+  DateTimeColumn get purchasedAt => dateTime()();
+  IntColumn get totalCents => integer()();
+
+  /// 'draft' | 'confirmed' | 'pending'
+  TextColumn get status => text().withDefault(const Constant('confirmed'))();
+
+  /// 'pdf_text' | 'on_device' | 'llm' | 'manual'
+  TextColumn get source => text().withDefault(const Constant('manual'))();
+
+  /// Eindeutige Kennung des Kaufs (bei Billa die Re-Nr), Grundlage der Duplikaterkennung.
+  TextColumn get externalId => text().nullable()();
+  RealColumn get confidence => real().nullable()();
+  BoolColumn get sumMismatch => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Bon-Positionen (Teilspiegel von public.receipt_items).
+class ReceiptItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get receiptId => text()();
+  IntColumn get lineNo => integer()();
+
+  /// 'article' | 'deposit' | 'discount'
+  TextColumn get kind => text().withDefault(const Constant('article'))();
+  TextColumn get rawText => text()();
+  TextColumn get productId => text().nullable()();
+  TextColumn get categoryId => text().nullable()();
+  RealColumn get quantity => real().withDefault(const Constant(1))();
+
+  /// 'piece' | 'kg' | 'l'
+  TextColumn get quantityUnit => text().withDefault(const Constant('piece'))();
+  IntColumn get unitPriceCents => integer().nullable()();
+  IntColumn get lineTotalCents => integer()();
+  TextColumn get taxCode => text().nullable()();
+  BoolColumn get needsReview => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -71,7 +138,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -79,7 +146,20 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          // 1 -> 2: Bon-Tabellen (Phase 2). Bestehende Installationen behalten Kategorien und Outbox.
+          if (from < 2) {
+            await m.createTable(stores);
+            await m.createTable(receipts);
+            await m.createTable(receiptItems);
+          }
+        },
+      );
 
   Future<String?> getKv(String key) async {
     final row = await (select(keyValues)..where((t) => t.key.equals(key))).getSingleOrNull();
