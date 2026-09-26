@@ -137,3 +137,24 @@ ReceiptItemsCompanion receiptItemFromRemote(Map<String, dynamic> j) => ReceiptIt
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> categoryAliasToRemote(CategoryAlias a) => {
+      'id': a.id,
+      'household_id': a.householdId,
+      'alias_text': a.aliasText,
+      'category_id': a.categoryId,
+      'hits': a.hits,
+      'updated_at': a.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
+    };
+
+CategoryAliasesCompanion categoryAliasFromRemote(Map<String, dynamic> j) => CategoryAliasesCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      aliasText: Value(j['alias_text'] as String),
+      categoryId: Value(j['category_id'] as String),
+      hits: Value((j['hits'] as num?)?.toInt() ?? 1),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+

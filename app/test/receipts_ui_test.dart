@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
@@ -118,8 +119,9 @@ void main() {
   });
 
   group('Detailseite', () {
-    Widget host(AppDatabaseHolder h, {required Receipt receipt, required List<ReceiptItem> items}) => ProviderScope(
+    Widget host(AppDatabaseHolder h, {required Receipt receipt, required List<ReceiptItem> items, List<Category> categories = const []}) => ProviderScope(
           overrides: [
+            categoriesStreamProvider.overrideWith((ref) => Stream.value(categories)),
             receiptProvider('r1').overrideWith((ref) => Stream.value(receipt)),
             receiptItemsProvider('r1').overrideWith((ref) => Stream.value(items)),
             storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
@@ -150,7 +152,7 @@ void main() {
 
       expect(find.text('Billa, Filiale 0643'), findsOneWidget);
       expect(find.text('02.07.2026, 19:51 Uhr'), findsOneWidget);
-      expect(find.text('2 × 2,85 €'), findsOneWidget);
+      expect(find.text('Nicht zugeordnet · 2 × 2,85 €'), findsOneWidget);
       expect(find.text('Rabatt'), findsOneWidget);
       expect(find.text('Pfand'), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('items-sum'))).data, '4,61 €');
@@ -188,6 +190,47 @@ void main() {
 
       expect((await db.select(db.receipts).getSingle()).deletedAt, isNotNull);
       expect(find.text('LISTE'), findsOneWidget); // zurueck auf der Liste
+    });
+
+    testWidgets('Tippen auf einen Artikel oeffnet die Kategorieauswahl, die Wahl wird gelernt', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final cat = await seedCategories(db);
+      final repo = receiptRepo(db);
+      await db.into(db.receipts).insert(_receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 285).toCompanion(false));
+      await db.into(db.receiptItems).insert(_item('i1', 1, 'scharfer Aufstrich', 285).toCompanion(false));
+      final categories = await db.select(db.categories).get();
+
+      await tester.pumpWidget(host(AppDatabaseHolder(db, repo: repo),
+          receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 285),
+          items: [_item('i1', 1, 'scharfer Aufstrich', 285)],
+          categories: categories));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+      expect(find.text('Nicht zugeordnet'), findsOneWidget);
+
+      await tester.tap(find.text('scharfer Aufstrich'));
+      await tester.pumpAndSettle();
+      final pick = find.byKey(const Key('pick-Öle, Gewürze & Saucen'));
+      await tester.scrollUntilVisible(pick, 100, scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)));
+      await tester.tap(pick);
+      await tester.pumpAndSettle();
+
+      expect((await db.select(db.receiptItems).getSingle()).categoryId, cat['Öle, Gewürze & Saucen']);
+      expect((await db.select(db.categoryAliases).getSingle()).aliasText, 'scharfer aufstrich');
+      expect(find.text('Zugeordnet'), findsOneWidget);
+    });
+
+    testWidgets('Zugeordneter Artikel zeigt den Kategorienamen', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      await seedCategories(db);
+      final categories = await db.select(db.categories).get();
+      final item = _item('i1', 1, 'Clever Champignon weiß', 199).copyWith(categoryId: const Value('cat:Gemüse'));
+      await tester.pumpWidget(host(AppDatabaseHolder(db), receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 199), items: [item], categories: categories));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+      expect(find.text('Gemüse'), findsOneWidget);
     });
 
     testWidgets('Bon mit Abweichung zeigt einen Hinweis', (tester) async {

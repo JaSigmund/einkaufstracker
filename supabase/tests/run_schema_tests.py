@@ -221,6 +221,19 @@ def main():
     check("Bon-Import: nach dem Loeschen (Soft-Delete) darf die Re-Nr erneut importiert werden",
           not raises(rec_sql, (ha, store, "2026-07-02 17:51+00", "0643-20260702-03-4852")))
 
+    # --- Lernende Kategorisierung (0006) ---------------------------------------------------
+    cat_a = one("select id from categories where household_id=%s and name='Gemüse'", (ha,))
+    alias_sql = "insert into category_aliases (household_id, alias_text, category_id) values (%s,%s,%s)"
+    db(alias_sql, (ha, "dkih paprika tricolore", cat_a))
+    check("Alias: gleicher normalisierter Name im selben Haushalt wird abgelehnt",
+          raises(alias_sql, (ha, "dkih paprika tricolore", cat_a)))
+    check("RLS: B sieht keine Aliase von A", one("select count(*) from category_aliases", user=B) == 0)
+    check("RLS: A sieht eigene Aliase", one("select count(*) from category_aliases", user=A) == 1)
+    check("RLS: B kann keinen Alias in Haushalt A anlegen",
+          raises(alias_sql, (ha, "fremd", cat_a), user=B))
+    db("delete from categories where id=%s", (cat_a,))
+    check("Alias wird mit seiner Kategorie geloescht (Kaskade)", one("select count(*) from category_aliases") == 0)
+
     # --- Inventarbewegungen (0003) -------------------------------------------------------
     ins_mv = ("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, occurred_at) "
               "values (%s,%s,%s,%s,'kg',%s)")

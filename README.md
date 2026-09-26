@@ -26,7 +26,7 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 Einkaufstracker/
   supabase/
     migrations/        0001_init, 0002_default_categories, 0003_inventory_movements
-    planned/           0006_meal_diary.sql (Phase 7, noch nicht produktiv)
+    planned/           meal_diary_draft.sql (Phase 7, noch nicht produktiv)
     tests/             run_schema_tests.py (Schema + RLS ohne Docker)
     functions/
       parse-receipt/   Edge Function (Claude Vision)
