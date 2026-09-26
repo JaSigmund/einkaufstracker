@@ -86,3 +86,20 @@ Ein Projekt mit einer Person, aber mit den Regeln eines Teams, damit der Verlauf
 - **Datenbank:** Migrationen in `supabase/migrations/` sind nach dem Einspielen unveraenderlich. Aenderungen kommen als neue, hoeher nummerierte Datei. Entwuerfe liegen in `supabase/planned/`.
 - **Geheimnisse** (Passwoerter, Keystore, API-Keys, Bon-Fotos) gehoeren nie ins Repo. Sie stehen in `.gitignore`. Vor jedem Commit ist der Diff darauf zu pruefen.
 - **Meilensteine** werden als Tag markiert (z.B. `m1-phase1`).
+
+
+## Signierter Release-Build (Android)
+
+1. Der Release-Keystore liegt **außerhalb** des Repos (`C:\Users\jakob\keys\einkaufstracker-release.jks`, Alias `einkaufstracker`), das Passwort im Passwortmanager. Java verlangt für Schlüsselpasswörter reines **ASCII** (keine Umlaute, kein ß, kein Eurozeichen).
+2. `app/android/key.properties` nach der Vorlage `key.properties.example` anlegen. `storePassword` und `keyPassword` müssen **identisch** sein (der Schlüssel nutzt das Keystore-Passwort). Die Datei steht in `.gitignore`.
+3. Bauen (im Ordner `app`): `flutter build apk --release --dart-define-from-file=dart_defines.local.json`
+4. Signatur prüfen: `apksigner verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk`. Der Fingerabdruck muss dem des Keystores entsprechen (`keytool -list -v -keystore ... -alias einkaufstracker`, das Passwort gibst du dort selbst ein).
+
+Öffentlicher Zertifikat-Fingerabdruck (SHA-256) der Release-Signatur:
+`93:B7:B6:E4:76:FA:8B:AD:8B:D0:1D:19:B0:DE:52:43:F1:A4:0C:EC:8F:B6:AA:52:E3:B5:E0:DB:DD:70:BB:02`
+
+Ohne `key.properties` fällt der Build auf den Debug-Schlüssel zurück, solche APKs sind nur zum lokalen Testen gedacht. Beim Wechsel zwischen Debug- und Release-Signatur muss die App auf dem Gerät vorher deinstalliert werden (die Daten liegen in der Cloud).
+
+## Hinweis zum Branch-Schutz
+
+GitHub bietet den Schutz für `main` (Pull Request und grüne Checks erzwingen) bei privaten Repositories nur mit einem bezahlten Tarif an. Im Free-Tarif gelten die Regeln oben deshalb **per Disziplin**. Aktiv sind dafür: nur Squash-Merge erlaubt, Branches werden nach dem Merge automatisch gelöscht.
