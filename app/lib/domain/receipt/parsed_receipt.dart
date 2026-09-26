@@ -71,6 +71,7 @@ class ReceiptChecks {
     required this.taxBlockGrossSumCents,
     required this.classDifferences,
     required this.missingTaxClasses,
+    this.unlabeledItems = 0,
   });
 
   final int itemsSumCents;
@@ -85,6 +86,10 @@ class ReceiptChecks {
   /// Steuerklassen, die bei Positionen vorkommen, aber im Steuerblock fehlen.
   final List<String> missingTaxClasses;
 
+  /// Positionen ohne gelesenen Steuerbuchstaben (nur bei OCR von Fotos). Dann ist die Steuerpruefung je Klasse
+  /// nicht vollstaendig und es zaehlt die Gesamtsumme des Steuerblocks.
+  final int unlabeledItems;
+
   /// Summe der Positionen plus Bon-Rabatte entspricht der Bon-Summe.
   bool get totalMatches => totalCents != null && itemsSumCents + bonDiscountSumCents == totalCents;
 
@@ -93,7 +98,8 @@ class ReceiptChecks {
 
   bool get taxMatches {
     if (missingTaxClasses.isNotEmpty) return false;
-    if (bonDiscountSumCents != 0) {
+    if (unlabeledItems > 0 && taxBlockGrossSumCents == 0) return false; // Steuerblock gar nicht gelesen
+    if (bonDiscountSumCents != 0 || unlabeledItems > 0) {
       // Bon-Rabatte werden vom Bon anteilig auf die Klassen verteilt: nur die Gesamtsumme laesst sich pruefen
       return totalCents != null && taxBlockGrossSumCents == totalCents;
     }

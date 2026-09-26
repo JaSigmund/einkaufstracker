@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../receipt_import/receipt_import_service.dart';
 
 /// Einzelner gespeicherter Bon mit allen Positionen. Loeschen ueber das Menue oben rechts.
 class ReceiptDetailPage extends ConsumerWidget {
@@ -64,7 +65,7 @@ class ReceiptDetailPage extends ConsumerWidget {
         children: [
           ListTile(
             title: Text(formatViennaDateTime(receipt.purchasedAt)),
-            subtitle: Text(receipt.source == 'pdf_text' ? 'Digitaler Bon (PDF)' : 'Quelle: ${receipt.source}'),
+            subtitle: Text(ReceiptSources.label(receipt.source)),
             trailing: Text(formatEuro(receipt.totalCents), style: t.textTheme.titleLarge, key: const Key('receipt-total')),
           ),
           if (receipt.sumMismatch)

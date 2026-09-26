@@ -96,7 +96,7 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
         icon: Icons.copy_all_outlined,
         color: t.colorScheme.tertiary,
         title: 'Dieser Bon ist schon gespeichert',
-        text: 'Ein Bon mit derselben Rechnungsnummer (${p.receipt.externalId}) ist bereits vorhanden. Es wird nichts doppelt angelegt.',
+        text: 'Derselbe Einkauf (gleiche Rechnungsnummer, oder gleiche Summe und Uhrzeit) ist bereits vorhanden. Es wird nichts doppelt angelegt.',
       );
     }
 
@@ -108,9 +108,17 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
         ListTile(
           leading: const Icon(Icons.store_outlined),
           title: Text('${r.chain}${r.branchCode == null ? '' : ', Filiale ${r.branchCode}'}'),
-          subtitle: Text(r.purchasedAtUtc == null ? '' : formatViennaDateTime(r.purchasedAtUtc!)),
+          subtitle: Text([
+            if (r.purchasedAtUtc != null) formatViennaDateTime(r.purchasedAtUtc!),
+            ReceiptSources.label(p.source),
+          ].join(' · ')),
           trailing: Text(formatEuro(r.totalCents!), style: t.textTheme.titleMedium),
         ),
+        if (p.note != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(p.note!, key: const Key('review-note'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          ),
         _CheckBanner(checks: c),
         const Divider(height: 1),
         for (final i in r.items) _ItemTile(item: i),
@@ -181,6 +189,11 @@ class _CheckBanner extends StatelessWidget {
     if (!checks.taxMatches) {
       if (checks.missingTaxClasses.isNotEmpty) lines.add('Steuerklasse ${checks.missingTaxClasses.join(', ')} fehlt im Steuerblock.');
       checks.classDifferences.forEach((code, diff) => lines.add('Steuerklasse $code weicht um ${formatEuro(diff)} vom Steuerblock ab.'));
+      if (checks.unlabeledItems > 0 && checks.missingTaxClasses.isEmpty && checks.classDifferences.isEmpty) {
+        lines.add(checks.taxBlockGrossSumCents == 0
+            ? 'Der Steuerblock wurde nicht gelesen, die Steuerprüfung ist nicht möglich.'
+            : 'Der Steuerblock ergibt ${formatEuro(checks.taxBlockGrossSumCents)}, der Bon nennt ${formatEuro(checks.totalCents ?? 0)}.');
+      }
     }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -196,7 +209,9 @@ class _CheckBanner extends StatelessWidget {
         Expanded(
           child: Text(
             ok
-                ? 'Alles stimmig: Die Summe der Positionen entspricht der Bon-Summe, und der Steuerblock geht auf.'
+                ? (checks.taxBlockGrossSumCents == 0
+                    ? 'Die Summe der Positionen entspricht der Bon-Summe.'
+                    : 'Alles stimmig: Die Summe der Positionen entspricht der Bon-Summe, und der Steuerblock geht auf.')
                 : lines.join('\n'),
             key: const Key('check-text'),
             style: TextStyle(color: ok ? t.colorScheme.onPrimaryContainer : t.colorScheme.onErrorContainer),

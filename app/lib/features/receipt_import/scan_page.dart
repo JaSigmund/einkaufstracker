@@ -43,6 +43,24 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     }
   }
 
+  Future<void> _scanPaper() async {
+    setState(() => _busy = true);
+    ImportPreview? preview;
+    try {
+      final pages = await ref.read(receiptScannerProvider).scan();
+      if (pages != null) preview = await ref.read(photoReceiptServiceProvider).read(pages);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan nicht möglich: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (preview != null && mounted) {
+      await context.push('/import-review', extra: preview);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -60,12 +78,15 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             onTap: _busy ? null : _importPdf,
           ),
         ),
-        const Card(
+        Card(
           child: ListTile(
-            enabled: false,
-            leading: Icon(Icons.document_scanner_outlined),
-            title: Text('Papierbon fotografieren'),
-            subtitle: Text('Folgt in einem späteren Schritt von Phase 2.'),
+            key: const Key('scan-paper'),
+            leading: const Icon(Icons.document_scanner_outlined),
+            title: const Text('Papierbon fotografieren'),
+            subtitle: const Text(
+                'Der Bon wird auf dem Handy gelesen. Nur wenn die Prüfung nicht aufgeht, hilft die Cloud, und dann ohne Zahlungsdaten.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _busy ? null : _scanPaper,
           ),
         ),
         const Card(

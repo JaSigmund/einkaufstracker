@@ -126,7 +126,7 @@ void main() {
 
       expect(find.text('Alles stimmig: Die Summe der Positionen entspricht der Bon-Summe, und der Steuerblock geht auf.'), findsOneWidget);
       expect(find.text('Billa, Filiale 0643'), findsOneWidget);
-      expect(find.text('02.07.2026, 19:51 Uhr'), findsOneWidget);
+      expect(find.text('02.07.2026, 19:51 Uhr · Digitaler Bon (PDF)'), findsOneWidget);
       expect(find.text('Clever Champignon weiß'), findsOneWidget);
       expect(find.text('Speichern'), findsOneWidget);
 

@@ -7,7 +7,11 @@ import 'vienna_time.dart';
 /// Test-Bons Summe und Steuerblock exakt getroffen hat. Der Parser kennt nur das Textformat, er
 /// liest keine PDF-Dateien.
 class BillaTextParser {
-  const BillaTextParser();
+  /// [lenient] fuer OCR-Text von Papierbons: Der Steuerbuchstabe hinter dem Artikelnamen darf fehlen
+  /// (er wird bei Fotos oft nicht gelesen). Die Steuerpruefung laeuft dann ueber die Gesamtsumme des Steuerblocks.
+  const BillaTextParser({this.lenient = false});
+
+  final bool lenient;
 
   static const _price = r'-?\d{1,4}[.,]\d{2}';
 
@@ -18,6 +22,7 @@ class BillaTextParser {
     r'^\s*(-?\d+(?:[.,]\d+)?)\s*(kg|g|l)?\s*(?:\(N\))?\s*[xX]\s+(' + _price + r')\s*(?:EUR/(kg|l))?\s*$',
   );
   static final _itemLine = RegExp(r'^\s*(.+?)\s+([A-Z])\s+(' + _price + r')\s*$');
+  static final _itemLineLenient = RegExp(r'^\s*(.+?)(?:\s+([A-Z]))?\s+(' + _price + r')\s*$');
   static final _bonDiscountLine = RegExp(r'^\s*(.+?)\s+(?:(\d+)%\s+)?(-\d{1,4}[.,]\d{2})\s*$');
   static final _labelLine = RegExp(r'^\s*[A-Za-zÄÖÜäöüß .\-]+$');
   static final _taxLine = RegExp(
@@ -58,6 +63,7 @@ class BillaTextParser {
     final items = <ParsedItem>[];
     final bonDiscounts = <BonDiscount>[];
     int? subtotal;
+    var unlabeledItems = 0;
 
     // Menge aus der Mengenzeile, gilt fuer die naechste Artikelzeile
     double? pendingQty;
@@ -84,8 +90,18 @@ class BillaTextParser {
         continue;
       }
 
-      final mi = _itemLine.firstMatch(l);
+      var mi = _itemLine.firstMatch(l);
+      var unlabeled = false;
+      if (mi == null && lenient) {
+        // Nach der Zwischensumme stehen Rabatte auf Bon-Ebene (ohne Steuerbuchstaben), keine Positionen
+        final isBonLevel = subtotal != null && _bonDiscountLine.hasMatch(l);
+        if (!isBonLevel) {
+          mi = _itemLineLenient.firstMatch(l);
+          unlabeled = mi != null && mi.group(2) == null;
+        }
+      }
       if (mi != null) {
+        if (unlabeled) unlabeledItems++;
         final name = mi.group(1)!.trim();
         final cents = _cents(mi.group(3)!);
         var kind = ReceiptItemKind.article;
@@ -181,6 +197,7 @@ class BillaTextParser {
       taxBlockGrossSumCents: tax.values.fold<int>(0, (s, e) => s + e.grossCents),
       classDifferences: differences,
       missingTaxClasses: missing,
+      unlabeledItems: unlabeledItems,
     );
 
     return ParsedReceipt(

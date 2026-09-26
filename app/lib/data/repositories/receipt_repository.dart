@@ -62,6 +62,28 @@ class ReceiptRepository {
         .getSingleOrNull();
   }
 
+  /// Bereits gespeicherter Bon zum selben Einkauf: gleiche Re-Nr, oder (ohne Re-Nr, z.B. Cloud-Lesung eines
+  /// Fotos) gleiche Summe und Kaufzeit auf zwei Minuten genau. So wird ein Papierbon nicht doppelt erfasst,
+  /// wenn derselbe Einkauf schon als digitaler Bon vorliegt.
+  Future<Receipt?> findDuplicate(ParsedReceipt r) async {
+    if (r.externalId != null) {
+      final byId = await findByExternalId(r.externalId!);
+      if (byId != null) return byId;
+    }
+    if (r.purchasedAtUtc == null || r.totalCents == null) return null;
+    final hid = await householdId();
+    final from = r.purchasedAtUtc!.subtract(const Duration(minutes: 2));
+    final to = r.purchasedAtUtc!.add(const Duration(minutes: 2));
+    final candidates = await (_db.select(_db.receipts)
+          ..where((x) =>
+              x.householdId.equals(hid) &
+              x.deletedAt.isNull() &
+              x.totalCents.equals(r.totalCents!) &
+              x.purchasedAt.isBetweenValues(from, to)))
+        .get();
+    return candidates.firstOrNull;
+  }
+
   /// Nicht geloeschte, bestaetigte Bons, neueste zuerst.
   Stream<List<Receipt>> watchAll() => (_db.select(_db.receipts)
         ..where((r) => r.deletedAt.isNull() & r.status.equals('confirmed'))
@@ -95,12 +117,8 @@ class ReceiptRepository {
     final categorizer = await _buildCategorizer(hid);
     final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : _uuid.v4();
 
-    if (r.externalId != null) {
-      final existing = await (_db.select(_db.receipts)
-            ..where((x) => x.householdId.equals(hid) & x.externalId.equals(r.externalId!) & x.deletedAt.isNull()))
-          .getSingleOrNull();
-      if (existing != null) return ReceiptSaveResult(ReceiptSaveOutcome.duplicate, existing.id);
-    }
+    final existing = await findDuplicate(r);
+    if (existing != null) return ReceiptSaveResult(ReceiptSaveOutcome.duplicate, existing.id);
 
     await _db.transaction(() async {
       // Filiale finden oder anlegen
