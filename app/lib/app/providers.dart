@@ -142,6 +142,14 @@ final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
 
 final receiptsStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchAll());
 
+final storesStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchStores());
+
+final receiptProvider =
+    StreamProvider.family((ref, String id) => ref.watch(receiptRepositoryProvider).watchReceipt(id));
+
+final receiptItemsProvider =
+    StreamProvider.family((ref, String id) => ref.watch(receiptRepositoryProvider).watchItems(id));
+
 final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextReader());
 
 final receiptImportServiceProvider = Provider<ReceiptImportService>(
