@@ -119,6 +119,28 @@ class CategoryAliases extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Originalbeleg zu einem Bon: Foto ohne Zahlungsblock oder PDF (Spiegel von public.receipt_files).
+/// Die Datei selbst liegt lokal im App-Ordner und im Storage-Bucket "receipts".
+@DataClassName('ReceiptFile')
+class ReceiptFiles extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get receiptId => text()();
+
+  /// 'pdf' | 'image'
+  TextColumn get kind => text()();
+  IntColumn get pageNo => integer().withDefault(const Constant(1))();
+
+  /// Pfad im Bucket: {household_id}/{receipt_id}/{file_id}.{ext}
+  TextColumn get storagePath => text()();
+  IntColumn get sizeBytes => integer().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -155,7 +177,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, CategoryAliases, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -163,7 +185,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -178,6 +200,10 @@ class AppDatabase extends _$AppDatabase {
           // 2 -> 3: gelernte Kategorie-Zuordnungen
           if (from < 3) {
             await m.createTable(categoryAliases);
+          }
+          // 3 -> 4: Originalbelege (Fotos, PDFs)
+          if (from < 4) {
+            await m.createTable(receiptFiles);
           }
         },
       );

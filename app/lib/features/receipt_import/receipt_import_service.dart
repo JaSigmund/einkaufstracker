@@ -1,9 +1,31 @@
 import 'dart:typed_data';
 
+import '../../data/files/receipt_file_service.dart';
 import '../../data/pdf/pdf_text_reader.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../domain/receipt/billa_text_parser.dart';
 import '../../domain/receipt/parsed_receipt.dart';
+
+/// Eine Datei, die nach dem Speichern zum Bon abgelegt wird. Bilder werden erst dann aufbereitet (verkleinert und
+/// ohne Zahlungsblock), damit beim Verwerfen keine Arbeit anfaellt.
+class AttachmentSource {
+  const AttachmentSource.pdf(this.bytes)
+      : kind = 'pdf',
+        imagePath = null,
+        cutY = null,
+        pageNo = 1;
+  const AttachmentSource.image(this.imagePath, {required this.cutY, required this.pageNo})
+      : kind = 'image',
+        bytes = null;
+
+  final String kind;
+  final Uint8List? bytes;
+  final String? imagePath;
+
+  /// Alles ab dieser Bildzeile (Zahlungsblock) wird abgeschnitten.
+  final double? cutY;
+  final int pageNo;
+}
 
 /// Werte der Spalte receipts.source (Postgres-Enum ocr_source).
 class ReceiptSources {
@@ -28,7 +50,11 @@ class ImportPreview {
     this.source = ReceiptSources.pdfText,
     this.note,
     this.edited = false,
+    this.attachments = const [],
   });
+
+  /// Originalbelege, die nach dem Speichern abgelegt werden.
+  final List<AttachmentSource> attachments;
 
   /// Vom Nutzer in der Bearbeitungsansicht veraendert.
   final bool edited;
@@ -41,6 +67,7 @@ class ImportPreview {
         source: source,
         note: note,
         edited: edited ?? this.edited,
+        attachments: attachments,
       );
 
   final ParsedReceipt receipt;
@@ -63,7 +90,19 @@ class ImportPreview {
 
 /// Ablauf des PDF-Imports: PDF lesen, Text parsen, auf Duplikat pruefen, speichern.
 class ReceiptImportService {
-  ReceiptImportService(this._reader, this._repo, {this.parser = const BillaTextParser()});
+  ReceiptImportService(
+    this._reader,
+    this._repo, {
+    this.parser = const BillaTextParser(),
+    this.files,
+    this.prepareImage,
+  });
+
+  /// Ablage der Originalbelege. Null = nichts ablegen.
+  final ReceiptFileService? files;
+
+  /// Bereitet ein Foto zum Ablegen auf (verkleinern, Zahlungsblock abschneiden).
+  final Future<Uint8List> Function(String path, {double? cutY})? prepareImage;
 
   final PdfTextReader _reader;
   final ReceiptRepository _repo;
@@ -85,7 +124,7 @@ class ReceiptImportService {
       );
     }
     final existing = await _repo.findDuplicate(parsed);
-    return ImportPreview(receipt: parsed, duplicateOfReceiptId: existing?.id);
+    return ImportPreview(receipt: parsed, duplicateOfReceiptId: existing?.id, attachments: [AttachmentSource.pdf(pdfBytes)]);
   }
 
   /// Prueft nach einer Bearbeitung erneut, ob der Einkauf schon gespeichert ist (Summe oder Zeit koennen sich geaendert haben).
@@ -98,12 +137,34 @@ class ReceiptImportService {
       source: preview.source,
       note: preview.note,
       edited: preview.edited,
+      attachments: preview.attachments,
     );
   }
 
   /// Speichert die Vorschau als bestaetigten Bon. Wirft, wenn sie nicht importierbar ist.
-  Future<ReceiptSaveResult> save(ImportPreview preview) {
+  Future<ReceiptSaveResult> save(ImportPreview preview) async {
     if (!preview.canImport) throw StateError('Der Bon kann nicht importiert werden.');
-    return _repo.saveParsed(preview.receipt, source: preview.source);
+    final result = await _repo.saveParsed(preview.receipt, source: preview.source);
+    if (result.outcome == ReceiptSaveOutcome.saved) await _storeAttachments(result.receiptId, preview.attachments);
+    return result;
+  }
+
+  /// Legt die Originalbelege ab. Das darf das Speichern des Bons nie scheitern lassen.
+  Future<void> _storeAttachments(String receiptId, List<AttachmentSource> sources) async {
+    final files = this.files;
+    if (files == null || sources.isEmpty) return;
+    try {
+      final list = <ReceiptAttachment>[];
+      for (final s in sources) {
+        if (s.kind == 'pdf') {
+          list.add(ReceiptAttachment(kind: 'pdf', bytes: s.bytes!));
+        } else if (prepareImage != null) {
+          list.add(ReceiptAttachment(kind: 'image', bytes: await prepareImage!(s.imagePath!, cutY: s.cutY), pageNo: s.pageNo));
+        }
+      }
+      await files.attach(receiptId, list);
+    } catch (_) {
+      // Beleg konnte nicht abgelegt werden (z.B. Speicher voll): der Bon selbst ist gespeichert
+    }
   }
 }

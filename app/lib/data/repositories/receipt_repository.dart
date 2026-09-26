@@ -102,6 +102,23 @@ class ReceiptRepository {
         ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
       .watch();
 
+  Stream<List<ReceiptFile>> watchFiles(String receiptId) => (_db.select(_db.receiptFiles)
+        ..where((f) => f.receiptId.equals(receiptId) & f.deletedAt.isNull())
+        ..orderBy([(f) => OrderingTerm.asc(f.pageNo)]))
+      .watch();
+
+  Future<List<ReceiptFile>> filesOf(String receiptId) => (_db.select(_db.receiptFiles)
+        ..where((f) => f.receiptId.equals(receiptId) & f.deletedAt.isNull())
+        ..orderBy([(f) => OrderingTerm.asc(f.pageNo)]))
+      .get();
+
+  /// Legt den Verweis auf eine Originaldatei an und stellt ihn in die Outbox.
+  Future<void> putFile(ReceiptFile f) async {
+    await _put('receipt_files', f.id, receiptFileToRemote(f),
+        () => _db.into(_db.receiptFiles).insertOnConflictUpdate(f.toCompanion(false)));
+    onChanged?.call();
+  }
+
   /// Alle nicht geloeschten Positionen (fuer die Auswertung; Positionen geloeschter Bons filtert der Aufrufer
   /// ueber die Bonliste).
   Stream<List<ReceiptItem>> watchAllItems() =>
@@ -336,6 +353,12 @@ class ReceiptRepository {
       final deleted = r.copyWith(deletedAt: Value(now), updatedAt: now);
       await _put('receipts', r.id, receiptToRemote(deleted),
           () => _db.into(_db.receipts).insertOnConflictUpdate(deleted.toCompanion(false)));
+      final files = await (_db.select(_db.receiptFiles)..where((f) => f.receiptId.equals(receiptId) & f.deletedAt.isNull())).get();
+      for (final f in files) {
+        final df = f.copyWith(deletedAt: Value(now), updatedAt: now);
+        await _put('receipt_files', f.id, receiptFileToRemote(df),
+            () => _db.into(_db.receiptFiles).insertOnConflictUpdate(df.toCompanion(false)));
+      }
       final items = await (_db.select(_db.receiptItems)..where((i) => i.receiptId.equals(receiptId) & i.deletedAt.isNull())).get();
       for (final i in items) {
         final di = i.copyWith(deletedAt: Value(now), updatedAt: now);

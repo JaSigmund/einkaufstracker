@@ -189,6 +189,22 @@ void main() {
     expect(sources, {'on_device', 'llm'});
   });
 
+  test('Belegfoto: Seiten bis zur Summenseite, die Summenseite mit Schnitt vor dem Zahlungsblock', () async {
+    final pages = _pages('billa_paper_02');
+    final p = await service().read(pages);
+    final a = p.attachments.single;
+    expect((a.kind, a.pageNo, a.imagePath), ('image', 1, 'page0.jpg'));
+    final lines = pages.single.lines;
+    expect(a.cutY, greaterThan(lines.firstWhere((l) => l.text.startsWith('Summe')).box.bottom));
+    expect(a.cutY, lessThan(lines.firstWhere((l) => l.text.contains('Kundenbeleg')).box.top));
+  });
+
+  test('Belegfoto: ohne erkennbaren Zahlungsschnitt wird kein Foto zum Ablegen vorgemerkt', () async {
+    final page = ScannedPage('x.jpg', const [OcrLine('Zwetschken 1kg', Rect.fromLTWH(100, 100, 300, 40))]);
+    final p = await service().read([page]);
+    expect(p.attachments, isEmpty);
+  });
+
   group('parsedReceiptFromCloud', () {
     test('Zeit mit Offset und ohne (Wiener Ortszeit)', () {
       expect(parsedReceiptFromCloud(_cloudJson(100, [100], at: '2026-09-24T14:42:00+02:00')).purchasedAtUtc, DateTime.utc(2026, 9, 24, 12, 42));

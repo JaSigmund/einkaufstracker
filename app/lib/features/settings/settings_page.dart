@@ -84,7 +84,8 @@ class SettingsPage extends ConsumerWidget {
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.photo_outlined),
-                title: const Text('Bon-Fotos speichern'),
+                title: const Text('Originalbelege speichern'),
+                subtitle: const Text('Foto (ohne Zahlungsblock) oder PDF wird beim Bon abgelegt, privat auf dem Server. Gilt für neue Bons.'),
                 value: s.keepReceiptImages,
                 onChanged: (v) => _update(context, ref, {'keep_receipt_images': v}),
               ),
