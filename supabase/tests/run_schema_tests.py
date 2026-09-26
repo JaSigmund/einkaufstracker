@@ -202,6 +202,25 @@ def main():
     check("Storage: A darf nicht in fremden Haushaltsordner schreiben",
           raises("insert into storage.objects (bucket_id, name) values ('receipts', %s)", (f"{hb}/x.jpg",), user=A))
 
+    # --- Bon-Import (0005) ----------------------------------------------------------------
+    rec_sql = ("insert into receipts (household_id, store_id, purchased_at, total_cents, status, source, external_id) "
+               "values (%s,%s,%s,100,'confirmed','pdf_text',%s)")
+    db(rec_sql, (ha, store, "2026-07-02 17:51+00", "0643-20260702-03-4852"))
+    check("Bon-Import: gleiche Re-Nr im selben Haushalt wird abgelehnt (Duplikat)",
+          raises(rec_sql, (ha, store, "2026-07-02 17:51+00", "0643-20260702-03-4852")))
+    check("Bon-Import: gleiche Re-Nr in anderem Haushalt ist erlaubt",
+          not raises(rec_sql, (hb, None, "2026-07-02 17:51+00", "0643-20260702-03-4852")))
+    check("Bon-Import: Bons ohne Re-Nr duerfen mehrfach vorkommen",
+          not raises(rec_sql.replace("%s)", "null)", 1), (ha, store, "2026-07-03 10:00+00"))
+          and not raises(rec_sql.replace("%s)", "null)", 1), (ha, store, "2026-07-04 10:00+00")))
+    rid = one("select id from receipts where external_id='0643-20260702-03-4852' and household_id=%s", (ha,))
+    check("Bon-Import: Position mit Steuerbuchstabe speicherbar",
+          not raises("insert into receipt_items (household_id, receipt_id, line_no, raw_text, line_total_cents, tax_code) "
+                     "values (%s,%s,1,'Clever Champignon',189,'H')", (ha, rid)))
+    db("update receipts set deleted_at = now() where id=%s", (rid,))
+    check("Bon-Import: nach dem Loeschen (Soft-Delete) darf die Re-Nr erneut importiert werden",
+          not raises(rec_sql, (ha, store, "2026-07-02 17:51+00", "0643-20260702-03-4852")))
+
     # --- Inventarbewegungen (0003) -------------------------------------------------------
     ins_mv = ("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, occurred_at) "
               "values (%s,%s,%s,%s,'kg',%s)")

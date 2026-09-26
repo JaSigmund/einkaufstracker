@@ -34,3 +34,7 @@ testdata/receipts/cloud_results/
 app/android/key.properties
 app/dart_defines.local.json
 *.jks
+
+# Python-Bytecode
+__pycache__/
+*.pyc

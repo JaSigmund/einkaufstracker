@@ -51,3 +51,89 @@ ProductsCompanion productFromRemote(Map<String, dynamic> j) => ProductsCompanion
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> storeToRemote(Store s) => {
+      'id': s.id,
+      'household_id': s.householdId,
+      'chain': s.chain,
+      'branch': s.branch,
+      'updated_at': s.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': s.deletedAt?.toUtc().toIso8601String(),
+    };
+
+StoresCompanion storeFromRemote(Map<String, dynamic> j) => StoresCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      chain: Value(j['chain'] as String),
+      branch: Value(j['branch'] as String?),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> receiptToRemote(Receipt r) => {
+      'id': r.id,
+      'household_id': r.householdId,
+      'store_id': r.storeId,
+      'purchased_at': r.purchasedAt.toUtc().toIso8601String(),
+      'total_cents': r.totalCents,
+      'status': r.status,
+      'source': r.source,
+      'external_id': r.externalId,
+      'confidence': r.confidence,
+      'sum_mismatch': r.sumMismatch,
+      'updated_at': r.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': r.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ReceiptsCompanion receiptFromRemote(Map<String, dynamic> j) => ReceiptsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      storeId: Value(j['store_id'] as String?),
+      purchasedAt: Value(_dt(j['purchased_at'])!),
+      totalCents: Value((j['total_cents'] as num).toInt()),
+      status: Value(j['status'] as String? ?? 'confirmed'),
+      source: Value(j['source'] as String? ?? 'manual'),
+      externalId: Value(j['external_id'] as String?),
+      confidence: Value((j['confidence'] as num?)?.toDouble()),
+      sumMismatch: Value(j['sum_mismatch'] as bool? ?? false),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> receiptItemToRemote(ReceiptItem i) => {
+      'id': i.id,
+      'household_id': i.householdId,
+      'receipt_id': i.receiptId,
+      'line_no': i.lineNo,
+      'kind': i.kind,
+      'raw_text': i.rawText,
+      'product_id': i.productId,
+      'category_id': i.categoryId,
+      'quantity': i.quantity,
+      'quantity_unit': i.quantityUnit,
+      'unit_price_cents': i.unitPriceCents,
+      'line_total_cents': i.lineTotalCents,
+      'tax_code': i.taxCode,
+      'needs_review': i.needsReview,
+      'updated_at': i.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ReceiptItemsCompanion receiptItemFromRemote(Map<String, dynamic> j) => ReceiptItemsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      receiptId: Value(j['receipt_id'] as String),
+      lineNo: Value((j['line_no'] as num).toInt()),
+      kind: Value(j['kind'] as String? ?? 'article'),
+      rawText: Value(j['raw_text'] as String),
+      productId: Value(j['product_id'] as String?),
+      categoryId: Value(j['category_id'] as String?),
+      quantity: Value((j['quantity'] as num?)?.toDouble() ?? 1),
+      quantityUnit: Value(j['quantity_unit'] as String? ?? 'piece'),
+      unitPriceCents: Value((j['unit_price_cents'] as num?)?.toInt()),
+      lineTotalCents: Value((j['line_total_cents'] as num).toInt()),
+      taxCode: Value(j['tax_code'] as String?),
+      needsReview: Value(j['needs_review'] as bool? ?? false),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );

@@ -16,6 +16,10 @@ class SyncTableDef {
 final syncTables = <SyncTableDef>[
   SyncTableDef('categories', (db, j) => db.into(db.categories).insertOnConflictUpdate(categoryFromRemote(j))),
   SyncTableDef('products', (db, j) => db.into(db.products).insertOnConflictUpdate(productFromRemote(j))),
+  // Reihenfolge wichtig: Fremdschluessel (Bon -> Filiale, Position -> Bon) zeigen auf zuvor gelieferte Zeilen
+  SyncTableDef('stores', (db, j) => db.into(db.stores).insertOnConflictUpdate(storeFromRemote(j))),
+  SyncTableDef('receipts', (db, j) => db.into(db.receipts).insertOnConflictUpdate(receiptFromRemote(j))),
+  SyncTableDef('receipt_items', (db, j) => db.into(db.receiptItems).insertOnConflictUpdate(receiptItemFromRemote(j))),
 ];
 
 class SyncResult {

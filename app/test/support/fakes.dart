@@ -6,6 +6,7 @@ import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
 import 'package:einkaufstracker/data/repositories/auth_repository.dart';
 import 'package:einkaufstracker/data/repositories/category_repository.dart';
+import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 
 AppDatabase memoryDb() {
   // Mehrere In-Memory-Datenbanken je Test sind gewollt (simulieren mehrere Geraete)
@@ -43,6 +44,15 @@ class FakeRemoteStore implements RemoteStore {
           r['id'] != row['id'] && r['household_id'] == row['household_id'] && r['name'] == row['name']);
       if (clash) throw RemoteDataException('23505: duplicate key value violates unique constraint');
     }
+    if (tableName == 'receipts' && row['external_id'] != null && row['deleted_at'] == null) {
+      // wie der Unique-Index receipts_external_id_uniq: gleiche Re-Nr, anderer Datensatz, nicht geloescht
+      final clash = table(tableName).values.any((r) =>
+          r['id'] != row['id'] &&
+          r['household_id'] == row['household_id'] &&
+          r['external_id'] == row['external_id'] &&
+          r['deleted_at'] == null);
+      if (clash) throw RemoteDataException('23505: duplicate key value violates unique constraint receipts_external_id_uniq');
+    }
     final stored = Map<String, dynamic>.from(row);
     stored['updated_at'] = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
     table(tableName)[row['id'] as String] = stored;
@@ -69,3 +79,6 @@ class FakeAuth implements AuthRepository {
 
 CategoryRepository categoryRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     CategoryRepository(db, householdId: () async => household, onChanged: onChanged);
+
+ReceiptRepository receiptRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    ReceiptRepository(db, householdId: () async => household, onChanged: onChanged);
