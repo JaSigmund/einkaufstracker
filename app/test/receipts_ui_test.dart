@@ -74,10 +74,10 @@ void main() {
   });
 
   group('Uebersicht', () {
-    Widget host(List<Receipt> list, {DateTime? now}) => ProviderScope(
+    Widget host(List<Receipt> list, {DateTime? now, List<Store>? stores}) => ProviderScope(
           overrides: [
             receiptsStreamProvider.overrideWith((ref) => Stream.value(list)),
-            storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
+            storesStreamProvider.overrideWith((ref) => Stream.value(stores ?? [_store])),
           ],
           child: MaterialApp.router(
             routerConfig: GoRouter(routes: [
@@ -95,11 +95,69 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
-      expect(find.text('September 2026'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('period-label'))).data, 'September 2026');
       expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '49,57 €');
       expect(find.text('2 Einkäufe'), findsOneWidget);
-      expect(find.text('Billa, Filiale 0643'), findsNWidgets(3));
+      expect(find.text('Billa, Filiale 0643'), findsNWidgets(2)); // nur September, der August ist ausgefiltert
       expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget); // Bon mit Abweichung markiert
+    });
+
+    final hofer = Store(id: 's2', householdId: 'h', chain: 'Hofer', updatedAt: DateTime.utc(2026));
+    List<Receipt> mixed() => [
+          _receipt('a', DateTime.utc(2026, 9, 24, 12, 42), 2319),
+          _receipt('b', DateTime.utc(2026, 9, 26, 14, 38), 1000, store: 's2'),
+          _receipt('c', DateTime.utc(2026, 8, 12, 16, 10), 632),
+          _receipt('d', DateTime.utc(2026, 8, 20, 9, 0), 500, store: 's2'),
+        ];
+
+    testWidgets('Filter Monat: Alle Monate zeigt alles, ein anderer Monat nur seine Bons, Summe folgt dem Filter', (tester) async {
+      await tester.pumpWidget(host(mixed(), stores: [_store, hofer]));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '33,19 €'); // September: 23,19 + 10,00
+
+      await tester.tap(find.byKey(const Key('filter-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alle Monate').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('period-label'))).data, 'Alle Monate');
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '44,51 €');
+      expect(find.text('4 Einkäufe'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('filter-month')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('August 2026').last);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '11,32 €');
+      expect(find.text('2 Einkäufe'), findsOneWidget);
+    });
+
+    testWidgets('Filter Markt: nur Billa oder nur Hofer, kombinierbar mit dem Monat, erneutes Tippen hebt auf', (tester) async {
+      await tester.pumpWidget(host(mixed(), stores: [_store, hofer]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('filter-chain-Billa')), findsOneWidget);
+      expect(find.byKey(const Key('filter-chain-Hofer')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('filter-chain-Hofer')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('period-label'))).data, 'September 2026 · Hofer');
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '10,00 €');
+      expect(find.text('1 Einkauf'), findsOneWidget);
+      expect(find.text('Hofer'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('filter-chain-Billa')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '23,19 €');
+
+      await tester.tap(find.byKey(const Key('filter-chain-Billa'))); // aufheben
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '33,19 €');
+    });
+
+    testWidgets('Auswahl ohne Treffer: Hinweis, Summe 0', (tester) async {
+      await tester.pumpWidget(host([_receipt('a', DateTime.utc(2026, 8, 24, 12, 42), 2319)], stores: [_store]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('no-match')), findsOneWidget); // aktueller Monat (September) hat keinen Bon
+      expect(tester.widget<Text>(find.byKey(const Key('month-total'))).data, '0,00 €');
     });
 
     testWidgets('ohne Bons: Hinweis auf den Import und Monatssumme 0', (tester) async {
