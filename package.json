@@ -1,0 +1,16 @@
+{
+  "name": "einkaufstracker",
+  "version": "1.0.0",
+  "description": "Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Ausgaben nach Kategorie/Artikel, Inventar mit Haltbarkeit und Einkaufsliste. Backend: Supabase.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "supabase": "^2.118.0"
+  }
+}

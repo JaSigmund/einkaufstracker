@@ -1,0 +1,36 @@
+# Secrets
+.env
+.env.*
+*.keystore
+*.jks
+key.properties
+
+# Bon-Fotos enthalten persoenliche Daten (Golden Set nur lokal)
+testdata/receipts/
+
+# Supabase lokal
+supabase/.branches/
+supabase/.temp/
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins*
+app/.packages
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Node
+node_modules/
+
+# Testkonfiguration (Projekt-URL und oeffentlicher Client-Schluessel)
+tools/.test_config.json
+testdata/receipts/cloud_results/
+
+# App: Signierung und lokale Konfiguration (Passwoerter, Projektschluessel)
+app/android/key.properties
+app/dart_defines.local.json
+*.jks

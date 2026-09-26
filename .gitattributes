@@ -1,0 +1,7 @@
+# Einheitliche Zeilenenden: im Repo LF, Windows-Checkouts duerfen CRLF nutzen
+* text=auto
+*.sh text eol=lf
+*.jpg binary
+*.png binary
+*.pdf binary
+*.jks binary
