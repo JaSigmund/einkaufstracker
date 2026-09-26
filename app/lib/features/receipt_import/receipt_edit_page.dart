@@ -333,20 +333,23 @@ class _LineDialogState extends State<_LineDialog> {
         title: Text(widget.initial == null ? 'Position hinzufügen' : 'Position bearbeiten'),
         content: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 8), // Platz fuer das schwebende Label des ersten Feldes
             TextField(key: const Key('line-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name'), textCapitalization: TextCapitalization.sentences),
+            const SizedBox(height: 16),
             TextField(
               key: const Key('line-amount'),
               controller: _amount,
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
               decoration: const InputDecoration(labelText: 'Betrag der Zeile (€)'),
             ),
+            const SizedBox(height: 16),
             TextField(
               key: const Key('line-qty'),
               controller: _qty,
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
               decoration: const InputDecoration(labelText: 'Menge'),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             DropdownButtonFormField<EditKind>(
               key: const Key('line-kind'),
               initialValue: _kind,
