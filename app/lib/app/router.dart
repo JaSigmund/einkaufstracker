@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/login_page.dart';
 import '../features/categories/categories_page.dart';
 import '../features/home/home_shell.dart';
+import '../features/receipt_import/import_review_page.dart';
+import '../features/receipt_import/receipt_import_service.dart';
 import '../features/settings/settings_page.dart';
 import 'providers.dart';
 
@@ -43,6 +45,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (_, _) => const HomeShell()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/categories', builder: (_, _) => const CategoriesPage()),
+      GoRoute(
+        path: '/import-review',
+        builder: (_, state) => ImportReviewPage(preview: state.extra as ImportPreview),
+        redirect: (_, state) => state.extra is ImportPreview ? null : '/',
+      ),
     ],
   );
 });

@@ -38,6 +38,14 @@ class ReceiptRepository {
 
   String _itemId(String receiptId, int lineNo) => _uuid.v5(Namespace.url.value, 'einkaufstracker:item:$receiptId:$lineNo');
 
+  /// Bereits gespeicherter (nicht geloeschter) Bon mit dieser Re-Nr, sonst null.
+  Future<Receipt?> findByExternalId(String externalId) async {
+    final hid = await householdId();
+    return (_db.select(_db.receipts)
+          ..where((x) => x.householdId.equals(hid) & x.externalId.equals(externalId) & x.deletedAt.isNull()))
+        .getSingleOrNull();
+  }
+
   /// Nicht geloeschte, bestaetigte Bons, neueste zuerst.
   Stream<List<Receipt>> watchAll() => (_db.select(_db.receipts)
         ..where((r) => r.deletedAt.isNull() & r.status.equals('confirmed'))
