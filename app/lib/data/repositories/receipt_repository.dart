@@ -77,6 +77,11 @@ class ReceiptRepository {
         ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
       .watch();
 
+  /// Alle nicht geloeschten Positionen (fuer die Auswertung; Positionen geloeschter Bons filtert der Aufrufer
+  /// ueber die Bonliste).
+  Stream<List<ReceiptItem>> watchAllItems() =>
+      (_db.select(_db.receiptItems)..where((i) => i.deletedAt.isNull())).watch();
+
   /// Speichert einen gelesenen Bon als bestaetigt. Ein Bon mit derselben Re-Nr wird nicht doppelt angelegt.
   ///
   /// Bons, die nicht alle Pruefungen bestehen, werden mit `sumMismatch = true` gespeichert (der Nutzer hat

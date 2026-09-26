@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
+import '../report/report_page.dart';
 
 /// Rahmen mit Navigation. Die Inhalte der Tabs kommen in spaeteren Phasen (siehe Roadmap).
 class HomeShell extends StatefulWidget {
@@ -67,6 +68,8 @@ class _HomeShellState extends State<HomeShell> {
           ? const ReceiptsOverview()
           : _index == 2
           ? const ScanPage()
+          : _index == 4
+          ? const ReportPage()
           : Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
