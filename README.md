@@ -74,3 +74,15 @@ npx supabase db query --linked "select 1"   # Abfrage gegen das Projekt
 ```
 
 Regel: bereits eingespielte Migrationen (0001 bis 0003) werden nie mehr geaendert, Aenderungen kommen als neue Migration. Datenbankpasswort, Access Tokens und API-Keys gehoeren nie in den Chat oder ins Repo.
+
+## Entwicklungs-Workflow
+
+Ein Projekt mit einer Person, aber mit den Regeln eines Teams, damit der Verlauf nachvollziehbar und `main` immer lauffaehig bleibt.
+
+- **`main` ist stabil.** Es wird nicht direkt darauf gearbeitet. Jede Aenderung kommt ueber einen Branch und einen Pull Request.
+- **Branch-Namen:** `feat/<thema>`, `fix/<thema>`, `docs/<thema>`, `chore/<thema>`, `ci/<thema>`, z.B. `feat/pdf-import`.
+- **Commits** nach Conventional Commits: `feat(app): ...`, `fix(db): ...`, `docs: ...`, `chore: ...`, `ci: ...`, `test: ...`. Betreff im Imperativ, ein Gedanke pro Commit, im Rumpf das *Warum*.
+- **Pull Requests** werden erst gemergt, wenn die CI gruen ist (App: analyze und test, Datenbank: Schema- und RLS-Tests, Edge Function: Typpruefung). Merge per **Squash**, damit `main` eine lineare, lesbare Historie hat.
+- **Datenbank:** Migrationen in `supabase/migrations/` sind nach dem Einspielen unveraenderlich. Aenderungen kommen als neue, hoeher nummerierte Datei. Entwuerfe liegen in `supabase/planned/`.
+- **Geheimnisse** (Passwoerter, Keystore, API-Keys, Bon-Fotos) gehoeren nie ins Repo. Sie stehen in `.gitignore`. Vor jedem Commit ist der Diff darauf zu pruefen.
+- **Meilensteine** werden als Tag markiert (z.B. `m1-phase1`).
