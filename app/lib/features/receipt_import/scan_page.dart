@@ -6,10 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
-import '../../data/repositories/product_repository.dart';
-import '../products/product_form_page.dart';
-import '../../data/local/database.dart';
-import '../products/stock_entry_page.dart';
+import '../products/barcode_flow.dart';
 import 'receipt_import_service.dart';
 
 enum _Busy { pdf, paper, barcode }
@@ -85,36 +82,19 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   }
 
   Future<void> _scanBarcode() async {
-    setState(() {
-      _busy = _Busy.barcode;
-      _status = 'Scanner wird geöffnet …';
-    });
-    String? ean;
-    BarcodeLookupResult? result;
-    try {
-      ean = await ref.read(barcodeScannerProvider).scan(context);
-      if (ean != null) {
-        if (mounted) setState(() => _status = 'Produkt wird gesucht …');
-        result = await ref.read(productRepositoryProvider).lookup(ean);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Barcode-Scan nicht möglich: $e')));
-      }
-    } finally {
-      // Die Ladeanzeige gilt nur fuer Scan und Suche, nicht fuer die Anlage-/Erfassungsseiten danach
-      // (sonst blockiert ein wartendes push() wie beim PDF-Import die Anzeige, siehe dortigen Kommentar).
-      if (mounted) setState(() => _busy = null);
-    }
-    if (ean == null || result == null || !mounted) return;
-    if (result.isKnown) {
-      await context.push('/stock-entry', extra: StockEntryArgs(product: result.product!, ean: ean));
-    } else {
-      final created = await context.push('/product-form', extra: ProductFormArgs(ean: ean, suggestion: result.offSuggestion));
-      if (created is Product && mounted) {
-        await context.push('/stock-entry', extra: StockEntryArgs(product: created, ean: ean));
-      }
-    }
+    setState(() => _busy = _Busy.barcode);
+    // Die Ladeanzeige gilt nur fuer Scan und Suche, nicht fuer die Anlage-/Erfassungsseiten danach
+    // (sonst blockiert ein wartendes push() wie beim PDF-Import die Anzeige, siehe dortigen Kommentar).
+    await startBarcodeScan(
+      context,
+      ref,
+      onStatus: (s) {
+        if (mounted) setState(() => _status = s);
+      },
+      onLookupDone: () {
+        if (mounted) setState(() => _busy = null);
+      },
+    );
   }
 
   @override

@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
+import '../products/barcode_flow.dart';
+import 'inventory_item_detail_page.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
 const _locationOrder = ['fridge', 'freezer', 'pantry', 'other'];
+
+const _groupTitles = {
+  ExpiryLevel.expired: 'Abgelaufen',
+  ExpiryLevel.soon: 'Läuft bald ab',
+  ExpiryLevel.ok: 'Gut',
+  ExpiryLevel.unknown: 'Ohne Ablaufdatum',
+};
+// Reihenfolge der Gruppen: das Dringende zuerst, wie in der Uebersicht (Doku 08 §3.1 "Bald ablaufend").
+const _groupOrder = [ExpiryLevel.expired, ExpiryLevel.soon, ExpiryLevel.ok, ExpiryLevel.unknown];
 
 Color _dotColor(ExpiryLevel level, ColorScheme cs) => switch (level) {
       ExpiryLevel.expired => cs.error,
@@ -27,15 +39,13 @@ String _expiryText(InventoryItem item, ExpiryLevel level) {
   return '$label: seit $overdue Tag${overdue == 1 ? '' : 'en'} abgelaufen';
 }
 
-/// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand mit Ampel, sortiert nach Ablauf, Filter nach
-/// Lagerort, Vorschlaege aus Bons einklappbar oben, FAB fuehrt zum Barcode-Scan.
+/// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand nach Dringlichkeit gruppiert (abgelaufen/
+/// bald faellig zuerst, wie auf der Uebersicht), Filter nach Lagerort, Vorschlaege aus Bons einklappbar oben.
+/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber den Scan-Tab.
 class InventoryPage extends ConsumerStatefulWidget {
-  const InventoryPage({super.key, this.now, this.onScan});
+  const InventoryPage({super.key, this.now});
 
   final DateTime? now;
-
-  /// Wechselt zum Scan-Tab (der Barcode-Ablauf lebt dort, siehe Doku 08 §3.2).
-  final VoidCallback? onScan;
 
   @override
   ConsumerState<InventoryPage> createState() => _InventoryPageState();
@@ -51,6 +61,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final suggestions = ref.watch(inventorySuggestionsStreamProvider).value ?? const <InventoryItem>[];
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final today = widget.now ?? DateTime.now();
+    final t = Theme.of(context);
 
     return active.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -58,11 +69,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       data: (all) {
         final locations = {for (final i in all) i.location}.toList()..sort((a, b) => _locationOrder.indexOf(a).compareTo(_locationOrder.indexOf(b)));
         final shown = _location == null ? all : all.where((i) => i.location == _location).toList();
+        final groups = <ExpiryLevel, List<InventoryItem>>{};
+        for (final item in shown) {
+          groups.putIfAbsent(expiryLevel(expiresOn: item.expiresOn, dateKind: item.dateKind, today: today), () => []).add(item);
+        }
 
         return Scaffold(
           floatingActionButton: FloatingActionButton.extended(
             key: const Key('inventory-scan-fab'),
-            onPressed: widget.onScan,
+            onPressed: () => startBarcodeScan(context, ref),
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('Scannen'),
           ),
@@ -114,14 +129,24 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   padding: const EdgeInsets.all(32),
                   child: Center(
                     child: Text(
-                      all.isEmpty ? 'Noch kein Bestand. Scanne einen Barcode im Tab „Scan".' : 'Keine Einträge für diese Auswahl',
+                      all.isEmpty ? 'Noch kein Bestand. Tippe unten auf „Scannen“, um den ersten Artikel zu erfassen.' : 'Keine Einträge für diese Auswahl',
                       key: const Key('inventory-empty'),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 )
               else
-                for (final item in shown) _InventoryTile(item: item, product: products[item.productId], today: today),
+                for (final level in _groupOrder)
+                  if (groups[level] case final items? when items.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                      child: Row(children: [
+                        Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 8), decoration: BoxDecoration(color: _dotColor(level, t.colorScheme), shape: BoxShape.circle)),
+                        Text('${_groupTitles[level]} (${items.length})', style: t.textTheme.titleSmall),
+                      ]),
+                    ),
+                    for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level),
+                  ],
             ],
           ),
         );
@@ -131,15 +156,14 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 }
 
 class _InventoryTile extends ConsumerWidget {
-  const _InventoryTile({required this.item, required this.product, required this.today});
+  const _InventoryTile({required this.item, required this.product, required this.level});
   final InventoryItem item;
   final Product? product;
-  final DateTime today;
+  final ExpiryLevel level;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context);
-    final level = expiryLevel(expiresOn: item.expiresOn, dateKind: item.dateKind, today: today);
     return Dismissible(
       key: ValueKey(item.id),
       background: Container(
@@ -172,46 +196,8 @@ class _InventoryTile extends ConsumerWidget {
           if (item.status == 'opened') 'geöffnet',
           '${formatQuantity(item.quantity)} ${item.unit}',
         ].join(' · ')),
-        onTap: () => _openDetail(context, ref),
-      ),
-    );
-  }
-
-  void _openDetail(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(title: Text(product?.name ?? 'Unbekanntes Produkt'), subtitle: Text(_locationLabels[item.location] ?? item.location)),
-          if (item.status == 'sealed')
-            ListTile(
-              key: const Key('detail-open'),
-              leading: const Icon(Icons.kitchen_outlined),
-              title: const Text('Geöffnet'),
-              onTap: () {
-                ref.read(inventoryRepositoryProvider).open(item.id, productDefaultOpenShelfLifeDays: product?.openedShelfLifeDays);
-                Navigator.pop(ctx);
-              },
-            ),
-          ListTile(
-            key: const Key('detail-consumed'),
-            leading: const Icon(Icons.check_circle_outline),
-            title: const Text('Aufgebraucht'),
-            onTap: () {
-              ref.read(inventoryRepositoryProvider).markConsumed(item.id);
-              Navigator.pop(ctx);
-            },
-          ),
-          ListTile(
-            key: const Key('detail-discarded'),
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Weggeworfen'),
-            onTap: () {
-              ref.read(inventoryRepositoryProvider).markDiscarded(item.id);
-              Navigator.pop(ctx);
-            },
-          ),
-        ]),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push('/inventory-item', extra: InventoryItemArgs(item: item, product: product)),
       ),
     );
   }

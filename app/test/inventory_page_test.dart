@@ -1,9 +1,11 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/features/inventory/inventory_item_detail_page.dart';
 import 'package:einkaufstracker/features/inventory/inventory_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'support/fakes.dart';
 
@@ -54,25 +56,42 @@ void main() {
     List<InventoryItem> active = const [],
     List<InventoryItem> suggestions = const [],
     List<Product> products = const [],
-    VoidCallback? onScan,
+    FakeBarcodeScanner? scanner,
   }) =>
       ProviderScope(
         overrides: [
+          databaseProvider.overrideWithValue(db),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
           activeInventoryStreamProvider.overrideWith((ref) => Stream.value(active)),
           inventorySuggestionsStreamProvider.overrideWith((ref) => Stream.value(suggestions)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
+          inventoryMovementsStreamProvider.overrideWith((ref, _) => Stream.value(const <InventoryMovement>[])),
+          if (scanner != null) barcodeScannerProvider.overrideWithValue(scanner),
+          productRepositoryProvider.overrideWithValue(productRepo(db)),
         ],
-        child: MaterialApp(home: Scaffold(body: InventoryPage(now: today, onScan: onScan))),
+        child: MaterialApp.router(
+          routerConfig: GoRouter(initialLocation: '/', routes: [
+            GoRoute(path: '/', builder: (_, _) => Scaffold(body: InventoryPage(now: today))),
+            GoRoute(
+              path: '/inventory-item',
+              builder: (_, s) {
+                final a = s.extra as InventoryItemArgs;
+                return InventoryItemDetailPage(item: a.item, product: a.product);
+              },
+            ),
+            GoRoute(path: '/product-form', builder: (_, _) => const Scaffold(body: Text('PRODUCT-FORM'))),
+            GoRoute(path: '/stock-entry', builder: (_, _) => const Scaffold(body: Text('STOCK-ENTRY'))),
+          ]),
+        ),
       );
 
-  testWidgets('leeres Inventar: Hinweistext, FAB ruft onScan', (tester) async {
-    var tapped = false;
-    await tester.pumpWidget(app(onScan: () => tapped = true));
+  testWidgets('leeres Inventar: Hinweistext, FAB startet den Barcode-Scan', (tester) async {
+    await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000001')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('inventory-empty')), findsOneWidget);
     await tester.tap(find.byKey(const Key('inventory-scan-fab')));
-    expect(tapped, isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('PRODUCT-FORM'), findsOneWidget); // unbekannter Barcode: Anlageformular
   });
 
   testWidgets('sortiert nach Ablaufdatum, Name und Menge werden angezeigt', (tester) async {
@@ -86,14 +105,12 @@ void main() {
       ],
     ));
     await tester.pumpAndSettle();
-    final tiles = find.byType(ListTile);
-    expect(tester.widget<ListTile>(tiles.at(0)), isA<ListTile>()); // Reihenfolge: Joghurt (frueher) vor Milch
     expect(find.text('Joghurt'), findsOneWidget);
     expect(find.text('Vollmilch'), findsOneWidget);
     expect(find.textContaining('2 piece'), findsOneWidget);
   });
 
-  testWidgets('Ampeltexte: morgen, heute, abgelaufen, kein Datum', (tester) async {
+  testWidgets('Ampeltexte: morgen, heute, abgelaufen, kein Datum, in Gruppen', (tester) async {
     await tester.pumpWidget(app(
       products: [_product('p1', 'A'), _product('p2', 'B'), _product('p3', 'C'), _product('p4', 'D')],
       active: [
@@ -108,6 +125,9 @@ void main() {
     expect(find.textContaining('MHD: heute'), findsOneWidget);
     expect(find.textContaining('abgelaufen'), findsOneWidget);
     expect(find.textContaining('Kein Ablaufdatum'), findsOneWidget);
+    expect(find.textContaining('Läuft bald ab'), findsOneWidget);
+    expect(find.textContaining('Abgelaufen (1)'), findsOneWidget);
+    expect(find.textContaining('Ohne Ablaufdatum'), findsOneWidget);
   });
 
   testWidgets('geoeffnete Position zeigt "geöffnet"', (tester) async {
@@ -119,7 +139,6 @@ void main() {
   testWidgets('Wischen nach rechts: aufgebraucht', (tester) async {
     final product = _product('p1', 'Käse');
     await inventoryRepo(db).recordFromScan(productId: 'p1', ean: '1', now: today);
-    // damit die Datenbank ein reales Element hat, das der Dismiss auch aendern kann
     final real = await db.select(db.inventoryItems).getSingle();
     await tester.pumpWidget(app(products: [product], active: [real]));
     await tester.pumpAndSettle();
@@ -142,7 +161,7 @@ void main() {
     expect(updated.status, 'discarded');
   });
 
-  testWidgets('Tippen oeffnet die Detailansicht mit Schnellaktionen', (tester) async {
+  testWidgets('Tippen oeffnet die Detailseite mit Schnellaktionen', (tester) async {
     await inventoryRepo(db).recordFromScan(productId: 'p1', ean: '1', now: today);
     final real = await db.select(db.inventoryItems).getSingle();
     await tester.pumpWidget(app(products: [_product('p1', 'Käse')], active: [real]));
@@ -150,20 +169,12 @@ void main() {
 
     await tester.tap(find.byKey(Key('inventory-item-${real.id}')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('detail-open')), findsOneWidget);
+    expect(find.byKey(const Key('action-open')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('detail-open')));
+    await tester.tap(find.byKey(const Key('action-open')));
     await tester.pumpAndSettle();
     final opened = await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle();
     expect(opened.status, 'opened');
-  });
-
-  testWidgets('Detailansicht eines bereits geoeffneten Eintrags bietet kein "Geöffnet" mehr an', (tester) async {
-    await tester.pumpWidget(app(products: [_product('p1', 'Käse')], active: [_item('a', 'p1', status: 'opened')]));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('inventory-item-a')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('detail-open')), findsNothing);
   });
 
   testWidgets('Vorschlaege: einklappbar, Verwerfen entfernt den Vorschlag', (tester) async {

@@ -157,6 +157,38 @@ void main() {
     });
   });
 
+  group('updateDetails', () {
+    test('aendert MHD, Datumsart und Lagerort, ohne Ledger-Bewegung', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: _d(2026, 10, 1), now: DateTime.utc(2026, 9, 27));
+      await repo.updateDetails(item.id, bestBefore: _d(2026, 10, 20), dateKind: 'use_by', location: 'fridge');
+      final updated = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(updated.bestBefore, _d(2026, 10, 20));
+      expect(updated.expiresOn, _d(2026, 10, 20));
+      expect(updated.dateKind, 'use_by');
+      expect(updated.location, 'fridge');
+      expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // nur der Kauf, keine neue Bewegung
+    });
+
+    test('MHD entfernen (clearBestBefore)', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: _d(2026, 10, 1), now: DateTime.utc(2026, 9, 27));
+      await repo.updateDetails(item.id, clearBestBefore: true);
+      final updated = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(updated.bestBefore, isNull);
+      expect(updated.expiresOn, isNull);
+    });
+
+    test('MHD-Aenderung wirkt sich auf einen bereits geoeffneten Eintrag aus (Oeffnungsfrist bleibt massgeblich)', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: _d(2026, 10, 20), now: DateTime.utc(2026, 9, 27));
+      await repo.open(item.id, productDefaultOpenShelfLifeDays: 3, now: DateTime.utc(2026, 9, 28));
+      await repo.updateDetails(item.id, bestBefore: _d(2026, 9, 29)); // MHD jetzt vor der Oeffnungsfrist
+      final updated = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(updated.expiresOn, _d(2026, 9, 29));
+    });
+  });
+
   group('adjustQuantity', () {
     test('bucht die Differenz als adjustment', () async {
       final repo = inventoryRepo(db);

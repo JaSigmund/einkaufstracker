@@ -68,7 +68,7 @@ class _HomeShellState extends State<HomeShell> {
       body: _index == 0
           ? const ReceiptsOverview()
           : _index == 1
-          ? InventoryPage(onScan: () => setState(() => _index = 2))
+          ? const InventoryPage()
           : _index == 2
           ? const ScanPage()
           : _index == 4

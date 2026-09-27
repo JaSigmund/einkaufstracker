@@ -156,6 +156,28 @@ class InventoryRepository {
     onChanged?.call();
   }
 
+  /// Datum, Lagerort oder Art des Datums nachtraeglich korrigieren (z.B. beim Scan falsch abgelesenes MHD).
+  /// Keine Ledger-Bewegung, weil sich dadurch die Bestandsmenge nicht aendert.
+  Future<void> updateDetails(
+    String id, {
+    DateTime? bestBefore,
+    bool clearBestBefore = false,
+    String? dateKind,
+    String? location,
+  }) async {
+    final item = await _get(id);
+    final newBestBefore = clearBestBefore ? null : (bestBefore ?? item.bestBefore);
+    final updated = item.copyWith(
+      bestBefore: Value(newBestBefore),
+      dateKind: dateKind ?? item.dateKind,
+      location: location ?? item.location,
+      expiresOn: Value(computeExpiresOn(bestBefore: newBestBefore, openedOn: item.openedOn, openShelfLifeDays: item.openShelfLifeDays)),
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _putItem(updated);
+    onChanged?.call();
+  }
+
   /// Menge korrigieren (Inventur, Doku 06 §9: Bewegungsart `adjustment`, Vorzeichen ist die Differenz).
   Future<void> adjustQuantity(String id, double newQuantity, {DateTime? now}) async {
     final item = await _get(id);
