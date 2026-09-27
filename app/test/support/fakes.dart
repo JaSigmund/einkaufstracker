@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart' show BuildContext;
+
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
@@ -9,6 +11,10 @@ import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
 import 'package:einkaufstracker/data/repositories/auth_repository.dart';
 import 'package:einkaufstracker/data/repositories/category_repository.dart';
+import 'package:einkaufstracker/data/barcode/barcode_scanner.dart';
+import 'package:einkaufstracker/data/products/off_client.dart';
+import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
+import 'package:einkaufstracker/data/repositories/product_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 
 AppDatabase memoryDb() {
@@ -56,9 +62,26 @@ class FakeRemoteStore implements RemoteStore {
           r['deleted_at'] == null);
       if (clash) throw RemoteDataException('23505: duplicate key value violates unique constraint receipts_external_id_uniq');
     }
+    if (tableName == 'inventory_items') {
+      // expires_on ist in Postgres eine generated column: hier nachgebildet, damit der zweite Sync in Tests
+      // dasselbe Ergebnis liefert wie gegen den echten Server (siehe computeExpiresOn im Client).
+      DateTime? date(String? s) => s == null ? null : DateTime.parse(s);
+      final bestBefore = date(row['best_before'] as String?);
+      final openedOn = date(row['opened_on'] as String?);
+      final openDays = (row['open_shelf_life_days'] as num?)?.toInt();
+      DateTime? expiresOn;
+      if (openedOn != null && openDays != null) {
+        final openExpiry = openedOn.add(Duration(days: openDays));
+        expiresOn = bestBefore == null || openExpiry.isBefore(bestBefore) ? openExpiry : bestBefore;
+      } else {
+        expiresOn = bestBefore;
+      }
+      row = {...row, 'expires_on': expiresOn == null ? null : '${expiresOn.year.toString().padLeft(4, '0')}-${expiresOn.month.toString().padLeft(2, '0')}-${expiresOn.day.toString().padLeft(2, '0')}'};
+    }
     final stored = Map<String, dynamic>.from(row);
     stored['updated_at'] = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
-    table(tableName)[row['id'] as String] = stored;
+    final key = tableName == 'product_barcodes' ? '${row['household_id']}:${row['ean']}' : row['id'] as String;
+    table(tableName)[key] = stored;
   }
 }
 
@@ -165,3 +188,31 @@ ReceiptFileService fileService(AppDatabase db, FakeRemoteFileStore remote, Direc
       baseDir: () async => dir,
       keepFiles: () async => keep,
     );
+
+ProductRepository productRepo(AppDatabase db, {String household = 'h1', OffClient? off, void Function()? onChanged}) =>
+    ProductRepository(db, householdId: () async => household, off: off, onChanged: onChanged);
+
+InventoryRepository inventoryRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    InventoryRepository(db, householdId: () async => household, onChanged: onChanged);
+
+/// Barcode-Scanner-Attrappe: liefert immer denselben Code (oder null bei Abbruch).
+class FakeBarcodeScanner implements BarcodeScanner {
+  FakeBarcodeScanner(this.code);
+  final String? code;
+  int calls = 0;
+
+  @override
+  Future<String?> scan(BuildContext context) async {
+    calls++;
+    return code;
+  }
+}
+
+/// OFF-Client-Attrappe fuer Tests.
+class FakeOffClient implements OffClient {
+  FakeOffClient([this.result]);
+  OffProduct? result;
+
+  @override
+  Future<OffProduct?> lookup(String ean) async => result;
+}

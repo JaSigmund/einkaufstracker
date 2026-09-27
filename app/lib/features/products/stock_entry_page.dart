@@ -1,0 +1,173 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../app/providers.dart';
+import '../../core/format.dart';
+import '../../data/local/database.dart';
+
+class StockEntryArgs {
+  const StockEntryArgs({required this.product, required this.ean});
+  final Product product;
+  final String ean;
+}
+
+String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu verbrauchen bis')];
+const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer', 'Tiefkühl'), ('other', 'Sonstiges')];
+
+/// Nach dem Barcode-Scan eines bekannten Produkts: MHD/Verbrauchsdatum, Lagerort, Menge erfassen und als
+/// Bestand speichern (Doku 06 §3.5). Ist bereits Bestand vorhanden, bietet die Seite oben die Schnellaktionen
+/// **Öffnen** und **Aufgebraucht** fuer den juengsten aktiven Eintrag an.
+class StockEntryPage extends ConsumerStatefulWidget {
+  const StockEntryPage({super.key, required this.product, required this.ean});
+
+  final Product product;
+  final String ean;
+
+  @override
+  ConsumerState<StockEntryPage> createState() => _StockEntryPageState();
+}
+
+class _StockEntryPageState extends ConsumerState<StockEntryPage> {
+  DateTime? _date;
+  late String _dateKind = widget.product.defaultDateKind;
+  late String _location = widget.product.defaultLocation;
+  late final _quantity = TextEditingController(text: '1');
+  var _saving = false;
+
+  Future<void> _pickDate({int? addDays}) async {
+    if (addDays != null) {
+      setState(() => _date = DateTime.now().add(Duration(days: addDays)));
+      return;
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 3650)),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _save() async {
+    final qty = double.tryParse(_quantity.text.replaceAll(',', '.').trim()) ?? 1;
+    setState(() => _saving = true);
+    try {
+      await ref.read(inventoryRepositoryProvider).recordFromScan(
+            productId: widget.product.id,
+            ean: widget.ean,
+            quantity: qty,
+            unit: widget.product.baseUnit,
+            bestBefore: _date,
+            dateKind: _dateKind,
+            location: _location,
+            openShelfLifeDays: widget.product.openedShelfLifeDays,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bestand gespeichert')));
+        context.go('/');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Speichern nicht möglich: $e')));
+      }
+    }
+  }
+
+  Future<void> _quickAction(Future<void> Function(String id) action, InventoryItem item) async {
+    await action(item.id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erledigt')));
+      context.go('/');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final active = ref.watch(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+    final existing = active.where((i) => i.productId == widget.product.id).toList();
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.product.name)),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (existing.isNotEmpty) ...[
+            Text('Bereits im Inventar', style: t.textTheme.titleSmall),
+            for (final item in existing)
+              Card(
+                child: ListTile(
+                  title: Text('${formatQuantity(item.quantity)} ${item.unit}'),
+                  subtitle: Text(item.status == 'opened' ? 'Geöffnet' : 'Ungeöffnet'),
+                  trailing: Wrap(spacing: 4, children: [
+                    if (item.status == 'sealed')
+                      OutlinedButton(
+                        key: Key('quick-open-${item.id}'),
+                        onPressed: () => _quickAction(
+                          (id) => ref.read(inventoryRepositoryProvider).open(id, productDefaultOpenShelfLifeDays: widget.product.openedShelfLifeDays),
+                          item,
+                        ),
+                        child: const Text('Öffnen'),
+                      ),
+                    OutlinedButton(
+                      key: Key('quick-consumed-${item.id}'),
+                      onPressed: () => _quickAction((id) => ref.read(inventoryRepositoryProvider).markConsumed(id), item),
+                      child: const Text('Aufgebraucht'),
+                    ),
+                  ]),
+                ),
+              ),
+            const Divider(height: 32),
+            Text('Neu hinzufügen', style: t.textTheme.titleSmall),
+            const SizedBox(height: 8),
+          ],
+          ListTile(
+            key: const Key('stock-date'),
+            leading: const Icon(Icons.event_outlined),
+            title: Text(_date == null ? 'Kein Datum' : _formatDate(_date!)),
+            subtitle: const Text('Antippen zum Ändern'),
+            onTap: () => _pickDate(),
+          ),
+          Wrap(spacing: 8, children: [
+            OutlinedButton(onPressed: () => _pickDate(addDays: 7), child: const Text('+7 Tage')),
+            OutlinedButton(onPressed: () => _pickDate(addDays: 14), child: const Text('+14 Tage')),
+            if (_date != null) TextButton(onPressed: () => setState(() => _date = null), child: const Text('Kein Datum')),
+          ]),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            key: const Key('stock-date-kind'),
+            initialValue: _dateKind,
+            decoration: const InputDecoration(labelText: 'Art des Datums'),
+            items: [for (final d in _dateKinds) DropdownMenuItem(value: d.$1, child: Text(d.$2))],
+            onChanged: (v) => setState(() => _dateKind = v ?? _dateKind),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: const Key('stock-location'),
+            initialValue: _location,
+            decoration: const InputDecoration(labelText: 'Lagerort'),
+            items: [for (final l in _locations) DropdownMenuItem(value: l.$1, child: Text(l.$2))],
+            onChanged: (v) => setState(() => _location = v ?? _location),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('stock-quantity'),
+            controller: _quantity,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(labelText: 'Menge (${widget.product.baseUnit})'),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            key: const Key('stock-save'),
+            onPressed: _saving ? null : _save,
+            child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+  }
+}

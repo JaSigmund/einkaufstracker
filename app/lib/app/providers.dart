@@ -14,7 +14,11 @@ import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
+import '../data/products/off_client.dart';
+import '../data/barcode/barcode_scanner.dart';
 import '../data/repositories/category_repository.dart';
+import '../data/repositories/inventory_repository.dart';
+import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
@@ -140,6 +144,42 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
 });
 
 final categoriesStreamProvider = StreamProvider((ref) => ref.watch(categoryRepositoryProvider).watchAll());
+
+final offClientProvider = Provider<OffClient>((ref) => HttpOffClient());
+
+final productRepositoryProvider = Provider<ProductRepository>((ref) {
+  return ProductRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    off: ref.watch(offClientProvider),
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final productsStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAll());
+
+final barcodeScannerProvider = Provider<BarcodeScanner>((ref) => MobileBarcodeScanner());
+
+final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
+  return InventoryRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchActive());
+final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchSuggestions());
+final inventoryMovementsStreamProvider =
+    StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));
 
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(

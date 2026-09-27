@@ -8,20 +8,33 @@ import 'mappers.dart';
 
 /// Beschreibt, wie eine Serverzeile einer Tabelle lokal gespeichert wird.
 class SyncTableDef {
-  const SyncTableDef(this.remoteName, this.applyRemote);
+  const SyncTableDef(this.remoteName, this.applyRemote, {String Function(Map<String, dynamic> json)? idOf})
+      : idOf = idOf ?? _defaultId;
   final String remoteName;
   final Future<void> Function(AppDatabase db, Map<String, dynamic> json) applyRemote;
+
+  /// Stabiler Schluessel einer Serverzeile fuer den Abgleich mit ausstehenden lokalen Aenderungen (Outbox).
+  /// Standard ist die Spalte "id"; Tabellen ohne diese Spalte (zusammengesetzter Primaerschluessel) geben eine
+  /// eigene Funktion an.
+  final String Function(Map<String, dynamic> json) idOf;
+
+  static String _defaultId(Map<String, dynamic> j) => j['id'] as String;
 }
 
 final syncTables = <SyncTableDef>[
   SyncTableDef('categories', (db, j) => db.into(db.categories).insertOnConflictUpdate(categoryFromRemote(j))),
   SyncTableDef('category_aliases', (db, j) => db.into(db.categoryAliases).insertOnConflictUpdate(categoryAliasFromRemote(j))),
   SyncTableDef('products', (db, j) => db.into(db.products).insertOnConflictUpdate(productFromRemote(j))),
+  SyncTableDef('product_barcodes', (db, j) => db.into(db.productBarcodes).insertOnConflictUpdate(productBarcodeFromRemote(j)),
+      idOf: (j) => '${j['household_id']}:${j['ean']}'),
   // Reihenfolge wichtig: Fremdschluessel (Bon -> Filiale, Position -> Bon) zeigen auf zuvor gelieferte Zeilen
   SyncTableDef('stores', (db, j) => db.into(db.stores).insertOnConflictUpdate(storeFromRemote(j))),
   SyncTableDef('receipts', (db, j) => db.into(db.receipts).insertOnConflictUpdate(receiptFromRemote(j))),
   SyncTableDef('receipt_items', (db, j) => db.into(db.receiptItems).insertOnConflictUpdate(receiptItemFromRemote(j))),
   SyncTableDef('receipt_files', (db, j) => db.into(db.receiptFiles).insertOnConflictUpdate(receiptFileFromRemote(j))),
+  // Fremdschluessel auf receipt_items (Vorschlaege) und products
+  SyncTableDef('inventory_items', (db, j) => db.into(db.inventoryItems).insertOnConflictUpdate(inventoryItemFromRemote(j))),
+  SyncTableDef('inventory_movements', (db, j) => db.into(db.inventoryMovements).insertOnConflictUpdate(inventoryMovementFromRemote(j))),
 ];
 
 class SyncResult {
@@ -85,7 +98,7 @@ class SyncEngine {
         if (rows.isEmpty) break;
 
         // Zeilen mit ausstehender lokaler Aenderung nicht ueberschreiben
-        final ids = rows.map((r) => r['id'] as String).toList();
+        final ids = rows.map(def.idOf).toList();
         final pending = (await (_db.select(_db.outbox)
                   ..where((t) => t.remoteTable.equals(def.remoteName) & t.rowId.isIn(ids)))
                 .get())
@@ -94,7 +107,7 @@ class SyncEngine {
 
         await _db.transaction(() async {
           for (final r in rows) {
-            if (pending.contains(r['id'])) continue;
+            if (pending.contains(def.idOf(r))) continue;
             await def.applyRemote(_db, r);
             total++;
           }

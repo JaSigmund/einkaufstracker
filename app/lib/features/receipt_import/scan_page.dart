@@ -6,9 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../products/barcode_flow.dart';
 import 'receipt_import_service.dart';
 
-enum _Busy { pdf, paper }
+enum _Busy { pdf, paper, barcode }
 
 /// Inhalt des Tabs "Scan": Einstiegspunkte zum Erfassen von Bons.
 class ScanPage extends ConsumerStatefulWidget {
@@ -80,6 +81,22 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     }
   }
 
+  Future<void> _scanBarcode() async {
+    setState(() => _busy = _Busy.barcode);
+    // Die Ladeanzeige gilt nur fuer Scan und Suche, nicht fuer die Anlage-/Erfassungsseiten danach
+    // (sonst blockiert ein wartendes push() wie beim PDF-Import die Anzeige, siehe dortigen Kommentar).
+    await startBarcodeScan(
+      context,
+      ref,
+      onStatus: (s) {
+        if (mounted) setState(() => _status = s);
+      },
+      onLookupDone: () {
+        if (mounted) setState(() => _busy = null);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -123,12 +140,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             onTap: _isBusy ? null : _scanPaper,
           ),
         ),
-        const Card(
+        Card(
           child: ListTile(
-            enabled: false,
-            leading: Icon(Icons.qr_code_scanner),
-            title: Text('Barcode scannen'),
-            subtitle: Text('Folgt in Phase 3 (Inventar).'),
+            key: const Key('scan-barcode'),
+            leading: const Icon(Icons.qr_code_scanner),
+            title: const Text('Barcode scannen'),
+            subtitle: const Text('Inventar erfassen: Produkt suchen oder neu anlegen, Haltbarkeit eintragen.'),
+            trailing: _busy == _Busy.barcode
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.chevron_right),
+            onTap: _isBusy ? null : _scanBarcode,
           ),
         ),
         const SizedBox(height: 8),

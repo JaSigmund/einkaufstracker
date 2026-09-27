@@ -26,13 +26,55 @@ class Products extends Table {
   TextColumn get name => text()();
   TextColumn get brand => text().nullable()();
   TextColumn get categoryId => text().nullable()();
+
+  /// 'kg' | 'l' | 'piece'
   TextColumn get baseUnit => text().withDefault(const Constant('piece'))();
   RealColumn get packSize => real().nullable()();
+
+  /// Standardhaltbarkeit ab Kauf (Tage), falls kein MHD bekannt ist.
+  IntColumn get sealedShelfLifeDays => integer().nullable()();
+
+  /// Standardhaltbarkeit nach dem Oeffnen (Tage).
+  IntColumn get openedShelfLifeDays => integer().nullable()();
+
+  /// 'best_before' | 'use_by'
+  TextColumn get defaultDateKind => text().withDefault(const Constant('best_before'))();
+
+  /// 'fridge' | 'freezer' | 'pantry' | 'other'
+  TextColumn get defaultLocation => text().withDefault(const Constant('pantry'))();
+
+  /// Nachkaufprodukt: Vorschlag fuer die Einkaufsliste, wenn der letzte Bestand ausgeht (Phase 3).
+  BoolColumn get restock => boolean().withDefault(const Constant(false))();
+  TextColumn get offCode => text().nullable()();
+
+  /// Naehrwerte je 100 g/ml als JSON (Phase 7): {kcal, protein_g, fat_g, sat_fat_g, carbs_g, sugar_g, fiber_g, salt_g}
+  TextColumn get nutrientsPer100 => text().nullable()();
+
+  /// 'g' | 'ml', nur gesetzt wenn nutrientsPer100 gesetzt ist.
+  TextColumn get nutrientsBasis => text().nullable()();
+
+  /// 'off' | 'usda' | 'manual' | 'llm_estimate'
+  TextColumn get nutrientsSource => text().nullable()();
+
+  /// Gewicht eines Stuecks in Gramm (z.B. Paprika ~150), fuer die Umrechnung Stueck <-> Gewicht.
+  RealColumn get unitWeightG => real().nullable()();
+
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// EAN -> Produkt (Spiegel von public.product_barcodes). Zusammengesetzter Primaerschluessel wie am Server.
+class ProductBarcodes extends Table {
+  TextColumn get householdId => text()();
+  TextColumn get ean => text()();
+  TextColumn get productId => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {householdId, ean};
 }
 
 /// Haendler/Filialen (Spiegel von public.stores). Je Kette und Filialnummer eine Zeile.
@@ -141,6 +183,73 @@ class ReceiptFiles extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Vorratseintrag (Spiegel von public.inventory_items). Doku 06 Inventar und Haltbarkeit.
+class InventoryItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get productId => text()();
+
+  /// Bon-Position, aus der dieser Eintrag als Vorschlag entstanden ist (Doku 06 §2).
+  TextColumn get receiptItemId => text().nullable()();
+  TextColumn get ean => text().nullable()();
+  RealColumn get quantity => real().withDefault(const Constant(1))();
+
+  /// 'piece' | 'kg' | 'l'
+  TextColumn get unit => text().withDefault(const Constant('piece'))();
+
+  /// 'fridge' | 'freezer' | 'pantry' | 'other'
+  TextColumn get location => text().withDefault(const Constant('pantry'))();
+
+  DateTimeColumn get purchasedOn => dateTime().nullable()();
+  DateTimeColumn get bestBefore => dateTime().nullable()();
+
+  /// 'best_before' | 'use_by'
+  TextColumn get dateKind => text().withDefault(const Constant('best_before'))();
+  DateTimeColumn get openedOn => dateTime().nullable()();
+  IntColumn get openShelfLifeDays => integer().nullable()();
+
+  /// 'sealed' | 'opened' | 'consumed' | 'discarded'
+  TextColumn get status => text().withDefault(const Constant('sealed'))();
+
+  /// Aus einem Bon vorgeschlagen, noch nicht per Barcode bestaetigt (Doku 06 §2, INV-08).
+  BoolColumn get isSuggestion => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get closedAt => dateTime().nullable()();
+
+  /// Fruehestes aus bestBefore und openedOn+openShelfLifeDays (siehe computeExpiresOn), vom Server berechnet
+  /// und hier gespiegelt; fuer optimistische lokale Anzeige vor dem naechsten Sync selbst gesetzt.
+  DateTimeColumn get expiresOn => dateTime().nullable()();
+
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Bestandsbewegung (Ledger, Spiegel von public.inventory_movements). Doku 06 §9.
+class InventoryMovements extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get inventoryItemId => text().nullable()();
+  TextColumn get productId => text()();
+  DateTimeColumn get occurredAt => dateTime()();
+
+  /// 'purchase' | 'consumed' | 'meal' | 'discarded' | 'adjustment'
+  TextColumn get type => text()();
+
+  /// Vorzeichen: Zugang +, Abgang -.
+  RealColumn get quantityDelta => real()();
+
+  /// 'piece' | 'kg' | 'l'
+  TextColumn get unit => text()();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -177,7 +286,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, ProductBarcodes, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -185,7 +294,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -204,6 +313,25 @@ class AppDatabase extends _$AppDatabase {
           // 3 -> 4: Originalbelege (Fotos, PDFs)
           if (from < 4) {
             await m.createTable(receiptFiles);
+          }
+          // 4 -> 5: erweiterte Produktdaten (Haltbarkeit, Naehrwerte) und Barcode-Zuordnung
+          if (from < 5) {
+            await m.addColumn(products, products.sealedShelfLifeDays);
+            await m.addColumn(products, products.openedShelfLifeDays);
+            await m.addColumn(products, products.defaultDateKind);
+            await m.addColumn(products, products.defaultLocation);
+            await m.addColumn(products, products.restock);
+            await m.addColumn(products, products.offCode);
+            await m.addColumn(products, products.nutrientsPer100);
+            await m.addColumn(products, products.nutrientsBasis);
+            await m.addColumn(products, products.nutrientsSource);
+            await m.addColumn(products, products.unitWeightG);
+            await m.createTable(productBarcodes);
+          }
+          // 5 -> 6: Inventar (Phase 3)
+          if (from < 6) {
+            await m.createTable(inventoryItems);
+            await m.createTable(inventoryMovements);
           }
         },
       );
