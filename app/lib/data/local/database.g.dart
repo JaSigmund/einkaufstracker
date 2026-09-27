@@ -7455,6 +7455,61 @@ class $BugReportsTable extends BugReports
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('new'),
+  );
+  static const VerificationMeta _severityMeta = const VerificationMeta(
+    'severity',
+  );
+  @override
+  late final GeneratedColumn<String> severity = GeneratedColumn<String>(
+    'severity',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resolutionMeta = const VerificationMeta(
+    'resolution',
+  );
+  @override
+  late final GeneratedColumn<String> resolution = GeneratedColumn<String>(
+    'resolution',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _fixedInVersionMeta = const VerificationMeta(
+    'fixedInVersion',
+  );
+  @override
+  late final GeneratedColumn<String> fixedInVersion = GeneratedColumn<String>(
+    'fixed_in_version',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusUpdatedAtMeta = const VerificationMeta(
+    'statusUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> statusUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'status_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -7496,6 +7551,11 @@ class $BugReportsTable extends BugReports
     description,
     appInfo,
     dataSnapshot,
+    status,
+    severity,
+    resolution,
+    fixedInVersion,
+    statusUpdatedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -7562,6 +7622,42 @@ class $BugReportsTable extends BugReports
         ),
       );
     }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('severity')) {
+      context.handle(
+        _severityMeta,
+        severity.isAcceptableOrUnknown(data['severity']!, _severityMeta),
+      );
+    }
+    if (data.containsKey('resolution')) {
+      context.handle(
+        _resolutionMeta,
+        resolution.isAcceptableOrUnknown(data['resolution']!, _resolutionMeta),
+      );
+    }
+    if (data.containsKey('fixed_in_version')) {
+      context.handle(
+        _fixedInVersionMeta,
+        fixedInVersion.isAcceptableOrUnknown(
+          data['fixed_in_version']!,
+          _fixedInVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status_updated_at')) {
+      context.handle(
+        _statusUpdatedAtMeta,
+        statusUpdatedAt.isAcceptableOrUnknown(
+          data['status_updated_at']!,
+          _statusUpdatedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -7617,6 +7713,26 @@ class $BugReportsTable extends BugReports
         DriftSqlType.string,
         data['${effectivePrefix}data_snapshot'],
       ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      severity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}severity'],
+      ),
+      resolution: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}resolution'],
+      ),
+      fixedInVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fixed_in_version'],
+      ),
+      statusUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}status_updated_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -7645,6 +7761,15 @@ class BugReport extends DataClass implements Insertable<BugReport> {
   final String? description;
   final String appInfo;
   final String? dataSnapshot;
+
+  /// 'new' | 'confirmed' | 'in_progress' | 'fixed' | 'verified' | 'wont_fix' | 'duplicate'
+  final String status;
+
+  /// 'low' | 'medium' | 'high' | 'critical', von der Entwicklung gesetzt.
+  final String? severity;
+  final String? resolution;
+  final String? fixedInVersion;
+  final DateTime? statusUpdatedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -7655,6 +7780,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     this.description,
     required this.appInfo,
     this.dataSnapshot,
+    required this.status,
+    this.severity,
+    this.resolution,
+    this.fixedInVersion,
+    this.statusUpdatedAt,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -7671,6 +7801,19 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     map['app_info'] = Variable<String>(appInfo);
     if (!nullToAbsent || dataSnapshot != null) {
       map['data_snapshot'] = Variable<String>(dataSnapshot);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || severity != null) {
+      map['severity'] = Variable<String>(severity);
+    }
+    if (!nullToAbsent || resolution != null) {
+      map['resolution'] = Variable<String>(resolution);
+    }
+    if (!nullToAbsent || fixedInVersion != null) {
+      map['fixed_in_version'] = Variable<String>(fixedInVersion);
+    }
+    if (!nullToAbsent || statusUpdatedAt != null) {
+      map['status_updated_at'] = Variable<DateTime>(statusUpdatedAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -7692,6 +7835,19 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       dataSnapshot: dataSnapshot == null && nullToAbsent
           ? const Value.absent()
           : Value(dataSnapshot),
+      status: Value(status),
+      severity: severity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(severity),
+      resolution: resolution == null && nullToAbsent
+          ? const Value.absent()
+          : Value(resolution),
+      fixedInVersion: fixedInVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fixedInVersion),
+      statusUpdatedAt: statusUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(statusUpdatedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -7712,6 +7868,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       description: serializer.fromJson<String?>(json['description']),
       appInfo: serializer.fromJson<String>(json['appInfo']),
       dataSnapshot: serializer.fromJson<String?>(json['dataSnapshot']),
+      status: serializer.fromJson<String>(json['status']),
+      severity: serializer.fromJson<String?>(json['severity']),
+      resolution: serializer.fromJson<String?>(json['resolution']),
+      fixedInVersion: serializer.fromJson<String?>(json['fixedInVersion']),
+      statusUpdatedAt: serializer.fromJson<DateTime?>(json['statusUpdatedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -7727,6 +7888,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       'description': serializer.toJson<String?>(description),
       'appInfo': serializer.toJson<String>(appInfo),
       'dataSnapshot': serializer.toJson<String?>(dataSnapshot),
+      'status': serializer.toJson<String>(status),
+      'severity': serializer.toJson<String?>(severity),
+      'resolution': serializer.toJson<String?>(resolution),
+      'fixedInVersion': serializer.toJson<String?>(fixedInVersion),
+      'statusUpdatedAt': serializer.toJson<DateTime?>(statusUpdatedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -7740,6 +7906,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     Value<String?> description = const Value.absent(),
     String? appInfo,
     Value<String?> dataSnapshot = const Value.absent(),
+    String? status,
+    Value<String?> severity = const Value.absent(),
+    Value<String?> resolution = const Value.absent(),
+    Value<String?> fixedInVersion = const Value.absent(),
+    Value<DateTime?> statusUpdatedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -7750,6 +7921,15 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     description: description.present ? description.value : this.description,
     appInfo: appInfo ?? this.appInfo,
     dataSnapshot: dataSnapshot.present ? dataSnapshot.value : this.dataSnapshot,
+    status: status ?? this.status,
+    severity: severity.present ? severity.value : this.severity,
+    resolution: resolution.present ? resolution.value : this.resolution,
+    fixedInVersion: fixedInVersion.present
+        ? fixedInVersion.value
+        : this.fixedInVersion,
+    statusUpdatedAt: statusUpdatedAt.present
+        ? statusUpdatedAt.value
+        : this.statusUpdatedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -7768,6 +7948,17 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       dataSnapshot: data.dataSnapshot.present
           ? data.dataSnapshot.value
           : this.dataSnapshot,
+      status: data.status.present ? data.status.value : this.status,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      resolution: data.resolution.present
+          ? data.resolution.value
+          : this.resolution,
+      fixedInVersion: data.fixedInVersion.present
+          ? data.fixedInVersion.value
+          : this.fixedInVersion,
+      statusUpdatedAt: data.statusUpdatedAt.present
+          ? data.statusUpdatedAt.value
+          : this.statusUpdatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -7783,6 +7974,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
           ..write('description: $description, ')
           ..write('appInfo: $appInfo, ')
           ..write('dataSnapshot: $dataSnapshot, ')
+          ..write('status: $status, ')
+          ..write('severity: $severity, ')
+          ..write('resolution: $resolution, ')
+          ..write('fixedInVersion: $fixedInVersion, ')
+          ..write('statusUpdatedAt: $statusUpdatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
@@ -7798,6 +7994,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     description,
     appInfo,
     dataSnapshot,
+    status,
+    severity,
+    resolution,
+    fixedInVersion,
+    statusUpdatedAt,
     createdAt,
     updatedAt,
     deletedAt,
@@ -7812,6 +8013,11 @@ class BugReport extends DataClass implements Insertable<BugReport> {
           other.description == this.description &&
           other.appInfo == this.appInfo &&
           other.dataSnapshot == this.dataSnapshot &&
+          other.status == this.status &&
+          other.severity == this.severity &&
+          other.resolution == this.resolution &&
+          other.fixedInVersion == this.fixedInVersion &&
+          other.statusUpdatedAt == this.statusUpdatedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
@@ -7824,6 +8030,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   final Value<String?> description;
   final Value<String> appInfo;
   final Value<String?> dataSnapshot;
+  final Value<String> status;
+  final Value<String?> severity;
+  final Value<String?> resolution;
+  final Value<String?> fixedInVersion;
+  final Value<DateTime?> statusUpdatedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -7835,6 +8046,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     this.description = const Value.absent(),
     this.appInfo = const Value.absent(),
     this.dataSnapshot = const Value.absent(),
+    this.status = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.resolution = const Value.absent(),
+    this.fixedInVersion = const Value.absent(),
+    this.statusUpdatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -7847,6 +8063,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     this.description = const Value.absent(),
     required String appInfo,
     this.dataSnapshot = const Value.absent(),
+    this.status = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.resolution = const Value.absent(),
+    this.fixedInVersion = const Value.absent(),
+    this.statusUpdatedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -7864,6 +8085,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     Expression<String>? description,
     Expression<String>? appInfo,
     Expression<String>? dataSnapshot,
+    Expression<String>? status,
+    Expression<String>? severity,
+    Expression<String>? resolution,
+    Expression<String>? fixedInVersion,
+    Expression<DateTime>? statusUpdatedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -7876,6 +8102,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
       if (description != null) 'description': description,
       if (appInfo != null) 'app_info': appInfo,
       if (dataSnapshot != null) 'data_snapshot': dataSnapshot,
+      if (status != null) 'status': status,
+      if (severity != null) 'severity': severity,
+      if (resolution != null) 'resolution': resolution,
+      if (fixedInVersion != null) 'fixed_in_version': fixedInVersion,
+      if (statusUpdatedAt != null) 'status_updated_at': statusUpdatedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -7890,6 +8121,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     Value<String?>? description,
     Value<String>? appInfo,
     Value<String?>? dataSnapshot,
+    Value<String>? status,
+    Value<String?>? severity,
+    Value<String?>? resolution,
+    Value<String?>? fixedInVersion,
+    Value<DateTime?>? statusUpdatedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -7902,6 +8138,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
       description: description ?? this.description,
       appInfo: appInfo ?? this.appInfo,
       dataSnapshot: dataSnapshot ?? this.dataSnapshot,
+      status: status ?? this.status,
+      severity: severity ?? this.severity,
+      resolution: resolution ?? this.resolution,
+      fixedInVersion: fixedInVersion ?? this.fixedInVersion,
+      statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -7930,6 +8171,21 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     if (dataSnapshot.present) {
       map['data_snapshot'] = Variable<String>(dataSnapshot.value);
     }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<String>(severity.value);
+    }
+    if (resolution.present) {
+      map['resolution'] = Variable<String>(resolution.value);
+    }
+    if (fixedInVersion.present) {
+      map['fixed_in_version'] = Variable<String>(fixedInVersion.value);
+    }
+    if (statusUpdatedAt.present) {
+      map['status_updated_at'] = Variable<DateTime>(statusUpdatedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -7954,6 +8210,11 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
           ..write('description: $description, ')
           ..write('appInfo: $appInfo, ')
           ..write('dataSnapshot: $dataSnapshot, ')
+          ..write('status: $status, ')
+          ..write('severity: $severity, ')
+          ..write('resolution: $resolution, ')
+          ..write('fixedInVersion: $fixedInVersion, ')
+          ..write('statusUpdatedAt: $statusUpdatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -12528,6 +12789,11 @@ typedef $$BugReportsTableCreateCompanionBuilder = BugReportsCompanion Function({
   Value<String?> description,
   required String appInfo,
   Value<String?> dataSnapshot,
+  Value<String> status,
+  Value<String?> severity,
+  Value<String?> resolution,
+  Value<String?> fixedInVersion,
+  Value<DateTime?> statusUpdatedAt,
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<DateTime?> deletedAt,
@@ -12540,6 +12806,11 @@ typedef $$BugReportsTableUpdateCompanionBuilder = BugReportsCompanion Function({
   Value<String?> description,
   Value<String> appInfo,
   Value<String?> dataSnapshot,
+  Value<String> status,
+  Value<String?> severity,
+  Value<String?> resolution,
+  Value<String?> fixedInVersion,
+  Value<DateTime?> statusUpdatedAt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<DateTime?> deletedAt,
@@ -12582,6 +12853,31 @@ class $$BugReportsTableFilterComposer
 
   ColumnFilters<String> get dataSnapshot => $composableBuilder(
     column: $table.dataSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get resolution => $composableBuilder(
+    column: $table.resolution,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fixedInVersion => $composableBuilder(
+    column: $table.fixedInVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get statusUpdatedAt => $composableBuilder(
+    column: $table.statusUpdatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12640,6 +12936,31 @@ class $$BugReportsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get resolution => $composableBuilder(
+    column: $table.resolution,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fixedInVersion => $composableBuilder(
+    column: $table.fixedInVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get statusUpdatedAt => $composableBuilder(
+    column: $table.statusUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12686,6 +13007,27 @@ class $$BugReportsTableAnnotationComposer
 
   GeneratedColumn<String> get dataSnapshot => $composableBuilder(
     column: $table.dataSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<String> get resolution => $composableBuilder(
+    column: $table.resolution,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get fixedInVersion => $composableBuilder(
+    column: $table.fixedInVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get statusUpdatedAt => $composableBuilder(
+    column: $table.statusUpdatedAt,
     builder: (column) => column,
   );
 
@@ -12736,6 +13078,11 @@ class $$BugReportsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> appInfo = const Value.absent(),
                 Value<String?> dataSnapshot = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> severity = const Value.absent(),
+                Value<String?> resolution = const Value.absent(),
+                Value<String?> fixedInVersion = const Value.absent(),
+                Value<DateTime?> statusUpdatedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -12747,6 +13094,11 @@ class $$BugReportsTableTableManager
                 description: description,
                 appInfo: appInfo,
                 dataSnapshot: dataSnapshot,
+                status: status,
+                severity: severity,
+                resolution: resolution,
+                fixedInVersion: fixedInVersion,
+                statusUpdatedAt: statusUpdatedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -12760,6 +13112,11 @@ class $$BugReportsTableTableManager
                 Value<String?> description = const Value.absent(),
                 required String appInfo,
                 Value<String?> dataSnapshot = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> severity = const Value.absent(),
+                Value<String?> resolution = const Value.absent(),
+                Value<String?> fixedInVersion = const Value.absent(),
+                Value<DateTime?> statusUpdatedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -12771,6 +13128,11 @@ class $$BugReportsTableTableManager
                 description: description,
                 appInfo: appInfo,
                 dataSnapshot: dataSnapshot,
+                status: status,
+                severity: severity,
+                resolution: resolution,
+                fixedInVersion: fixedInVersion,
+                statusUpdatedAt: statusUpdatedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

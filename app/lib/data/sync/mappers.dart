@@ -322,6 +322,13 @@ Map<String, dynamic> bugReportToRemote(BugReport b) => {
       'description': b.description,
       'app_info': jsonDecode(b.appInfo),
       'data_snapshot': b.dataSnapshot == null ? null : jsonDecode(b.dataSnapshot!),
+      // status/severity/resolution/fixed_in_version werden von der Entwicklung per SQL gesetzt, nicht vom
+      // Client; sie werden trotzdem mitgeschickt, damit ein Upsert eine lokale Aenderung (z.B. Titel) nicht
+      // versehentlich auf den Standardwert 'new' zuruecksetzt.
+      'status': b.status,
+      'severity': b.severity,
+      'resolution': b.resolution,
+      'fixed_in_version': b.fixedInVersion,
       'created_at': b.createdAt.toUtc().toIso8601String(),
       'updated_at': b.updatedAt.toUtc().toIso8601String(),
       'deleted_at': b.deletedAt?.toUtc().toIso8601String(),
@@ -334,6 +341,11 @@ BugReportsCompanion bugReportFromRemote(Map<String, dynamic> j) => BugReportsCom
       description: Value(j['description'] as String?),
       appInfo: Value(jsonEncode(j['app_info'])),
       dataSnapshot: Value(j['data_snapshot'] == null ? null : jsonEncode(j['data_snapshot'])),
+      status: Value(j['status'] as String? ?? 'new'),
+      severity: Value(j['severity'] as String?),
+      resolution: Value(j['resolution'] as String?),
+      fixedInVersion: Value(j['fixed_in_version'] as String?),
+      statusUpdatedAt: Value(_dt(j['status_updated_at'])),
       createdAt: Value(_dt(j['created_at'])!),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),

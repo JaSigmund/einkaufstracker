@@ -154,6 +154,52 @@ void main() {
     expect(find.text('Clever Champignon weiß'), findsWidgets); // Titel der Bestandserfassung
   });
 
+  testWidgets('Unbekannter Barcode MIT OFF-Vorschlag: die Suche laeuft automatisch, kein Tippen noetig', (tester) async {
+    final existing = await productRepo(db).create(name: 'DKIH Paprika Tricolore', baseUnit: 'kg', categoryId: null);
+    await tester.pumpWidget(app(
+      scanner: FakeBarcodeScanner('9008700000200'),
+      offResult: const OffProduct(name: 'Paprika Tricolore', brand: 'Da komm ich her!'), // OFF-Name weicht vom Bon-Namen ab
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+
+    // Die Suche lief automatisch mit dem OFF-Namen, kein eigenes Tippen noetig (Fehlerbericht
+    // "Automatische Bonzuordnung", 2026-09-28). "Paprika Tricolore" ist ein Teilstring von "DKIH Paprika
+    // Tricolore", die Suche findet das Bon-Produkt also trotz des abweichenden OFF-Namens.
+    expect(find.byKey(Key('match-${existing.id}')), findsOneWidget);
+
+    await tester.tap(find.byKey(Key('match-${existing.id}')));
+    await tester.pumpAndSettle();
+    expect(find.text('DKIH Paprika Tricolore'), findsWidgets); // Titel der Bestandserfassung
+    expect((await db.select(db.productBarcodes).getSingle()).productId, existing.id);
+  });
+
+  testWidgets('Falsch verknuepfter Barcode: ueber "Andere Zuordnung" neu zuweisen', (tester) async {
+    final wrong = await productRepo(db).create(name: 'Falsches Produkt', ean: '9008700000201');
+    final right = await productRepo(db).create(name: 'Richtiges Produkt');
+    await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000201'), products: [wrong, right]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+    expect(find.text('Falsches Produkt'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('stock-reassign')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('product-search')), 'Richtiges');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('match-${right.id}')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Richtiges Produkt'), findsWidgets);
+    final mapping = await db.select(db.productBarcodes).getSingle();
+    expect(mapping.productId, right.id); // die Zuordnung zeigt jetzt auf das richtige Produkt
+  });
+
   testWidgets('Unbekanntes Produkt MIT OFF-Vorschlag: Formular ist vorbelegt', (tester) async {
     await tester.pumpWidget(app(
       scanner: FakeBarcodeScanner('9008700000002'),

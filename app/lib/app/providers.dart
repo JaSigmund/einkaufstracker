@@ -17,6 +17,9 @@ import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
 import '../data/barcode/barcode_scanner.dart';
 import '../data/repositories/category_repository.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
+import '../data/changelog/changelog_repository.dart';
 import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
@@ -192,6 +195,16 @@ final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
 });
 
 final bugReportsStreamProvider = StreamProvider((ref) => ref.watch(bugReportRepositoryProvider).watchAll());
+
+final changelogRepositoryProvider = Provider<ChangelogRepository>((ref) => ChangelogRepository(ref.watch(supabaseClientProvider)));
+final changelogProvider = FutureProvider.autoDispose((ref) => ref.watch(changelogRepositoryProvider).load());
+
+/// Versionsname wie in den App-Stores ueblich ("1.1.0 (2)"), aus pubspec.yaml zur Build-Zeit (Doku-Wunsch
+/// "Versionsnummer in der App").
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return '${info.version} (${info.buildNumber})';
+});
 
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));

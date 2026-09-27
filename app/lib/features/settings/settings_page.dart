@@ -122,11 +122,33 @@ class SettingsPage extends ConsumerWidget {
             title: const Text('Meine Fehlerberichte'),
             onTap: () => context.push('/bug-reports'),
           ),
+          ListTile(
+            key: const Key('settings-changelog'),
+            leading: const Icon(Icons.new_releases_outlined),
+            title: const Text('Änderungsprotokoll'),
+            onTap: () => context.push('/changelog'),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Abmelden'),
             onTap: () => _signOut(context, ref),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Consumer(
+                builder: (context, ref, _) => Text(
+                  ref.watch(appVersionProvider).when(
+                        data: (v) => 'Einkaufstracker $v',
+                        loading: () => 'Einkaufstracker',
+                        error: (_, _) => 'Einkaufstracker',
+                      ),
+                  key: const Key('app-version'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+                ),
+              ),
+            ),
           ),
         ],
       ),

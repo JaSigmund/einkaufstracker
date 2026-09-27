@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import 'product_form_page.dart';
 
 class StockEntryArgs {
   const StockEntryArgs({required this.product, required this.ean});
@@ -91,6 +92,15 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     }
   }
 
+  /// Der Barcode wurde beim letzten Mal dem falschen Produkt zugeordnet: hier neu verknuepfen, ohne dass
+  /// der Nutzer dazu erst woanders hinnavigieren muss (Fehlerbericht "Keine Bonzuordnung", 2026-09-28).
+  Future<void> _reassign() async {
+    final newProduct = await context.push<Product>('/product-form', extra: ProductFormArgs(ean: widget.ean));
+    if (newProduct != null && mounted) {
+      context.pushReplacement('/stock-entry', extra: StockEntryArgs(product: newProduct, ean: widget.ean));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -98,7 +108,17 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     final existing = active.where((i) => i.productId == widget.product.id).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.product.name)),
+      appBar: AppBar(
+        title: Text(widget.product.name),
+        actions: [
+          IconButton(
+            key: const Key('stock-reassign'),
+            tooltip: 'Falsches Produkt? Anderes verknüpfen',
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: _reassign,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

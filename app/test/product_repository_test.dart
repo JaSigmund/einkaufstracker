@@ -106,6 +106,26 @@ void main() {
     });
   });
 
+  group('recentUnlinked', () {
+    test('nur Produkte ohne Barcode, zuletzt geaendert zuerst', () async {
+      final repo = productRepo(db);
+      final a = await repo.create(name: 'A');
+      await repo.create(name: 'B', ean: '1');
+      final c = await repo.findOrCreateForReceiptItem('C'); // aus einem Bon, ohne Barcode
+
+      final unlinked = await repo.recentUnlinked();
+      expect(unlinked.map((p) => p.id).toSet(), {a.id, c.id});
+    });
+
+    test('begrenzt auf limit', () async {
+      final repo = productRepo(db);
+      for (var i = 0; i < 5; i++) {
+        await repo.create(name: 'P$i');
+      }
+      expect(await repo.recentUnlinked(limit: 3), hasLength(3));
+    });
+  });
+
   group('matchByLearnedName / lookup ordnet automatisch zu', () {
     test('OFF-Name entspricht (normalisiert) einem gelernten Bon-Alias: automatisch verknuepft', () async {
       final repo = productRepo(db);

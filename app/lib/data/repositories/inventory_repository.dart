@@ -192,6 +192,28 @@ class InventoryRepository {
     onChanged?.call();
   }
 
+  /// Macht "Aufgebraucht"/"Weggeworfen" rueckgaengig, z.B. nach einem verwischten Wisch (Fehlerbericht
+  /// "Rueckgaengigmachen von aufgebrauchten Artikeln", 2026-09-28): der Eintrag wird wieder aktiv (offen,
+  /// falls er schon geoeffnet war, sonst versiegelt), die dadurch gebuchte Abgangsbewegung wird geloescht.
+  Future<void> reopen(String id) async {
+    final item = await _get(id);
+    if (item.status != 'consumed' && item.status != 'discarded') return;
+    final now = DateTime.now().toUtc();
+    final updated = item.copyWith(status: item.openedOn != null ? 'opened' : 'sealed', closedAt: const Value(null), updatedAt: now);
+    await _putItem(updated);
+    final movement = await (_db.select(_db.inventoryMovements)
+          ..where((m) => m.inventoryItemId.equals(id) & m.deletedAt.isNull() & (m.type.equals('consumed') | m.type.equals('discarded')))
+          ..orderBy([(m) => OrderingTerm.desc(m.occurredAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (movement != null) {
+      final deletedMovement = movement.copyWith(deletedAt: Value(now), updatedAt: now);
+      await _put('inventory_movements', movement.id, inventoryMovementToRemote(deletedMovement),
+          () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(deletedMovement.toCompanion(false)));
+    }
+    onChanged?.call();
+  }
+
   /// Datum, Lagerort oder Art des Datums nachtraeglich korrigieren (z.B. beim Scan falsch abgelesenes MHD).
   /// Keine Ledger-Bewegung, weil sich dadurch die Bestandsmenge nicht aendert.
   Future<void> updateDetails(
@@ -230,9 +252,27 @@ class InventoryRepository {
   /// "Vorschlag verwerfen"; das hier ist das Gegenstueck fuer Bestand, der schon gescannt wurde). Anders als
   /// "aufgebraucht"/"weggeworfen" (echte Ereignisse) wird auch die Kaufbewegung geloescht: es soll so aussehen,
   /// als waere der Scan nie passiert (Fehlerbericht "Rueckgaengig machen", 2026-09-27).
+  ///
+  /// Stammt der Eintrag von einem Bon (receiptItemId gesetzt), wird er stattdessen wieder zum Bon-Vorschlag:
+  /// die Kaufbewegung des Bons ist ja weiterhin belegt, nur die Barcode-Zuordnung und die dabei eingegebenen
+  /// Werte werden zurueckgenommen (Fehlerbericht "Rueckgaengigmachen Bonartikel", 2026-09-28 - "soll wieder
+  /// als Bonvorschlag auftauchen").
   Future<void> deleteItem(String id) async {
     final item = await _get(id);
     final now = DateTime.now().toUtc();
+    if (item.receiptItemId != null) {
+      final reverted = item.copyWith(
+        isSuggestion: true,
+        status: 'sealed',
+        ean: const Value(null),
+        openedOn: const Value(null),
+        closedAt: const Value(null),
+        updatedAt: now,
+      );
+      await _putItem(reverted);
+      onChanged?.call();
+      return;
+    }
     final updated = item.copyWith(deletedAt: Value(now), updatedAt: now);
     await _putItem(updated);
     final movements = await (_db.select(_db.inventoryMovements)
