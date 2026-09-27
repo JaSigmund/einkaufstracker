@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../inventory/inventory_page.dart';
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
 import '../report/report_page.dart';
@@ -66,6 +67,8 @@ class _HomeShellState extends State<HomeShell> {
       ),
       body: _index == 0
           ? const ReceiptsOverview()
+          : _index == 1
+          ? InventoryPage(onScan: () => setState(() => _index = 2))
           : _index == 2
           ? const ScanPage()
           : _index == 4

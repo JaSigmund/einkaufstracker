@@ -1,8 +1,14 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../local/database.dart';
 
 DateTime? _dt(Object? v) => v == null ? null : DateTime.parse(v as String).toUtc();
+
+/// Postgres `date` (kein `timestamptz`): 'YYYY-MM-DD' ohne Zeitzone, als UTC-Mitternacht dieses Kalendertags.
+DateTime? _date(Object? v) => v == null ? null : DateTime.parse('${v as String}T00:00:00Z');
+String? _dateStr(DateTime? d) => d == null ? null : '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 Map<String, dynamic> categoryToRemote(Category c) => {
       'id': c.id,
@@ -36,6 +42,16 @@ Map<String, dynamic> productToRemote(Product p) => {
       'category_id': p.categoryId,
       'base_unit': p.baseUnit,
       'pack_size': p.packSize,
+      'sealed_shelf_life_days': p.sealedShelfLifeDays,
+      'opened_shelf_life_days': p.openedShelfLifeDays,
+      'default_date_kind': p.defaultDateKind,
+      'default_location': p.defaultLocation,
+      'restock': p.restock,
+      'off_code': p.offCode,
+      'nutrients_per_100': p.nutrientsPer100 == null ? null : jsonDecode(p.nutrientsPer100!),
+      'nutrients_basis': p.nutrientsBasis,
+      'nutrients_source': p.nutrientsSource,
+      'unit_weight_g': p.unitWeightG,
       'updated_at': p.updatedAt.toUtc().toIso8601String(),
       'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
     };
@@ -48,8 +64,32 @@ ProductsCompanion productFromRemote(Map<String, dynamic> j) => ProductsCompanion
       categoryId: Value(j['category_id'] as String?),
       baseUnit: Value(j['base_unit'] as String? ?? 'piece'),
       packSize: Value((j['pack_size'] as num?)?.toDouble()),
+      sealedShelfLifeDays: Value((j['sealed_shelf_life_days'] as num?)?.toInt()),
+      openedShelfLifeDays: Value((j['opened_shelf_life_days'] as num?)?.toInt()),
+      defaultDateKind: Value(j['default_date_kind'] as String? ?? 'best_before'),
+      defaultLocation: Value(j['default_location'] as String? ?? 'pantry'),
+      restock: Value(j['restock'] as bool? ?? false),
+      offCode: Value(j['off_code'] as String?),
+      nutrientsPer100: Value(j['nutrients_per_100'] == null ? null : jsonEncode(j['nutrients_per_100'])),
+      nutrientsBasis: Value(j['nutrients_basis'] as String?),
+      nutrientsSource: Value(j['nutrients_source'] as String?),
+      unitWeightG: Value((j['unit_weight_g'] as num?)?.toDouble()),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> productBarcodeToRemote(ProductBarcode b) => {
+      'household_id': b.householdId,
+      'ean': b.ean,
+      'product_id': b.productId,
+      'updated_at': b.updatedAt.toUtc().toIso8601String(),
+    };
+
+ProductBarcodesCompanion productBarcodeFromRemote(Map<String, dynamic> j) => ProductBarcodesCompanion(
+      householdId: Value(j['household_id'] as String),
+      ean: Value(j['ean'] as String),
+      productId: Value(j['product_id'] as String),
+      updatedAt: Value(_dt(j['updated_at'])!),
     );
 
 Map<String, dynamic> storeToRemote(Store s) => {
@@ -178,6 +218,77 @@ ReceiptFilesCompanion receiptFileFromRemote(Map<String, dynamic> j) => ReceiptFi
       pageNo: Value((j['page_no'] as num?)?.toInt() ?? 1),
       storagePath: Value(j['storage_path'] as String),
       sizeBytes: Value((j['size_bytes'] as num?)?.toInt()),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> inventoryItemToRemote(InventoryItem i) => {
+      'id': i.id,
+      'household_id': i.householdId,
+      'product_id': i.productId,
+      'receipt_item_id': i.receiptItemId,
+      'ean': i.ean,
+      'quantity': i.quantity,
+      'unit': i.unit,
+      'location': i.location,
+      'purchased_on': _dateStr(i.purchasedOn),
+      'best_before': _dateStr(i.bestBefore),
+      'date_kind': i.dateKind,
+      'opened_on': _dateStr(i.openedOn),
+      'open_shelf_life_days': i.openShelfLifeDays,
+      'status': i.status,
+      'is_suggestion': i.isSuggestion,
+      'closed_at': i.closedAt?.toUtc().toIso8601String(),
+      'updated_at': i.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+    };
+
+InventoryItemsCompanion inventoryItemFromRemote(Map<String, dynamic> j) => InventoryItemsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      productId: Value(j['product_id'] as String),
+      receiptItemId: Value(j['receipt_item_id'] as String?),
+      ean: Value(j['ean'] as String?),
+      quantity: Value((j['quantity'] as num?)?.toDouble() ?? 1),
+      unit: Value(j['unit'] as String? ?? 'piece'),
+      location: Value(j['location'] as String? ?? 'pantry'),
+      purchasedOn: Value(_date(j['purchased_on'])),
+      bestBefore: Value(_date(j['best_before'])),
+      dateKind: Value(j['date_kind'] as String? ?? 'best_before'),
+      openedOn: Value(_date(j['opened_on'])),
+      openShelfLifeDays: Value((j['open_shelf_life_days'] as num?)?.toInt()),
+      status: Value(j['status'] as String? ?? 'sealed'),
+      isSuggestion: Value(j['is_suggestion'] as bool? ?? false),
+      closedAt: Value(_dt(j['closed_at'])),
+      expiresOn: Value(_date(j['expires_on'])),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> inventoryMovementToRemote(InventoryMovement m) => {
+      'id': m.id,
+      'household_id': m.householdId,
+      'inventory_item_id': m.inventoryItemId,
+      'product_id': m.productId,
+      'occurred_at': m.occurredAt.toUtc().toIso8601String(),
+      'type': m.type,
+      'quantity_delta': m.quantityDelta,
+      'unit': m.unit,
+      'note': m.note,
+      'updated_at': m.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': m.deletedAt?.toUtc().toIso8601String(),
+    };
+
+InventoryMovementsCompanion inventoryMovementFromRemote(Map<String, dynamic> j) => InventoryMovementsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      inventoryItemId: Value(j['inventory_item_id'] as String?),
+      productId: Value(j['product_id'] as String),
+      occurredAt: Value(_dt(j['occurred_at'])!),
+      type: Value(j['type'] as String),
+      quantityDelta: Value((j['quantity_delta'] as num).toDouble()),
+      unit: Value(j['unit'] as String),
+      note: Value(j['note'] as String?),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );

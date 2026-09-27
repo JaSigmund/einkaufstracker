@@ -643,6 +643,120 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _sealedShelfLifeDaysMeta =
+      const VerificationMeta('sealedShelfLifeDays');
+  @override
+  late final GeneratedColumn<int> sealedShelfLifeDays = GeneratedColumn<int>(
+    'sealed_shelf_life_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _openedShelfLifeDaysMeta =
+      const VerificationMeta('openedShelfLifeDays');
+  @override
+  late final GeneratedColumn<int> openedShelfLifeDays = GeneratedColumn<int>(
+    'opened_shelf_life_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _defaultDateKindMeta = const VerificationMeta(
+    'defaultDateKind',
+  );
+  @override
+  late final GeneratedColumn<String> defaultDateKind = GeneratedColumn<String>(
+    'default_date_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('best_before'),
+  );
+  static const VerificationMeta _defaultLocationMeta = const VerificationMeta(
+    'defaultLocation',
+  );
+  @override
+  late final GeneratedColumn<String> defaultLocation = GeneratedColumn<String>(
+    'default_location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pantry'),
+  );
+  static const VerificationMeta _restockMeta = const VerificationMeta(
+    'restock',
+  );
+  @override
+  late final GeneratedColumn<bool> restock = GeneratedColumn<bool>(
+    'restock',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("restock" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _offCodeMeta = const VerificationMeta(
+    'offCode',
+  );
+  @override
+  late final GeneratedColumn<String> offCode = GeneratedColumn<String>(
+    'off_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nutrientsPer100Meta = const VerificationMeta(
+    'nutrientsPer100',
+  );
+  @override
+  late final GeneratedColumn<String> nutrientsPer100 = GeneratedColumn<String>(
+    'nutrients_per100',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nutrientsBasisMeta = const VerificationMeta(
+    'nutrientsBasis',
+  );
+  @override
+  late final GeneratedColumn<String> nutrientsBasis = GeneratedColumn<String>(
+    'nutrients_basis',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nutrientsSourceMeta = const VerificationMeta(
+    'nutrientsSource',
+  );
+  @override
+  late final GeneratedColumn<String> nutrientsSource = GeneratedColumn<String>(
+    'nutrients_source',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitWeightGMeta = const VerificationMeta(
+    'unitWeightG',
+  );
+  @override
+  late final GeneratedColumn<double> unitWeightG = GeneratedColumn<double>(
+    'unit_weight_g',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -674,6 +788,16 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     categoryId,
     baseUnit,
     packSize,
+    sealedShelfLifeDays,
+    openedShelfLifeDays,
+    defaultDateKind,
+    defaultLocation,
+    restock,
+    offCode,
+    nutrientsPer100,
+    nutrientsBasis,
+    nutrientsSource,
+    unitWeightG,
     updatedAt,
     deletedAt,
   ];
@@ -737,6 +861,90 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         packSize.isAcceptableOrUnknown(data['pack_size']!, _packSizeMeta),
       );
     }
+    if (data.containsKey('sealed_shelf_life_days')) {
+      context.handle(
+        _sealedShelfLifeDaysMeta,
+        sealedShelfLifeDays.isAcceptableOrUnknown(
+          data['sealed_shelf_life_days']!,
+          _sealedShelfLifeDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('opened_shelf_life_days')) {
+      context.handle(
+        _openedShelfLifeDaysMeta,
+        openedShelfLifeDays.isAcceptableOrUnknown(
+          data['opened_shelf_life_days']!,
+          _openedShelfLifeDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_date_kind')) {
+      context.handle(
+        _defaultDateKindMeta,
+        defaultDateKind.isAcceptableOrUnknown(
+          data['default_date_kind']!,
+          _defaultDateKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_location')) {
+      context.handle(
+        _defaultLocationMeta,
+        defaultLocation.isAcceptableOrUnknown(
+          data['default_location']!,
+          _defaultLocationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('restock')) {
+      context.handle(
+        _restockMeta,
+        restock.isAcceptableOrUnknown(data['restock']!, _restockMeta),
+      );
+    }
+    if (data.containsKey('off_code')) {
+      context.handle(
+        _offCodeMeta,
+        offCode.isAcceptableOrUnknown(data['off_code']!, _offCodeMeta),
+      );
+    }
+    if (data.containsKey('nutrients_per100')) {
+      context.handle(
+        _nutrientsPer100Meta,
+        nutrientsPer100.isAcceptableOrUnknown(
+          data['nutrients_per100']!,
+          _nutrientsPer100Meta,
+        ),
+      );
+    }
+    if (data.containsKey('nutrients_basis')) {
+      context.handle(
+        _nutrientsBasisMeta,
+        nutrientsBasis.isAcceptableOrUnknown(
+          data['nutrients_basis']!,
+          _nutrientsBasisMeta,
+        ),
+      );
+    }
+    if (data.containsKey('nutrients_source')) {
+      context.handle(
+        _nutrientsSourceMeta,
+        nutrientsSource.isAcceptableOrUnknown(
+          data['nutrients_source']!,
+          _nutrientsSourceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unit_weight_g')) {
+      context.handle(
+        _unitWeightGMeta,
+        unitWeightG.isAcceptableOrUnknown(
+          data['unit_weight_g']!,
+          _unitWeightGMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -788,6 +996,46 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.double,
         data['${effectivePrefix}pack_size'],
       ),
+      sealedShelfLifeDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sealed_shelf_life_days'],
+      ),
+      openedShelfLifeDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}opened_shelf_life_days'],
+      ),
+      defaultDateKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_date_kind'],
+      )!,
+      defaultLocation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_location'],
+      )!,
+      restock: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}restock'],
+      )!,
+      offCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}off_code'],
+      ),
+      nutrientsPer100: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nutrients_per100'],
+      ),
+      nutrientsBasis: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nutrients_basis'],
+      ),
+      nutrientsSource: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}nutrients_source'],
+      ),
+      unitWeightG: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}unit_weight_g'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -811,8 +1059,38 @@ class Product extends DataClass implements Insertable<Product> {
   final String name;
   final String? brand;
   final String? categoryId;
+
+  /// 'kg' | 'l' | 'piece'
   final String baseUnit;
   final double? packSize;
+
+  /// Standardhaltbarkeit ab Kauf (Tage), falls kein MHD bekannt ist.
+  final int? sealedShelfLifeDays;
+
+  /// Standardhaltbarkeit nach dem Oeffnen (Tage).
+  final int? openedShelfLifeDays;
+
+  /// 'best_before' | 'use_by'
+  final String defaultDateKind;
+
+  /// 'fridge' | 'freezer' | 'pantry' | 'other'
+  final String defaultLocation;
+
+  /// Nachkaufprodukt: Vorschlag fuer die Einkaufsliste, wenn der letzte Bestand ausgeht (Phase 3).
+  final bool restock;
+  final String? offCode;
+
+  /// Naehrwerte je 100 g/ml als JSON (Phase 7): {kcal, protein_g, fat_g, sat_fat_g, carbs_g, sugar_g, fiber_g, salt_g}
+  final String? nutrientsPer100;
+
+  /// 'g' | 'ml', nur gesetzt wenn nutrientsPer100 gesetzt ist.
+  final String? nutrientsBasis;
+
+  /// 'off' | 'usda' | 'manual' | 'llm_estimate'
+  final String? nutrientsSource;
+
+  /// Gewicht eines Stuecks in Gramm (z.B. Paprika ~150), fuer die Umrechnung Stueck <-> Gewicht.
+  final double? unitWeightG;
   final DateTime updatedAt;
   final DateTime? deletedAt;
   const Product({
@@ -823,6 +1101,16 @@ class Product extends DataClass implements Insertable<Product> {
     this.categoryId,
     required this.baseUnit,
     this.packSize,
+    this.sealedShelfLifeDays,
+    this.openedShelfLifeDays,
+    required this.defaultDateKind,
+    required this.defaultLocation,
+    required this.restock,
+    this.offCode,
+    this.nutrientsPer100,
+    this.nutrientsBasis,
+    this.nutrientsSource,
+    this.unitWeightG,
     required this.updatedAt,
     this.deletedAt,
   });
@@ -841,6 +1129,30 @@ class Product extends DataClass implements Insertable<Product> {
     map['base_unit'] = Variable<String>(baseUnit);
     if (!nullToAbsent || packSize != null) {
       map['pack_size'] = Variable<double>(packSize);
+    }
+    if (!nullToAbsent || sealedShelfLifeDays != null) {
+      map['sealed_shelf_life_days'] = Variable<int>(sealedShelfLifeDays);
+    }
+    if (!nullToAbsent || openedShelfLifeDays != null) {
+      map['opened_shelf_life_days'] = Variable<int>(openedShelfLifeDays);
+    }
+    map['default_date_kind'] = Variable<String>(defaultDateKind);
+    map['default_location'] = Variable<String>(defaultLocation);
+    map['restock'] = Variable<bool>(restock);
+    if (!nullToAbsent || offCode != null) {
+      map['off_code'] = Variable<String>(offCode);
+    }
+    if (!nullToAbsent || nutrientsPer100 != null) {
+      map['nutrients_per100'] = Variable<String>(nutrientsPer100);
+    }
+    if (!nullToAbsent || nutrientsBasis != null) {
+      map['nutrients_basis'] = Variable<String>(nutrientsBasis);
+    }
+    if (!nullToAbsent || nutrientsSource != null) {
+      map['nutrients_source'] = Variable<String>(nutrientsSource);
+    }
+    if (!nullToAbsent || unitWeightG != null) {
+      map['unit_weight_g'] = Variable<double>(unitWeightG);
     }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
@@ -864,6 +1176,30 @@ class Product extends DataClass implements Insertable<Product> {
       packSize: packSize == null && nullToAbsent
           ? const Value.absent()
           : Value(packSize),
+      sealedShelfLifeDays: sealedShelfLifeDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sealedShelfLifeDays),
+      openedShelfLifeDays: openedShelfLifeDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(openedShelfLifeDays),
+      defaultDateKind: Value(defaultDateKind),
+      defaultLocation: Value(defaultLocation),
+      restock: Value(restock),
+      offCode: offCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(offCode),
+      nutrientsPer100: nutrientsPer100 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nutrientsPer100),
+      nutrientsBasis: nutrientsBasis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nutrientsBasis),
+      nutrientsSource: nutrientsSource == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nutrientsSource),
+      unitWeightG: unitWeightG == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitWeightG),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -884,6 +1220,20 @@ class Product extends DataClass implements Insertable<Product> {
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       baseUnit: serializer.fromJson<String>(json['baseUnit']),
       packSize: serializer.fromJson<double?>(json['packSize']),
+      sealedShelfLifeDays: serializer.fromJson<int?>(
+        json['sealedShelfLifeDays'],
+      ),
+      openedShelfLifeDays: serializer.fromJson<int?>(
+        json['openedShelfLifeDays'],
+      ),
+      defaultDateKind: serializer.fromJson<String>(json['defaultDateKind']),
+      defaultLocation: serializer.fromJson<String>(json['defaultLocation']),
+      restock: serializer.fromJson<bool>(json['restock']),
+      offCode: serializer.fromJson<String?>(json['offCode']),
+      nutrientsPer100: serializer.fromJson<String?>(json['nutrientsPer100']),
+      nutrientsBasis: serializer.fromJson<String?>(json['nutrientsBasis']),
+      nutrientsSource: serializer.fromJson<String?>(json['nutrientsSource']),
+      unitWeightG: serializer.fromJson<double?>(json['unitWeightG']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
@@ -899,6 +1249,16 @@ class Product extends DataClass implements Insertable<Product> {
       'categoryId': serializer.toJson<String?>(categoryId),
       'baseUnit': serializer.toJson<String>(baseUnit),
       'packSize': serializer.toJson<double?>(packSize),
+      'sealedShelfLifeDays': serializer.toJson<int?>(sealedShelfLifeDays),
+      'openedShelfLifeDays': serializer.toJson<int?>(openedShelfLifeDays),
+      'defaultDateKind': serializer.toJson<String>(defaultDateKind),
+      'defaultLocation': serializer.toJson<String>(defaultLocation),
+      'restock': serializer.toJson<bool>(restock),
+      'offCode': serializer.toJson<String?>(offCode),
+      'nutrientsPer100': serializer.toJson<String?>(nutrientsPer100),
+      'nutrientsBasis': serializer.toJson<String?>(nutrientsBasis),
+      'nutrientsSource': serializer.toJson<String?>(nutrientsSource),
+      'unitWeightG': serializer.toJson<double?>(unitWeightG),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
@@ -912,6 +1272,16 @@ class Product extends DataClass implements Insertable<Product> {
     Value<String?> categoryId = const Value.absent(),
     String? baseUnit,
     Value<double?> packSize = const Value.absent(),
+    Value<int?> sealedShelfLifeDays = const Value.absent(),
+    Value<int?> openedShelfLifeDays = const Value.absent(),
+    String? defaultDateKind,
+    String? defaultLocation,
+    bool? restock,
+    Value<String?> offCode = const Value.absent(),
+    Value<String?> nutrientsPer100 = const Value.absent(),
+    Value<String?> nutrientsBasis = const Value.absent(),
+    Value<String?> nutrientsSource = const Value.absent(),
+    Value<double?> unitWeightG = const Value.absent(),
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
   }) => Product(
@@ -922,6 +1292,26 @@ class Product extends DataClass implements Insertable<Product> {
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
     baseUnit: baseUnit ?? this.baseUnit,
     packSize: packSize.present ? packSize.value : this.packSize,
+    sealedShelfLifeDays: sealedShelfLifeDays.present
+        ? sealedShelfLifeDays.value
+        : this.sealedShelfLifeDays,
+    openedShelfLifeDays: openedShelfLifeDays.present
+        ? openedShelfLifeDays.value
+        : this.openedShelfLifeDays,
+    defaultDateKind: defaultDateKind ?? this.defaultDateKind,
+    defaultLocation: defaultLocation ?? this.defaultLocation,
+    restock: restock ?? this.restock,
+    offCode: offCode.present ? offCode.value : this.offCode,
+    nutrientsPer100: nutrientsPer100.present
+        ? nutrientsPer100.value
+        : this.nutrientsPer100,
+    nutrientsBasis: nutrientsBasis.present
+        ? nutrientsBasis.value
+        : this.nutrientsBasis,
+    nutrientsSource: nutrientsSource.present
+        ? nutrientsSource.value
+        : this.nutrientsSource,
+    unitWeightG: unitWeightG.present ? unitWeightG.value : this.unitWeightG,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
@@ -938,6 +1328,32 @@ class Product extends DataClass implements Insertable<Product> {
           : this.categoryId,
       baseUnit: data.baseUnit.present ? data.baseUnit.value : this.baseUnit,
       packSize: data.packSize.present ? data.packSize.value : this.packSize,
+      sealedShelfLifeDays: data.sealedShelfLifeDays.present
+          ? data.sealedShelfLifeDays.value
+          : this.sealedShelfLifeDays,
+      openedShelfLifeDays: data.openedShelfLifeDays.present
+          ? data.openedShelfLifeDays.value
+          : this.openedShelfLifeDays,
+      defaultDateKind: data.defaultDateKind.present
+          ? data.defaultDateKind.value
+          : this.defaultDateKind,
+      defaultLocation: data.defaultLocation.present
+          ? data.defaultLocation.value
+          : this.defaultLocation,
+      restock: data.restock.present ? data.restock.value : this.restock,
+      offCode: data.offCode.present ? data.offCode.value : this.offCode,
+      nutrientsPer100: data.nutrientsPer100.present
+          ? data.nutrientsPer100.value
+          : this.nutrientsPer100,
+      nutrientsBasis: data.nutrientsBasis.present
+          ? data.nutrientsBasis.value
+          : this.nutrientsBasis,
+      nutrientsSource: data.nutrientsSource.present
+          ? data.nutrientsSource.value
+          : this.nutrientsSource,
+      unitWeightG: data.unitWeightG.present
+          ? data.unitWeightG.value
+          : this.unitWeightG,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
@@ -953,6 +1369,16 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('categoryId: $categoryId, ')
           ..write('baseUnit: $baseUnit, ')
           ..write('packSize: $packSize, ')
+          ..write('sealedShelfLifeDays: $sealedShelfLifeDays, ')
+          ..write('openedShelfLifeDays: $openedShelfLifeDays, ')
+          ..write('defaultDateKind: $defaultDateKind, ')
+          ..write('defaultLocation: $defaultLocation, ')
+          ..write('restock: $restock, ')
+          ..write('offCode: $offCode, ')
+          ..write('nutrientsPer100: $nutrientsPer100, ')
+          ..write('nutrientsBasis: $nutrientsBasis, ')
+          ..write('nutrientsSource: $nutrientsSource, ')
+          ..write('unitWeightG: $unitWeightG, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
           ..write(')'))
@@ -968,6 +1394,16 @@ class Product extends DataClass implements Insertable<Product> {
     categoryId,
     baseUnit,
     packSize,
+    sealedShelfLifeDays,
+    openedShelfLifeDays,
+    defaultDateKind,
+    defaultLocation,
+    restock,
+    offCode,
+    nutrientsPer100,
+    nutrientsBasis,
+    nutrientsSource,
+    unitWeightG,
     updatedAt,
     deletedAt,
   );
@@ -982,6 +1418,16 @@ class Product extends DataClass implements Insertable<Product> {
           other.categoryId == this.categoryId &&
           other.baseUnit == this.baseUnit &&
           other.packSize == this.packSize &&
+          other.sealedShelfLifeDays == this.sealedShelfLifeDays &&
+          other.openedShelfLifeDays == this.openedShelfLifeDays &&
+          other.defaultDateKind == this.defaultDateKind &&
+          other.defaultLocation == this.defaultLocation &&
+          other.restock == this.restock &&
+          other.offCode == this.offCode &&
+          other.nutrientsPer100 == this.nutrientsPer100 &&
+          other.nutrientsBasis == this.nutrientsBasis &&
+          other.nutrientsSource == this.nutrientsSource &&
+          other.unitWeightG == this.unitWeightG &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
 }
@@ -994,6 +1440,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String?> categoryId;
   final Value<String> baseUnit;
   final Value<double?> packSize;
+  final Value<int?> sealedShelfLifeDays;
+  final Value<int?> openedShelfLifeDays;
+  final Value<String> defaultDateKind;
+  final Value<String> defaultLocation;
+  final Value<bool> restock;
+  final Value<String?> offCode;
+  final Value<String?> nutrientsPer100;
+  final Value<String?> nutrientsBasis;
+  final Value<String?> nutrientsSource;
+  final Value<double?> unitWeightG;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> rowid;
@@ -1005,6 +1461,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.categoryId = const Value.absent(),
     this.baseUnit = const Value.absent(),
     this.packSize = const Value.absent(),
+    this.sealedShelfLifeDays = const Value.absent(),
+    this.openedShelfLifeDays = const Value.absent(),
+    this.defaultDateKind = const Value.absent(),
+    this.defaultLocation = const Value.absent(),
+    this.restock = const Value.absent(),
+    this.offCode = const Value.absent(),
+    this.nutrientsPer100 = const Value.absent(),
+    this.nutrientsBasis = const Value.absent(),
+    this.nutrientsSource = const Value.absent(),
+    this.unitWeightG = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1017,6 +1483,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.categoryId = const Value.absent(),
     this.baseUnit = const Value.absent(),
     this.packSize = const Value.absent(),
+    this.sealedShelfLifeDays = const Value.absent(),
+    this.openedShelfLifeDays = const Value.absent(),
+    this.defaultDateKind = const Value.absent(),
+    this.defaultLocation = const Value.absent(),
+    this.restock = const Value.absent(),
+    this.offCode = const Value.absent(),
+    this.nutrientsPer100 = const Value.absent(),
+    this.nutrientsBasis = const Value.absent(),
+    this.nutrientsSource = const Value.absent(),
+    this.unitWeightG = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1032,6 +1508,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? categoryId,
     Expression<String>? baseUnit,
     Expression<double>? packSize,
+    Expression<int>? sealedShelfLifeDays,
+    Expression<int>? openedShelfLifeDays,
+    Expression<String>? defaultDateKind,
+    Expression<String>? defaultLocation,
+    Expression<bool>? restock,
+    Expression<String>? offCode,
+    Expression<String>? nutrientsPer100,
+    Expression<String>? nutrientsBasis,
+    Expression<String>? nutrientsSource,
+    Expression<double>? unitWeightG,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
@@ -1044,6 +1530,18 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (categoryId != null) 'category_id': categoryId,
       if (baseUnit != null) 'base_unit': baseUnit,
       if (packSize != null) 'pack_size': packSize,
+      if (sealedShelfLifeDays != null)
+        'sealed_shelf_life_days': sealedShelfLifeDays,
+      if (openedShelfLifeDays != null)
+        'opened_shelf_life_days': openedShelfLifeDays,
+      if (defaultDateKind != null) 'default_date_kind': defaultDateKind,
+      if (defaultLocation != null) 'default_location': defaultLocation,
+      if (restock != null) 'restock': restock,
+      if (offCode != null) 'off_code': offCode,
+      if (nutrientsPer100 != null) 'nutrients_per100': nutrientsPer100,
+      if (nutrientsBasis != null) 'nutrients_basis': nutrientsBasis,
+      if (nutrientsSource != null) 'nutrients_source': nutrientsSource,
+      if (unitWeightG != null) 'unit_weight_g': unitWeightG,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1058,6 +1556,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<String?>? categoryId,
     Value<String>? baseUnit,
     Value<double?>? packSize,
+    Value<int?>? sealedShelfLifeDays,
+    Value<int?>? openedShelfLifeDays,
+    Value<String>? defaultDateKind,
+    Value<String>? defaultLocation,
+    Value<bool>? restock,
+    Value<String?>? offCode,
+    Value<String?>? nutrientsPer100,
+    Value<String?>? nutrientsBasis,
+    Value<String?>? nutrientsSource,
+    Value<double?>? unitWeightG,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? rowid,
@@ -1070,6 +1578,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       categoryId: categoryId ?? this.categoryId,
       baseUnit: baseUnit ?? this.baseUnit,
       packSize: packSize ?? this.packSize,
+      sealedShelfLifeDays: sealedShelfLifeDays ?? this.sealedShelfLifeDays,
+      openedShelfLifeDays: openedShelfLifeDays ?? this.openedShelfLifeDays,
+      defaultDateKind: defaultDateKind ?? this.defaultDateKind,
+      defaultLocation: defaultLocation ?? this.defaultLocation,
+      restock: restock ?? this.restock,
+      offCode: offCode ?? this.offCode,
+      nutrientsPer100: nutrientsPer100 ?? this.nutrientsPer100,
+      nutrientsBasis: nutrientsBasis ?? this.nutrientsBasis,
+      nutrientsSource: nutrientsSource ?? this.nutrientsSource,
+      unitWeightG: unitWeightG ?? this.unitWeightG,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
@@ -1100,6 +1618,36 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (packSize.present) {
       map['pack_size'] = Variable<double>(packSize.value);
     }
+    if (sealedShelfLifeDays.present) {
+      map['sealed_shelf_life_days'] = Variable<int>(sealedShelfLifeDays.value);
+    }
+    if (openedShelfLifeDays.present) {
+      map['opened_shelf_life_days'] = Variable<int>(openedShelfLifeDays.value);
+    }
+    if (defaultDateKind.present) {
+      map['default_date_kind'] = Variable<String>(defaultDateKind.value);
+    }
+    if (defaultLocation.present) {
+      map['default_location'] = Variable<String>(defaultLocation.value);
+    }
+    if (restock.present) {
+      map['restock'] = Variable<bool>(restock.value);
+    }
+    if (offCode.present) {
+      map['off_code'] = Variable<String>(offCode.value);
+    }
+    if (nutrientsPer100.present) {
+      map['nutrients_per100'] = Variable<String>(nutrientsPer100.value);
+    }
+    if (nutrientsBasis.present) {
+      map['nutrients_basis'] = Variable<String>(nutrientsBasis.value);
+    }
+    if (nutrientsSource.present) {
+      map['nutrients_source'] = Variable<String>(nutrientsSource.value);
+    }
+    if (unitWeightG.present) {
+      map['unit_weight_g'] = Variable<double>(unitWeightG.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -1122,8 +1670,341 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('categoryId: $categoryId, ')
           ..write('baseUnit: $baseUnit, ')
           ..write('packSize: $packSize, ')
+          ..write('sealedShelfLifeDays: $sealedShelfLifeDays, ')
+          ..write('openedShelfLifeDays: $openedShelfLifeDays, ')
+          ..write('defaultDateKind: $defaultDateKind, ')
+          ..write('defaultLocation: $defaultLocation, ')
+          ..write('restock: $restock, ')
+          ..write('offCode: $offCode, ')
+          ..write('nutrientsPer100: $nutrientsPer100, ')
+          ..write('nutrientsBasis: $nutrientsBasis, ')
+          ..write('nutrientsSource: $nutrientsSource, ')
+          ..write('unitWeightG: $unitWeightG, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProductBarcodesTable extends ProductBarcodes
+    with TableInfo<$ProductBarcodesTable, ProductBarcode> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductBarcodesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eanMeta = const VerificationMeta('ean');
+  @override
+  late final GeneratedColumn<String> ean = GeneratedColumn<String>(
+    'ean',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    householdId,
+    ean,
+    productId,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_barcodes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProductBarcode> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('ean')) {
+      context.handle(
+        _eanMeta,
+        ean.isAcceptableOrUnknown(data['ean']!, _eanMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eanMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {householdId, ean};
+  @override
+  ProductBarcode map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductBarcode(
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      ean: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ean'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ProductBarcodesTable createAlias(String alias) {
+    return $ProductBarcodesTable(attachedDatabase, alias);
+  }
+}
+
+class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
+  final String householdId;
+  final String ean;
+  final String productId;
+  final DateTime updatedAt;
+  const ProductBarcode({
+    required this.householdId,
+    required this.ean,
+    required this.productId,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['household_id'] = Variable<String>(householdId);
+    map['ean'] = Variable<String>(ean);
+    map['product_id'] = Variable<String>(productId);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ProductBarcodesCompanion toCompanion(bool nullToAbsent) {
+    return ProductBarcodesCompanion(
+      householdId: Value(householdId),
+      ean: Value(ean),
+      productId: Value(productId),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProductBarcode.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductBarcode(
+      householdId: serializer.fromJson<String>(json['householdId']),
+      ean: serializer.fromJson<String>(json['ean']),
+      productId: serializer.fromJson<String>(json['productId']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'householdId': serializer.toJson<String>(householdId),
+      'ean': serializer.toJson<String>(ean),
+      'productId': serializer.toJson<String>(productId),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProductBarcode copyWith({
+    String? householdId,
+    String? ean,
+    String? productId,
+    DateTime? updatedAt,
+  }) => ProductBarcode(
+    householdId: householdId ?? this.householdId,
+    ean: ean ?? this.ean,
+    productId: productId ?? this.productId,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ProductBarcode copyWithCompanion(ProductBarcodesCompanion data) {
+    return ProductBarcode(
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      ean: data.ean.present ? data.ean.value : this.ean,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductBarcode(')
+          ..write('householdId: $householdId, ')
+          ..write('ean: $ean, ')
+          ..write('productId: $productId, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(householdId, ean, productId, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductBarcode &&
+          other.householdId == this.householdId &&
+          other.ean == this.ean &&
+          other.productId == this.productId &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
+  final Value<String> householdId;
+  final Value<String> ean;
+  final Value<String> productId;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ProductBarcodesCompanion({
+    this.householdId = const Value.absent(),
+    this.ean = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductBarcodesCompanion.insert({
+    required String householdId,
+    required String ean,
+    required String productId,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : householdId = Value(householdId),
+       ean = Value(ean),
+       productId = Value(productId),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProductBarcode> custom({
+    Expression<String>? householdId,
+    Expression<String>? ean,
+    Expression<String>? productId,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (householdId != null) 'household_id': householdId,
+      if (ean != null) 'ean': ean,
+      if (productId != null) 'product_id': productId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductBarcodesCompanion copyWith({
+    Value<String>? householdId,
+    Value<String>? ean,
+    Value<String>? productId,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ProductBarcodesCompanion(
+      householdId: householdId ?? this.householdId,
+      ean: ean ?? this.ean,
+      productId: productId ?? this.productId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (ean.present) {
+      map['ean'] = Variable<String>(ean.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductBarcodesCompanion(')
+          ..write('householdId: $householdId, ')
+          ..write('ean: $ean, ')
+          ..write('productId: $productId, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4236,6 +5117,1761 @@ class ReceiptFilesCompanion extends UpdateCompanion<ReceiptFile> {
   }
 }
 
+class $InventoryItemsTable extends InventoryItems
+    with TableInfo<$InventoryItemsTable, InventoryItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InventoryItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _receiptItemIdMeta = const VerificationMeta(
+    'receiptItemId',
+  );
+  @override
+  late final GeneratedColumn<String> receiptItemId = GeneratedColumn<String>(
+    'receipt_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _eanMeta = const VerificationMeta('ean');
+  @override
+  late final GeneratedColumn<String> ean = GeneratedColumn<String>(
+    'ean',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('piece'),
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pantry'),
+  );
+  static const VerificationMeta _purchasedOnMeta = const VerificationMeta(
+    'purchasedOn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> purchasedOn = GeneratedColumn<DateTime>(
+    'purchased_on',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _bestBeforeMeta = const VerificationMeta(
+    'bestBefore',
+  );
+  @override
+  late final GeneratedColumn<DateTime> bestBefore = GeneratedColumn<DateTime>(
+    'best_before',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dateKindMeta = const VerificationMeta(
+    'dateKind',
+  );
+  @override
+  late final GeneratedColumn<String> dateKind = GeneratedColumn<String>(
+    'date_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('best_before'),
+  );
+  static const VerificationMeta _openedOnMeta = const VerificationMeta(
+    'openedOn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> openedOn = GeneratedColumn<DateTime>(
+    'opened_on',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _openShelfLifeDaysMeta = const VerificationMeta(
+    'openShelfLifeDays',
+  );
+  @override
+  late final GeneratedColumn<int> openShelfLifeDays = GeneratedColumn<int>(
+    'open_shelf_life_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('sealed'),
+  );
+  static const VerificationMeta _isSuggestionMeta = const VerificationMeta(
+    'isSuggestion',
+  );
+  @override
+  late final GeneratedColumn<bool> isSuggestion = GeneratedColumn<bool>(
+    'is_suggestion',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_suggestion" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _closedAtMeta = const VerificationMeta(
+    'closedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+    'closed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _expiresOnMeta = const VerificationMeta(
+    'expiresOn',
+  );
+  @override
+  late final GeneratedColumn<DateTime> expiresOn = GeneratedColumn<DateTime>(
+    'expires_on',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    productId,
+    receiptItemId,
+    ean,
+    quantity,
+    unit,
+    location,
+    purchasedOn,
+    bestBefore,
+    dateKind,
+    openedOn,
+    openShelfLifeDays,
+    status,
+    isSuggestion,
+    closedAt,
+    expiresOn,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'inventory_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InventoryItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('receipt_item_id')) {
+      context.handle(
+        _receiptItemIdMeta,
+        receiptItemId.isAcceptableOrUnknown(
+          data['receipt_item_id']!,
+          _receiptItemIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ean')) {
+      context.handle(
+        _eanMeta,
+        ean.isAcceptableOrUnknown(data['ean']!, _eanMeta),
+      );
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('purchased_on')) {
+      context.handle(
+        _purchasedOnMeta,
+        purchasedOn.isAcceptableOrUnknown(
+          data['purchased_on']!,
+          _purchasedOnMeta,
+        ),
+      );
+    }
+    if (data.containsKey('best_before')) {
+      context.handle(
+        _bestBeforeMeta,
+        bestBefore.isAcceptableOrUnknown(data['best_before']!, _bestBeforeMeta),
+      );
+    }
+    if (data.containsKey('date_kind')) {
+      context.handle(
+        _dateKindMeta,
+        dateKind.isAcceptableOrUnknown(data['date_kind']!, _dateKindMeta),
+      );
+    }
+    if (data.containsKey('opened_on')) {
+      context.handle(
+        _openedOnMeta,
+        openedOn.isAcceptableOrUnknown(data['opened_on']!, _openedOnMeta),
+      );
+    }
+    if (data.containsKey('open_shelf_life_days')) {
+      context.handle(
+        _openShelfLifeDaysMeta,
+        openShelfLifeDays.isAcceptableOrUnknown(
+          data['open_shelf_life_days']!,
+          _openShelfLifeDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('is_suggestion')) {
+      context.handle(
+        _isSuggestionMeta,
+        isSuggestion.isAcceptableOrUnknown(
+          data['is_suggestion']!,
+          _isSuggestionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(
+        _closedAtMeta,
+        closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta),
+      );
+    }
+    if (data.containsKey('expires_on')) {
+      context.handle(
+        _expiresOnMeta,
+        expiresOn.isAcceptableOrUnknown(data['expires_on']!, _expiresOnMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InventoryItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InventoryItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      receiptItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_item_id'],
+      ),
+      ean: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ean'],
+      ),
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      )!,
+      purchasedOn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}purchased_on'],
+      ),
+      bestBefore: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}best_before'],
+      ),
+      dateKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date_kind'],
+      )!,
+      openedOn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}opened_on'],
+      ),
+      openShelfLifeDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}open_shelf_life_days'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      isSuggestion: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_suggestion'],
+      )!,
+      closedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}closed_at'],
+      ),
+      expiresOn: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}expires_on'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $InventoryItemsTable createAlias(String alias) {
+    return $InventoryItemsTable(attachedDatabase, alias);
+  }
+}
+
+class InventoryItem extends DataClass implements Insertable<InventoryItem> {
+  final String id;
+  final String householdId;
+  final String productId;
+
+  /// Bon-Position, aus der dieser Eintrag als Vorschlag entstanden ist (Doku 06 §2).
+  final String? receiptItemId;
+  final String? ean;
+  final double quantity;
+
+  /// 'piece' | 'kg' | 'l'
+  final String unit;
+
+  /// 'fridge' | 'freezer' | 'pantry' | 'other'
+  final String location;
+  final DateTime? purchasedOn;
+  final DateTime? bestBefore;
+
+  /// 'best_before' | 'use_by'
+  final String dateKind;
+  final DateTime? openedOn;
+  final int? openShelfLifeDays;
+
+  /// 'sealed' | 'opened' | 'consumed' | 'discarded'
+  final String status;
+
+  /// Aus einem Bon vorgeschlagen, noch nicht per Barcode bestaetigt (Doku 06 §2, INV-08).
+  final bool isSuggestion;
+  final DateTime? closedAt;
+
+  /// Fruehestes aus bestBefore und openedOn+openShelfLifeDays (siehe computeExpiresOn), vom Server berechnet
+  /// und hier gespiegelt; fuer optimistische lokale Anzeige vor dem naechsten Sync selbst gesetzt.
+  final DateTime? expiresOn;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const InventoryItem({
+    required this.id,
+    required this.householdId,
+    required this.productId,
+    this.receiptItemId,
+    this.ean,
+    required this.quantity,
+    required this.unit,
+    required this.location,
+    this.purchasedOn,
+    this.bestBefore,
+    required this.dateKind,
+    this.openedOn,
+    this.openShelfLifeDays,
+    required this.status,
+    required this.isSuggestion,
+    this.closedAt,
+    this.expiresOn,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['product_id'] = Variable<String>(productId);
+    if (!nullToAbsent || receiptItemId != null) {
+      map['receipt_item_id'] = Variable<String>(receiptItemId);
+    }
+    if (!nullToAbsent || ean != null) {
+      map['ean'] = Variable<String>(ean);
+    }
+    map['quantity'] = Variable<double>(quantity);
+    map['unit'] = Variable<String>(unit);
+    map['location'] = Variable<String>(location);
+    if (!nullToAbsent || purchasedOn != null) {
+      map['purchased_on'] = Variable<DateTime>(purchasedOn);
+    }
+    if (!nullToAbsent || bestBefore != null) {
+      map['best_before'] = Variable<DateTime>(bestBefore);
+    }
+    map['date_kind'] = Variable<String>(dateKind);
+    if (!nullToAbsent || openedOn != null) {
+      map['opened_on'] = Variable<DateTime>(openedOn);
+    }
+    if (!nullToAbsent || openShelfLifeDays != null) {
+      map['open_shelf_life_days'] = Variable<int>(openShelfLifeDays);
+    }
+    map['status'] = Variable<String>(status);
+    map['is_suggestion'] = Variable<bool>(isSuggestion);
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
+    }
+    if (!nullToAbsent || expiresOn != null) {
+      map['expires_on'] = Variable<DateTime>(expiresOn);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  InventoryItemsCompanion toCompanion(bool nullToAbsent) {
+    return InventoryItemsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      productId: Value(productId),
+      receiptItemId: receiptItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptItemId),
+      ean: ean == null && nullToAbsent ? const Value.absent() : Value(ean),
+      quantity: Value(quantity),
+      unit: Value(unit),
+      location: Value(location),
+      purchasedOn: purchasedOn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(purchasedOn),
+      bestBefore: bestBefore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bestBefore),
+      dateKind: Value(dateKind),
+      openedOn: openedOn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(openedOn),
+      openShelfLifeDays: openShelfLifeDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(openShelfLifeDays),
+      status: Value(status),
+      isSuggestion: Value(isSuggestion),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
+      expiresOn: expiresOn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expiresOn),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory InventoryItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InventoryItem(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      receiptItemId: serializer.fromJson<String?>(json['receiptItemId']),
+      ean: serializer.fromJson<String?>(json['ean']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      unit: serializer.fromJson<String>(json['unit']),
+      location: serializer.fromJson<String>(json['location']),
+      purchasedOn: serializer.fromJson<DateTime?>(json['purchasedOn']),
+      bestBefore: serializer.fromJson<DateTime?>(json['bestBefore']),
+      dateKind: serializer.fromJson<String>(json['dateKind']),
+      openedOn: serializer.fromJson<DateTime?>(json['openedOn']),
+      openShelfLifeDays: serializer.fromJson<int?>(json['openShelfLifeDays']),
+      status: serializer.fromJson<String>(json['status']),
+      isSuggestion: serializer.fromJson<bool>(json['isSuggestion']),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
+      expiresOn: serializer.fromJson<DateTime?>(json['expiresOn']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'productId': serializer.toJson<String>(productId),
+      'receiptItemId': serializer.toJson<String?>(receiptItemId),
+      'ean': serializer.toJson<String?>(ean),
+      'quantity': serializer.toJson<double>(quantity),
+      'unit': serializer.toJson<String>(unit),
+      'location': serializer.toJson<String>(location),
+      'purchasedOn': serializer.toJson<DateTime?>(purchasedOn),
+      'bestBefore': serializer.toJson<DateTime?>(bestBefore),
+      'dateKind': serializer.toJson<String>(dateKind),
+      'openedOn': serializer.toJson<DateTime?>(openedOn),
+      'openShelfLifeDays': serializer.toJson<int?>(openShelfLifeDays),
+      'status': serializer.toJson<String>(status),
+      'isSuggestion': serializer.toJson<bool>(isSuggestion),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
+      'expiresOn': serializer.toJson<DateTime?>(expiresOn),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  InventoryItem copyWith({
+    String? id,
+    String? householdId,
+    String? productId,
+    Value<String?> receiptItemId = const Value.absent(),
+    Value<String?> ean = const Value.absent(),
+    double? quantity,
+    String? unit,
+    String? location,
+    Value<DateTime?> purchasedOn = const Value.absent(),
+    Value<DateTime?> bestBefore = const Value.absent(),
+    String? dateKind,
+    Value<DateTime?> openedOn = const Value.absent(),
+    Value<int?> openShelfLifeDays = const Value.absent(),
+    String? status,
+    bool? isSuggestion,
+    Value<DateTime?> closedAt = const Value.absent(),
+    Value<DateTime?> expiresOn = const Value.absent(),
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => InventoryItem(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    productId: productId ?? this.productId,
+    receiptItemId: receiptItemId.present
+        ? receiptItemId.value
+        : this.receiptItemId,
+    ean: ean.present ? ean.value : this.ean,
+    quantity: quantity ?? this.quantity,
+    unit: unit ?? this.unit,
+    location: location ?? this.location,
+    purchasedOn: purchasedOn.present ? purchasedOn.value : this.purchasedOn,
+    bestBefore: bestBefore.present ? bestBefore.value : this.bestBefore,
+    dateKind: dateKind ?? this.dateKind,
+    openedOn: openedOn.present ? openedOn.value : this.openedOn,
+    openShelfLifeDays: openShelfLifeDays.present
+        ? openShelfLifeDays.value
+        : this.openShelfLifeDays,
+    status: status ?? this.status,
+    isSuggestion: isSuggestion ?? this.isSuggestion,
+    closedAt: closedAt.present ? closedAt.value : this.closedAt,
+    expiresOn: expiresOn.present ? expiresOn.value : this.expiresOn,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  InventoryItem copyWithCompanion(InventoryItemsCompanion data) {
+    return InventoryItem(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      receiptItemId: data.receiptItemId.present
+          ? data.receiptItemId.value
+          : this.receiptItemId,
+      ean: data.ean.present ? data.ean.value : this.ean,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      location: data.location.present ? data.location.value : this.location,
+      purchasedOn: data.purchasedOn.present
+          ? data.purchasedOn.value
+          : this.purchasedOn,
+      bestBefore: data.bestBefore.present
+          ? data.bestBefore.value
+          : this.bestBefore,
+      dateKind: data.dateKind.present ? data.dateKind.value : this.dateKind,
+      openedOn: data.openedOn.present ? data.openedOn.value : this.openedOn,
+      openShelfLifeDays: data.openShelfLifeDays.present
+          ? data.openShelfLifeDays.value
+          : this.openShelfLifeDays,
+      status: data.status.present ? data.status.value : this.status,
+      isSuggestion: data.isSuggestion.present
+          ? data.isSuggestion.value
+          : this.isSuggestion,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
+      expiresOn: data.expiresOn.present ? data.expiresOn.value : this.expiresOn,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InventoryItem(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('productId: $productId, ')
+          ..write('receiptItemId: $receiptItemId, ')
+          ..write('ean: $ean, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('location: $location, ')
+          ..write('purchasedOn: $purchasedOn, ')
+          ..write('bestBefore: $bestBefore, ')
+          ..write('dateKind: $dateKind, ')
+          ..write('openedOn: $openedOn, ')
+          ..write('openShelfLifeDays: $openShelfLifeDays, ')
+          ..write('status: $status, ')
+          ..write('isSuggestion: $isSuggestion, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('expiresOn: $expiresOn, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    productId,
+    receiptItemId,
+    ean,
+    quantity,
+    unit,
+    location,
+    purchasedOn,
+    bestBefore,
+    dateKind,
+    openedOn,
+    openShelfLifeDays,
+    status,
+    isSuggestion,
+    closedAt,
+    expiresOn,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InventoryItem &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.productId == this.productId &&
+          other.receiptItemId == this.receiptItemId &&
+          other.ean == this.ean &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
+          other.location == this.location &&
+          other.purchasedOn == this.purchasedOn &&
+          other.bestBefore == this.bestBefore &&
+          other.dateKind == this.dateKind &&
+          other.openedOn == this.openedOn &&
+          other.openShelfLifeDays == this.openShelfLifeDays &&
+          other.status == this.status &&
+          other.isSuggestion == this.isSuggestion &&
+          other.closedAt == this.closedAt &&
+          other.expiresOn == this.expiresOn &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class InventoryItemsCompanion extends UpdateCompanion<InventoryItem> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> productId;
+  final Value<String?> receiptItemId;
+  final Value<String?> ean;
+  final Value<double> quantity;
+  final Value<String> unit;
+  final Value<String> location;
+  final Value<DateTime?> purchasedOn;
+  final Value<DateTime?> bestBefore;
+  final Value<String> dateKind;
+  final Value<DateTime?> openedOn;
+  final Value<int?> openShelfLifeDays;
+  final Value<String> status;
+  final Value<bool> isSuggestion;
+  final Value<DateTime?> closedAt;
+  final Value<DateTime?> expiresOn;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const InventoryItemsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.receiptItemId = const Value.absent(),
+    this.ean = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.location = const Value.absent(),
+    this.purchasedOn = const Value.absent(),
+    this.bestBefore = const Value.absent(),
+    this.dateKind = const Value.absent(),
+    this.openedOn = const Value.absent(),
+    this.openShelfLifeDays = const Value.absent(),
+    this.status = const Value.absent(),
+    this.isSuggestion = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.expiresOn = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InventoryItemsCompanion.insert({
+    required String id,
+    required String householdId,
+    required String productId,
+    this.receiptItemId = const Value.absent(),
+    this.ean = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.location = const Value.absent(),
+    this.purchasedOn = const Value.absent(),
+    this.bestBefore = const Value.absent(),
+    this.dateKind = const Value.absent(),
+    this.openedOn = const Value.absent(),
+    this.openShelfLifeDays = const Value.absent(),
+    this.status = const Value.absent(),
+    this.isSuggestion = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.expiresOn = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       productId = Value(productId),
+       updatedAt = Value(updatedAt);
+  static Insertable<InventoryItem> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? productId,
+    Expression<String>? receiptItemId,
+    Expression<String>? ean,
+    Expression<double>? quantity,
+    Expression<String>? unit,
+    Expression<String>? location,
+    Expression<DateTime>? purchasedOn,
+    Expression<DateTime>? bestBefore,
+    Expression<String>? dateKind,
+    Expression<DateTime>? openedOn,
+    Expression<int>? openShelfLifeDays,
+    Expression<String>? status,
+    Expression<bool>? isSuggestion,
+    Expression<DateTime>? closedAt,
+    Expression<DateTime>? expiresOn,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (productId != null) 'product_id': productId,
+      if (receiptItemId != null) 'receipt_item_id': receiptItemId,
+      if (ean != null) 'ean': ean,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
+      if (location != null) 'location': location,
+      if (purchasedOn != null) 'purchased_on': purchasedOn,
+      if (bestBefore != null) 'best_before': bestBefore,
+      if (dateKind != null) 'date_kind': dateKind,
+      if (openedOn != null) 'opened_on': openedOn,
+      if (openShelfLifeDays != null) 'open_shelf_life_days': openShelfLifeDays,
+      if (status != null) 'status': status,
+      if (isSuggestion != null) 'is_suggestion': isSuggestion,
+      if (closedAt != null) 'closed_at': closedAt,
+      if (expiresOn != null) 'expires_on': expiresOn,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InventoryItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? productId,
+    Value<String?>? receiptItemId,
+    Value<String?>? ean,
+    Value<double>? quantity,
+    Value<String>? unit,
+    Value<String>? location,
+    Value<DateTime?>? purchasedOn,
+    Value<DateTime?>? bestBefore,
+    Value<String>? dateKind,
+    Value<DateTime?>? openedOn,
+    Value<int?>? openShelfLifeDays,
+    Value<String>? status,
+    Value<bool>? isSuggestion,
+    Value<DateTime?>? closedAt,
+    Value<DateTime?>? expiresOn,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return InventoryItemsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      productId: productId ?? this.productId,
+      receiptItemId: receiptItemId ?? this.receiptItemId,
+      ean: ean ?? this.ean,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      location: location ?? this.location,
+      purchasedOn: purchasedOn ?? this.purchasedOn,
+      bestBefore: bestBefore ?? this.bestBefore,
+      dateKind: dateKind ?? this.dateKind,
+      openedOn: openedOn ?? this.openedOn,
+      openShelfLifeDays: openShelfLifeDays ?? this.openShelfLifeDays,
+      status: status ?? this.status,
+      isSuggestion: isSuggestion ?? this.isSuggestion,
+      closedAt: closedAt ?? this.closedAt,
+      expiresOn: expiresOn ?? this.expiresOn,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (receiptItemId.present) {
+      map['receipt_item_id'] = Variable<String>(receiptItemId.value);
+    }
+    if (ean.present) {
+      map['ean'] = Variable<String>(ean.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (purchasedOn.present) {
+      map['purchased_on'] = Variable<DateTime>(purchasedOn.value);
+    }
+    if (bestBefore.present) {
+      map['best_before'] = Variable<DateTime>(bestBefore.value);
+    }
+    if (dateKind.present) {
+      map['date_kind'] = Variable<String>(dateKind.value);
+    }
+    if (openedOn.present) {
+      map['opened_on'] = Variable<DateTime>(openedOn.value);
+    }
+    if (openShelfLifeDays.present) {
+      map['open_shelf_life_days'] = Variable<int>(openShelfLifeDays.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (isSuggestion.present) {
+      map['is_suggestion'] = Variable<bool>(isSuggestion.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
+    if (expiresOn.present) {
+      map['expires_on'] = Variable<DateTime>(expiresOn.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InventoryItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('productId: $productId, ')
+          ..write('receiptItemId: $receiptItemId, ')
+          ..write('ean: $ean, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('location: $location, ')
+          ..write('purchasedOn: $purchasedOn, ')
+          ..write('bestBefore: $bestBefore, ')
+          ..write('dateKind: $dateKind, ')
+          ..write('openedOn: $openedOn, ')
+          ..write('openShelfLifeDays: $openShelfLifeDays, ')
+          ..write('status: $status, ')
+          ..write('isSuggestion: $isSuggestion, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('expiresOn: $expiresOn, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $InventoryMovementsTable extends InventoryMovements
+    with TableInfo<$InventoryMovementsTable, InventoryMovement> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InventoryMovementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _inventoryItemIdMeta = const VerificationMeta(
+    'inventoryItemId',
+  );
+  @override
+  late final GeneratedColumn<String> inventoryItemId = GeneratedColumn<String>(
+    'inventory_item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _occurredAtMeta = const VerificationMeta(
+    'occurredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> occurredAt = GeneratedColumn<DateTime>(
+    'occurred_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityDeltaMeta = const VerificationMeta(
+    'quantityDelta',
+  );
+  @override
+  late final GeneratedColumn<double> quantityDelta = GeneratedColumn<double>(
+    'quantity_delta',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    inventoryItemId,
+    productId,
+    occurredAt,
+    type,
+    quantityDelta,
+    unit,
+    note,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'inventory_movements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InventoryMovement> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('inventory_item_id')) {
+      context.handle(
+        _inventoryItemIdMeta,
+        inventoryItemId.isAcceptableOrUnknown(
+          data['inventory_item_id']!,
+          _inventoryItemIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('occurred_at')) {
+      context.handle(
+        _occurredAtMeta,
+        occurredAt.isAcceptableOrUnknown(data['occurred_at']!, _occurredAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_occurredAtMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('quantity_delta')) {
+      context.handle(
+        _quantityDeltaMeta,
+        quantityDelta.isAcceptableOrUnknown(
+          data['quantity_delta']!,
+          _quantityDeltaMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_quantityDeltaMeta);
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_unitMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InventoryMovement map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InventoryMovement(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      inventoryItemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}inventory_item_id'],
+      ),
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      occurredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}occurred_at'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      quantityDelta: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity_delta'],
+      )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $InventoryMovementsTable createAlias(String alias) {
+    return $InventoryMovementsTable(attachedDatabase, alias);
+  }
+}
+
+class InventoryMovement extends DataClass
+    implements Insertable<InventoryMovement> {
+  final String id;
+  final String householdId;
+  final String? inventoryItemId;
+  final String productId;
+  final DateTime occurredAt;
+
+  /// 'purchase' | 'consumed' | 'meal' | 'discarded' | 'adjustment'
+  final String type;
+
+  /// Vorzeichen: Zugang +, Abgang -.
+  final double quantityDelta;
+
+  /// 'piece' | 'kg' | 'l'
+  final String unit;
+  final String? note;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const InventoryMovement({
+    required this.id,
+    required this.householdId,
+    this.inventoryItemId,
+    required this.productId,
+    required this.occurredAt,
+    required this.type,
+    required this.quantityDelta,
+    required this.unit,
+    this.note,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    if (!nullToAbsent || inventoryItemId != null) {
+      map['inventory_item_id'] = Variable<String>(inventoryItemId);
+    }
+    map['product_id'] = Variable<String>(productId);
+    map['occurred_at'] = Variable<DateTime>(occurredAt);
+    map['type'] = Variable<String>(type);
+    map['quantity_delta'] = Variable<double>(quantityDelta);
+    map['unit'] = Variable<String>(unit);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  InventoryMovementsCompanion toCompanion(bool nullToAbsent) {
+    return InventoryMovementsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      inventoryItemId: inventoryItemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(inventoryItemId),
+      productId: Value(productId),
+      occurredAt: Value(occurredAt),
+      type: Value(type),
+      quantityDelta: Value(quantityDelta),
+      unit: Value(unit),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory InventoryMovement.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InventoryMovement(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      inventoryItemId: serializer.fromJson<String?>(json['inventoryItemId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      occurredAt: serializer.fromJson<DateTime>(json['occurredAt']),
+      type: serializer.fromJson<String>(json['type']),
+      quantityDelta: serializer.fromJson<double>(json['quantityDelta']),
+      unit: serializer.fromJson<String>(json['unit']),
+      note: serializer.fromJson<String?>(json['note']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'inventoryItemId': serializer.toJson<String?>(inventoryItemId),
+      'productId': serializer.toJson<String>(productId),
+      'occurredAt': serializer.toJson<DateTime>(occurredAt),
+      'type': serializer.toJson<String>(type),
+      'quantityDelta': serializer.toJson<double>(quantityDelta),
+      'unit': serializer.toJson<String>(unit),
+      'note': serializer.toJson<String?>(note),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  InventoryMovement copyWith({
+    String? id,
+    String? householdId,
+    Value<String?> inventoryItemId = const Value.absent(),
+    String? productId,
+    DateTime? occurredAt,
+    String? type,
+    double? quantityDelta,
+    String? unit,
+    Value<String?> note = const Value.absent(),
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => InventoryMovement(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    inventoryItemId: inventoryItemId.present
+        ? inventoryItemId.value
+        : this.inventoryItemId,
+    productId: productId ?? this.productId,
+    occurredAt: occurredAt ?? this.occurredAt,
+    type: type ?? this.type,
+    quantityDelta: quantityDelta ?? this.quantityDelta,
+    unit: unit ?? this.unit,
+    note: note.present ? note.value : this.note,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  InventoryMovement copyWithCompanion(InventoryMovementsCompanion data) {
+    return InventoryMovement(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      inventoryItemId: data.inventoryItemId.present
+          ? data.inventoryItemId.value
+          : this.inventoryItemId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      occurredAt: data.occurredAt.present
+          ? data.occurredAt.value
+          : this.occurredAt,
+      type: data.type.present ? data.type.value : this.type,
+      quantityDelta: data.quantityDelta.present
+          ? data.quantityDelta.value
+          : this.quantityDelta,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      note: data.note.present ? data.note.value : this.note,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InventoryMovement(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('inventoryItemId: $inventoryItemId, ')
+          ..write('productId: $productId, ')
+          ..write('occurredAt: $occurredAt, ')
+          ..write('type: $type, ')
+          ..write('quantityDelta: $quantityDelta, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    inventoryItemId,
+    productId,
+    occurredAt,
+    type,
+    quantityDelta,
+    unit,
+    note,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InventoryMovement &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.inventoryItemId == this.inventoryItemId &&
+          other.productId == this.productId &&
+          other.occurredAt == this.occurredAt &&
+          other.type == this.type &&
+          other.quantityDelta == this.quantityDelta &&
+          other.unit == this.unit &&
+          other.note == this.note &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class InventoryMovementsCompanion extends UpdateCompanion<InventoryMovement> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String?> inventoryItemId;
+  final Value<String> productId;
+  final Value<DateTime> occurredAt;
+  final Value<String> type;
+  final Value<double> quantityDelta;
+  final Value<String> unit;
+  final Value<String?> note;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const InventoryMovementsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.inventoryItemId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.occurredAt = const Value.absent(),
+    this.type = const Value.absent(),
+    this.quantityDelta = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.note = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InventoryMovementsCompanion.insert({
+    required String id,
+    required String householdId,
+    this.inventoryItemId = const Value.absent(),
+    required String productId,
+    required DateTime occurredAt,
+    required String type,
+    required double quantityDelta,
+    required String unit,
+    this.note = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       productId = Value(productId),
+       occurredAt = Value(occurredAt),
+       type = Value(type),
+       quantityDelta = Value(quantityDelta),
+       unit = Value(unit),
+       updatedAt = Value(updatedAt);
+  static Insertable<InventoryMovement> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? inventoryItemId,
+    Expression<String>? productId,
+    Expression<DateTime>? occurredAt,
+    Expression<String>? type,
+    Expression<double>? quantityDelta,
+    Expression<String>? unit,
+    Expression<String>? note,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (inventoryItemId != null) 'inventory_item_id': inventoryItemId,
+      if (productId != null) 'product_id': productId,
+      if (occurredAt != null) 'occurred_at': occurredAt,
+      if (type != null) 'type': type,
+      if (quantityDelta != null) 'quantity_delta': quantityDelta,
+      if (unit != null) 'unit': unit,
+      if (note != null) 'note': note,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InventoryMovementsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String?>? inventoryItemId,
+    Value<String>? productId,
+    Value<DateTime>? occurredAt,
+    Value<String>? type,
+    Value<double>? quantityDelta,
+    Value<String>? unit,
+    Value<String?>? note,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return InventoryMovementsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      inventoryItemId: inventoryItemId ?? this.inventoryItemId,
+      productId: productId ?? this.productId,
+      occurredAt: occurredAt ?? this.occurredAt,
+      type: type ?? this.type,
+      quantityDelta: quantityDelta ?? this.quantityDelta,
+      unit: unit ?? this.unit,
+      note: note ?? this.note,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (inventoryItemId.present) {
+      map['inventory_item_id'] = Variable<String>(inventoryItemId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (occurredAt.present) {
+      map['occurred_at'] = Variable<DateTime>(occurredAt.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (quantityDelta.present) {
+      map['quantity_delta'] = Variable<double>(quantityDelta.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InventoryMovementsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('inventoryItemId: $inventoryItemId, ')
+          ..write('productId: $productId, ')
+          ..write('occurredAt: $occurredAt, ')
+          ..write('type: $type, ')
+          ..write('quantityDelta: $quantityDelta, ')
+          ..write('unit: $unit, ')
+          ..write('note: $note, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -5139,6 +7775,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $ProductBarcodesTable productBarcodes = $ProductBarcodesTable(
+    this,
+  );
   late final $StoresTable stores = $StoresTable(this);
   late final $ReceiptsTable receipts = $ReceiptsTable(this);
   late final $ReceiptItemsTable receiptItems = $ReceiptItemsTable(this);
@@ -5146,6 +7785,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $ReceiptFilesTable receiptFiles = $ReceiptFilesTable(this);
+  late final $InventoryItemsTable inventoryItems = $InventoryItemsTable(this);
+  late final $InventoryMovementsTable inventoryMovements =
+      $InventoryMovementsTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -5156,11 +7798,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     categories,
     products,
+    productBarcodes,
     stores,
     receipts,
     receiptItems,
     categoryAliases,
     receiptFiles,
+    inventoryItems,
+    inventoryMovements,
     outbox,
     syncStates,
     keyValues,
@@ -5459,6 +8104,16 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   Value<String?> categoryId,
   Value<String> baseUnit,
   Value<double?> packSize,
+  Value<int?> sealedShelfLifeDays,
+  Value<int?> openedShelfLifeDays,
+  Value<String> defaultDateKind,
+  Value<String> defaultLocation,
+  Value<bool> restock,
+  Value<String?> offCode,
+  Value<String?> nutrientsPer100,
+  Value<String?> nutrientsBasis,
+  Value<String?> nutrientsSource,
+  Value<double?> unitWeightG,
   required DateTime updatedAt,
   Value<DateTime?> deletedAt,
   Value<int> rowid,
@@ -5471,6 +8126,16 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<String?> categoryId,
   Value<String> baseUnit,
   Value<double?> packSize,
+  Value<int?> sealedShelfLifeDays,
+  Value<int?> openedShelfLifeDays,
+  Value<String> defaultDateKind,
+  Value<String> defaultLocation,
+  Value<bool> restock,
+  Value<String?> offCode,
+  Value<String?> nutrientsPer100,
+  Value<String?> nutrientsBasis,
+  Value<String?> nutrientsSource,
+  Value<double?> unitWeightG,
   Value<DateTime> updatedAt,
   Value<DateTime?> deletedAt,
   Value<int> rowid,
@@ -5517,6 +8182,56 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<double> get packSize => $composableBuilder(
     column: $table.packSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sealedShelfLifeDays => $composableBuilder(
+    column: $table.sealedShelfLifeDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get openedShelfLifeDays => $composableBuilder(
+    column: $table.openedShelfLifeDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultDateKind => $composableBuilder(
+    column: $table.defaultDateKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultLocation => $composableBuilder(
+    column: $table.defaultLocation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get restock => $composableBuilder(
+    column: $table.restock,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get offCode => $composableBuilder(
+    column: $table.offCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nutrientsPer100 => $composableBuilder(
+    column: $table.nutrientsPer100,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nutrientsBasis => $composableBuilder(
+    column: $table.nutrientsBasis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nutrientsSource => $composableBuilder(
+    column: $table.nutrientsSource,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5575,6 +8290,56 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get sealedShelfLifeDays => $composableBuilder(
+    column: $table.sealedShelfLifeDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get openedShelfLifeDays => $composableBuilder(
+    column: $table.openedShelfLifeDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultDateKind => $composableBuilder(
+    column: $table.defaultDateKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultLocation => $composableBuilder(
+    column: $table.defaultLocation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get restock => $composableBuilder(
+    column: $table.restock,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get offCode => $composableBuilder(
+    column: $table.offCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nutrientsPer100 => $composableBuilder(
+    column: $table.nutrientsPer100,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nutrientsBasis => $composableBuilder(
+    column: $table.nutrientsBasis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nutrientsSource => $composableBuilder(
+    column: $table.nutrientsSource,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5620,6 +8385,52 @@ class $$ProductsTableAnnotationComposer
   GeneratedColumn<double> get packSize =>
       $composableBuilder(column: $table.packSize, builder: (column) => column);
 
+  GeneratedColumn<int> get sealedShelfLifeDays => $composableBuilder(
+    column: $table.sealedShelfLifeDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get openedShelfLifeDays => $composableBuilder(
+    column: $table.openedShelfLifeDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultDateKind => $composableBuilder(
+    column: $table.defaultDateKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultLocation => $composableBuilder(
+    column: $table.defaultLocation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get restock =>
+      $composableBuilder(column: $table.restock, builder: (column) => column);
+
+  GeneratedColumn<String> get offCode =>
+      $composableBuilder(column: $table.offCode, builder: (column) => column);
+
+  GeneratedColumn<String> get nutrientsPer100 => $composableBuilder(
+    column: $table.nutrientsPer100,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nutrientsBasis => $composableBuilder(
+    column: $table.nutrientsBasis,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get nutrientsSource => $composableBuilder(
+    column: $table.nutrientsSource,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -5662,6 +8473,16 @@ class $$ProductsTableTableManager
                 Value<String?> categoryId = const Value.absent(),
                 Value<String> baseUnit = const Value.absent(),
                 Value<double?> packSize = const Value.absent(),
+                Value<int?> sealedShelfLifeDays = const Value.absent(),
+                Value<int?> openedShelfLifeDays = const Value.absent(),
+                Value<String> defaultDateKind = const Value.absent(),
+                Value<String> defaultLocation = const Value.absent(),
+                Value<bool> restock = const Value.absent(),
+                Value<String?> offCode = const Value.absent(),
+                Value<String?> nutrientsPer100 = const Value.absent(),
+                Value<String?> nutrientsBasis = const Value.absent(),
+                Value<String?> nutrientsSource = const Value.absent(),
+                Value<double?> unitWeightG = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5673,6 +8494,16 @@ class $$ProductsTableTableManager
                 categoryId: categoryId,
                 baseUnit: baseUnit,
                 packSize: packSize,
+                sealedShelfLifeDays: sealedShelfLifeDays,
+                openedShelfLifeDays: openedShelfLifeDays,
+                defaultDateKind: defaultDateKind,
+                defaultLocation: defaultLocation,
+                restock: restock,
+                offCode: offCode,
+                nutrientsPer100: nutrientsPer100,
+                nutrientsBasis: nutrientsBasis,
+                nutrientsSource: nutrientsSource,
+                unitWeightG: unitWeightG,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,
@@ -5686,6 +8517,16 @@ class $$ProductsTableTableManager
                 Value<String?> categoryId = const Value.absent(),
                 Value<String> baseUnit = const Value.absent(),
                 Value<double?> packSize = const Value.absent(),
+                Value<int?> sealedShelfLifeDays = const Value.absent(),
+                Value<int?> openedShelfLifeDays = const Value.absent(),
+                Value<String> defaultDateKind = const Value.absent(),
+                Value<String> defaultLocation = const Value.absent(),
+                Value<bool> restock = const Value.absent(),
+                Value<String?> offCode = const Value.absent(),
+                Value<String?> nutrientsPer100 = const Value.absent(),
+                Value<String?> nutrientsBasis = const Value.absent(),
+                Value<String?> nutrientsSource = const Value.absent(),
+                Value<double?> unitWeightG = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5697,6 +8538,16 @@ class $$ProductsTableTableManager
                 categoryId: categoryId,
                 baseUnit: baseUnit,
                 packSize: packSize,
+                sealedShelfLifeDays: sealedShelfLifeDays,
+                openedShelfLifeDays: openedShelfLifeDays,
+                defaultDateKind: defaultDateKind,
+                defaultLocation: defaultLocation,
+                restock: restock,
+                offCode: offCode,
+                nutrientsPer100: nutrientsPer100,
+                nutrientsBasis: nutrientsBasis,
+                nutrientsSource: nutrientsSource,
+                unitWeightG: unitWeightG,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,
@@ -5730,6 +8581,204 @@ typedef $$ProductsTableProcessedTableManager =
       $$ProductsTableUpdateCompanionBuilder,
       (Product, BaseReferences<_$AppDatabase, $ProductsTable, Product>),
       Product,
+      PrefetchHooks Function()
+    >;
+typedef $$ProductBarcodesTableCreateCompanionBuilder =
+    ProductBarcodesCompanion Function({
+      required String householdId,
+      required String ean,
+      required String productId,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ProductBarcodesTableUpdateCompanionBuilder =
+    ProductBarcodesCompanion Function({
+      Value<String> householdId,
+      Value<String> ean,
+      Value<String> productId,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ProductBarcodesTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductBarcodesTable> {
+  $$ProductBarcodesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ean => $composableBuilder(
+    column: $table.ean,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ProductBarcodesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductBarcodesTable> {
+  $$ProductBarcodesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ean => $composableBuilder(
+    column: $table.ean,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProductBarcodesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductBarcodesTable> {
+  $$ProductBarcodesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ean =>
+      $composableBuilder(column: $table.ean, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProductBarcodesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductBarcodesTable,
+          ProductBarcode,
+          $$ProductBarcodesTableFilterComposer,
+          $$ProductBarcodesTableOrderingComposer,
+          $$ProductBarcodesTableAnnotationComposer,
+          $$ProductBarcodesTableCreateCompanionBuilder,
+          $$ProductBarcodesTableUpdateCompanionBuilder,
+          (
+            ProductBarcode,
+            BaseReferences<
+              _$AppDatabase,
+              $ProductBarcodesTable,
+              ProductBarcode
+            >,
+          ),
+          ProductBarcode,
+          PrefetchHooks Function()
+        > {
+  $$ProductBarcodesTableTableManager(
+    _$AppDatabase db,
+    $ProductBarcodesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductBarcodesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductBarcodesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductBarcodesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> householdId = const Value.absent(),
+                Value<String> ean = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductBarcodesCompanion(
+                householdId: householdId,
+                ean: ean,
+                productId: productId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String householdId,
+                required String ean,
+                required String productId,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ProductBarcodesCompanion.insert(
+                householdId: householdId,
+                ean: ean,
+                productId: productId,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ProductBarcodesTable, ProductBarcode>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ProductBarcodesTable,
+                    ProductBarcode
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProductBarcodesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductBarcodesTable,
+      ProductBarcode,
+      $$ProductBarcodesTableFilterComposer,
+      $$ProductBarcodesTableOrderingComposer,
+      $$ProductBarcodesTableAnnotationComposer,
+      $$ProductBarcodesTableCreateCompanionBuilder,
+      $$ProductBarcodesTableUpdateCompanionBuilder,
+      (
+        ProductBarcode,
+        BaseReferences<_$AppDatabase, $ProductBarcodesTable, ProductBarcode>,
+      ),
+      ProductBarcode,
       PrefetchHooks Function()
     >;
 typedef $$StoresTableCreateCompanionBuilder = StoresCompanion Function({
@@ -7272,6 +10321,841 @@ typedef $$ReceiptFilesTableProcessedTableManager =
       ReceiptFile,
       PrefetchHooks Function()
     >;
+typedef $$InventoryItemsTableCreateCompanionBuilder =
+    InventoryItemsCompanion Function({
+      required String id,
+      required String householdId,
+      required String productId,
+      Value<String?> receiptItemId,
+      Value<String?> ean,
+      Value<double> quantity,
+      Value<String> unit,
+      Value<String> location,
+      Value<DateTime?> purchasedOn,
+      Value<DateTime?> bestBefore,
+      Value<String> dateKind,
+      Value<DateTime?> openedOn,
+      Value<int?> openShelfLifeDays,
+      Value<String> status,
+      Value<bool> isSuggestion,
+      Value<DateTime?> closedAt,
+      Value<DateTime?> expiresOn,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$InventoryItemsTableUpdateCompanionBuilder =
+    InventoryItemsCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> productId,
+      Value<String?> receiptItemId,
+      Value<String?> ean,
+      Value<double> quantity,
+      Value<String> unit,
+      Value<String> location,
+      Value<DateTime?> purchasedOn,
+      Value<DateTime?> bestBefore,
+      Value<String> dateKind,
+      Value<DateTime?> openedOn,
+      Value<int?> openShelfLifeDays,
+      Value<String> status,
+      Value<bool> isSuggestion,
+      Value<DateTime?> closedAt,
+      Value<DateTime?> expiresOn,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$InventoryItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $InventoryItemsTable> {
+  $$InventoryItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get receiptItemId => $composableBuilder(
+    column: $table.receiptItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ean => $composableBuilder(
+    column: $table.ean,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get purchasedOn => $composableBuilder(
+    column: $table.purchasedOn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get bestBefore => $composableBuilder(
+    column: $table.bestBefore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dateKind => $composableBuilder(
+    column: $table.dateKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get openedOn => $composableBuilder(
+    column: $table.openedOn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get openShelfLifeDays => $composableBuilder(
+    column: $table.openShelfLifeDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get expiresOn => $composableBuilder(
+    column: $table.expiresOn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InventoryItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $InventoryItemsTable> {
+  $$InventoryItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get receiptItemId => $composableBuilder(
+    column: $table.receiptItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ean => $composableBuilder(
+    column: $table.ean,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get purchasedOn => $composableBuilder(
+    column: $table.purchasedOn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get bestBefore => $composableBuilder(
+    column: $table.bestBefore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dateKind => $composableBuilder(
+    column: $table.dateKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get openedOn => $composableBuilder(
+    column: $table.openedOn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get openShelfLifeDays => $composableBuilder(
+    column: $table.openShelfLifeDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+    column: $table.closedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get expiresOn => $composableBuilder(
+    column: $table.expiresOn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InventoryItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InventoryItemsTable> {
+  $$InventoryItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptItemId => $composableBuilder(
+    column: $table.receiptItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ean =>
+      $composableBuilder(column: $table.ean, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get purchasedOn => $composableBuilder(
+    column: $table.purchasedOn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get bestBefore => $composableBuilder(
+    column: $table.bestBefore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dateKind =>
+      $composableBuilder(column: $table.dateKind, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get openedOn =>
+      $composableBuilder(column: $table.openedOn, builder: (column) => column);
+
+  GeneratedColumn<int> get openShelfLifeDays => $composableBuilder(
+    column: $table.openShelfLifeDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get expiresOn =>
+      $composableBuilder(column: $table.expiresOn, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$InventoryItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InventoryItemsTable,
+          InventoryItem,
+          $$InventoryItemsTableFilterComposer,
+          $$InventoryItemsTableOrderingComposer,
+          $$InventoryItemsTableAnnotationComposer,
+          $$InventoryItemsTableCreateCompanionBuilder,
+          $$InventoryItemsTableUpdateCompanionBuilder,
+          (
+            InventoryItem,
+            BaseReferences<_$AppDatabase, $InventoryItemsTable, InventoryItem>,
+          ),
+          InventoryItem,
+          PrefetchHooks Function()
+        > {
+  $$InventoryItemsTableTableManager(
+    _$AppDatabase db,
+    $InventoryItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InventoryItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InventoryItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InventoryItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String?> receiptItemId = const Value.absent(),
+                Value<String?> ean = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<String> location = const Value.absent(),
+                Value<DateTime?> purchasedOn = const Value.absent(),
+                Value<DateTime?> bestBefore = const Value.absent(),
+                Value<String> dateKind = const Value.absent(),
+                Value<DateTime?> openedOn = const Value.absent(),
+                Value<int?> openShelfLifeDays = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<bool> isSuggestion = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<DateTime?> expiresOn = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InventoryItemsCompanion(
+                id: id,
+                householdId: householdId,
+                productId: productId,
+                receiptItemId: receiptItemId,
+                ean: ean,
+                quantity: quantity,
+                unit: unit,
+                location: location,
+                purchasedOn: purchasedOn,
+                bestBefore: bestBefore,
+                dateKind: dateKind,
+                openedOn: openedOn,
+                openShelfLifeDays: openShelfLifeDays,
+                status: status,
+                isSuggestion: isSuggestion,
+                closedAt: closedAt,
+                expiresOn: expiresOn,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String productId,
+                Value<String?> receiptItemId = const Value.absent(),
+                Value<String?> ean = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<String> location = const Value.absent(),
+                Value<DateTime?> purchasedOn = const Value.absent(),
+                Value<DateTime?> bestBefore = const Value.absent(),
+                Value<String> dateKind = const Value.absent(),
+                Value<DateTime?> openedOn = const Value.absent(),
+                Value<int?> openShelfLifeDays = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<bool> isSuggestion = const Value.absent(),
+                Value<DateTime?> closedAt = const Value.absent(),
+                Value<DateTime?> expiresOn = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InventoryItemsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                productId: productId,
+                receiptItemId: receiptItemId,
+                ean: ean,
+                quantity: quantity,
+                unit: unit,
+                location: location,
+                purchasedOn: purchasedOn,
+                bestBefore: bestBefore,
+                dateKind: dateKind,
+                openedOn: openedOn,
+                openShelfLifeDays: openShelfLifeDays,
+                status: status,
+                isSuggestion: isSuggestion,
+                closedAt: closedAt,
+                expiresOn: expiresOn,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$InventoryItemsTable, InventoryItem>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $InventoryItemsTable,
+                    InventoryItem
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InventoryItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InventoryItemsTable,
+      InventoryItem,
+      $$InventoryItemsTableFilterComposer,
+      $$InventoryItemsTableOrderingComposer,
+      $$InventoryItemsTableAnnotationComposer,
+      $$InventoryItemsTableCreateCompanionBuilder,
+      $$InventoryItemsTableUpdateCompanionBuilder,
+      (
+        InventoryItem,
+        BaseReferences<_$AppDatabase, $InventoryItemsTable, InventoryItem>,
+      ),
+      InventoryItem,
+      PrefetchHooks Function()
+    >;
+typedef $$InventoryMovementsTableCreateCompanionBuilder =
+    InventoryMovementsCompanion Function({
+      required String id,
+      required String householdId,
+      Value<String?> inventoryItemId,
+      required String productId,
+      required DateTime occurredAt,
+      required String type,
+      required double quantityDelta,
+      required String unit,
+      Value<String?> note,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$InventoryMovementsTableUpdateCompanionBuilder =
+    InventoryMovementsCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String?> inventoryItemId,
+      Value<String> productId,
+      Value<DateTime> occurredAt,
+      Value<String> type,
+      Value<double> quantityDelta,
+      Value<String> unit,
+      Value<String?> note,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$InventoryMovementsTableFilterComposer
+    extends Composer<_$AppDatabase, $InventoryMovementsTable> {
+  $$InventoryMovementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get occurredAt => $composableBuilder(
+    column: $table.occurredAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantityDelta => $composableBuilder(
+    column: $table.quantityDelta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$InventoryMovementsTableOrderingComposer
+    extends Composer<_$AppDatabase, $InventoryMovementsTable> {
+  $$InventoryMovementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get occurredAt => $composableBuilder(
+    column: $table.occurredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantityDelta => $composableBuilder(
+    column: $table.quantityDelta,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InventoryMovementsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InventoryMovementsTable> {
+  $$InventoryMovementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get inventoryItemId => $composableBuilder(
+    column: $table.inventoryItemId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get occurredAt => $composableBuilder(
+    column: $table.occurredAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<double> get quantityDelta => $composableBuilder(
+    column: $table.quantityDelta,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$InventoryMovementsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InventoryMovementsTable,
+          InventoryMovement,
+          $$InventoryMovementsTableFilterComposer,
+          $$InventoryMovementsTableOrderingComposer,
+          $$InventoryMovementsTableAnnotationComposer,
+          $$InventoryMovementsTableCreateCompanionBuilder,
+          $$InventoryMovementsTableUpdateCompanionBuilder,
+          (
+            InventoryMovement,
+            BaseReferences<
+              _$AppDatabase,
+              $InventoryMovementsTable,
+              InventoryMovement
+            >,
+          ),
+          InventoryMovement,
+          PrefetchHooks Function()
+        > {
+  $$InventoryMovementsTableTableManager(
+    _$AppDatabase db,
+    $InventoryMovementsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InventoryMovementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$InventoryMovementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$InventoryMovementsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String?> inventoryItemId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<DateTime> occurredAt = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<double> quantityDelta = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InventoryMovementsCompanion(
+                id: id,
+                householdId: householdId,
+                inventoryItemId: inventoryItemId,
+                productId: productId,
+                occurredAt: occurredAt,
+                type: type,
+                quantityDelta: quantityDelta,
+                unit: unit,
+                note: note,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                Value<String?> inventoryItemId = const Value.absent(),
+                required String productId,
+                required DateTime occurredAt,
+                required String type,
+                required double quantityDelta,
+                required String unit,
+                Value<String?> note = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InventoryMovementsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                inventoryItemId: inventoryItemId,
+                productId: productId,
+                occurredAt: occurredAt,
+                type: type,
+                quantityDelta: quantityDelta,
+                unit: unit,
+                note: note,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$InventoryMovementsTable, InventoryMovement>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $InventoryMovementsTable,
+                    InventoryMovement
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InventoryMovementsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InventoryMovementsTable,
+      InventoryMovement,
+      $$InventoryMovementsTableFilterComposer,
+      $$InventoryMovementsTableOrderingComposer,
+      $$InventoryMovementsTableAnnotationComposer,
+      $$InventoryMovementsTableCreateCompanionBuilder,
+      $$InventoryMovementsTableUpdateCompanionBuilder,
+      (
+        InventoryMovement,
+        BaseReferences<
+          _$AppDatabase,
+          $InventoryMovementsTable,
+          InventoryMovement
+        >,
+      ),
+      InventoryMovement,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -7812,6 +11696,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$ProductBarcodesTableTableManager get productBarcodes =>
+      $$ProductBarcodesTableTableManager(_db, _db.productBarcodes);
   $$StoresTableTableManager get stores =>
       $$StoresTableTableManager(_db, _db.stores);
   $$ReceiptsTableTableManager get receipts =>
@@ -7822,6 +11708,10 @@ class $AppDatabaseManager {
       $$CategoryAliasesTableTableManager(_db, _db.categoryAliases);
   $$ReceiptFilesTableTableManager get receiptFiles =>
       $$ReceiptFilesTableTableManager(_db, _db.receiptFiles);
+  $$InventoryItemsTableTableManager get inventoryItems =>
+      $$InventoryItemsTableTableManager(_db, _db.inventoryItems);
+  $$InventoryMovementsTableTableManager get inventoryMovements =>
+      $$InventoryMovementsTableTableManager(_db, _db.inventoryMovements);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

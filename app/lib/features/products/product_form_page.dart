@@ -1,0 +1,234 @@
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../app/providers.dart';
+import '../../data/local/database.dart';
+import '../../data/products/off_client.dart';
+import '../../data/repositories/product_repository.dart';
+
+/// Argumente fuer /product-form: entweder ein unbekannter Barcode (mit optionalem OFF-Vorschlag) oder ein
+/// bestehendes Produkt zum Bearbeiten.
+class ProductFormArgs {
+  const ProductFormArgs({this.ean, this.suggestion, this.existing});
+  final String? ean;
+  final OffProduct? suggestion;
+  final Product? existing;
+}
+
+const _units = [('piece', 'Stück'), ('kg', 'kg'), ('l', 'l')];
+const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer', 'Tiefkühl'), ('other', 'Sonstiges')];
+const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu verbrauchen bis')];
+
+/// Anlegen oder Bearbeiten eines Produkts (Doku 06 §3.5, §4). Nach einem Barcode-Scan eines unbekannten
+/// Produkts vorbelegt mit dem OFF-Vorschlag, sonst leer oder mit dem bestehenden Produkt.
+class ProductFormPage extends ConsumerStatefulWidget {
+  const ProductFormPage({super.key, this.ean, this.suggestion, this.existing});
+
+  /// EAN, mit dem das neue Produkt verknuepft wird (Barcode-Scan eines unbekannten Produkts).
+  final String? ean;
+  final OffProduct? suggestion;
+
+  /// Bearbeiten eines bestehenden Produkts (dann kein EAN-Verweis).
+  final Product? existing;
+
+  @override
+  ConsumerState<ProductFormPage> createState() => _ProductFormPageState();
+}
+
+class _ProductFormPageState extends ConsumerState<ProductFormPage> {
+  late final _name = TextEditingController(text: widget.existing?.name ?? widget.suggestion?.name ?? '');
+  late final _brand = TextEditingController(text: widget.existing?.brand ?? widget.suggestion?.brand ?? '');
+  late final _packSize = TextEditingController(text: widget.existing?.packSize?.toString() ?? '');
+  late final _openedDays = TextEditingController(text: widget.existing?.openedShelfLifeDays?.toString() ?? '');
+  String? _categoryId;
+  var _categoryInitialized = false;
+  late String _unit = widget.existing?.baseUnit ?? 'piece';
+  late String _location = widget.existing?.defaultLocation ?? 'pantry';
+  late String _dateKind = widget.existing?.defaultDateKind ?? 'best_before';
+  late bool _restock = widget.existing?.restock ?? false;
+  var _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _brand.dispose();
+    _packSize.dispose();
+    _openedDays.dispose();
+    super.dispose();
+  }
+
+  void _initCategory(List<Category> categories) {
+    if (_categoryInitialized) return;
+    _categoryInitialized = true;
+    if (widget.existing != null) {
+      _categoryId = widget.existing!.categoryId;
+      return;
+    }
+    final suggestion = widget.suggestion;
+    if (suggestion != null) {
+      _categoryId = suggestCategoryId(suggestion, {for (final c in categories) c.name: c.id});
+    }
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Bitte einen Namen eingeben.');
+      return;
+    }
+    final packSize = double.tryParse(_packSize.text.replaceAll(',', '.').trim());
+    final openedDays = int.tryParse(_openedDays.text.trim());
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final repo = ref.read(productRepositoryProvider);
+      final Product product;
+      if (widget.existing != null) {
+        final updated = widget.existing!.copyWith(
+          name: name,
+          brand: Value(_brand.text.trim().isEmpty ? null : _brand.text.trim()),
+          categoryId: Value(_categoryId),
+          baseUnit: _unit,
+          packSize: Value(packSize),
+          defaultLocation: _location,
+          defaultDateKind: _dateKind,
+          openedShelfLifeDays: Value(openedDays),
+          restock: _restock,
+        );
+        await repo.update(updated);
+        product = updated;
+      } else {
+        product = await repo.create(
+          name: name,
+          brand: _brand.text.trim(),
+          categoryId: _categoryId,
+          baseUnit: _unit,
+          packSize: packSize,
+          defaultLocation: _location,
+          defaultDateKind: _dateKind,
+          openedShelfLifeDays: openedDays,
+          restock: _restock,
+          offCode: null,
+          nutrientsPer100: widget.suggestion?.nutrientsPer100,
+          nutrientsBasis: widget.suggestion?.nutrientsBasis,
+          ean: widget.ean,
+        );
+      }
+      if (mounted) context.pop(product);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Speichern nicht möglich: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = (ref.watch(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
+    _initCategory(categories);
+    final editing = widget.existing != null;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(editing ? 'Produkt bearbeiten' : 'Neues Produkt')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (widget.suggestion != null)
+            Card(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(children: [
+                  const Icon(Icons.info_outline),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Vorschlag von Open Food Facts. Bitte prüfen und bei Bedarf anpassen.')),
+                ]),
+              ),
+            ),
+          const SizedBox(height: 12),
+          TextField(key: const Key('product-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name')),
+          const SizedBox(height: 12),
+          TextField(key: const Key('product-brand'), controller: _brand, decoration: const InputDecoration(labelText: 'Marke (optional)')),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            key: const Key('product-category'),
+            initialValue: _categoryId,
+            decoration: const InputDecoration(labelText: 'Kategorie'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('Keine')),
+              for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
+            ],
+            onChanged: (v) => setState(() => _categoryId = v),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                key: const Key('product-pack-size'),
+                controller: _packSize,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Packungsgröße (optional)'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                key: const Key('product-unit'),
+                initialValue: _unit,
+                decoration: const InputDecoration(labelText: 'Einheit'),
+                items: [for (final u in _units) DropdownMenuItem(value: u.$1, child: Text(u.$2))],
+                onChanged: (v) => setState(() => _unit = v ?? _unit),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: const Key('product-location'),
+            initialValue: _location,
+            decoration: const InputDecoration(labelText: 'Üblicher Lagerort'),
+            items: [for (final l in _locations) DropdownMenuItem(value: l.$1, child: Text(l.$2))],
+            onChanged: (v) => setState(() => _location = v ?? _location),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: const Key('product-date-kind'),
+            initialValue: _dateKind,
+            decoration: const InputDecoration(labelText: 'Art des Datums'),
+            items: [for (final d in _dateKinds) DropdownMenuItem(value: d.$1, child: Text(d.$2))],
+            onChanged: (v) => setState(() => _dateKind = v ?? _dateKind),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('product-opened-days'),
+            controller: _openedDays,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Haltbarkeit nach dem Öffnen (Tage, optional)'),
+          ),
+          SwitchListTile(
+            key: const Key('product-restock'),
+            title: const Text('Nachkaufprodukt'),
+            subtitle: const Text('Vorschlag auf der Einkaufsliste, wenn der Bestand ausgeht'),
+            value: _restock,
+            onChanged: (v) => setState(() => _restock = v),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          const SizedBox(height: 16),
+          FilledButton(
+            key: const Key('product-save'),
+            onPressed: _saving ? null : _save,
+            child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+  }
+}
