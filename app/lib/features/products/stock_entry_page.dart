@@ -16,6 +16,7 @@ String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month
 
 const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu verbrauchen bis')];
 const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer', 'Tiefkühl'), ('other', 'Sonstiges')];
+const _units = [('piece', 'Stück'), ('kg', 'kg'), ('l', 'l')];
 
 /// Nach dem Barcode-Scan eines bekannten Produkts: MHD/Verbrauchsdatum, Lagerort, Menge erfassen und als
 /// Bestand speichern (Doku 06 §3.5). Ist bereits Bestand vorhanden, bietet die Seite oben die Schnellaktionen
@@ -34,7 +35,9 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
   DateTime? _date;
   late String _dateKind = widget.product.defaultDateKind;
   late String _location = widget.product.defaultLocation;
+  late String _unit = widget.product.baseUnit;
   late final _quantity = TextEditingController(text: '1');
+  var _rememberUnit = false;
   var _saving = false;
 
   Future<void> _pickDate({int? addDays}) async {
@@ -55,11 +58,14 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     final qty = double.tryParse(_quantity.text.replaceAll(',', '.').trim()) ?? 1;
     setState(() => _saving = true);
     try {
+      if (_rememberUnit && _unit != widget.product.baseUnit) {
+        await ref.read(productRepositoryProvider).update(widget.product.copyWith(baseUnit: _unit));
+      }
       await ref.read(inventoryRepositoryProvider).recordFromScan(
             productId: widget.product.id,
             ean: widget.ean,
             quantity: qty,
-            unit: widget.product.baseUnit,
+            unit: _unit,
             bestBefore: _date,
             dateKind: _dateKind,
             location: _location,
@@ -154,12 +160,36 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
             onChanged: (v) => setState(() => _location = v ?? _location),
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: const Key('stock-quantity'),
-            controller: _quantity,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Menge (${widget.product.baseUnit})'),
-          ),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: TextField(
+                key: const Key('stock-quantity'),
+                controller: _quantity,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Menge'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                key: const Key('stock-unit'),
+                initialValue: _unit,
+                decoration: const InputDecoration(labelText: 'Einheit'),
+                items: [for (final u in _units) DropdownMenuItem(value: u.$1, child: Text(u.$2))],
+                onChanged: (v) => setState(() => _unit = v ?? _unit),
+              ),
+            ),
+          ]),
+          if (_unit != widget.product.baseUnit)
+            CheckboxListTile(
+              key: const Key('stock-remember-unit'),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Für dieses Produkt merken'),
+              subtitle: const Text('Künftige Käufe schlagen dann gleich diese Einheit vor.'),
+              value: _rememberUnit,
+              onChanged: (v) => setState(() => _rememberUnit = v ?? false),
+            ),
           const SizedBox(height: 16),
           FilledButton(
             key: const Key('stock-save'),

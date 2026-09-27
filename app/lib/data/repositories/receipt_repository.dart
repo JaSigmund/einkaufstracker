@@ -235,7 +235,7 @@ class ReceiptRepository {
         // Bon-Vorschlag im Inventar fuer lagerbare Kategorien (Doku 06 §2 Punkt 1): kein MHD, hoechstens
         // eine Schaetzung aus der Standardhaltbarkeit des Produkts.
         if (i.kind == ReceiptItemKind.article && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
-          final product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId);
+          final product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId, baseUnit: i.quantityUnit);
           await inventoryRepo!.createSuggestionFromReceipt(
             productId: product.id,
             receiptItemId: _itemId(receiptId, lineNo),

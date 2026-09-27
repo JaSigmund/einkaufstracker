@@ -226,6 +226,26 @@ class InventoryRepository {
     onChanged?.call();
   }
 
+  /// Loescht einen faelschlich erfassten, bereits bestaetigten Eintrag rueckwirkend (Doku 06 kennt bisher nur
+  /// "Vorschlag verwerfen"; das hier ist das Gegenstueck fuer Bestand, der schon gescannt wurde). Anders als
+  /// "aufgebraucht"/"weggeworfen" (echte Ereignisse) wird auch die Kaufbewegung geloescht: es soll so aussehen,
+  /// als waere der Scan nie passiert (Fehlerbericht "Rueckgaengig machen", 2026-09-27).
+  Future<void> deleteItem(String id) async {
+    final item = await _get(id);
+    final now = DateTime.now().toUtc();
+    final updated = item.copyWith(deletedAt: Value(now), updatedAt: now);
+    await _putItem(updated);
+    final movements = await (_db.select(_db.inventoryMovements)
+          ..where((m) => m.inventoryItemId.equals(id) & m.deletedAt.isNull()))
+        .get();
+    for (final m in movements) {
+      final deleted = m.copyWith(deletedAt: Value(now), updatedAt: now);
+      await _put('inventory_movements', m.id, inventoryMovementToRemote(deleted),
+          () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(deleted.toCompanion(false)));
+    }
+    onChanged?.call();
+  }
+
   /// Loescht einen Vorschlag, den der Nutzer nicht behalten will (Doku 06 §1: "Vorschlag --> verwerfen").
   Future<void> discardSuggestion(String id) async {
     final item = await _get(id);
