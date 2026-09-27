@@ -17,6 +17,7 @@ import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
 import '../data/barcode/barcode_scanner.dart';
 import '../data/repositories/category_repository.dart';
+import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
@@ -178,6 +179,20 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
 
 final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchActive());
 final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchSuggestions());
+final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
+  return BugReportRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final bugReportsStreamProvider = StreamProvider((ref) => ref.watch(bugReportRepositoryProvider).watchAll());
+
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));
 

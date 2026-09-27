@@ -237,6 +237,15 @@ def main():
     db("delete from receipts where id=%s", (rid2,))
     check("Beleg wird mit seinem Bon geloescht (Kaskade)", one("select count(*) from receipt_files") == 0)
 
+    # --- Fehlerberichte (0009) --------------------------------------------------------------
+    bug_sql = "insert into bug_reports (household_id, title, app_info) values (%s,%s,%s)"
+    db(bug_sql, (ha, "Scan legt Duplikat an", '{"platform":"android"}'))
+    check("RLS: B sieht keine Fehlerberichte von A", one("select count(*) from bug_reports", user=B) == 0)
+    check("RLS: A sieht eigene Fehlerberichte", one("select count(*) from bug_reports", user=A) == 1)
+    check("RLS: B kann keinen Fehlerbericht in Haushalt A anlegen", raises(bug_sql, (ha, "fremd", "{}"), user=B))
+    check("Fehlerbericht ohne app_info wird abgelehnt", raises(
+        "insert into bug_reports (household_id, title) values (%s,%s)", (ha, "x")))
+
     # --- Lernende Kategorisierung (0006) ---------------------------------------------------
     cat_a = one("select id from categories where household_id=%s and name='Gemüse'", (ha,))
     alias_sql = "insert into category_aliases (household_id, alias_text, category_id) values (%s,%s,%s)"

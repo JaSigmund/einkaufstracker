@@ -110,6 +110,20 @@ class SettingsPage extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
+            key: const Key('settings-bug-report'),
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Fehler melden'),
+            subtitle: const Text('Hält fest, was passiert ist, damit der Fehler behoben werden kann.'),
+            onTap: () => context.push('/bug-report'),
+          ),
+          ListTile(
+            key: const Key('settings-bug-reports'),
+            leading: const Icon(Icons.list_alt_outlined),
+            title: const Text('Meine Fehlerberichte'),
+            onTap: () => context.push('/bug-reports'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Abmelden'),
             onTap: () => _signOut(context, ref),

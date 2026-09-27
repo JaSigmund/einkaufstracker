@@ -13,6 +13,7 @@ import 'package:einkaufstracker/data/repositories/auth_repository.dart';
 import 'package:einkaufstracker/data/repositories/category_repository.dart';
 import 'package:einkaufstracker/data/barcode/barcode_scanner.dart';
 import 'package:einkaufstracker/data/products/off_client.dart';
+import 'package:einkaufstracker/data/repositories/bug_report_repository.dart';
 import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
 import 'package:einkaufstracker/data/repositories/product_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
@@ -229,3 +230,6 @@ class FakeOffClient implements OffClient {
   @override
   Future<OffProduct?> lookup(String ean) async => result;
 }
+
+BugReportRepository bugReportRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    BugReportRepository(db, householdId: () async => household, onChanged: onChanged);

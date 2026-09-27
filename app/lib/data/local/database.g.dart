@@ -7387,6 +7387,582 @@ class InventoryMovementsCompanion extends UpdateCompanion<InventoryMovement> {
   }
 }
 
+class $BugReportsTable extends BugReports
+    with TableInfo<$BugReportsTable, BugReport> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BugReportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _appInfoMeta = const VerificationMeta(
+    'appInfo',
+  );
+  @override
+  late final GeneratedColumn<String> appInfo = GeneratedColumn<String>(
+    'app_info',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dataSnapshotMeta = const VerificationMeta(
+    'dataSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> dataSnapshot = GeneratedColumn<String>(
+    'data_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    title,
+    description,
+    appInfo,
+    dataSnapshot,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bug_reports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BugReport> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('app_info')) {
+      context.handle(
+        _appInfoMeta,
+        appInfo.isAcceptableOrUnknown(data['app_info']!, _appInfoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_appInfoMeta);
+    }
+    if (data.containsKey('data_snapshot')) {
+      context.handle(
+        _dataSnapshotMeta,
+        dataSnapshot.isAcceptableOrUnknown(
+          data['data_snapshot']!,
+          _dataSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BugReport map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BugReport(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      appInfo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}app_info'],
+      )!,
+      dataSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}data_snapshot'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $BugReportsTable createAlias(String alias) {
+    return $BugReportsTable(attachedDatabase, alias);
+  }
+}
+
+class BugReport extends DataClass implements Insertable<BugReport> {
+  final String id;
+  final String householdId;
+  final String title;
+  final String? description;
+  final String appInfo;
+  final String? dataSnapshot;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const BugReport({
+    required this.id,
+    required this.householdId,
+    required this.title,
+    this.description,
+    required this.appInfo,
+    this.dataSnapshot,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['app_info'] = Variable<String>(appInfo);
+    if (!nullToAbsent || dataSnapshot != null) {
+      map['data_snapshot'] = Variable<String>(dataSnapshot);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  BugReportsCompanion toCompanion(bool nullToAbsent) {
+    return BugReportsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      title: Value(title),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      appInfo: Value(appInfo),
+      dataSnapshot: dataSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dataSnapshot),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory BugReport.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BugReport(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
+      appInfo: serializer.fromJson<String>(json['appInfo']),
+      dataSnapshot: serializer.fromJson<String?>(json['dataSnapshot']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String?>(description),
+      'appInfo': serializer.toJson<String>(appInfo),
+      'dataSnapshot': serializer.toJson<String?>(dataSnapshot),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  BugReport copyWith({
+    String? id,
+    String? householdId,
+    String? title,
+    Value<String?> description = const Value.absent(),
+    String? appInfo,
+    Value<String?> dataSnapshot = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => BugReport(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    title: title ?? this.title,
+    description: description.present ? description.value : this.description,
+    appInfo: appInfo ?? this.appInfo,
+    dataSnapshot: dataSnapshot.present ? dataSnapshot.value : this.dataSnapshot,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  BugReport copyWithCompanion(BugReportsCompanion data) {
+    return BugReport(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      title: data.title.present ? data.title.value : this.title,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      appInfo: data.appInfo.present ? data.appInfo.value : this.appInfo,
+      dataSnapshot: data.dataSnapshot.present
+          ? data.dataSnapshot.value
+          : this.dataSnapshot,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BugReport(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('appInfo: $appInfo, ')
+          ..write('dataSnapshot: $dataSnapshot, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    title,
+    description,
+    appInfo,
+    dataSnapshot,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BugReport &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.appInfo == this.appInfo &&
+          other.dataSnapshot == this.dataSnapshot &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class BugReportsCompanion extends UpdateCompanion<BugReport> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> title;
+  final Value<String?> description;
+  final Value<String> appInfo;
+  final Value<String?> dataSnapshot;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const BugReportsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.appInfo = const Value.absent(),
+    this.dataSnapshot = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BugReportsCompanion.insert({
+    required String id,
+    required String householdId,
+    required String title,
+    this.description = const Value.absent(),
+    required String appInfo,
+    this.dataSnapshot = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       title = Value(title),
+       appInfo = Value(appInfo),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<BugReport> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<String>? appInfo,
+    Expression<String>? dataSnapshot,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (appInfo != null) 'app_info': appInfo,
+      if (dataSnapshot != null) 'data_snapshot': dataSnapshot,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BugReportsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? title,
+    Value<String?>? description,
+    Value<String>? appInfo,
+    Value<String?>? dataSnapshot,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return BugReportsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      appInfo: appInfo ?? this.appInfo,
+      dataSnapshot: dataSnapshot ?? this.dataSnapshot,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (appInfo.present) {
+      map['app_info'] = Variable<String>(appInfo.value);
+    }
+    if (dataSnapshot.present) {
+      map['data_snapshot'] = Variable<String>(dataSnapshot.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BugReportsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('appInfo: $appInfo, ')
+          ..write('dataSnapshot: $dataSnapshot, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -8304,6 +8880,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $InventoryItemsTable inventoryItems = $InventoryItemsTable(this);
   late final $InventoryMovementsTable inventoryMovements =
       $InventoryMovementsTable(this);
+  late final $BugReportsTable bugReports = $BugReportsTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -8323,6 +8900,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     receiptFiles,
     inventoryItems,
     inventoryMovements,
+    bugReports,
     outbox,
     syncStates,
     keyValues,
@@ -11943,6 +12521,292 @@ typedef $$InventoryMovementsTableProcessedTableManager =
       InventoryMovement,
       PrefetchHooks Function()
     >;
+typedef $$BugReportsTableCreateCompanionBuilder = BugReportsCompanion Function({
+  required String id,
+  required String householdId,
+  required String title,
+  Value<String?> description,
+  required String appInfo,
+  Value<String?> dataSnapshot,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> rowid,
+});
+typedef $$BugReportsTableUpdateCompanionBuilder = BugReportsCompanion Function({
+  Value<String> id,
+  Value<String> householdId,
+  Value<String> title,
+  Value<String?> description,
+  Value<String> appInfo,
+  Value<String?> dataSnapshot,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> deletedAt,
+  Value<int> rowid,
+});
+
+class $$BugReportsTableFilterComposer
+    extends Composer<_$AppDatabase, $BugReportsTable> {
+  $$BugReportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appInfo => $composableBuilder(
+    column: $table.appInfo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dataSnapshot => $composableBuilder(
+    column: $table.dataSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BugReportsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BugReportsTable> {
+  $$BugReportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appInfo => $composableBuilder(
+    column: $table.appInfo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dataSnapshot => $composableBuilder(
+    column: $table.dataSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BugReportsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BugReportsTable> {
+  $$BugReportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appInfo =>
+      $composableBuilder(column: $table.appInfo, builder: (column) => column);
+
+  GeneratedColumn<String> get dataSnapshot => $composableBuilder(
+    column: $table.dataSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$BugReportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BugReportsTable,
+          BugReport,
+          $$BugReportsTableFilterComposer,
+          $$BugReportsTableOrderingComposer,
+          $$BugReportsTableAnnotationComposer,
+          $$BugReportsTableCreateCompanionBuilder,
+          $$BugReportsTableUpdateCompanionBuilder,
+          (
+            BugReport,
+            BaseReferences<_$AppDatabase, $BugReportsTable, BugReport>,
+          ),
+          BugReport,
+          PrefetchHooks Function()
+        > {
+  $$BugReportsTableTableManager(_$AppDatabase db, $BugReportsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BugReportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BugReportsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BugReportsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> appInfo = const Value.absent(),
+                Value<String?> dataSnapshot = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BugReportsCompanion(
+                id: id,
+                householdId: householdId,
+                title: title,
+                description: description,
+                appInfo: appInfo,
+                dataSnapshot: dataSnapshot,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String title,
+                Value<String?> description = const Value.absent(),
+                required String appInfo,
+                Value<String?> dataSnapshot = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BugReportsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                title: title,
+                description: description,
+                appInfo: appInfo,
+                dataSnapshot: dataSnapshot,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BugReportsTable, BugReport>(table),
+                  BaseReferences<_$AppDatabase, $BugReportsTable, BugReport>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BugReportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BugReportsTable,
+      BugReport,
+      $$BugReportsTableFilterComposer,
+      $$BugReportsTableOrderingComposer,
+      $$BugReportsTableAnnotationComposer,
+      $$BugReportsTableCreateCompanionBuilder,
+      $$BugReportsTableUpdateCompanionBuilder,
+      (BugReport, BaseReferences<_$AppDatabase, $BugReportsTable, BugReport>),
+      BugReport,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -12501,6 +13365,8 @@ class $AppDatabaseManager {
       $$InventoryItemsTableTableManager(_db, _db.inventoryItems);
   $$InventoryMovementsTableTableManager get inventoryMovements =>
       $$InventoryMovementsTableTableManager(_db, _db.inventoryMovements);
+  $$BugReportsTableTableManager get bugReports =>
+      $$BugReportsTableTableManager(_db, _db.bugReports);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

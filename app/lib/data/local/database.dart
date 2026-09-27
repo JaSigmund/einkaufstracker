@@ -268,6 +268,24 @@ class ProductAliases extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Fehlerbericht aus der App (Spiegel von public.bug_reports). appInfo/dataSnapshot sind als JSON-Text
+/// gespeichert (drift kennt kein natives jsonb), beim Sync wird daraus/ dahin dekodiert.
+@DataClassName('BugReport')
+class BugReports extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get title => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get appInfo => text()();
+  TextColumn get dataSnapshot => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -304,7 +322,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, BugReports, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -312,7 +330,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -354,6 +372,10 @@ class AppDatabase extends _$AppDatabase {
           // 6 -> 7: gelernte Bon-Text-zu-Produkt-Zuordnung (schliesst Bon -> Inventar-Vorschlag)
           if (from < 7) {
             await m.createTable(productAliases);
+          }
+          // 7 -> 8: Fehlerberichte
+          if (from < 8) {
+            await m.createTable(bugReports);
           }
         },
       );

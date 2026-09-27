@@ -314,3 +314,27 @@ ProductAliasesCompanion productAliasFromRemote(Map<String, dynamic> j) => Produc
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> bugReportToRemote(BugReport b) => {
+      'id': b.id,
+      'household_id': b.householdId,
+      'title': b.title,
+      'description': b.description,
+      'app_info': jsonDecode(b.appInfo),
+      'data_snapshot': b.dataSnapshot == null ? null : jsonDecode(b.dataSnapshot!),
+      'created_at': b.createdAt.toUtc().toIso8601String(),
+      'updated_at': b.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': b.deletedAt?.toUtc().toIso8601String(),
+    };
+
+BugReportsCompanion bugReportFromRemote(Map<String, dynamic> j) => BugReportsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      title: Value(j['title'] as String),
+      description: Value(j['description'] as String?),
+      appInfo: Value(jsonEncode(j['app_info'])),
+      dataSnapshot: Value(j['data_snapshot'] == null ? null : jsonEncode(j['data_snapshot'])),
+      createdAt: Value(_dt(j['created_at'])!),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );

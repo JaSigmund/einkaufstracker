@@ -14,6 +14,8 @@ import '../data/local/database.dart';
 import '../features/receipts/receipt_detail_page.dart';
 import '../features/receipts/receipt_file_page.dart';
 import '../features/products/product_form_page.dart';
+import '../features/bugreport/bug_report_list_page.dart';
+import '../features/bugreport/bug_report_page.dart';
 import '../features/inventory/inventory_item_detail_page.dart';
 import '../features/products/stock_entry_page.dart';
 import '../features/settings/settings_page.dart';
@@ -67,6 +69,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/import-review',
         builder: (_, state) => ImportReviewPage(preview: state.extra as ImportPreview),
         redirect: (_, state) => state.extra is ImportPreview ? null : '/',
+      ),
+      GoRoute(path: '/bug-report', builder: (_, _) => const BugReportPage()),
+      GoRoute(path: '/bug-reports', builder: (_, _) => const BugReportListPage()),
+      GoRoute(
+        path: '/bug-reports/detail',
+        builder: (_, state) => BugReportDetailPage(report: state.extra as BugReport),
+        redirect: (_, state) => state.extra is BugReport ? null : '/bug-reports',
       ),
       GoRoute(
         path: '/product-form',
