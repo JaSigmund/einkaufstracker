@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../local/database.dart';
 import '../products/off_client.dart';
@@ -61,6 +62,36 @@ class ProductRepository {
     }
     final suggestion = off == null ? null : await off!.lookup(ean);
     return BarcodeLookupResult(offSuggestion: suggestion);
+  }
+
+  /// Bon-Position (Doku 06 §2, ADR-010): gelernter Alias -> vorhandenes Produkt, sonst neu angelegt und
+  /// die Zuordnung gemerkt. Haendlerunabhaengig gelernt (storeId bleibt in der Zuordnung leer), damit
+  /// derselbe Artikel bei jedem Haendler wiedererkannt wird.
+  Future<Product> findOrCreateForReceiptItem(String rawText, {String? categoryId}) async {
+    final hid = await householdId();
+    final key = normalizeItemName(rawText);
+    final alias = await (_db.select(_db.productAliases)
+          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (alias != null) {
+      final p = await byId(alias.productId);
+      if (p != null && p.deletedAt == null) return p;
+    }
+    final product = await create(name: _cleanName(rawText), categoryId: categoryId);
+    await _learnAlias(key, product.id, hid);
+    return product;
+  }
+
+  /// Entfernt bekannte Bon-Praefixe ("IC", "1C" ...), behaelt sonst Gross-/Kleinschreibung wie gedruckt.
+  static String _cleanName(String raw) {
+    final t = raw.trim();
+    final m = RegExp(r'^(ic|1c|io|i0|lc)\s+', caseSensitive: false).firstMatch(t);
+    return (m == null ? t : t.substring(m.end)).trim();
+  }
+
+  Future<void> _learnAlias(String key, String productId, String householdId) async {
+    final a = ProductAlias(id: _uuid.v4(), householdId: householdId, aliasText: key, productId: productId, hits: 1, updatedAt: DateTime.now().toUtc());
+    await _put('product_aliases', a.id, productAliasToRemote(a), () => _db.into(_db.productAliases).insertOnConflictUpdate(a.toCompanion(false)));
   }
 
   /// Legt ein neues Produkt an und verknuepft optional gleich den EAN (Barcode-Scan eines unbekannten Produkts).

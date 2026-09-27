@@ -106,8 +106,20 @@ class FakeAuth implements AuthRepository {
 CategoryRepository categoryRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     CategoryRepository(db, householdId: () async => household, onChanged: onChanged);
 
-ReceiptRepository receiptRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
-    ReceiptRepository(db, householdId: () async => household, onChanged: onChanged);
+ReceiptRepository receiptRepo(
+  AppDatabase db, {
+  String household = 'h1',
+  void Function()? onChanged,
+  ProductRepository? productRepo,
+  InventoryRepository? inventoryRepo,
+}) =>
+    ReceiptRepository(
+      db,
+      householdId: () async => household,
+      onChanged: onChanged,
+      productRepo: productRepo,
+      inventoryRepo: inventoryRepo,
+    );
 
 /// PDF-Leser-Attrappe: liefert den Text einer Fixture oder wirft.
 class FakePdfReader implements PdfTextReader {
@@ -141,6 +153,7 @@ Future<Map<String, String>> seedCategories(AppDatabase db, {String household = '
           name: name,
           updatedAt: DateTime.utc(2026),
           sortOrder: Value(order += 10),
+          isStorable: Value(name != 'Pfand'), // wie supabase/migrations/0002_default_categories.sql
         ));
   }
   return ids;
