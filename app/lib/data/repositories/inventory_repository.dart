@@ -41,6 +41,42 @@ class InventoryRepository {
         ..orderBy([(m) => OrderingTerm.desc(m.occurredAt)]))
       .watch();
 
+  /// Legt einen Bon-Vorschlag an (Doku 06 §2 Punkt 1, §9 "Bon bestaetigt"): kein MHD, sondern hoechstens
+  /// ein geschaetztes Ablaufdatum aus der Standardhaltbarkeit des Produkts. Bucht eine Kaufbewegung, weil der
+  /// Bon selbst der Beleg ist (anders als beim Verfeinern per Scan, das keine neue Bewegung braucht).
+  Future<InventoryItem> createSuggestionFromReceipt({
+    required String productId,
+    required String receiptItemId,
+    required double quantity,
+    required String unit,
+    required DateTime purchasedOn,
+    int? sealedShelfLifeDays,
+    String dateKind = 'best_before',
+    String location = 'pantry',
+  }) async {
+    final hid = await householdId();
+    final estimatedExpiry = sealedShelfLifeDays == null ? null : purchasedOn.add(Duration(days: sealedShelfLifeDays));
+    final item = InventoryItem(
+      id: _uuid.v4(),
+      householdId: hid,
+      productId: productId,
+      receiptItemId: receiptItemId,
+      quantity: quantity,
+      unit: unit,
+      location: location,
+      purchasedOn: purchasedOn,
+      bestBefore: estimatedExpiry,
+      dateKind: dateKind,
+      status: 'sealed',
+      isSuggestion: true,
+      expiresOn: estimatedExpiry,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _putItem(item);
+    await _addMovement(inventoryItemId: item.id, productId: productId, type: 'purchase', delta: quantity, unit: unit, now: purchasedOn);
+    return item;
+  }
+
   /// Ein Bon-Vorschlag (isSuggestion, gleiches Produkt) aus den letzten 7 Tagen, der per Scan verfeinert werden
   /// kann, statt einen zweiten Eintrag anzulegen (Doku 06 §2, Punkt 2). Der juengste Vorschlag gewinnt.
   Future<InventoryItem?> findRefinableSuggestion(String productId, {DateTime? now}) async {

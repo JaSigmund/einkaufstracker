@@ -2011,6 +2011,521 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
   }
 }
 
+class $ProductAliasesTable extends ProductAliases
+    with TableInfo<$ProductAliasesTable, ProductAlias> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductAliasesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _storeIdMeta = const VerificationMeta(
+    'storeId',
+  );
+  @override
+  late final GeneratedColumn<String> storeId = GeneratedColumn<String>(
+    'store_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _aliasTextMeta = const VerificationMeta(
+    'aliasText',
+  );
+  @override
+  late final GeneratedColumn<String> aliasText = GeneratedColumn<String>(
+    'alias_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hitsMeta = const VerificationMeta('hits');
+  @override
+  late final GeneratedColumn<int> hits = GeneratedColumn<int>(
+    'hits',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    storeId,
+    aliasText,
+    productId,
+    hits,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_aliases';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProductAlias> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('store_id')) {
+      context.handle(
+        _storeIdMeta,
+        storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
+      );
+    }
+    if (data.containsKey('alias_text')) {
+      context.handle(
+        _aliasTextMeta,
+        aliasText.isAcceptableOrUnknown(data['alias_text']!, _aliasTextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_aliasTextMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('hits')) {
+      context.handle(
+        _hitsMeta,
+        hits.isAcceptableOrUnknown(data['hits']!, _hitsMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProductAlias map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductAlias(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      storeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_id'],
+      ),
+      aliasText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alias_text'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      hits: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hits'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $ProductAliasesTable createAlias(String alias) {
+    return $ProductAliasesTable(attachedDatabase, alias);
+  }
+}
+
+class ProductAlias extends DataClass implements Insertable<ProductAlias> {
+  final String id;
+  final String householdId;
+  final String? storeId;
+  final String aliasText;
+  final String productId;
+  final int hits;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const ProductAlias({
+    required this.id,
+    required this.householdId,
+    this.storeId,
+    required this.aliasText,
+    required this.productId,
+    required this.hits,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    if (!nullToAbsent || storeId != null) {
+      map['store_id'] = Variable<String>(storeId);
+    }
+    map['alias_text'] = Variable<String>(aliasText);
+    map['product_id'] = Variable<String>(productId);
+    map['hits'] = Variable<int>(hits);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  ProductAliasesCompanion toCompanion(bool nullToAbsent) {
+    return ProductAliasesCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      storeId: storeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(storeId),
+      aliasText: Value(aliasText),
+      productId: Value(productId),
+      hits: Value(hits),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory ProductAlias.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductAlias(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      storeId: serializer.fromJson<String?>(json['storeId']),
+      aliasText: serializer.fromJson<String>(json['aliasText']),
+      productId: serializer.fromJson<String>(json['productId']),
+      hits: serializer.fromJson<int>(json['hits']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'storeId': serializer.toJson<String?>(storeId),
+      'aliasText': serializer.toJson<String>(aliasText),
+      'productId': serializer.toJson<String>(productId),
+      'hits': serializer.toJson<int>(hits),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  ProductAlias copyWith({
+    String? id,
+    String? householdId,
+    Value<String?> storeId = const Value.absent(),
+    String? aliasText,
+    String? productId,
+    int? hits,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => ProductAlias(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    storeId: storeId.present ? storeId.value : this.storeId,
+    aliasText: aliasText ?? this.aliasText,
+    productId: productId ?? this.productId,
+    hits: hits ?? this.hits,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  ProductAlias copyWithCompanion(ProductAliasesCompanion data) {
+    return ProductAlias(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      aliasText: data.aliasText.present ? data.aliasText.value : this.aliasText,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      hits: data.hits.present ? data.hits.value : this.hits,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductAlias(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('storeId: $storeId, ')
+          ..write('aliasText: $aliasText, ')
+          ..write('productId: $productId, ')
+          ..write('hits: $hits, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    storeId,
+    aliasText,
+    productId,
+    hits,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductAlias &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.storeId == this.storeId &&
+          other.aliasText == this.aliasText &&
+          other.productId == this.productId &&
+          other.hits == this.hits &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class ProductAliasesCompanion extends UpdateCompanion<ProductAlias> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String?> storeId;
+  final Value<String> aliasText;
+  final Value<String> productId;
+  final Value<int> hits;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const ProductAliasesCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.storeId = const Value.absent(),
+    this.aliasText = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.hits = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductAliasesCompanion.insert({
+    required String id,
+    required String householdId,
+    this.storeId = const Value.absent(),
+    required String aliasText,
+    required String productId,
+    this.hits = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       aliasText = Value(aliasText),
+       productId = Value(productId),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProductAlias> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? storeId,
+    Expression<String>? aliasText,
+    Expression<String>? productId,
+    Expression<int>? hits,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (storeId != null) 'store_id': storeId,
+      if (aliasText != null) 'alias_text': aliasText,
+      if (productId != null) 'product_id': productId,
+      if (hits != null) 'hits': hits,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductAliasesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String?>? storeId,
+    Value<String>? aliasText,
+    Value<String>? productId,
+    Value<int>? hits,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return ProductAliasesCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      storeId: storeId ?? this.storeId,
+      aliasText: aliasText ?? this.aliasText,
+      productId: productId ?? this.productId,
+      hits: hits ?? this.hits,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (storeId.present) {
+      map['store_id'] = Variable<String>(storeId.value);
+    }
+    if (aliasText.present) {
+      map['alias_text'] = Variable<String>(aliasText.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (hits.present) {
+      map['hits'] = Variable<int>(hits.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductAliasesCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('storeId: $storeId, ')
+          ..write('aliasText: $aliasText, ')
+          ..write('productId: $productId, ')
+          ..write('hits: $hits, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StoresTable extends Stores with TableInfo<$StoresTable, Store> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -7778,6 +8293,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProductBarcodesTable productBarcodes = $ProductBarcodesTable(
     this,
   );
+  late final $ProductAliasesTable productAliases = $ProductAliasesTable(this);
   late final $StoresTable stores = $StoresTable(this);
   late final $ReceiptsTable receipts = $ReceiptsTable(this);
   late final $ReceiptItemsTable receiptItems = $ReceiptItemsTable(this);
@@ -7799,6 +8315,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     categories,
     products,
     productBarcodes,
+    productAliases,
     stores,
     receipts,
     receiptItems,
@@ -8779,6 +9296,276 @@ typedef $$ProductBarcodesTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $ProductBarcodesTable, ProductBarcode>,
       ),
       ProductBarcode,
+      PrefetchHooks Function()
+    >;
+typedef $$ProductAliasesTableCreateCompanionBuilder =
+    ProductAliasesCompanion Function({
+      required String id,
+      required String householdId,
+      Value<String?> storeId,
+      required String aliasText,
+      required String productId,
+      Value<int> hits,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$ProductAliasesTableUpdateCompanionBuilder =
+    ProductAliasesCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String?> storeId,
+      Value<String> aliasText,
+      Value<String> productId,
+      Value<int> hits,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$ProductAliasesTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductAliasesTable> {
+  $$ProductAliasesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get aliasText => $composableBuilder(
+    column: $table.aliasText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hits => $composableBuilder(
+    column: $table.hits,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ProductAliasesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductAliasesTable> {
+  $$ProductAliasesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get aliasText => $composableBuilder(
+    column: $table.aliasText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hits => $composableBuilder(
+    column: $table.hits,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProductAliasesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductAliasesTable> {
+  $$ProductAliasesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get storeId =>
+      $composableBuilder(column: $table.storeId, builder: (column) => column);
+
+  GeneratedColumn<String> get aliasText =>
+      $composableBuilder(column: $table.aliasText, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<int> get hits =>
+      $composableBuilder(column: $table.hits, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$ProductAliasesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductAliasesTable,
+          ProductAlias,
+          $$ProductAliasesTableFilterComposer,
+          $$ProductAliasesTableOrderingComposer,
+          $$ProductAliasesTableAnnotationComposer,
+          $$ProductAliasesTableCreateCompanionBuilder,
+          $$ProductAliasesTableUpdateCompanionBuilder,
+          (
+            ProductAlias,
+            BaseReferences<_$AppDatabase, $ProductAliasesTable, ProductAlias>,
+          ),
+          ProductAlias,
+          PrefetchHooks Function()
+        > {
+  $$ProductAliasesTableTableManager(
+    _$AppDatabase db,
+    $ProductAliasesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductAliasesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductAliasesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductAliasesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String?> storeId = const Value.absent(),
+                Value<String> aliasText = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<int> hits = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductAliasesCompanion(
+                id: id,
+                householdId: householdId,
+                storeId: storeId,
+                aliasText: aliasText,
+                productId: productId,
+                hits: hits,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                Value<String?> storeId = const Value.absent(),
+                required String aliasText,
+                required String productId,
+                Value<int> hits = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductAliasesCompanion.insert(
+                id: id,
+                householdId: householdId,
+                storeId: storeId,
+                aliasText: aliasText,
+                productId: productId,
+                hits: hits,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ProductAliasesTable, ProductAlias>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ProductAliasesTable,
+                    ProductAlias
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProductAliasesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductAliasesTable,
+      ProductAlias,
+      $$ProductAliasesTableFilterComposer,
+      $$ProductAliasesTableOrderingComposer,
+      $$ProductAliasesTableAnnotationComposer,
+      $$ProductAliasesTableCreateCompanionBuilder,
+      $$ProductAliasesTableUpdateCompanionBuilder,
+      (
+        ProductAlias,
+        BaseReferences<_$AppDatabase, $ProductAliasesTable, ProductAlias>,
+      ),
+      ProductAlias,
       PrefetchHooks Function()
     >;
 typedef $$StoresTableCreateCompanionBuilder = StoresCompanion Function({
@@ -11698,6 +12485,8 @@ class $AppDatabaseManager {
       $$ProductsTableTableManager(_db, _db.products);
   $$ProductBarcodesTableTableManager get productBarcodes =>
       $$ProductBarcodesTableTableManager(_db, _db.productBarcodes);
+  $$ProductAliasesTableTableManager get productAliases =>
+      $$ProductAliasesTableTableManager(_db, _db.productAliases);
   $$StoresTableTableManager get stores =>
       $$StoresTableTableManager(_db, _db.stores);
   $$ReceiptsTableTableManager get receipts =>

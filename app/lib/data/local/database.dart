@@ -250,6 +250,24 @@ class InventoryMovements extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Gelernte Zuordnung "normalisierter Bon-Text -> Produkt" (Spiegel von public.product_aliases, ADR-010).
+/// Anders als category_aliases haendlerabhaengig (storeId), weil derselbe Kurztext bei zwei Haendlern
+/// verschiedene Produkte meinen kann; storeId null = haendlerunabhaengig gelernt.
+@DataClassName('ProductAlias')
+class ProductAliases extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get storeId => text().nullable()();
+  TextColumn get aliasText => text()();
+  TextColumn get productId => text()();
+  IntColumn get hits => integer().withDefault(const Constant(1))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -286,7 +304,7 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, ProductBarcodes, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, Outbox, SyncStates, KeyValues])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -294,7 +312,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -332,6 +350,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.createTable(inventoryItems);
             await m.createTable(inventoryMovements);
+          }
+          // 6 -> 7: gelernte Bon-Text-zu-Produkt-Zuordnung (schliesst Bon -> Inventar-Vorschlag)
+          if (from < 7) {
+            await m.createTable(productAliases);
           }
         },
       );

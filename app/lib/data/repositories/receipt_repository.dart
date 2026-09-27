@@ -8,6 +8,9 @@ import '../../domain/categorization/normalize_name.dart';
 import '../../domain/receipt/parsed_receipt.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
+import '../repositories/inventory_repository.dart';
+import '../repositories/product_repository.dart';
+import '../../domain/receipt/vienna_time.dart' show utcToViennaLocal;
 
 enum ReceiptSaveOutcome { saved, duplicate }
 
@@ -28,12 +31,18 @@ class ReceiptSaveResult {
 const billDiscountKind = 'bill_discount';
 
 class ReceiptRepository {
-  ReceiptRepository(this._db, {required this.householdId, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  ReceiptRepository(this._db, {required this.householdId, this.onChanged, this.productRepo, this.inventoryRepo, Uuid? uuid})
+      : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
   final Future<String> Function() householdId;
   final void Function()? onChanged;
   final Uuid _uuid;
+
+  /// Erzeugen Bon-Vorschlaege im Inventar fuer Positionen lagerbarer Kategorien (Doku 06 §2 Punkt 1).
+  /// Ohne diese beiden Abhaengigkeiten (z.B. in aelteren Tests) bleibt das Verhalten wie zuvor: kein Vorschlag.
+  final ProductRepository? productRepo;
+  final InventoryRepository? inventoryRepo;
 
   String _storeId(String hid, String chain, String? branch) =>
       _uuid.v5(Namespace.url.value, 'einkaufstracker:store:$hid:${chain.toLowerCase()}:${branch ?? '-'}');
@@ -44,6 +53,20 @@ class ReceiptRepository {
   String _itemId(String receiptId, int lineNo) => _uuid.v5(Namespace.url.value, 'einkaufstracker:item:$receiptId:$lineNo');
 
   String _aliasId(String hid, String key) => _uuid.v5(Namespace.url.value, 'einkaufstracker:alias:$hid:$key');
+
+  /// Kalendertag des Kaufs in Wiener Ortszeit, als UTC-Mitternacht dieses Tages (Doku FR-07).
+  DateTime _viennaDate(DateTime purchasedAtUtc) {
+    final local = utcToViennaLocal(purchasedAtUtc);
+    return DateTime.utc(local.year, local.month, local.day);
+  }
+
+  /// IDs der lagerbaren Kategorien des Haushalts (Doku FR-09), Grundlage fuer die Bon-Vorschlaege im Inventar.
+  Future<Set<String>> _storableCategoryIds(String hid) async {
+    final cats = await (_db.select(_db.categories)
+          ..where((c) => c.householdId.equals(hid) & c.deletedAt.isNull() & c.isStorable.equals(true)))
+        .get();
+    return {for (final c in cats) c.id};
+  }
 
   /// Kategorisierer aus den Kategorien und den gelernten Zuordnungen des Haushalts.
   Future<Categorizer> _buildCategorizer(String hid) async {
@@ -135,6 +158,8 @@ class ReceiptRepository {
     final hid = await householdId();
     final now = DateTime.now().toUtc();
     final categorizer = await _buildCategorizer(hid);
+    final storableIds = productRepo != null && inventoryRepo != null ? await _storableCategoryIds(hid) : const <String>{};
+    final purchasedOn = _viennaDate(r.purchasedAtUtc!);
     final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : _uuid.v4();
 
     final existing = await findDuplicate(r);
@@ -206,6 +231,22 @@ class ReceiptRepository {
           needsReview: i.kind == ReceiptItemKind.article && suggestion.categoryId == null,
           updatedAt: now,
         ));
+
+        // Bon-Vorschlag im Inventar fuer lagerbare Kategorien (Doku 06 §2 Punkt 1): kein MHD, hoechstens
+        // eine Schaetzung aus der Standardhaltbarkeit des Produkts.
+        if (i.kind == ReceiptItemKind.article && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
+          final product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId);
+          await inventoryRepo!.createSuggestionFromReceipt(
+            productId: product.id,
+            receiptItemId: _itemId(receiptId, lineNo),
+            quantity: i.quantity,
+            unit: i.quantityUnit,
+            purchasedOn: purchasedOn,
+            sealedShelfLifeDays: product.sealedShelfLifeDays,
+            dateKind: product.defaultDateKind,
+            location: product.defaultLocation,
+          );
+        }
       }
       // Rabatte auf Bon-Ebene (z.B. jö Rabattsammler) als eigene Positionen ohne Steuerbuchstaben,
       // damit die Summe aller Positionen der Bon-Summe entspricht

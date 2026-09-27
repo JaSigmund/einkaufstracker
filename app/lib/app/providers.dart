@@ -190,6 +190,8 @@ final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
       return id;
     },
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+    productRepo: ref.watch(productRepositoryProvider),
+    inventoryRepo: ref.watch(inventoryRepositoryProvider),
   );
 });
 

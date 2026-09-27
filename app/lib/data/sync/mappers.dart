@@ -292,3 +292,25 @@ InventoryMovementsCompanion inventoryMovementFromRemote(Map<String, dynamic> j) 
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> productAliasToRemote(ProductAlias a) => {
+      'id': a.id,
+      'household_id': a.householdId,
+      'store_id': a.storeId,
+      'alias_text': a.aliasText,
+      'product_id': a.productId,
+      'hits': a.hits,
+      'updated_at': a.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': a.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ProductAliasesCompanion productAliasFromRemote(Map<String, dynamic> j) => ProductAliasesCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      storeId: Value(j['store_id'] as String?),
+      aliasText: Value(j['alias_text'] as String),
+      productId: Value(j['product_id'] as String),
+      hits: Value((j['hits'] as num?)?.toInt() ?? 1),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
