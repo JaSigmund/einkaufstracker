@@ -245,6 +245,39 @@ void main() {
     expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle()).deletedAt, isNull);
   });
 
+  group('deleteItem', () {
+    test('loescht den Eintrag und seine Kaufbewegung, so als waere der Scan nie passiert', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', quantity: 2, now: DateTime.utc(2026, 9, 27));
+      expect(await db.select(db.inventoryMovements).get(), hasLength(1));
+
+      await repo.deleteItem(item.id);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+      expect(await (db.select(db.inventoryMovements)..where((m) => m.deletedAt.isNull())).get(), isEmpty);
+      expect(await repo.watchActive().first, isEmpty);
+    });
+
+    test('spaetere Bewegungen (z.B. eine Korrektur) werden ebenfalls entfernt', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', quantity: 2, now: DateTime.utc(2026, 9, 27));
+      await repo.adjustQuantity(item.id, 5);
+      expect(await db.select(db.inventoryMovements).get(), hasLength(2));
+
+      await repo.deleteItem(item.id);
+      expect(await (db.select(db.inventoryMovements)..where((m) => m.deletedAt.isNull())).get(), isEmpty);
+    });
+
+    test('landet in der Outbox (Eintrag und Bewegung)', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await db.delete(db.outbox).go();
+      await repo.deleteItem(item.id);
+      final tables = (await db.select(db.outbox).get()).map((o) => o.remoteTable).toSet();
+      expect(tables, {'inventory_items', 'inventory_movements'});
+    });
+  });
+
   group('Sync', () {
     test('Inventareintrag und Bewegung kommen auf einem zweiten Geraet an', () async {
       final remote = FakeRemoteStore();

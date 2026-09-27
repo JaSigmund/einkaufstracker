@@ -79,6 +79,33 @@ void main() {
     expect(item.status, 'sealed');
   });
 
+  testWidgets('Einheit fuer diesen Kauf aendern und fuer das Produkt merken', (tester) async {
+    final product = await productRepo(db).create(name: 'Clever Champignon weiß', baseUnit: 'piece', ean: '9008700000101');
+    await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000101')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('stock-remember-unit')), findsNothing); // noch unveraendert: kein Haken noetig
+    await tester.tap(find.byKey(const Key('stock-unit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('kg').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('stock-remember-unit')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('stock-remember-unit')));
+    await tester.enterText(find.byKey(const Key('stock-quantity')), '0,5');
+
+    await tester.tap(find.byKey(const Key('stock-save')));
+    await tester.pumpAndSettle();
+
+    final item = await db.select(db.inventoryItems).getSingle();
+    expect((item.unit, item.quantity), ('kg', 0.5));
+    final updatedProduct = await (db.select(db.products)..where((p) => p.id.equals(product.id))).getSingle();
+    expect(updatedProduct.baseUnit, 'kg'); // fuer kuenftige Kaeufe gemerkt
+  });
+
   testWidgets('Unbekanntes Produkt ohne OFF-Treffer: manuell anlegen, dann Bestand erfassen', (tester) async {
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000099')));
     await tester.pumpAndSettle();

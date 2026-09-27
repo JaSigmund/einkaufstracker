@@ -139,4 +139,27 @@ void main() {
     final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
     expect(row.status, 'discarded');
   });
+
+  testWidgets('Loeschen (falsch erfasst): Rueckfrage, dann sind Eintrag und Kaufbewegung weg', (tester) async {
+    final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+    await tester.pumpWidget(app(item));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('START'))).push('/item');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('action-delete')));
+    await tester.pumpAndSettle();
+    expect(find.text('Eintrag löschen?'), findsOneWidget);
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+    expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).deletedAt, isNull);
+
+    await tester.tap(find.byKey(const Key('action-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+    await tester.pumpAndSettle();
+
+    expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).deletedAt, isNotNull);
+    expect(await (db.select(db.inventoryMovements)..where((m) => m.deletedAt.isNull())).get(), isEmpty);
+  });
 }

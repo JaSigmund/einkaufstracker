@@ -135,6 +135,23 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     if (mounted) context.pop();
   }
 
+  Future<void> _delete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eintrag löschen?'),
+        content: const Text('Der Eintrag und seine Kaufbewegung werden entfernt, so als wäre er nie erfasst worden. Anders als "Aufgebraucht" oder "Weggeworfen".'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Löschen')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _repo.deleteItem(_item.id);
+    if (mounted) context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -150,7 +167,17 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     final ownMovements = movements.where((m) => m.inventoryItemId == _item.id).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.product?.name ?? 'Unbekanntes Produkt')),
+      appBar: AppBar(
+        title: Text(widget.product?.name ?? 'Unbekanntes Produkt'),
+        actions: [
+          IconButton(
+            key: const Key('action-delete'),
+            tooltip: 'Löschen (falsch erfasst)',
+            icon: const Icon(Icons.delete_forever_outlined),
+            onPressed: _delete,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

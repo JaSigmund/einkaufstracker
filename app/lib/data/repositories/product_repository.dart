@@ -61,13 +61,20 @@ class ProductRepository {
       if (p != null && p.deletedAt == null) return BarcodeLookupResult(product: p);
     }
     final suggestion = off == null ? null : await off!.lookup(ean);
+    if (suggestion != null) {
+      final matched = await matchByLearnedName(suggestion.name);
+      if (matched != null) {
+        await linkBarcode(ean, matched.id);
+        return BarcodeLookupResult(product: matched);
+      }
+    }
     return BarcodeLookupResult(offSuggestion: suggestion);
   }
 
   /// Bon-Position (Doku 06 §2, ADR-010): gelernter Alias -> vorhandenes Produkt, sonst neu angelegt und
   /// die Zuordnung gemerkt. Haendlerunabhaengig gelernt (storeId bleibt in der Zuordnung leer), damit
   /// derselbe Artikel bei jedem Haendler wiedererkannt wird.
-  Future<Product> findOrCreateForReceiptItem(String rawText, {String? categoryId}) async {
+  Future<Product> findOrCreateForReceiptItem(String rawText, {String? categoryId, String baseUnit = 'piece'}) async {
     final hid = await householdId();
     final key = normalizeItemName(rawText);
     final alias = await (_db.select(_db.productAliases)
@@ -77,9 +84,27 @@ class ProductRepository {
       final p = await byId(alias.productId);
       if (p != null && p.deletedAt == null) return p;
     }
-    final product = await create(name: _cleanName(rawText), categoryId: categoryId);
+    // Waegware (Obst, Gemuese, Kaese am Stueck ...) steht im Bon in kg: das gleich als Grundeinheit setzen,
+    // statt bei "Stueck" zu bleiben (Fehlerbericht "Bonartikel bearbeiten", 2026-09-27).
+    final product = await create(name: _cleanName(rawText), categoryId: categoryId, baseUnit: baseUnit);
     await _learnAlias(key, product.id, hid);
     return product;
+  }
+
+  /// Versucht, einen unbekannten Barcode automatisch einem bereits gelernten Produkt zuzuordnen: der
+  /// Produktname von Open Food Facts wird wie ein Bon-Text normalisiert und gegen die gelernten Alias-
+  /// Schluessel geprueft. Trifft das zu, wird der Barcode gleich mitverknuepft. So muss der Nutzer nicht
+  /// immer manuell nach dem Bon-Vorschlag suchen (Fehlerbericht "Bonartikel bearbeiten", 2026-09-27).
+  Future<Product?> matchByLearnedName(String offName) async {
+    final hid = await householdId();
+    final key = normalizeItemName(offName);
+    if (key.isEmpty) return null;
+    final alias = await (_db.select(_db.productAliases)
+          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull()))
+        .getSingleOrNull();
+    if (alias == null) return null;
+    final p = await byId(alias.productId);
+    return (p != null && p.deletedAt == null) ? p : null;
   }
 
   /// Entfernt bekannte Bon-Praefixe ("IC", "1C" ...), behaelt sonst Gross-/Kleinschreibung wie gedruckt.

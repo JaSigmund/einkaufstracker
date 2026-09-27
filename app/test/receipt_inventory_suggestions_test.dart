@@ -104,6 +104,26 @@ void main() {
     expect(suggestion.expiresOn, suggestion.purchasedOn!.add(const Duration(days: 5)));
   });
 
+  test('Waegware (kg-Menge im Bon) legt das Produkt gleich mit Grundeinheit kg an', () async {
+    final receipt = ParsedReceipt.edited(
+      base: null,
+      chain: 'Billa',
+      purchasedAtUtc: DateTime.utc(2026, 9, 27, 10),
+      totalCents: 249,
+      items: const [
+        ParsedItem(rawText: 'DKIH Paprika Tricolore', kind: ReceiptItemKind.article, lineTotalCents: 249, quantity: 0.62, quantityUnit: 'kg'),
+      ],
+      bonDiscounts: const [],
+    );
+    final repo = receiptRepo(db, productRepo: productRepo(db), inventoryRepo: inventoryRepo(db));
+    await repo.saveParsed(receipt);
+
+    final product = await (db.select(db.products)..where((p) => p.name.equals('DKIH Paprika Tricolore'))).getSingle();
+    expect(product.baseUnit, 'kg');
+    final suggestion = await (db.select(db.inventoryItems)..where((i) => i.productId.equals(product.id))).getSingle();
+    expect((suggestion.unit, suggestion.quantity), ('kg', 0.62));
+  });
+
   test('Ohne Produkt-/Inventar-Repository (z.B. Altverhalten) entstehen keine Vorschlaege', () async {
     final repo = receiptRepo(db); // wie zuvor: beide Abhaengigkeiten fehlen
     await repo.saveParsed(_parse('billa_digital_04'));

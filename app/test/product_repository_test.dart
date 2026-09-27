@@ -89,6 +89,53 @@ void main() {
     });
   });
 
+  group('findOrCreateForReceiptItem', () {
+    test('uebernimmt die Grundeinheit des Bon-Artikels bei der Neuanlage (Waegware)', () async {
+      final repo = productRepo(db);
+      final p = await repo.findOrCreateForReceiptItem('DKIH Paprika Tricolore', baseUnit: 'kg');
+      expect(p.baseUnit, 'kg');
+    });
+
+    test('ein bereits gelerntes Produkt behaelt seine (ggf. spaeter korrigierte) Einheit', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('DKIH Paprika Tricolore', baseUnit: 'kg');
+      await repo.update(first.copyWith(baseUnit: 'piece')); // Nutzer korrigiert
+      final second = await repo.findOrCreateForReceiptItem('IC DKIH Paprika Tricolore', baseUnit: 'kg');
+      expect(second.id, first.id);
+      expect(second.baseUnit, 'piece'); // wird nicht von der Bon-Einheit ueberschrieben
+    });
+  });
+
+  group('matchByLearnedName / lookup ordnet automatisch zu', () {
+    test('OFF-Name entspricht (normalisiert) einem gelernten Bon-Alias: automatisch verknuepft', () async {
+      final repo = productRepo(db);
+      final product = await repo.findOrCreateForReceiptItem('Clever Champignon weiß');
+      final matched = await repo.matchByLearnedName('Clever Champignon weiss');
+      expect(matched?.id, product.id);
+    });
+
+    test('kein Treffer fuer einen unbekannten Namen', () async {
+      expect(await productRepo(db).matchByLearnedName('Irgendein Joghurt'), isNull);
+    });
+
+    test('lookup: unbekannter Barcode wird automatisch verknuepft, wenn OFF den Bon-Namen trifft', () async {
+      final product = await productRepo(db).findOrCreateForReceiptItem('Clever Champignon weiß');
+      final repo = productRepo(db, off: _FakeOff(const OffProduct(name: 'Clever Champignon weiss')));
+      final result = await repo.lookup('9008700000042');
+      expect(result.isKnown, isTrue);
+      expect(result.product!.id, product.id);
+      expect((await db.select(db.productBarcodes).getSingle()).ean, '9008700000042'); // dauerhaft gemerkt
+    });
+
+    test('lookup: kein automatischer Treffer, wenn der OFF-Name nicht passt', () async {
+      await productRepo(db).findOrCreateForReceiptItem('Clever Champignon weiß');
+      final repo = productRepo(db, off: _FakeOff(const OffProduct(name: 'Ganz anderes Produkt')));
+      final result = await repo.lookup('9008700000043');
+      expect(result.isKnown, isFalse);
+      expect(result.offSuggestion?.name, 'Ganz anderes Produkt');
+    });
+  });
+
   group('linkBarcode', () {
     test('verknuepft nachtraeglich, landet in der Outbox mit zusammengesetztem Schluessel', () async {
       final repo = productRepo(db);
