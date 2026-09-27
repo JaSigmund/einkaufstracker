@@ -23,6 +23,7 @@ void main() {
         appInfo: {'platform': 'android', 'pending_changes': 0},
       );
       expect(report.title, 'Scan legt Duplikat an');
+      expect(report.status, 'new'); // Bearbeitungsstatus wird von der Entwicklung gesetzt, nicht vom Melder
       expect(changed, 1);
       expect(jsonDecode(report.appInfo)['platform'], 'android');
       expect((await db.select(db.outbox).get()).map((o) => o.remoteTable), contains('bug_reports'));
@@ -81,6 +82,29 @@ void main() {
     final synced = await db2.select(db2.bugReports).getSingle();
     expect(jsonDecode(synced.appInfo)['route'], 'Inventar');
     expect(jsonDecode(synced.dataSnapshot!)['inventory_items'][0]['quantity'], 2.5);
+  });
+
+  group('Sync uebernimmt einen von der Entwicklung gesetzten Status', () {
+    test('Status, Schweregrad, Loesung und Version kommen auf einem zweiten Geraet an', () async {
+      final remote = FakeRemoteStore();
+      final report = await bugReportRepo(db).create(title: 'x', appInfo: const {});
+      await SyncEngine(db, remote).sync();
+      // wie ein SQL-Update durch die Entwicklung (siehe supabase/tests): der Server kennt den Fehlerbericht
+      // schon mit Status, das simulieren wir hier direkt im Fake-Remote-Store.
+      final row = Map<String, dynamic>.from(remote.table('bug_reports')[report.id]!);
+      row['status'] = 'fixed';
+      row['severity'] = 'medium';
+      row['resolution'] = 'Behoben in PR #20.';
+      row['fixed_in_version'] = '1.1.0';
+      row['status_updated_at'] = DateTime.utc(2026, 9, 28).toIso8601String();
+      await remote.upsert('bug_reports', row);
+
+      final db2 = memoryDb();
+      addTearDown(db2.close);
+      await SyncEngine(db2, remote).sync();
+      final synced = await db2.select(db2.bugReports).getSingle();
+      expect((synced.status, synced.severity, synced.resolution, synced.fixedInVersion), ('fixed', 'medium', 'Behoben in PR #20.', '1.1.0'));
+    });
   });
 
   group('collectAppInfo', () {

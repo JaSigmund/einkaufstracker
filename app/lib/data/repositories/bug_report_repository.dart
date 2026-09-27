@@ -38,6 +38,7 @@ class BugReportRepository {
       description: description?.trim().isEmpty == true ? null : description?.trim(),
       appInfo: jsonEncode(appInfo),
       dataSnapshot: dataSnapshot == null ? null : jsonEncode(dataSnapshot),
+      status: 'new',
       createdAt: now,
       updatedAt: now,
     );

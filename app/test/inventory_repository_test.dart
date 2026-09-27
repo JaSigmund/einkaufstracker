@@ -157,6 +157,59 @@ void main() {
     });
   });
 
+  group('reopen', () {
+    test('macht Aufgebraucht rueckgaengig, entfernt die Abgangsbewegung', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', quantity: 2, now: DateTime.utc(2026, 9, 27));
+      await repo.markConsumed(item.id);
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).status, 'consumed');
+
+      await repo.reopen(item.id);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.status, 'sealed');
+      expect(row.closedAt, isNull);
+      expect(await (db.select(db.inventoryMovements)..where((m) => m.type.equals('consumed'))).get().then((l) => l.where((m) => m.deletedAt == null).toList()), isEmpty);
+      final remaining = (await db.select(db.inventoryMovements).get()).where((m) => m.deletedAt == null).toList();
+      expect(remaining, hasLength(1)); // der Kauf bleibt
+    });
+
+    test('war schon geoeffnet: kommt wieder auf opened zurueck, nicht sealed', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.open(item.id, now: DateTime.utc(2026, 9, 28));
+      await repo.markDiscarded(item.id);
+      await repo.reopen(item.id);
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).status, 'opened');
+    });
+
+    test('aktiver Eintrag: kein Effekt', () async {
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.reopen(item.id); // war nie geschlossen
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).status, 'sealed');
+    });
+  });
+
+  group('deleteItem bei einem Bon-Artikel', () {
+    test('wird wieder zum Vorschlag statt geloescht zu werden, die Kaufbewegung bleibt', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: DateTime.utc(2026, 9, 20),
+      );
+      final refined = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: DateTime.utc(2026, 10, 10), now: DateTime.utc(2026, 9, 21));
+      expect(refined.id, suggestion.id); // verfeinert, kein zweiter Eintrag
+
+      await repo.deleteItem(refined.id);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(refined.id))).getSingle();
+      expect(row.deletedAt, isNull); // nicht geloescht
+      expect(row.isSuggestion, isTrue);
+      expect(row.status, 'sealed');
+      expect(row.ean, isNull);
+      expect(await repo.watchSuggestions().first, hasLength(1));
+      expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // die Kaufbewegung des Bons bleibt
+    });
+  });
+
   group('updateDetails', () {
     test('aendert MHD, Datumsart und Lagerort, ohne Ledger-Bewegung', () async {
       final repo = inventoryRepo(db);

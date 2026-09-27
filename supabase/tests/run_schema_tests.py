@@ -246,6 +246,19 @@ def main():
     check("Fehlerbericht ohne app_info wird abgelehnt", raises(
         "insert into bug_reports (household_id, title) values (%s,%s)", (ha, "x")))
 
+    # --- Fehlerverfolgung und Changelog (0011) -----------------------------------------------
+    bug_id = one("select id from bug_reports where household_id=%s limit 1", (ha,))
+    db("update bug_reports set status='fixed', severity='medium', resolution='behoben', fixed_in_version='1.1.0' where id=%s", (bug_id,))
+    check("Fehlerbericht: Status kann gesetzt werden", one("select status::text from bug_reports where id=%s", (bug_id,)) == "fixed")
+    check("Fehlerbericht: unbekannter Status wird abgelehnt",
+          raises("update bug_reports set status='erledigt' where id=%s", (bug_id,)))
+    check("Fehlerbericht: status_updated_at hat einen Standardwert", one("select status_updated_at is not null from bug_reports where id=%s", (bug_id,)))
+
+    changelog_sql = "insert into app_changelog (version, title, highlights) values (%s,%s,%s)"
+    db(changelog_sql, ("1.1.0", "Fehlerverfolgung", '["Status je Fehlerbericht", "Changelog"]'))
+    check("Changelog: von A lesbar (haushaltsunabhaengig)", one("select count(*) from app_changelog", user=A) == 1)
+    check("Changelog: von B lesbar", one("select count(*) from app_changelog", user=B) == 1)
+
     # --- Lernende Kategorisierung (0006) ---------------------------------------------------
     cat_a = one("select id from categories where household_id=%s and name='Gemüse'", (ha,))
     alias_sql = "insert into category_aliases (household_id, alias_text, category_id) values (%s,%s,%s)"

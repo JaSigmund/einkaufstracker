@@ -52,7 +52,29 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   String? _error;
   late final _search = TextEditingController();
   List<Product> _matches = const [];
+
+  /// Produkte ohne Barcode, als Vorauswahl solange noch nicht gesucht wurde (Fehlerbericht "Automatische
+  /// Bonzuordnung": die App soll nicht erst tippen lassen, wenn sie schon Kandidaten kennt).
+  List<Product> _unlinked = const [];
   var _linking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.ean != null && widget.existing == null) {
+      // Bei einem OFF-Vorschlag gleich danach suchen, statt den Nutzer tippen zu lassen (Fehlerbericht
+      // "Automatische Bonzuordnung", 2026-09-28).
+      final suggestedName = widget.suggestion?.name;
+      if (suggestedName != null) {
+        _search.text = suggestedName;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _searchExisting(suggestedName));
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final recent = await ref.read(productRepositoryProvider).recentUnlinked();
+        if (mounted) setState(() => _unlinked = recent);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -201,6 +223,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   onTap: _linking ? null : () => _linkExisting(m),
                 ),
               ),
+            if (_search.text.trim().isEmpty && _unlinked.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Zuletzt aus Bons, noch ohne Barcode', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.outline)),
+              for (final m in _unlinked)
+                Card(
+                  child: ListTile(
+                    key: Key('unlinked-${m.id}'),
+                    title: Text(m.name),
+                    subtitle: m.brand == null ? null : Text(m.brand!),
+                    trailing: _linking ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.link),
+                    onTap: _linking ? null : () => _linkExisting(m),
+                  ),
+                ),
+            ],
             const Divider(height: 32),
             Text('Oder neu anlegen', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),

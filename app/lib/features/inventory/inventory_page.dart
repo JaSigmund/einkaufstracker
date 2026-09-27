@@ -180,10 +180,19 @@ class _InventoryTile extends ConsumerWidget {
       ),
       confirmDismiss: (direction) async {
         final repo = ref.read(inventoryRepositoryProvider);
-        if (direction == DismissDirection.startToEnd) {
+        final consumed = direction == DismissDirection.startToEnd;
+        if (consumed) {
           await repo.markConsumed(item.id);
         } else {
           await repo.markDiscarded(item.id);
+        }
+        // Sofortiger Rueckweg fuer einen verwischten Wisch (Fehlerbericht "Rueckgaengigmachen von
+        // aufgebrauchten Artikeln", 2026-09-28), statt den Eintrag erst wiederfinden zu muessen.
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(consumed ? 'Als aufgebraucht markiert' : 'Als weggeworfen markiert'),
+            action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.reopen(item.id)),
+          ));
         }
         return false; // die Liste aktualisiert sich ueber den Stream, kein manuelles Entfernen noetig
       },

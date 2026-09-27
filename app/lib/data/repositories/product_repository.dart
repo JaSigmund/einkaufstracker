@@ -51,6 +51,23 @@ class ProductRepository {
         .get();
   }
 
+  /// Produkte ohne Barcode, zuletzt geaendert zuerst - typischerweise Bon-Vorschlaege, die noch nie gescannt
+  /// wurden. Als Vorauswahl beim Verknuepfen eines unbekannten Barcodes (Fehlerbericht "Keine Bonzuordnung"/
+  /// "Automatische Bonzuordnung", 2026-09-28), damit der Nutzer nicht zwingend selbst tippen muss.
+  Future<List<Product>> recentUnlinked({int limit = 10}) async {
+    final hid = await householdId();
+    final linked = _db.selectOnly(_db.productBarcodes)
+      ..addColumns([_db.productBarcodes.productId])
+      ..where(_db.productBarcodes.householdId.equals(hid));
+    final linkedIds = (await linked.map((r) => r.read(_db.productBarcodes.productId)!).get()).toSet();
+    final all = await (_db.select(_db.products)
+          ..where((p) => p.householdId.equals(hid) & p.deletedAt.isNull())
+          ..orderBy([(p) => OrderingTerm.desc(p.updatedAt)])
+          ..limit(limit + linkedIds.length))
+        .get();
+    return all.where((p) => !linkedIds.contains(p.id)).take(limit).toList();
+  }
+
   /// Sucht den EAN zuerst lokal (schon einmal zugeordnet), dann bei Open Food Facts. Das lokale Produkt hat
   /// immer Vorrang, auch offline verfuegbar; OFF wird nur befragt, wenn nichts gefunden wurde.
   Future<BarcodeLookupResult> lookup(String ean) async {

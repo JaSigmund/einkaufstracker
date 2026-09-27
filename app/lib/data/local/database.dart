@@ -278,6 +278,15 @@ class BugReports extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get appInfo => text()();
   TextColumn get dataSnapshot => text().nullable()();
+
+  /// 'new' | 'confirmed' | 'in_progress' | 'fixed' | 'verified' | 'wont_fix' | 'duplicate'
+  TextColumn get status => text().withDefault(const Constant('new'))();
+
+  /// 'low' | 'medium' | 'high' | 'critical', von der Entwicklung gesetzt.
+  TextColumn get severity => text().nullable()();
+  TextColumn get resolution => text().nullable()();
+  TextColumn get fixedInVersion => text().nullable()();
+  DateTimeColumn get statusUpdatedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
@@ -330,7 +339,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -376,6 +385,14 @@ class AppDatabase extends _$AppDatabase {
           // 7 -> 8: Fehlerberichte
           if (from < 8) {
             await m.createTable(bugReports);
+          }
+          // 8 -> 9: Bearbeitungsstatus fuer Fehlerberichte
+          if (from < 9) {
+            await m.addColumn(bugReports, bugReports.status);
+            await m.addColumn(bugReports, bugReports.severity);
+            await m.addColumn(bugReports, bugReports.resolution);
+            await m.addColumn(bugReports, bugReports.fixedInVersion);
+            await m.addColumn(bugReports, bugReports.statusUpdatedAt);
           }
         },
       );

@@ -11,13 +11,42 @@ import '../../data/local/database.dart';
 
 const _prettyJson = JsonEncoder.withIndent('  ');
 
+/// Bearbeitungsstatus wie in einem Ticket-System (Doku-Wunsch "aehnlich wie in MS Azure"): Reihenfolge,
+/// Farbe und Anzeigename je Status.
+const _statusLabels = {
+  'new': 'Gemeldet',
+  'confirmed': 'Bestätigt',
+  'in_progress': 'In Bearbeitung',
+  'fixed': 'Behoben',
+  'verified': 'Bestätigt behoben',
+  'wont_fix': 'Wird nicht behoben',
+  'duplicate': 'Duplikat',
+};
+
+Color _statusColor(String status, ColorScheme cs) => switch (status) {
+      'new' => cs.outline,
+      'confirmed' => Colors.blue.shade700,
+      'in_progress' => Colors.amber.shade800,
+      'fixed' => Colors.lightGreen.shade700,
+      'verified' => Colors.green.shade700,
+      'wont_fix' => cs.outline,
+      'duplicate' => cs.outline,
+      _ => cs.outline,
+    };
+
+const _severityLabels = {'low': 'Niedrig', 'medium': 'Mittel', 'high': 'Hoch', 'critical': 'Kritisch'};
+
 /// Text, den der Nutzer kopieren und weitergeben kann (Jakobs Wunsch: "sodass ich dir diese dann geben kann").
 String reportAsText(BugReport r) {
   final buf = StringBuffer()
     ..writeln('# ${r.title}')
     ..writeln('Gemeldet: ${formatViennaDateTime(r.createdAt)}')
+    ..writeln('Status: ${_statusLabels[r.status] ?? r.status}')
     ..writeln();
   if (r.description != null) buf..writeln(r.description)..writeln();
+  if (r.resolution != null) {
+    buf.writeln('## Lösung${r.fixedInVersion == null ? '' : ' (Version ${r.fixedInVersion})'}\n${r.resolution}\n');
+  }
   buf..writeln('## Technischer Stand')..writeln(_prettyJson.convert(jsonDecode(r.appInfo)));
   if (r.dataSnapshot != null) {
     buf..writeln()..writeln('## Datenausschnitt')..writeln(_prettyJson.convert(jsonDecode(r.dataSnapshot!)));
@@ -25,7 +54,22 @@ String reportAsText(BugReport r) {
   return buf.toString();
 }
 
-/// Liste der eigenen Fehlerberichte, zum Nachschauen und Kopieren (siehe [BugReportDetailPage]).
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(status, Theme.of(context).colorScheme);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(999)),
+      child: Text(_statusLabels[status] ?? status, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+    );
+  }
+}
+
+/// Liste der eigenen Fehlerberichte mit Status, zum Nachschauen und Kopieren (siehe [BugReportDetailPage]).
 class BugReportListPage extends ConsumerWidget {
   const BugReportListPage({super.key});
 
@@ -47,7 +91,11 @@ class BugReportListPage extends ConsumerWidget {
                       leading: const Icon(Icons.bug_report_outlined),
                       title: Text(r.title),
                       subtitle: Text(formatViennaDateTime(r.createdAt)),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        _StatusChip(status: r.status),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.chevron_right),
+                      ]),
                       onTap: () => context.push('/bug-reports/detail', extra: r),
                     ),
                 ],
@@ -63,6 +111,7 @@ class BugReportDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final text = reportAsText(report);
     return Scaffold(
       appBar: AppBar(
@@ -81,9 +130,41 @@ class BugReportDetailPage extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        children: [
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _StatusChip(status: report.status),
+            if (report.severity != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(999)),
+                child: Text('Dringlichkeit: ${_severityLabels[report.severity] ?? report.severity}', style: t.textTheme.labelMedium),
+              ),
+            if (report.fixedInVersion != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: t.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(999)),
+                child: Text('Version ${report.fixedInVersion}', style: t.textTheme.labelMedium),
+              ),
+          ]),
+          const SizedBox(height: 16),
+          if (report.resolution != null) ...[
+            Card(
+              color: t.colorScheme.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Lösung', style: t.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  Text(report.resolution!),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12), key: const Key('bug-detail-text')),
+        ],
       ),
     );
   }

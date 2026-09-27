@@ -147,6 +147,12 @@ void main() {
     await tester.pumpAndSettle();
     final updated = await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle();
     expect(updated.status, 'consumed');
+    expect(find.text('Rückgängig'), findsOneWidget); // sofortiger Rueckweg fuer einen Fehlgriff
+
+    await tester.tap(find.text('Rückgängig'));
+    await tester.pumpAndSettle();
+    final reopened = await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle();
+    expect(reopened.status, 'sealed');
   });
 
   testWidgets('Wischen nach links: weggeworfen', (tester) async {
