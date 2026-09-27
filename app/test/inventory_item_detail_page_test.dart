@@ -1,6 +1,7 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/features/inventory/inventory_item_detail_page.dart';
+import 'package:einkaufstracker/features/products/product_form_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,11 +26,21 @@ void main() {
           databaseProvider.overrideWithValue(db),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
           inventoryMovementsStreamProvider.overrideWith((ref, _) => Stream.value(const <InventoryMovement>[])),
+          productRepositoryProvider.overrideWithValue(productRepo(db)),
+          categoriesStreamProvider.overrideWith((ref) => Stream.value(const <Category>[])),
+          productAliasesStreamProvider.overrideWith((ref, _) => Stream.value(const <ProductAlias>[])),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [
             GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('START'))),
             GoRoute(path: '/item', builder: (_, _) => InventoryItemDetailPage(item: item, product: p ?? product)),
+            GoRoute(
+              path: '/product-form',
+              builder: (_, s) {
+                final a = s.extra as ProductFormArgs?;
+                return ProductFormPage(ean: a?.ean, suggestion: a?.suggestion, existing: a?.existing);
+              },
+            ),
           ]),
         ),
       );
@@ -56,6 +67,172 @@ void main() {
 
     final movements = await db.select(db.inventoryMovements).get();
     expect(movements.where((m) => m.type == 'adjustment'), hasLength(2));
+  });
+
+  testWidgets('zeigt den zugeordneten Bon an (Fehlerbericht "Bonzuordnung anzeigen")', (tester) async {
+    await db.into(db.stores).insert(Store(id: 'store1', householdId: 'h1', chain: 'Billa', updatedAt: DateTime.utc(2026)));
+    await db.into(db.receipts).insert(Receipt(
+          id: 'r1',
+          householdId: 'h1',
+          storeId: 'store1',
+          purchasedAt: _d(2026, 9, 20),
+          totalCents: 500,
+          status: 'confirmed',
+          source: 'manual',
+          sumMismatch: false,
+          updatedAt: DateTime.utc(2026),
+        ));
+    await db.into(db.receiptItems).insert(ReceiptItem(
+          id: 'ri1',
+          householdId: 'h1',
+          receiptId: 'r1',
+          lineNo: 1,
+          kind: 'article',
+          rawText: 'H-VOLLMILCH 1L',
+          quantity: 1,
+          quantityUnit: 'piece',
+          lineTotalCents: 129,
+          needsReview: false,
+          updatedAt: DateTime.utc(2026),
+        ));
+    final repo = inventoryRepo(db);
+    final suggestion = await repo.createSuggestionFromReceipt(
+      productId: product.id, receiptItemId: 'ri1', quantity: 1, unit: 'l', purchasedOn: _d(2026, 9, 20),
+    );
+    final item = await repo.recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 21));
+    expect(item.id, suggestion.id);
+
+    await tester.pumpWidget(app(item));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('START'))).push('/item');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('receipt-link')), findsOneWidget);
+    expect(find.text('Billa'), findsOneWidget);
+    expect(find.textContaining('H-VOLLMILCH 1L'), findsOneWidget);
+    expect(find.text('1,29 €'), findsOneWidget);
+  });
+
+  testWidgets('ohne Bon-Zuordnung: kein Hinweis auf einen Bon', (tester) async {
+    final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+    await tester.pumpWidget(app(item));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('START'))).push('/item');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('receipt-link')), findsNothing);
+  });
+
+  testWidgets('Produktname direkt umbenennen (Wunsch "intuitiver", 2026-09-28)', (tester) async {
+    final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+    await tester.pumpWidget(app(item));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('START'))).push('/item');
+    await tester.pumpAndSettle();
+    expect(find.text('Vollmilch'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('product-name-tap')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('product-name-input')), 'Vollmilch 3,5%');
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vollmilch 3,5%'), findsOneWidget);
+    final row = await (db.select(db.products)..where((p) => p.id.equals(product.id))).getSingle();
+    expect(row.name, 'Vollmilch 3,5%');
+  });
+
+  testWidgets('weitere Produktdetails: oeffnet das volle Formular, Aenderung kommt zurueck', (tester) async {
+    tester.view.physicalSize = const Size(1080, 3400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+    await tester.pumpWidget(app(item));
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.text('START'))).push('/item');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('action-edit-product')));
+    await tester.pumpAndSettle();
+    expect(find.text('Produkt bearbeiten'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('product-name')), 'Bio-Vollmilch');
+    await tester.tap(find.byKey(const Key('product-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bio-Vollmilch'), findsOneWidget);
+  });
+
+  group('Bonzuordnung aendern (2026-09-28)', () {
+    Future<void> makeReceiptItem(String id, String rawText) async {
+      await db.into(db.receipts).insertOnConflictUpdate(Receipt(
+            id: 'r-$id',
+            householdId: 'h1',
+            purchasedAt: _d(2026, 9, 20),
+            totalCents: 500,
+            status: 'confirmed',
+            source: 'manual',
+            sumMismatch: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+      await db.into(db.receiptItems).insert(ReceiptItem(
+            id: id,
+            householdId: 'h1',
+            receiptId: 'r-$id',
+            lineNo: 1,
+            kind: 'article',
+            rawText: rawText,
+            productId: product.id,
+            quantity: 1,
+            quantityUnit: 'piece',
+            lineTotalCents: 129,
+            needsReview: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+    }
+
+    testWidgets('reiner Scan: Bon nachtraeglich zuordnen', (tester) async {
+      await makeReceiptItem('ri1', 'H-VOLLMILCH 1L');
+      final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await tester.pumpWidget(app(item));
+      await tester.pumpAndSettle();
+      GoRouter.of(tester.element(find.text('START'))).push('/item');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-link-add')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receipt-link-add')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('receipt-link-candidate-ri1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receipt-link-candidate-ri1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-link')), findsOneWidget);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.receiptItemId, 'ri1');
+    });
+
+    testWidgets('bereits zugeordnet: loesen macht den Eintrag zum reinen Scan', (tester) async {
+      await makeReceiptItem('ri1', 'H-VOLLMILCH 1L');
+      final repo = inventoryRepo(db);
+      final created = await repo.recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.setReceiptLink(created.id, 'ri1');
+      final item = await (db.select(db.inventoryItems)..where((i) => i.id.equals(created.id))).getSingle();
+
+      await tester.pumpWidget(app(item));
+      await tester.pumpAndSettle();
+      GoRouter.of(tester.element(find.text('START'))).push('/item');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('receipt-link')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('receipt-link-remove')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-link-add')), findsOneWidget);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.receiptItemId, isNull);
+    });
   });
 
   testWidgets('Menge kann nicht negativ werden', (tester) async {
@@ -110,6 +287,11 @@ void main() {
   });
 
   testWidgets('Aufgebraucht/Weggeworfen schliessen den Eintrag und verlassen die Seite', (tester) async {
+    tester.view.physicalSize = const Size(1080, 3400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 27));
     await tester.pumpWidget(app(item));
     await tester.pumpAndSettle();

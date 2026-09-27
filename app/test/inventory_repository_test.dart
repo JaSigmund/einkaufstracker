@@ -68,11 +68,12 @@ void main() {
       return id;
     }
 
-    test('Vorschlag der letzten 7 Tage wird verfeinert, kein zweiter Eintrag, keine zweite Kaufbewegung', () async {
+    test('Vorschlag der letzten 7 Tage wird verfeinert, kein zweiter Eintrag, keine zweite Kaufbewegung, Menge bleibt gleich', () async {
       final id = await makeSuggestion(_d(2026, 9, 25));
       final item = await inventoryRepo(db).recordFromScan(
         productId: productId,
         ean: '9008700000002',
+        quantity: 2,
         bestBefore: _d(2026, 10, 10),
         location: 'fridge',
         now: DateTime.utc(2026, 9, 27),
@@ -81,9 +82,25 @@ void main() {
       expect(item.isSuggestion, isFalse);
       expect(item.ean, '9008700000002');
       expect(item.location, 'fridge');
-      expect(item.quantity, 2); // Menge des Vorschlags bleibt
+      expect(item.quantity, 2);
       expect(await db.select(db.inventoryItems).get(), hasLength(1));
       expect(await db.select(db.inventoryMovements).get(), isEmpty); // der Bon hat die Kaufbewegung schon erzeugt
+    });
+
+    test('beim Scan eingegebene Menge ueberschreibt die Menge des Bon-Vorschlags (Fehlerbericht "Bonartikel-Erkennung")', () async {
+      final id = await makeSuggestion(_d(2026, 9, 25)); // Vorschlag hat Menge 2 aus dem Bon
+      final item = await inventoryRepo(db).recordFromScan(
+        productId: productId,
+        ean: '9008700000002',
+        quantity: 4, // Nutzer korrigiert beim Scan auf 4
+        now: DateTime.utc(2026, 9, 27),
+      );
+      expect(item.id, id);
+      expect(item.quantity, 4);
+      final movements = await db.select(db.inventoryMovements).get();
+      expect(movements, hasLength(1));
+      expect(movements.single.type, 'adjustment');
+      expect(movements.single.quantityDelta, 2); // 4 - 2
     });
 
     test('Vorschlag ist aelter als 7 Tage: neuer Eintrag statt Verfeinerung', () async {
@@ -155,6 +172,23 @@ void main() {
       expect(updated.status, 'consumed');
       expect(await db.select(db.inventoryMovements).get(), hasLength(2)); // Kauf + ein Abgang
     });
+
+    test('onDepleted feuert, wenn kein aktiver Bestand mehr uebrig ist (Einkaufsliste "Leer", Roadmap Phase 3)', () async {
+      final depleted = <String>[];
+      final repo = inventoryRepo(db, onDepleted: (id) async => depleted.add(id));
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.markConsumed(item.id);
+      expect(depleted, [productId]);
+    });
+
+    test('onDepleted feuert nicht, solange noch aktiver Bestand desselben Produkts existiert', () async {
+      final depleted = <String>[];
+      final repo = inventoryRepo(db, onDepleted: (id) async => depleted.add(id));
+      final a = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.recordFromScan(productId: productId, ean: '2', now: DateTime.utc(2026, 9, 27));
+      await repo.markConsumed(a.id);
+      expect(depleted, isEmpty);
+    });
   });
 
   group('reopen', () {
@@ -207,6 +241,107 @@ void main() {
       expect(row.ean, isNull);
       expect(await repo.watchSuggestions().first, hasLength(1));
       expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // die Kaufbewegung des Bons bleibt
+    });
+  });
+
+  group('receiptLinkFor (Fehlerbericht "Bonzuordnung anzeigen")', () {
+    test('liefert Bon-Datum, Haendler, Rohtext und Preis der Bon-Position', () async {
+      await db.into(db.stores).insert(Store(id: 'store1', householdId: 'h1', chain: 'Billa', updatedAt: DateTime.utc(2026)));
+      await db.into(db.receipts).insert(Receipt(
+            id: 'r1',
+            householdId: 'h1',
+            storeId: 'store1',
+            purchasedAt: _d(2026, 9, 20),
+            totalCents: 500,
+            status: 'confirmed',
+            source: 'manual',
+            sumMismatch: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+      await db.into(db.receiptItems).insert(ReceiptItem(
+            id: 'ri1',
+            householdId: 'h1',
+            receiptId: 'r1',
+            lineNo: 1,
+            kind: 'article',
+            rawText: 'DKIH PAPRIKA TRICOLORE',
+            quantity: 1,
+            quantityUnit: 'piece',
+            lineTotalCents: 249,
+            needsReview: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      final link = await repo.receiptLinkFor(suggestion.receiptItemId);
+      expect(link, isNotNull);
+      expect(link!.storeChain, 'Billa');
+      expect(link.purchasedAt, _d(2026, 9, 20));
+      expect(link.rawText, 'DKIH PAPRIKA TRICOLORE');
+      expect(link.lineTotalCents, 249);
+    });
+
+    test('kein receiptItemId: null statt Fehler', () async {
+      final link = await inventoryRepo(db).receiptLinkFor(null);
+      expect(link, isNull);
+    });
+  });
+
+  group('candidateReceiptLinksFor / setReceiptLink (Bonzuordnung aendern, 2026-09-28)', () {
+    Future<void> makeReceiptItem(String id, String receiptId, {DateTime? purchasedAt}) async {
+      await db.into(db.receipts).insertOnConflictUpdate(Receipt(
+            id: receiptId,
+            householdId: 'h1',
+            purchasedAt: purchasedAt ?? _d(2026, 9, 20),
+            totalCents: 500,
+            status: 'confirmed',
+            source: 'manual',
+            sumMismatch: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+      await db.into(db.receiptItems).insert(ReceiptItem(
+            id: id,
+            householdId: 'h1',
+            receiptId: receiptId,
+            lineNo: 1,
+            kind: 'article',
+            rawText: 'Bon-Position $id',
+            productId: productId,
+            quantity: 1,
+            quantityUnit: 'piece',
+            lineTotalCents: 100,
+            needsReview: false,
+            updatedAt: DateTime.utc(2026),
+          ));
+    }
+
+    test('zeigt nur Bon-Positionen ohne bestehende Zuordnung, neueste zuerst', () async {
+      await makeReceiptItem('ri1', 'r1', purchasedAt: _d(2026, 9, 1));
+      await makeReceiptItem('ri2', 'r2', purchasedAt: _d(2026, 9, 20));
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await repo.setReceiptLink(item.id, 'ri1'); // ri1 ist damit "verlinkt", darf nicht als Kandidat auftauchen
+
+      final candidates = await repo.candidateReceiptLinksFor(productId);
+      expect(candidates.map((c) => c.receiptItemId), ['ri2']);
+    });
+
+    test('setReceiptLink verknuepft, setReceiptLink(null) loest wieder', () async {
+      await makeReceiptItem('ri1', 'r1');
+      final repo = inventoryRepo(db);
+      final item = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 27));
+      expect(item.receiptItemId, isNull);
+
+      await repo.setReceiptLink(item.id, 'ri1');
+      var row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.receiptItemId, 'ri1');
+
+      await repo.setReceiptLink(item.id, null);
+      row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
+      expect(row.receiptItemId, isNull);
     });
   });
 

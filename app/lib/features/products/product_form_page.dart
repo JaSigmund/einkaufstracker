@@ -7,6 +7,8 @@ import '../../app/providers.dart';
 import '../../data/local/database.dart';
 import '../../data/products/off_client.dart';
 import '../../data/repositories/product_repository.dart';
+import '../../domain/inventory/shelf_life_rules.dart';
+import '../../domain/products/off_quantity.dart';
 
 /// Argumente fuer /product-form: entweder ein unbekannter Barcode (mit optionalem OFF-Vorschlag) oder ein
 /// bestehendes Produkt zum Bearbeiten.
@@ -38,15 +40,19 @@ class ProductFormPage extends ConsumerStatefulWidget {
 }
 
 class _ProductFormPageState extends ConsumerState<ProductFormPage> {
+  /// Vorbelegung fuer ein neues Produkt aus dem OFF-Namen (Doku 06 §3.2, Roadmap Phase 3), damit
+  /// Haltbarkeit-nach-Oeffnen, Lagerort und Datumsart nicht bei jedem Produkt neu eingetippt werden muessen.
+  late final _shelfLifeSuggestion = widget.existing == null ? suggestShelfLife(widget.suggestion?.name ?? '') : null;
   late final _name = TextEditingController(text: widget.existing?.name ?? widget.suggestion?.name ?? '');
   late final _brand = TextEditingController(text: widget.existing?.brand ?? widget.suggestion?.brand ?? '');
   late final _packSize = TextEditingController(text: widget.existing?.packSize?.toString() ?? '');
-  late final _openedDays = TextEditingController(text: widget.existing?.openedShelfLifeDays?.toString() ?? '');
+  late final _openedDays =
+      TextEditingController(text: (widget.existing?.openedShelfLifeDays ?? _shelfLifeSuggestion?.openedShelfLifeDays)?.toString() ?? '');
   String? _categoryId;
   var _categoryInitialized = false;
   late String _unit = widget.existing?.baseUnit ?? 'piece';
-  late String _location = widget.existing?.defaultLocation ?? 'pantry';
-  late String _dateKind = widget.existing?.defaultDateKind ?? 'best_before';
+  late String _location = widget.existing?.defaultLocation ?? _shelfLifeSuggestion?.location ?? 'pantry';
+  late String _dateKind = widget.existing?.defaultDateKind ?? _shelfLifeSuggestion?.dateKind ?? 'best_before';
   late bool _restock = widget.existing?.restock ?? false;
   var _saving = false;
   String? _error;
@@ -84,6 +90,23 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _openedDays.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _removeAlias(ProductAlias alias) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zuordnung lösen?'),
+        content: Text('„${alias.aliasText}“ wird beim nächsten Bon nicht mehr automatisch diesem Produkt zugeordnet.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lösen')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(productRepositoryProvider).removeAlias(alias.id);
+    }
   }
 
   Future<void> _searchExisting(String query) async {
@@ -165,6 +188,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           offCode: null,
           nutrientsPer100: widget.suggestion?.nutrientsPer100,
           nutrientsBasis: widget.suggestion?.nutrientsBasis,
+          unitWeightG: widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!),
           ean: widget.ean,
         );
       }
@@ -241,6 +265,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             Text('Oder neu anlegen', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
           ],
+          if (editing) ...[
+            _AliasSection(productId: widget.existing!.id, onRemove: _removeAlias),
+            const SizedBox(height: 16),
+          ],
           TextField(key: const Key('product-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name')),
           const SizedBox(height: 12),
           TextField(key: const Key('product-brand'), controller: _brand, decoration: const InputDecoration(labelText: 'Marke (optional)')),
@@ -262,7 +290,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 key: const Key('product-pack-size'),
                 controller: _packSize,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Packungsgröße (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Inhalt je Packung (optional)',
+                  helperText: 'z.B. 4 für 4 Stück, 0,15 für 150 g',
+                  helperMaxLines: 2,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -318,6 +350,45 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Speichern'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Gelernte Bon-Text-Zuordnungen (ADR-010) dieses Produkts, mit der Moeglichkeit, eine falsch gelernte
+/// wieder zu loesen (Fehlerbericht "Alias ändern", 2026-09-27).
+class _AliasSection extends ConsumerWidget {
+  const _AliasSection({required this.productId, required this.onRemove});
+  final String productId;
+  final Future<void> Function(ProductAlias alias) onRemove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final aliases = ref.watch(productAliasesStreamProvider(productId)).value ?? const <ProductAlias>[];
+    if (aliases.isEmpty) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Gelernte Bon-Zuordnungen', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            'Diese Bon-Texte werden automatisch diesem Produkt zugeordnet.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+          ),
+          for (final a in aliases)
+            ListTile(
+              key: Key('alias-${a.id}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(a.aliasText),
+              trailing: IconButton(
+                key: Key('alias-remove-${a.id}'),
+                icon: const Icon(Icons.link_off),
+                tooltip: 'Zuordnung lösen',
+                onPressed: () => onRemove(a),
+              ),
+            ),
+        ]),
       ),
     );
   }

@@ -14,6 +14,7 @@ import '../data/local/database.dart';
 import '../features/receipts/receipt_detail_page.dart';
 import '../features/receipts/receipt_file_page.dart';
 import '../features/products/product_form_page.dart';
+import '../features/products/products_list_page.dart';
 import '../features/bugreport/bug_report_list_page.dart';
 import '../features/bugreport/bug_report_page.dart';
 import '../features/changelog/changelog_page.dart';
@@ -55,6 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (_, _) => const HomeShell()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/categories', builder: (_, _) => const CategoriesPage()),
+      GoRoute(path: '/products', builder: (_, _) => const ProductsListPage()),
       GoRoute(
         path: '/receipt-file',
         builder: (_, state) => ReceiptFilePage(file: state.extra as ReceiptFile),

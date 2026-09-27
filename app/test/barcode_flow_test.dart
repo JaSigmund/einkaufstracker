@@ -216,6 +216,48 @@ void main() {
     expect(find.textContaining('Vorschlag von Open Food Facts'), findsOneWidget);
   });
 
+  testWidgets('Unbekanntes Produkt MIT OFF-Vorschlag: Haltbarkeit-nach-Oeffnen und Lagerort werden vorbelegt (Doku 06 §3.2)', (tester) async {
+    tester.view.physicalSize = const Size(1080, 3400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app(
+      scanner: FakeBarcodeScanner('9008700000002'),
+      offResult: const OffProduct(name: 'Vollmilch'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(find.byKey(const Key('product-opened-days'))).controller!.text, '3');
+    expect(tester.widget<DropdownButtonFormField<String>>(find.byKey(const Key('product-location'))).initialValue, 'fridge');
+  });
+
+  testWidgets('Unbekanntes Produkt MIT OFF-Vorschlag: Stueckgewicht aus der Packungsangabe wird mitgespeichert', (tester) async {
+    tester.view.physicalSize = const Size(1080, 3400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(app(
+      scanner: FakeBarcodeScanner('9008700000003'),
+      offResult: const OffProduct(name: 'Joghurt', quantityText: '500 g'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('product-save')));
+    await tester.pumpAndSettle();
+
+    final product = await (db.select(db.products)..where((p) => p.name.equals('Joghurt'))).getSingle();
+    expect(product.unitWeightG, 500);
+  });
+
   testWidgets('Abbruch im Scanner: nichts passiert', (tester) async {
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner(null)));
     await tester.pumpAndSettle();

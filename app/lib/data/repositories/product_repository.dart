@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
+import '../../domain/inventory/shelf_life_rules.dart';
 import '../local/database.dart';
 import '../products/off_client.dart';
 import '../sync/mappers.dart';
@@ -36,6 +37,25 @@ class ProductRepository {
   final Uuid _uuid;
 
   Stream<List<Product>> watchAll() => (_db.select(_db.products)..where((p) => p.deletedAt.isNull())).watch();
+
+  /// Einmalige Momentaufnahme von [watchAll], ohne eine dauerhafte Abfrage offen zu halten.
+  Future<List<Product>> allSnapshot() => (_db.select(_db.products)..where((p) => p.deletedAt.isNull())).get();
+
+  /// Gelernte Bon-Text-Zuordnungen dieses Produkts (ADR-010), damit sie sich nachtraeglich loesen lassen
+  /// (Fehlerbericht "Alias ändern", 2026-09-27) statt fuer immer gebunden zu sein.
+  Stream<List<ProductAlias>> watchAliasesFor(String productId) => (_db.select(_db.productAliases)
+        ..where((a) => a.productId.equals(productId) & a.deletedAt.isNull())
+        ..orderBy([(a) => OrderingTerm.desc(a.updatedAt)]))
+      .watch();
+
+  /// Loest eine gelernte Zuordnung: der Bon-Text wird beim naechsten Mal wieder als neues/anderes Produkt
+  /// vorgeschlagen, statt automatisch an dieses Produkt gehaengt zu werden.
+  Future<void> removeAlias(String aliasId) async {
+    final alias = await (_db.select(_db.productAliases)..where((a) => a.id.equals(aliasId))).getSingle();
+    final updated = alias.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
+    await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+  }
 
   Future<Product?> byId(String id) => (_db.select(_db.products)..where((p) => p.id.equals(id))).getSingleOrNull();
 
@@ -103,7 +123,17 @@ class ProductRepository {
     }
     // Waegware (Obst, Gemuese, Kaese am Stueck ...) steht im Bon in kg: das gleich als Grundeinheit setzen,
     // statt bei "Stueck" zu bleiben (Fehlerbericht "Bonartikel bearbeiten", 2026-09-27).
-    final product = await create(name: _cleanName(rawText), categoryId: categoryId, baseUnit: baseUnit);
+    // Haltbarkeit nach dem Oeffnen, Lagerort und Datumsart aus den Startwerten der Roadmap-Phase 3
+    // (Doku 06 §3.2) vorbelegen, damit nicht jedes Bon-Produkt erst manuell nachgepflegt werden muss.
+    final shelfLife = suggestShelfLife(rawText);
+    final product = await create(
+      name: _cleanName(rawText),
+      categoryId: categoryId,
+      baseUnit: baseUnit,
+      openedShelfLifeDays: shelfLife?.openedShelfLifeDays,
+      defaultLocation: shelfLife?.location ?? 'pantry',
+      defaultDateKind: shelfLife?.dateKind ?? 'best_before',
+    );
     await _learnAlias(key, product.id, hid);
     return product;
   }
@@ -186,6 +216,17 @@ class ProductRepository {
 
   Future<void> update(Product product) async {
     final updated = product.copyWith(updatedAt: DateTime.now().toUtc());
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+  }
+
+  /// Loescht ein Produkt aus "Meine Produkte" (Fehlerbericht "Produkt löschen", 2026-09-28). Bestehende
+  /// Bons, Inventar-Eintraege und Einkaufslisten-Positionen behalten ihre `product_id` und zeigen den Namen
+  /// weiter an; nur Suche, Autovervollstaendigung und Barcode-Zuordnung ignorieren das Produkt danach.
+  Future<void> softDelete(String id) async {
+    final product = await byId(id);
+    if (product == null) return;
+    final updated = product.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
   }

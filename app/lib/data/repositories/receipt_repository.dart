@@ -10,6 +10,7 @@ import '../local/database.dart';
 import '../sync/mappers.dart';
 import '../repositories/inventory_repository.dart';
 import '../repositories/product_repository.dart';
+import '../repositories/shopping_list_repository.dart';
 import '../../domain/receipt/vienna_time.dart' show utcToViennaLocal;
 
 enum ReceiptSaveOutcome { saved, duplicate }
@@ -31,7 +32,8 @@ class ReceiptSaveResult {
 const billDiscountKind = 'bill_discount';
 
 class ReceiptRepository {
-  ReceiptRepository(this._db, {required this.householdId, this.onChanged, this.productRepo, this.inventoryRepo, Uuid? uuid})
+  ReceiptRepository(this._db,
+      {required this.householdId, this.onChanged, this.productRepo, this.inventoryRepo, this.shoppingListRepo, Uuid? uuid})
       : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
@@ -43,6 +45,10 @@ class ReceiptRepository {
   /// Ohne diese beiden Abhaengigkeiten (z.B. in aelteren Tests) bleibt das Verhalten wie zuvor: kein Vorschlag.
   final ProductRepository? productRepo;
   final InventoryRepository? inventoryRepo;
+
+  /// Hakt passende offene Einkaufslisten-Eintraege ab (Doku 06 §7). Optional wie die beiden oben, aus
+  /// demselben Grund.
+  final ShoppingListRepository? shoppingListRepo;
 
   String _storeId(String hid, String chain, String? branch) =>
       _uuid.v5(Namespace.url.value, 'einkaufstracker:store:$hid:${chain.toLowerCase()}:${branch ?? '-'}');
@@ -246,6 +252,9 @@ class ReceiptRepository {
             dateKind: product.defaultDateKind,
             location: product.defaultLocation,
           );
+          // Schliesst den Kreis Liste -> Einkauf -> Bon (Doku 06 §7): offene, bereits bestaetigte
+          // Eintraege desselben Produkts gelten damit als erledigt.
+          await shoppingListRepo?.checkOffForProduct(product.id);
         }
       }
       // Rabatte auf Bon-Ebene (z.B. jö Rabattsammler) als eigene Positionen ohne Steuerbuchstaben,

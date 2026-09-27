@@ -37,6 +37,9 @@ final syncTables = <SyncTableDef>[
   // Fremdschluessel auf receipt_items (Vorschlaege) und products
   SyncTableDef('inventory_items', (db, j) => db.into(db.inventoryItems).insertOnConflictUpdate(inventoryItemFromRemote(j))),
   SyncTableDef('inventory_movements', (db, j) => db.into(db.inventoryMovements).insertOnConflictUpdate(inventoryMovementFromRemote(j))),
+  // Fremdschluessel: shopping_list_items -> shopping_lists, deshalb zuerst die Liste
+  SyncTableDef('shopping_lists', (db, j) => db.into(db.shoppingLists).insertOnConflictUpdate(shoppingListFromRemote(j))),
+  SyncTableDef('shopping_list_items', (db, j) => db.into(db.shoppingListItems).insertOnConflictUpdate(shoppingListItemFromRemote(j))),
 ];
 
 class SyncResult {

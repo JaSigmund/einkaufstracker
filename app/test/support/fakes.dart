@@ -17,6 +17,10 @@ import 'package:einkaufstracker/data/repositories/bug_report_repository.dart';
 import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
 import 'package:einkaufstracker/data/repositories/product_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
+import 'package:einkaufstracker/data/repositories/settings_repository.dart';
+import 'package:einkaufstracker/data/repositories/shopping_list_repository.dart';
+import 'package:einkaufstracker/data/notifications/notification_scheduler.dart';
+import 'package:einkaufstracker/domain/notifications/expiry_reminders.dart';
 
 AppDatabase memoryDb() {
   // Mehrere In-Memory-Datenbanken je Test sind gewollt (simulieren mehrere Geraete)
@@ -113,6 +117,7 @@ ReceiptRepository receiptRepo(
   void Function()? onChanged,
   ProductRepository? productRepo,
   InventoryRepository? inventoryRepo,
+  ShoppingListRepository? shoppingListRepo,
 }) =>
     ReceiptRepository(
       db,
@@ -120,6 +125,7 @@ ReceiptRepository receiptRepo(
       onChanged: onChanged,
       productRepo: productRepo,
       inventoryRepo: inventoryRepo,
+      shoppingListRepo: shoppingListRepo,
     );
 
 /// PDF-Leser-Attrappe: liefert den Text einer Fixture oder wirft.
@@ -206,8 +212,43 @@ ReceiptFileService fileService(AppDatabase db, FakeRemoteFileStore remote, Direc
 ProductRepository productRepo(AppDatabase db, {String household = 'h1', OffClient? off, void Function()? onChanged}) =>
     ProductRepository(db, householdId: () async => household, off: off, onChanged: onChanged);
 
-InventoryRepository inventoryRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
-    InventoryRepository(db, householdId: () async => household, onChanged: onChanged);
+InventoryRepository inventoryRepo(AppDatabase db,
+        {String household = 'h1', void Function()? onChanged, Future<void> Function(String productId)? onDepleted}) =>
+    InventoryRepository(db, householdId: () async => household, onChanged: onChanged, onDepleted: onDepleted);
+
+ShoppingListRepository shoppingListRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    ShoppingListRepository(db, householdId: () async => household, onChanged: onChanged);
+
+/// Einstellungen-Attrappe (die echte Implementierung ist online-only ueber Supabase).
+class FakeSettingsRepository implements SettingsRepository {
+  FakeSettingsRepository(this.settings);
+  HouseholdSettings settings;
+
+  @override
+  Future<HouseholdSettings> load(String householdId) async => settings;
+
+  @override
+  Future<void> update(String householdId, Map<String, dynamic> changes) async {}
+}
+
+/// Benachrichtigungs-Attrappe: haelt den zuletzt geplanten Stand fest, ohne Plattform-Kanaele
+/// (flutter_local_notifications hat keinen Testmodus fuer `flutter test`).
+class FakeNotificationScheduler implements NotificationScheduler {
+  List<ExpiryReminderDay>? lastScheduled;
+  String? lastNotifyTime;
+  int? lastLeadDays;
+  var initializeCalls = 0;
+
+  @override
+  Future<void> initialize() async => initializeCalls++;
+
+  @override
+  Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays}) async {
+    lastScheduled = reminders;
+    lastNotifyTime = notifyTime;
+    lastLeadDays = leadDays;
+  }
+}
 
 /// Barcode-Scanner-Attrappe: liefert immer denselben Code (oder null bei Abbruch).
 class FakeBarcodeScanner implements BarcodeScanner {

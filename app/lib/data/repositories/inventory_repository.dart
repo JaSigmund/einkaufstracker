@@ -11,14 +11,31 @@ import '../sync/mappers.dart';
 /// Kein aktiver Bestand mehr fuer dieses Produkt (fuer die Einkaufsliste-Vorschlaege in einer spaeteren PR).
 class NoActiveStockException implements Exception {}
 
+/// Der Bon, dem ein Inventar-Eintrag zugeordnet ist (siehe [InventoryRepository.receiptLinkFor]).
+class ReceiptLink {
+  const ReceiptLink(
+      {required this.receiptId, required this.receiptItemId, required this.purchasedAt, this.storeChain, required this.rawText, this.lineTotalCents});
+  final String receiptId;
+  final String receiptItemId;
+  final DateTime purchasedAt;
+  final String? storeChain;
+  final String rawText;
+  final int? lineTotalCents;
+}
+
 /// Inventar und Bestandsbewegungen (Doku 06). Jede Bestandsaenderung schreibt in derselben "Transaktion"
 /// (lokal: drift-Transaktion, remote: zwei Outbox-Eintraege) auch eine Zeile ins Ledger (§9).
 class InventoryRepository {
-  InventoryRepository(this._db, {required this.householdId, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  InventoryRepository(this._db, {required this.householdId, this.onChanged, this.onDepleted, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
   final Future<String> Function() householdId;
   final void Function()? onChanged;
+
+  /// Wird aufgerufen, wenn ein Produkt nach "Aufgebraucht"/"Weggeworfen" keinen aktiven Bestand mehr hat
+  /// (Doku 06 §6, Ausloeser "Leer"): haengt die Einkaufsliste per Vorschlag ein, ohne dass InventoryRepository
+  /// die Einkaufsliste selbst kennen muss.
+  final Future<void> Function(String productId)? onDepleted;
   final Uuid _uuid;
 
   /// Aktiver Bestand (sealed/opened), nicht geloescht, nach Ablaufdatum sortiert (unbekannt zuletzt).
@@ -30,6 +47,12 @@ class InventoryRepository {
         ]))
       .watch();
 
+  /// Einmalige Momentaufnahme von [watchActive], ohne eine dauerhafte Abfrage offen zu halten (z.B. fuer die
+  /// Ablauf-Erinnerungen, die nur gelegentlich neu geplant werden muessen).
+  Future<List<InventoryItem>> activeSnapshot() => (_db.select(_db.inventoryItems)
+        ..where((i) => i.deletedAt.isNull() & i.status.isIn(['sealed', 'opened']) & i.isSuggestion.equals(false)))
+      .get();
+
   /// Bon-Vorschlaege, die noch nicht per Barcode bestaetigt wurden (Doku 06 §2, "Noch nicht gescannt").
   Stream<List<InventoryItem>> watchSuggestions() => (_db.select(_db.inventoryItems)
         ..where((i) => i.deletedAt.isNull() & i.isSuggestion.equals(true))
@@ -40,6 +63,77 @@ class InventoryRepository {
         ..where((m) => m.productId.equals(productId) & m.deletedAt.isNull())
         ..orderBy([(m) => OrderingTerm.desc(m.occurredAt)]))
       .watch();
+
+  /// Der Bon, aus dem ein Inventar-Eintrag als Vorschlag entstanden ist (Fehlerbericht "Bonzuordnung
+  /// anzeigen", 2026-09-27). `null`, wenn der Eintrag nie einem Bon zugeordnet war (z.B. reiner Scan ohne
+  /// vorherigen Bon-Vorschlag).
+  Future<ReceiptLink?> receiptLinkFor(String? receiptItemId) async {
+    if (receiptItemId == null) return null;
+    final row = await (_db.select(_db.receiptItems).join([
+      innerJoin(_db.receipts, _db.receipts.id.equalsExp(_db.receiptItems.receiptId)),
+      leftOuterJoin(_db.stores, _db.stores.id.equalsExp(_db.receipts.storeId)),
+    ])
+          ..where(_db.receiptItems.id.equals(receiptItemId)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    final item = row.readTable(_db.receiptItems);
+    final receipt = row.readTable(_db.receipts);
+    final store = row.readTableOrNull(_db.stores);
+    return ReceiptLink(
+      receiptId: receipt.id,
+      receiptItemId: item.id,
+      purchasedAt: receipt.purchasedAt,
+      storeChain: store?.chain,
+      rawText: item.rawText,
+      lineTotalCents: item.lineTotalCents,
+    );
+  }
+
+  /// Bon-Positionen desselben Produkts, die noch keinem Inventar-Eintrag zugeordnet sind: Kandidaten, um
+  /// eine Bonzuordnung nachtraeglich zu setzen oder zu korrigieren (Fehlerbericht "Bonzuordnung anzeigen",
+  /// erweitert 2026-09-28 um die Moeglichkeit, die Zuordnung auch wieder zu aendern).
+  Future<List<ReceiptLink>> candidateReceiptLinksFor(String productId, {int limit = 10}) async {
+    final hid = await householdId();
+    final linked = _db.selectOnly(_db.inventoryItems)
+      ..addColumns([_db.inventoryItems.receiptItemId])
+      ..where(_db.inventoryItems.receiptItemId.isNotNull() & _db.inventoryItems.deletedAt.isNull());
+    final linkedIds = (await linked.map((r) => r.read(_db.inventoryItems.receiptItemId)!).get()).toSet();
+
+    final query = _db.select(_db.receiptItems).join([
+      innerJoin(_db.receipts, _db.receipts.id.equalsExp(_db.receiptItems.receiptId)),
+      leftOuterJoin(_db.stores, _db.stores.id.equalsExp(_db.receipts.storeId)),
+    ])
+      ..where(_db.receiptItems.householdId.equals(hid) & _db.receiptItems.productId.equals(productId) & _db.receiptItems.deletedAt.isNull())
+      ..orderBy([OrderingTerm.desc(_db.receipts.purchasedAt)])
+      ..limit(limit + linkedIds.length);
+    final rows = await query.get();
+    return rows
+        .where((row) => !linkedIds.contains(row.readTable(_db.receiptItems).id))
+        .take(limit)
+        .map((row) {
+          final item = row.readTable(_db.receiptItems);
+          final receipt = row.readTable(_db.receipts);
+          final store = row.readTableOrNull(_db.stores);
+          return ReceiptLink(
+            receiptId: receipt.id,
+            receiptItemId: item.id,
+            purchasedAt: receipt.purchasedAt,
+            storeChain: store?.chain,
+            rawText: item.rawText,
+            lineTotalCents: item.lineTotalCents,
+          );
+        })
+        .toList();
+  }
+
+  /// Setzt oder loest die Bonzuordnung eines Inventar-Eintrags nachtraeglich (Fehlerbericht "Bonzuordnung
+  /// anzeigen"): `null` macht den Eintrag zu einem reinen Scan ohne Bon-Herkunft.
+  Future<void> setReceiptLink(String inventoryItemId, String? receiptItemId) async {
+    final item = await _get(inventoryItemId);
+    final updated = item.copyWith(receiptItemId: Value(receiptItemId), updatedAt: DateTime.now().toUtc());
+    await _putItem(updated);
+    onChanged?.call();
+  }
 
   /// Legt einen Bon-Vorschlag an (Doku 06 §2 Punkt 1, §9 "Bon bestaetigt"): kein MHD, sondern hoechstens
   /// ein geschaetztes Ablaufdatum aus der Standardhaltbarkeit des Produkts. Bucht eine Kaufbewegung, weil der
@@ -116,6 +210,8 @@ class InventoryRepository {
     if (refine != null) {
       final updated = refine.copyWith(
         ean: Value(ean),
+        quantity: quantity,
+        unit: unit,
         bestBefore: Value(bestBefore),
         dateKind: dateKind,
         location: location,
@@ -125,6 +221,10 @@ class InventoryRepository {
         updatedAt: DateTime.now().toUtc(),
       );
       await _putItem(updated);
+      final delta = quantity - refine.quantity;
+      if (delta != 0) {
+        await _addMovement(inventoryItemId: updated.id, productId: productId, type: 'adjustment', delta: delta, unit: unit, now: now);
+      }
       onChanged?.call();
       return updated;
     }
@@ -188,6 +288,13 @@ class InventoryRepository {
         unit: item.unit,
         now: now,
       );
+    }
+    if (onDepleted != null) {
+      final remaining = await (_db.select(_db.inventoryItems)
+            ..where((i) =>
+                i.productId.equals(item.productId) & i.deletedAt.isNull() & i.isSuggestion.equals(false) & i.status.isIn(['sealed', 'opened'])))
+          .get();
+      if (remaining.isEmpty) await onDepleted!(item.productId);
     }
     onChanged?.call();
   }
