@@ -50,6 +50,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late bool _restock = widget.existing?.restock ?? false;
   var _saving = false;
   String? _error;
+  late final _search = TextEditingController();
+  List<Product> _matches = const [];
+  var _linking = false;
 
   @override
   void dispose() {
@@ -57,7 +60,31 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _brand.dispose();
     _packSize.dispose();
     _openedDays.dispose();
+    _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _searchExisting(String query) async {
+    final results = query.trim().isEmpty ? const <Product>[] : await ref.read(productRepositoryProvider).search(query);
+    if (mounted) setState(() => _matches = results);
+  }
+
+  /// Verknuepft den gescannten Barcode mit einem bereits vorhandenen Produkt, statt ein zweites anzulegen.
+  /// Wichtig, wenn ein Bon-Vorschlag (Doku 06 §2) schon ein Produkt mit diesem Namen erzeugt hat, das OFF
+  /// aber unter einem anderen Namen fuehrt: die Bon-Suche findet das Produkt, die OFF-Suche nicht.
+  Future<void> _linkExisting(Product product) async {
+    setState(() => _linking = true);
+    try {
+      await ref.read(productRepositoryProvider).linkBarcode(widget.ean!, product.id);
+      if (mounted) context.pop(product);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _linking = false;
+          _error = 'Verknüpfen nicht möglich: $e';
+        });
+      }
+    }
   }
 
   void _initCategory(List<Category> categories) {
@@ -150,7 +177,34 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ]),
               ),
             ),
-          const SizedBox(height: 12),
+          if (widget.ean != null && widget.existing == null) ...[
+            Text('Gibt es diesen Artikel schon in deinem Inventar?', key: const Key('existing-product-hint'), style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Ein Bon kann ein Produkt schon angelegt haben, bevor du es gescannt hast. Dann hier verknüpfen, statt neu anzulegen.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('product-search'),
+              controller: _search,
+              decoration: const InputDecoration(labelText: 'Vorhandenes Produkt suchen', prefixIcon: Icon(Icons.search)),
+              onChanged: _searchExisting,
+            ),
+            for (final m in _matches)
+              Card(
+                child: ListTile(
+                  key: Key('match-${m.id}'),
+                  title: Text(m.name),
+                  subtitle: m.brand == null ? null : Text(m.brand!),
+                  trailing: _linking ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.link),
+                  onTap: _linking ? null : () => _linkExisting(m),
+                ),
+              ),
+            const Divider(height: 32),
+            Text('Oder neu anlegen', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+          ],
           TextField(key: const Key('product-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name')),
           const SizedBox(height: 12),
           TextField(key: const Key('product-brand'), controller: _brand, decoration: const InputDecoration(labelText: 'Marke (optional)')),

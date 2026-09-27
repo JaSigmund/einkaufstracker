@@ -88,11 +88,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Neues Produkt'), findsOneWidget);
 
+    tester.view.physicalSize = const Size(1080, 3400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('product-name')), 'Testartikel');
-    for (var i = 0; i < 5; i++) {
-      await tester.drag(find.byKey(const Key('product-restock')), const Offset(0, -400), warnIfMissed: false);
-      await tester.pump();
-    }
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('product-save')));
     await tester.pumpAndSettle();
@@ -102,6 +103,28 @@ void main() {
     expect(product.name, 'Testartikel');
     final barcode = await db.select(db.productBarcodes).getSingle();
     expect((barcode.ean, barcode.productId), ('9008700000099', product.id));
+  });
+
+  testWidgets('Unbekannter Barcode: bestehendes Produkt (z.B. aus einem Bon-Vorschlag) verknuepfen statt duplizieren', (tester) async {
+    final existing = await productRepo(db).create(name: 'Clever Champignon weiß', baseUnit: 'piece');
+    await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000100'), products: [existing]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('scan-barcode')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('product-search')), 'Champignon');
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('match-${existing.id}')), findsOneWidget);
+
+    await tester.tap(find.byKey(Key('match-${existing.id}')));
+    await tester.pumpAndSettle();
+
+    expect(await db.select(db.products).get(), hasLength(1)); // kein zweites Produkt
+    final barcode = await db.select(db.productBarcodes).getSingle();
+    expect((barcode.ean, barcode.productId), ('9008700000100', existing.id));
+    expect(find.text('Clever Champignon weiß'), findsWidgets); // Titel der Bestandserfassung
   });
 
   testWidgets('Unbekanntes Produkt MIT OFF-Vorschlag: Formular ist vorbelegt', (tester) async {
