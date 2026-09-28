@@ -402,6 +402,24 @@ class InventoryRepository {
     onChanged?.call();
   }
 
+  /// Verwirft alle noch unbestaetigten Vorschlaege zu den angegebenen Bon-Positionen (Fehlerbericht
+  /// "Bonartikel Vorschlag doppelt", 2026-09-28): wird ein Bon geloescht, sollen seine Vorschlaege nicht als
+  /// Karteileiche liegen bleiben, sonst entsteht beim erneuten Import derselben Position ein Duplikat.
+  /// Bereits bestaetigte Inventar-Eintraege (isSuggestion = false) bleiben unangetastet.
+  Future<void> discardSuggestionsForReceiptItems(Iterable<String> receiptItemIds) async {
+    final ids = receiptItemIds.toSet();
+    if (ids.isEmpty) return;
+    final items = await (_db.select(_db.inventoryItems)
+          ..where((i) => i.receiptItemId.isIn(ids) & i.isSuggestion.equals(true) & i.deletedAt.isNull()))
+        .get();
+    if (items.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    for (final item in items) {
+      await _putItem(item.copyWith(deletedAt: Value(now), updatedAt: now));
+    }
+    onChanged?.call();
+  }
+
   Future<InventoryItem> _get(String id) => (_db.select(_db.inventoryItems)..where((i) => i.id.equals(id))).getSingle();
 
   Future<void> _putItem(InventoryItem item) =>

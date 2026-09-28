@@ -12,6 +12,7 @@ typedef ReportItem = ({
   String rawText,
   String? categoryId,
   String? productId,
+  String? productName,
   double quantity,
   int lineTotalCents,
 });
@@ -153,9 +154,14 @@ MonthReport buildMonthReport(
         }
         continue;
       }
-      final key = normalizeItemName(i.rawText);
-      final k = key.isEmpty ? i.rawText : key;
-      add(id, i.categoryId ?? unassignedKey, k, i.rawText, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true, productId: i.productId);
+      // Gruppierung ueber die Produkt-Zuordnung, wenn vorhanden (Fehlerbericht "Alias wird nicht ueberall
+      // angewandt", 2026-09-28): zwei unterschiedlich geschriebene Bon-Texte desselben Produkts (z.B. je
+      // Haendler) gehoeren sonst faelschlich in zwei Zeilen, und es wird der Produktname statt des rohen
+      // Bon-Texts angezeigt. Ohne Produkt-Zuordnung bleibt der normalisierte Bon-Text die Gruppierung.
+      final normalized = normalizeItemName(i.rawText);
+      final k = i.productId ?? (normalized.isEmpty ? i.rawText : normalized);
+      final label = i.productName ?? i.rawText;
+      add(id, i.categoryId ?? unassignedKey, k, label, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true, productId: i.productId);
       if (i.kind == 'article') {
         hasArticle = true;
         lastKey = k;

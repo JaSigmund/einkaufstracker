@@ -1,8 +1,17 @@
 import 'package:einkaufstracker/domain/receipt/month_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ReportItem _i(String rid, int no, String text, int cents, {String kind = 'article', String? cat, double qty = 1}) =>
-    (receiptId: rid, lineNo: no, kind: kind, rawText: text, categoryId: cat, productId: null, quantity: qty, lineTotalCents: cents);
+ReportItem _i(String rid, int no, String text, int cents, {String kind = 'article', String? cat, double qty = 1, String? productId, String? productName}) => (
+      receiptId: rid,
+      lineNo: no,
+      kind: kind,
+      rawText: text,
+      categoryId: cat,
+      productId: productId,
+      productName: productName,
+      quantity: qty,
+      lineTotalCents: cents,
+    );
 
 ReportReceipt _r(String id, DateTime utc) => (id: id, purchasedAtUtc: utc);
 
@@ -152,6 +161,28 @@ void main() {
       final rep = buildMonthReport([_r('a', sep)], [_i('a', 1, 'x', 100)], year: 2026, month: 5);
       expect(rep.categories, isEmpty);
       expect(rep.totalCents, 0);
+    });
+
+    test('Mit Produkt-Zuordnung: Produktname statt Bon-Rohtext, ueber Haendler hinweg zusammengefasst '
+        '(Fehlerbericht "Alias wird nicht ueberall angewandt", 2026-09-28)', () {
+      final rep = buildMonthReport(
+        [_r('a', sep), _r('b', DateTime.utc(2026, 9, 12))],
+        [
+          _i('a', 1, 'DKIH Paprika Tricolore', 249, cat: 'g', productId: 'p1', productName: 'Paprika Tricolore'),
+          // andere Bon-Schreibweise (z.B. anderer Haendler), aber dasselbe Produkt: gehoert zusammen
+          _i('b', 1, 'Bio Paprika Mix 4 Stk', 199, cat: 'g', productId: 'p1', productName: 'Paprika Tricolore'),
+        ],
+        year: 2026,
+        month: 9,
+      );
+      final item = rep.categories.single.items.single;
+      expect(item.label, 'Paprika Tricolore');
+      expect((item.totalCents, item.purchases), (448, 2));
+    });
+
+    test('Ohne Produkt-Zuordnung: Bon-Rohtext bleibt die Anzeige (Altverhalten)', () {
+      final rep = buildMonthReport([_r('a', sep)], [_i('a', 1, 'Unbekannter Artikel', 100, cat: 'g')], year: 2026, month: 9);
+      expect(rep.categories.single.items.single.label, 'Unbekannter Artikel');
     });
   });
 
