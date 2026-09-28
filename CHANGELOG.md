@@ -2,6 +2,15 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.1 — 2026-09-28
+
+Drei Praxistest-Fehler behoben
+
+- Grundpreis bei Mehrfach-Packungen (z.B. 4er-Packung) wird auf den Preis je Einzelstück heruntergerechnet
+- Bon löschen verwirft auch die dazugehörigen Inventar-Vorschläge, kein doppelter Vorschlag mehr beim erneuten Import
+- Monatsauswertung zeigt den Produktnamen statt des rohen Bon-Texts und fasst denselben Artikel über Händler hinweg zusammen
+- Sync hängt nicht mehr dauerhaft, wenn eine Verbindung abreißt
+
 ## 1.7.0 — 2026-09-28
 
 Grundpreis, Preisvergleich und Trends (Phase 4 komplett)
