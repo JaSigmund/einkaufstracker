@@ -466,6 +466,61 @@ void main() {
     });
   });
 
+  group('createSuggestionFromReceipt ist idempotent ueber receiptItemId (Gesamtkonzept Artikel<->Bon, 2026-09-28)', () {
+    test('zweiter Aufruf fuer dieselbe Bon-Position legt keinen zweiten Eintrag an', () async {
+      final repo = inventoryRepo(db);
+      final first = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final second = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      expect(second.id, first.id);
+      expect(await (db.select(db.inventoryItems)..where((i) => i.receiptItemId.equals('ri1'))).get(), hasLength(1));
+      expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // keine doppelte Kaufbewegung
+    });
+
+    test('reaktiviert einen zuvor verworfenen Vorschlag, statt eine zweite Zeile anzulegen '
+        '(z.B. Bon geloescht und derselbe Bon erneut importiert)', () async {
+      final repo = inventoryRepo(db);
+      final first = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      await repo.discardSuggestionsForReceiptItems(['ri1']);
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(first.id))).getSingle()).deletedAt, isNotNull);
+
+      final again = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      expect(again.id, first.id);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(first.id))).getSingle();
+      expect(row.deletedAt, isNull); // reaktiviert
+      expect(await (db.select(db.inventoryItems)..where((i) => i.receiptItemId.equals('ri1'))).get(), hasLength(1));
+    });
+
+    test('bereits bestaetigter Eintrag bleibt unangetastet, auch bei erneutem Import derselben Position', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', quantity: 3, location: 'fridge', now: DateTime.utc(2026, 9, 21));
+      expect(confirmed.id, suggestion.id);
+      final movementsBefore = await db.select(db.inventoryMovements).get();
+
+      final again = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      expect(again.id, confirmed.id);
+      expect(again.isSuggestion, isFalse); // bleibt bestaetigt
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(confirmed.id))).getSingle();
+      expect((row.quantity, row.location), (3.0, 'fridge')); // Nutzerangaben unveraendert
+      expect(await db.select(db.inventoryMovements).get(), hasLength(movementsBefore.length)); // keine zusaetzliche Kaufbewegung
+    });
+  });
+
   group('deleteItem', () {
     test('loescht den Eintrag und seine Kaufbewegung, so als waere der Scan nie passiert', () async {
       final repo = inventoryRepo(db);

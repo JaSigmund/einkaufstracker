@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+const _networkTimeout = Duration(seconds: 20);
 
 /// Einstellungen des Haushalts (Tabelle household_settings). In Phase 1 nur online verfuegbar.
 class HouseholdSettings {
@@ -43,12 +47,13 @@ class SupabaseSettingsRepository implements SettingsRepository {
         .from('household_settings')
         .select('notify_time, notify_lead_days, allow_cloud_ocr, keep_receipt_images, monthly_budget_cents')
         .eq('household_id', householdId)
-        .single();
+        .single()
+        .timeout(_networkTimeout);
     return HouseholdSettings.fromJson(row);
   }
 
   @override
   Future<void> update(String householdId, Map<String, dynamic> changes) async {
-    await _client.from('household_settings').update(changes).eq('household_id', householdId);
+    await _client.from('household_settings').update(changes).eq('household_id', householdId).timeout(_networkTimeout);
   }
 }
