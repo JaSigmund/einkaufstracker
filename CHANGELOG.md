@@ -2,6 +2,17 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.0 — 2026-09-28
+
+Grundpreis, Preisvergleich und Trends (Phase 4 komplett)
+
+- Jeder Bon-Artikel bekommt eine Produkt-Zuordnung und einen Grundpreis (€/kg, €/l, €/Stk)
+- Duplikate zusammenführen: zwei versehentlich getrennte Produkte lassen sich unter „Meine Produkte“ vereinen
+- Artikel-Detail mit Preisverlauf und Händlervergleich (Tippen auf einen Artikel in der Auswertung)
+- Neuer Trend-Tab: Ausgaben der letzten 6 oder 12 Monate auf einen Blick
+- Monatsbudget mit Fortschrittsbalken
+- Bon-Daten als CSV exportieren und teilen
+
 ## 1.6.0 — 2026-09-28
 
 Einkaufsliste hakt sich jetzt selbst ab (Phase 3 komplett)
