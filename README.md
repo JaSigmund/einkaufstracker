@@ -5,7 +5,7 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 **Die vollständige Dokumentation liegt im Obsidian-Vault:**
 `C:\Users\jakob\Documents\ClaudeBrain\02 Projekte\Einkaufstracker\` (Einstieg: `Einkaufstracker.md`, Anforderungen: `01 Lastenheft.md`)
 
-## Stand (Phase 3 funktional fertig bis auf den Listen-Rücklauf, 2026-09-28)
+## Stand (Phase 4 komplett, 2026-09-28)
 
 | Teil | Status |
 |---|---|
@@ -18,7 +18,7 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 | `tools/metrics.py` | Kennzahlen aus dem Testkonzept (Bons je Quelle, Summenstimmigkeit, Fallback-Quote, Kosten, Kategorisierung) aus den Live-Daten, nur lesend: `python tools/metrics.py` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 2 fertig, Phase 3 funktional fertig bis auf den Rücklauf Bon→Liste (Doku 06 §7): Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (manuell, Vorschläge aus „Leer“/„Ablauf“), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 490 Tests, signierter Release-Build (aktuell v1.4.0) läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| Flutter-App (`app/`) | Phase 2 und 3 fertig, Phase 4 (Preisvergleich und Trends) komplett umgesetzt: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung mit Grundpreis/Produkt-Zuordnung je Artikel, Duplikate zusammenführen, Artikel-Detail (Preisverlauf, Händlervergleich), Trend über 6/12 Monate, Monatsbudget, CSV-Export, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (Menge/Inhalt, Vorschläge aus „Leer“/„Ablauf“, hakt sich bei Bon-Zuordnung selbst ab), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 549 Tests, signierter Release-Build (aktuell v1.7.0) läuft auf dem Handy — **Phase 4 selbst noch nicht auf dem Handy gegen echte Daten geprüft** (Stand direkt nach dem Merge). Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
 | CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
 
 ## Struktur
@@ -34,13 +34,13 @@ Einkaufstracker/
       parse-receipt/   Edge Function (Claude Vision)
   tools/               Prototypen und einmalige SQL-Skripte (parse_digital_billa.py, changelog_*.sql, bugstatus_*.sql)
   spikes/spike_scanner Phase-0-Messapp (Scanner, OCR, Barcode, Open Food Facts)
-  app/                 Flutter-App (Phase 2 + 3)
+  app/                 Flutter-App (Phase 2 bis 4)
   testdata/receipts/   Golden Set (Bon-Fotos, OCR-Rohdaten, digital/*.pdf, NICHT einchecken, siehe .gitignore)
 ```
 
 ## Nächste Schritte
 
-Phase 0 bis 2 sind abgeschlossen, Phase 3 (Inventar und Einkaufsliste) ist funktional fertig (siehe [[11 Roadmap und Meilensteine]] im Vault). **Offen aus Phase 3:** der Rücklauf Bon → Einkaufsliste (Doku 06 §7, Bon-Positionen sollen offene Listeneinträge automatisch abhaken), Ausloeser „Wiederkehrend“ für Listen-Vorschläge, die Haltbarkeits-Startwerte selbst sind noch nicht gegen Herstellerangaben/AGES verifiziert (Doku 06 §3.2), und M3 (zwei Wochen Praxistest mit den Ablauf-Erinnerungen im Alltag). **Weiterhin offen aus Phase 2, läuft parallel:** Hofer-Bons, weitere jö-PDFs fürs Golden Set, Diagnose der lokalen Foto-Erkennung. **Als Nächstes:** Phase 4 (Preisvergleich und Trends) oder die offenen Phase-3-Punkte zuerst schliessen.
+Phase 0 bis 4 sind aus Code-Sicht abgeschlossen (siehe [[11 Roadmap und Meilensteine]] im Vault). **Offen aus Phase 3:** Ausloeser „Wiederkehrend“ für Listen-Vorschläge, die Haltbarkeits-Startwerte selbst sind noch nicht gegen Herstellerangaben/AGES verifiziert (Doku 06 §3.2), und M3 (zwei Wochen Praxistest mit den Ablauf-Erinnerungen im Alltag). **Offen aus Phase 4:** M4 selbst (Praxistest mit echten Daten; aktuell nur 7 Bons über ~3 Monate, Händlervergleich damit noch nicht aussagekräftig, zeigt aber korrekt „zu wenig Daten“), `share_plus` (CSV-Export) noch nicht auf dem Handy geprüft. **Weiterhin offen aus Phase 2, läuft parallel:** Hofer-Bons, weitere jö-PDFs fürs Golden Set, Diagnose der lokalen Foto-Erkennung. **Als Nächstes:** Phase 5 (Härtung und Abnahme) oder die offenen Phase-3/4-Punkte zuerst schliessen.
 
 **Migrationen anwenden:** `npx supabase db push --dry-run`, dann `npx supabase db push --yes` (gegen das Live-Projekt, verknüpft per `supabase link`). Neue Migrationen müssen live sein, **bevor** die App-Version mit dem neuen Schema installiert wird.
 
