@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/sync/sync_engine.dart';
 import 'package:einkaufstracker/domain/diagnostics/app_info.dart';
@@ -24,6 +25,7 @@ void main() {
       );
       expect(report.title, 'Scan legt Duplikat an');
       expect(report.status, 'new'); // Bearbeitungsstatus wird von der Entwicklung gesetzt, nicht vom Melder
+      expect(report.kind, 'bug'); // Standard, sofern nicht anders angegeben
       expect(changed, 1);
       expect(jsonDecode(report.appInfo)['platform'], 'android');
       expect((await db.select(db.outbox).get()).map((o) => o.remoteTable), contains('bug_reports'));
@@ -50,6 +52,37 @@ void main() {
       );
       final decoded = jsonDecode(report.dataSnapshot!);
       expect(decoded['receipts'][0]['total_cents'], 1234);
+    });
+  });
+
+  group('kind (Gesamtkonzept Feedback-Warteschlange, 2026-09-28)', () {
+    test('Feature-Vorschlag bekommt kind=feature statt des Standards bug', () async {
+      final report = await bugReportRepo(db).create(title: 'Trend-Export als CSV', appInfo: const {}, kind: 'feature');
+      expect(report.kind, 'feature');
+    });
+
+    test('watchPlanningList zeigt nur angenommene Feature-Vorschlaege, aelteste zuerst', () async {
+      final repo = bugReportRepo(db);
+      final bug = await repo.create(title: 'Ein Bug', appInfo: const {});
+      final newFeature = await repo.create(title: 'Neuer Vorschlag', appInfo: const {}, kind: 'feature');
+      final confirmedOld = await repo.create(title: 'Alt angenommen', appInfo: const {}, kind: 'feature');
+      final confirmedNew = await repo.create(title: 'Neu angenommen', appInfo: const {}, kind: 'feature');
+      final inProgress = await repo.create(title: 'Schon in Umsetzung', appInfo: const {}, kind: 'feature');
+
+      // Status setzen, wie es sonst per SQL durch die Entwicklung passiert (siehe Sync-Test oben)
+      Future<void> setStatus(String id, String status) => (db.update(db.bugReports)..where((b) => b.id.equals(id))).write(
+            BugReportsCompanion(status: Value(status)),
+          );
+      await setStatus(bug.id, 'confirmed');
+      await setStatus(confirmedOld.id, 'confirmed');
+      await setStatus(confirmedNew.id, 'confirmed');
+      await setStatus(inProgress.id, 'in_progress');
+
+      final planning = await repo.watchPlanningList().first;
+      expect(planning.map((r) => r.id), [confirmedOld.id, confirmedNew.id]);
+      expect(planning.any((r) => r.id == bug.id), isFalse); // kein Bug, auch wenn confirmed
+      expect(planning.any((r) => r.id == newFeature.id), isFalse); // noch nicht angenommen
+      expect(planning.any((r) => r.id == inProgress.id), isFalse); // schon in Umsetzung, nicht mehr "geplant"
     });
   });
 

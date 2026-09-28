@@ -322,6 +322,7 @@ ProductAliasesCompanion productAliasFromRemote(Map<String, dynamic> j) => Produc
 Map<String, dynamic> bugReportToRemote(BugReport b) => {
       'id': b.id,
       'household_id': b.householdId,
+      'kind': b.kind,
       'title': b.title,
       'description': b.description,
       'app_info': jsonDecode(b.appInfo),
@@ -341,6 +342,7 @@ Map<String, dynamic> bugReportToRemote(BugReport b) => {
 BugReportsCompanion bugReportFromRemote(Map<String, dynamic> j) => BugReportsCompanion(
       id: Value(j['id'] as String),
       householdId: Value(j['household_id'] as String),
+      kind: Value(j['kind'] as String? ?? 'bug'),
       title: Value(j['title'] as String),
       description: Value(j['description'] as String?),
       appInfo: Value(jsonEncode(j['app_info'])),

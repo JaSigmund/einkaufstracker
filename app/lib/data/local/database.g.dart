@@ -7519,6 +7519,16 @@ class $BugReportsTable extends BugReports
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('bug'),
+  );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -7653,6 +7663,7 @@ class $BugReportsTable extends BugReports
   List<GeneratedColumn> get $columns => [
     id,
     householdId,
+    kind,
     title,
     description,
     appInfo,
@@ -7693,6 +7704,12 @@ class $BugReportsTable extends BugReports
       );
     } else if (isInserting) {
       context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
     }
     if (data.containsKey('title')) {
       context.handle(
@@ -7803,6 +7820,10 @@ class $BugReportsTable extends BugReports
         DriftSqlType.string,
         data['${effectivePrefix}household_id'],
       )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
       title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title'],
@@ -7863,6 +7884,9 @@ class $BugReportsTable extends BugReports
 class BugReport extends DataClass implements Insertable<BugReport> {
   final String id;
   final String householdId;
+
+  /// 'bug' | 'feature'
+  final String kind;
   final String title;
   final String? description;
   final String appInfo;
@@ -7882,6 +7906,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
   const BugReport({
     required this.id,
     required this.householdId,
+    required this.kind,
     required this.title,
     this.description,
     required this.appInfo,
@@ -7900,6 +7925,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['household_id'] = Variable<String>(householdId);
+    map['kind'] = Variable<String>(kind);
     map['title'] = Variable<String>(title);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
@@ -7933,6 +7959,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     return BugReportsCompanion(
       id: Value(id),
       householdId: Value(householdId),
+      kind: Value(kind),
       title: Value(title),
       description: description == null && nullToAbsent
           ? const Value.absent()
@@ -7970,6 +7997,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     return BugReport(
       id: serializer.fromJson<String>(json['id']),
       householdId: serializer.fromJson<String>(json['householdId']),
+      kind: serializer.fromJson<String>(json['kind']),
       title: serializer.fromJson<String>(json['title']),
       description: serializer.fromJson<String?>(json['description']),
       appInfo: serializer.fromJson<String>(json['appInfo']),
@@ -7990,6 +8018,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'householdId': serializer.toJson<String>(householdId),
+      'kind': serializer.toJson<String>(kind),
       'title': serializer.toJson<String>(title),
       'description': serializer.toJson<String?>(description),
       'appInfo': serializer.toJson<String>(appInfo),
@@ -8008,6 +8037,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
   BugReport copyWith({
     String? id,
     String? householdId,
+    String? kind,
     String? title,
     Value<String?> description = const Value.absent(),
     String? appInfo,
@@ -8023,6 +8053,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
   }) => BugReport(
     id: id ?? this.id,
     householdId: householdId ?? this.householdId,
+    kind: kind ?? this.kind,
     title: title ?? this.title,
     description: description.present ? description.value : this.description,
     appInfo: appInfo ?? this.appInfo,
@@ -8046,6 +8077,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       householdId: data.householdId.present
           ? data.householdId.value
           : this.householdId,
+      kind: data.kind.present ? data.kind.value : this.kind,
       title: data.title.present ? data.title.value : this.title,
       description: data.description.present
           ? data.description.value
@@ -8076,6 +8108,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
     return (StringBuffer('BugReport(')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
+          ..write('kind: $kind, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('appInfo: $appInfo, ')
@@ -8096,6 +8129,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
   int get hashCode => Object.hash(
     id,
     householdId,
+    kind,
     title,
     description,
     appInfo,
@@ -8115,6 +8149,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
       (other is BugReport &&
           other.id == this.id &&
           other.householdId == this.householdId &&
+          other.kind == this.kind &&
           other.title == this.title &&
           other.description == this.description &&
           other.appInfo == this.appInfo &&
@@ -8132,6 +8167,7 @@ class BugReport extends DataClass implements Insertable<BugReport> {
 class BugReportsCompanion extends UpdateCompanion<BugReport> {
   final Value<String> id;
   final Value<String> householdId;
+  final Value<String> kind;
   final Value<String> title;
   final Value<String?> description;
   final Value<String> appInfo;
@@ -8148,6 +8184,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   const BugReportsCompanion({
     this.id = const Value.absent(),
     this.householdId = const Value.absent(),
+    this.kind = const Value.absent(),
     this.title = const Value.absent(),
     this.description = const Value.absent(),
     this.appInfo = const Value.absent(),
@@ -8165,6 +8202,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   BugReportsCompanion.insert({
     required String id,
     required String householdId,
+    this.kind = const Value.absent(),
     required String title,
     this.description = const Value.absent(),
     required String appInfo,
@@ -8187,6 +8225,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   static Insertable<BugReport> custom({
     Expression<String>? id,
     Expression<String>? householdId,
+    Expression<String>? kind,
     Expression<String>? title,
     Expression<String>? description,
     Expression<String>? appInfo,
@@ -8204,6 +8243,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (householdId != null) 'household_id': householdId,
+      if (kind != null) 'kind': kind,
       if (title != null) 'title': title,
       if (description != null) 'description': description,
       if (appInfo != null) 'app_info': appInfo,
@@ -8223,6 +8263,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   BugReportsCompanion copyWith({
     Value<String>? id,
     Value<String>? householdId,
+    Value<String>? kind,
     Value<String>? title,
     Value<String?>? description,
     Value<String>? appInfo,
@@ -8240,6 +8281,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     return BugReportsCompanion(
       id: id ?? this.id,
       householdId: householdId ?? this.householdId,
+      kind: kind ?? this.kind,
       title: title ?? this.title,
       description: description ?? this.description,
       appInfo: appInfo ?? this.appInfo,
@@ -8264,6 +8306,9 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     }
     if (householdId.present) {
       map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -8312,6 +8357,7 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
     return (StringBuffer('BugReportsCompanion(')
           ..write('id: $id, ')
           ..write('householdId: $householdId, ')
+          ..write('kind: $kind, ')
           ..write('title: $title, ')
           ..write('description: $description, ')
           ..write('appInfo: $appInfo, ')
@@ -14061,6 +14107,7 @@ typedef $$InventoryMovementsTableProcessedTableManager =
 typedef $$BugReportsTableCreateCompanionBuilder = BugReportsCompanion Function({
   required String id,
   required String householdId,
+  Value<String> kind,
   required String title,
   Value<String?> description,
   required String appInfo,
@@ -14078,6 +14125,7 @@ typedef $$BugReportsTableCreateCompanionBuilder = BugReportsCompanion Function({
 typedef $$BugReportsTableUpdateCompanionBuilder = BugReportsCompanion Function({
   Value<String> id,
   Value<String> householdId,
+  Value<String> kind,
   Value<String> title,
   Value<String?> description,
   Value<String> appInfo,
@@ -14109,6 +14157,11 @@ class $$BugReportsTableFilterComposer
 
   ColumnFilters<String> get householdId => $composableBuilder(
     column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14192,6 +14245,11 @@ class $$BugReportsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get title => $composableBuilder(
     column: $table.title,
     builder: (column) => ColumnOrderings(column),
@@ -14269,6 +14327,9 @@ class $$BugReportsTableAnnotationComposer
     column: $table.householdId,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
 
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
@@ -14350,6 +14411,7 @@ class $$BugReportsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> householdId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String> appInfo = const Value.absent(),
@@ -14366,6 +14428,7 @@ class $$BugReportsTableTableManager
               }) => BugReportsCompanion(
                 id: id,
                 householdId: householdId,
+                kind: kind,
                 title: title,
                 description: description,
                 appInfo: appInfo,
@@ -14384,6 +14447,7 @@ class $$BugReportsTableTableManager
               ({
                 required String id,
                 required String householdId,
+                Value<String> kind = const Value.absent(),
                 required String title,
                 Value<String?> description = const Value.absent(),
                 required String appInfo,
@@ -14400,6 +14464,7 @@ class $$BugReportsTableTableManager
               }) => BugReportsCompanion.insert(
                 id: id,
                 householdId: householdId,
+                kind: kind,
                 title: title,
                 description: description,
                 appInfo: appInfo,
