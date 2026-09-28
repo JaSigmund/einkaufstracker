@@ -4,8 +4,8 @@ import '../../data/cloud/cloud_receipt.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../domain/ocr/ocr_text.dart';
 import '../../domain/ocr/row_cluster.dart';
-import '../../domain/receipt/billa_text_parser.dart';
 import '../../domain/receipt/parsed_receipt.dart';
+import '../../domain/receipt/receipt_text_parser.dart';
 import 'receipt_import_service.dart';
 
 /// Eine fotografierte Seite: Bilddatei und die per OCR erkannten Zeilen (Koordinaten in Pixeln dieser Datei).
@@ -32,14 +32,16 @@ class PhotoReceiptService {
     required this.cloud,
     required this.cloudAllowed,
     required this.prepare,
-    this.parser = const BillaTextParser(lenient: true),
+    this.parser = parseReceiptText,
   });
 
   final ReceiptRepository repo;
   final CloudReceiptReader cloud;
   final Future<bool> Function() cloudAllowed;
   final ImagePreparer prepare;
-  final BillaTextParser parser;
+
+  /// Waehlt anhand der Kopfzeilen den passenden Bon-Parser (siehe `receipt_text_parser.dart`).
+  final ParsedReceipt Function(String text) parser;
 
   /// [onStatus] meldet die Schritte fuer die Oberflaeche ("lokal lesen", "Cloud liest mit").
   Future<ImportPreview> read(List<ScannedPage> pages, {void Function(String status)? onStatus}) async {
@@ -140,7 +142,7 @@ class PhotoReceiptService {
       final rows = clusterRows(p.lines, slope: estimateSlope(p.lines));
       return ocrRowsToText(rows);
     }).join('\n');
-    return parser.parse(text);
+    return parser(text);
   }
 
   /// Bilder fuer die Cloud: ab der Seite mit "Summe" bzw. den ersten Zahlungsdaten wird abgeschnitten, spaetere

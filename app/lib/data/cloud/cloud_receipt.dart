@@ -64,7 +64,16 @@ ParsedReceipt parsedReceiptFromCloud(Map<String, dynamic> response) {
   }
 
   final store = (receipt['store_name'] as String?)?.trim();
-  final chain = store == null || store.isEmpty ? null : (RegExp('billa', caseSensitive: false).hasMatch(store) ? 'Billa' : store);
+  final String? chain;
+  if (store == null || store.isEmpty) {
+    chain = null;
+  } else if (RegExp('billa', caseSensitive: false).hasMatch(store)) {
+    chain = 'Billa';
+  } else if (RegExp('hofer', caseSensitive: false).hasMatch(store)) {
+    chain = 'Hofer';
+  } else {
+    chain = store;
+  }
 
   return ParsedReceipt(
     chain: chain,
