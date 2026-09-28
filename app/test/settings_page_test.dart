@@ -71,4 +71,20 @@ void main() {
 
     expect(repo.lastUpdate, {'monthly_budget_cents': null});
   });
+
+  testWidgets('CSV-Export: Eintrag vorhanden, Tippen fuehrt nicht zum Absturz (Doku 07 §5)', (tester) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(host(FakeSettingsRepository(_settings)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bon-Daten exportieren (CSV)'), findsOneWidget);
+    await tester.tap(find.text('Bon-Daten exportieren (CSV)'));
+    await tester.pumpAndSettle();
+    // Kein Plattform-Kanal fuer databaseProvider/share_plus in flutter test: faellt auf die
+    // Fehlermeldung zurueck statt abzustuerzen.
+    expect(find.text('Export nicht möglich.'), findsOneWidget);
+  });
 }

@@ -127,6 +127,15 @@ class ReceiptRepository {
 
   Stream<List<Store>> watchStores() => (_db.select(_db.stores)..where((s) => s.deletedAt.isNull())).watch();
 
+  /// Einmalige Momentaufnahmen von [watchAll]/[watchStores]/[watchAllItems] (Doku 07 §5 CSV-Export), ohne
+  /// eine dauerhafte Abfrage offen zu halten.
+  Future<List<Receipt>> allSnapshot() => (_db.select(_db.receipts)
+        ..where((r) => r.deletedAt.isNull() & r.status.equals('confirmed'))
+        ..orderBy([(r) => OrderingTerm.desc(r.purchasedAt)]))
+      .get();
+
+  Future<List<Store>> storesSnapshot() => (_db.select(_db.stores)..where((s) => s.deletedAt.isNull())).get();
+
   Stream<List<ReceiptItem>> watchItems(String receiptId) => (_db.select(_db.receiptItems)
         ..where((i) => i.receiptId.equals(receiptId) & i.deletedAt.isNull())
         ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
@@ -153,6 +162,8 @@ class ReceiptRepository {
   /// ueber die Bonliste).
   Stream<List<ReceiptItem>> watchAllItems() =>
       (_db.select(_db.receiptItems)..where((i) => i.deletedAt.isNull())).watch();
+
+  Future<List<ReceiptItem>> allItemsSnapshot() => (_db.select(_db.receiptItems)..where((i) => i.deletedAt.isNull())).get();
 
   /// Speichert einen gelesenen Bon als bestaetigt. Ein Bon mit derselben Re-Nr wird nicht doppelt angelegt.
   ///
