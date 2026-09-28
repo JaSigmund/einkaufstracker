@@ -295,6 +295,47 @@ class BugReports extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Einkaufsliste (Spiegel von public.shopping_lists). MVP: je Haushalt genau eine Standardliste, die
+/// beim ersten Eintrag angelegt wird (Doku 06 §6/§7, Roadmap Phase 3).
+@DataClassName('ShoppingList')
+class ShoppingLists extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get name => text().withDefault(const Constant('Einkaufsliste'))();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Position auf der Einkaufsliste (Spiegel von public.shopping_list_items). Entweder an ein Produkt
+/// gebunden (`productId`) oder frei getippt (`freeText`); `isSuggestion` markiert einen noch unbestaetigten
+/// automatischen Vorschlag (Doku 06 §6: Ablauf/Leer/Wiederkehrend), bis der Nutzer ihn bestaetigt oder verwirft.
+@DataClassName('ShoppingListItem')
+class ShoppingListItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get listId => text()();
+  TextColumn get productId => text().nullable()();
+  TextColumn get freeText => text().nullable()();
+  RealColumn get quantity => real().withDefault(const Constant(1))();
+
+  /// 'piece' | 'kg' | 'l'
+  TextColumn get unit => text().withDefault(const Constant('piece'))();
+  BoolColumn get checked => boolean().withDefault(const Constant(false))();
+
+  /// 'manual' | 'expiring' | 'depleted' | 'recurring' | 'scan'
+  TextColumn get source => text().withDefault(const Constant('manual'))();
+  BoolColumn get isSuggestion => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Warteschlange fuer Schreibzugriffe, die noch nicht beim Server angekommen sind (Outbox-Muster).
 @DataClassName('OutboxEntry')
 class Outbox extends Table {
@@ -331,7 +372,11 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases, ReceiptFiles, InventoryItems, InventoryMovements, BugReports, Outbox, SyncStates, KeyValues])
+@DriftDatabase(tables: [
+  Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
+  ReceiptFiles, InventoryItems, InventoryMovements, BugReports, ShoppingLists, ShoppingListItems, Outbox,
+  SyncStates, KeyValues,
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
@@ -339,7 +384,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -393,6 +438,11 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(bugReports, bugReports.resolution);
             await m.addColumn(bugReports, bugReports.fixedInVersion);
             await m.addColumn(bugReports, bugReports.statusUpdatedAt);
+          }
+          // 9 -> 10: Einkaufsliste (Phase 3)
+          if (from < 10) {
+            await m.createTable(shoppingLists);
+            await m.createTable(shoppingListItems);
           }
         },
       );

@@ -66,6 +66,14 @@ class SettingsPage extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/categories'),
           ),
+          ListTile(
+            key: const Key('settings-products'),
+            leading: const Icon(Icons.inventory_2_outlined),
+            title: const Text('Meine Produkte'),
+            subtitle: const Text('Bearbeiten, gelernte Bon-Zuordnungen lösen'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/products'),
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

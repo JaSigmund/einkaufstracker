@@ -8224,6 +8224,1131 @@ class BugReportsCompanion extends UpdateCompanion<BugReport> {
   }
 }
 
+class $ShoppingListsTable extends ShoppingLists
+    with TableInfo<$ShoppingListsTable, ShoppingList> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShoppingListsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Einkaufsliste'),
+  );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    name,
+    isDefault,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shopping_lists';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShoppingList> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShoppingList map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShoppingList(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $ShoppingListsTable createAlias(String alias) {
+    return $ShoppingListsTable(attachedDatabase, alias);
+  }
+}
+
+class ShoppingList extends DataClass implements Insertable<ShoppingList> {
+  final String id;
+  final String householdId;
+  final String name;
+  final bool isDefault;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const ShoppingList({
+    required this.id,
+    required this.householdId,
+    required this.name,
+    required this.isDefault,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['name'] = Variable<String>(name);
+    map['is_default'] = Variable<bool>(isDefault);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  ShoppingListsCompanion toCompanion(bool nullToAbsent) {
+    return ShoppingListsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      name: Value(name),
+      isDefault: Value(isDefault),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory ShoppingList.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShoppingList(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      name: serializer.fromJson<String>(json['name']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'name': serializer.toJson<String>(name),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  ShoppingList copyWith({
+    String? id,
+    String? householdId,
+    String? name,
+    bool? isDefault,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => ShoppingList(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    name: name ?? this.name,
+    isDefault: isDefault ?? this.isDefault,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  ShoppingList copyWithCompanion(ShoppingListsCompanion data) {
+    return ShoppingList(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      name: data.name.present ? data.name.value : this.name,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingList(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('name: $name, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, householdId, name, isDefault, updatedAt, deletedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShoppingList &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.name == this.name &&
+          other.isDefault == this.isDefault &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class ShoppingListsCompanion extends UpdateCompanion<ShoppingList> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> name;
+  final Value<bool> isDefault;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const ShoppingListsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ShoppingListsCompanion.insert({
+    required String id,
+    required String householdId,
+    this.name = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       updatedAt = Value(updatedAt);
+  static Insertable<ShoppingList> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? name,
+    Expression<bool>? isDefault,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (name != null) 'name': name,
+      if (isDefault != null) 'is_default': isDefault,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ShoppingListsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? name,
+    Value<bool>? isDefault,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return ShoppingListsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      name: name ?? this.name,
+      isDefault: isDefault ?? this.isDefault,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingListsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('name: $name, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ShoppingListItemsTable extends ShoppingListItems
+    with TableInfo<$ShoppingListItemsTable, ShoppingListItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShoppingListItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<String> listId = GeneratedColumn<String>(
+    'list_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _freeTextMeta = const VerificationMeta(
+    'freeText',
+  );
+  @override
+  late final GeneratedColumn<String> freeText = GeneratedColumn<String>(
+    'free_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('piece'),
+  );
+  static const VerificationMeta _checkedMeta = const VerificationMeta(
+    'checked',
+  );
+  @override
+  late final GeneratedColumn<bool> checked = GeneratedColumn<bool>(
+    'checked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("checked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('manual'),
+  );
+  static const VerificationMeta _isSuggestionMeta = const VerificationMeta(
+    'isSuggestion',
+  );
+  @override
+  late final GeneratedColumn<bool> isSuggestion = GeneratedColumn<bool>(
+    'is_suggestion',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_suggestion" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    listId,
+    productId,
+    freeText,
+    quantity,
+    unit,
+    checked,
+    source,
+    isSuggestion,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shopping_list_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShoppingListItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(
+        _listIdMeta,
+        listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_listIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    }
+    if (data.containsKey('free_text')) {
+      context.handle(
+        _freeTextMeta,
+        freeText.isAcceptableOrUnknown(data['free_text']!, _freeTextMeta),
+      );
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('checked')) {
+      context.handle(
+        _checkedMeta,
+        checked.isAcceptableOrUnknown(data['checked']!, _checkedMeta),
+      );
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('is_suggestion')) {
+      context.handle(
+        _isSuggestionMeta,
+        isSuggestion.isAcceptableOrUnknown(
+          data['is_suggestion']!,
+          _isSuggestionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShoppingListItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShoppingListItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      listId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}list_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      ),
+      freeText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}free_text'],
+      ),
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      )!,
+      checked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}checked'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      isSuggestion: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_suggestion'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $ShoppingListItemsTable createAlias(String alias) {
+    return $ShoppingListItemsTable(attachedDatabase, alias);
+  }
+}
+
+class ShoppingListItem extends DataClass
+    implements Insertable<ShoppingListItem> {
+  final String id;
+  final String householdId;
+  final String listId;
+  final String? productId;
+  final String? freeText;
+  final double quantity;
+
+  /// 'piece' | 'kg' | 'l'
+  final String unit;
+  final bool checked;
+
+  /// 'manual' | 'expiring' | 'depleted' | 'recurring' | 'scan'
+  final String source;
+  final bool isSuggestion;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const ShoppingListItem({
+    required this.id,
+    required this.householdId,
+    required this.listId,
+    this.productId,
+    this.freeText,
+    required this.quantity,
+    required this.unit,
+    required this.checked,
+    required this.source,
+    required this.isSuggestion,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['list_id'] = Variable<String>(listId);
+    if (!nullToAbsent || productId != null) {
+      map['product_id'] = Variable<String>(productId);
+    }
+    if (!nullToAbsent || freeText != null) {
+      map['free_text'] = Variable<String>(freeText);
+    }
+    map['quantity'] = Variable<double>(quantity);
+    map['unit'] = Variable<String>(unit);
+    map['checked'] = Variable<bool>(checked);
+    map['source'] = Variable<String>(source);
+    map['is_suggestion'] = Variable<bool>(isSuggestion);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  ShoppingListItemsCompanion toCompanion(bool nullToAbsent) {
+    return ShoppingListItemsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      listId: Value(listId),
+      productId: productId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(productId),
+      freeText: freeText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(freeText),
+      quantity: Value(quantity),
+      unit: Value(unit),
+      checked: Value(checked),
+      source: Value(source),
+      isSuggestion: Value(isSuggestion),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory ShoppingListItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShoppingListItem(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      listId: serializer.fromJson<String>(json['listId']),
+      productId: serializer.fromJson<String?>(json['productId']),
+      freeText: serializer.fromJson<String?>(json['freeText']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+      unit: serializer.fromJson<String>(json['unit']),
+      checked: serializer.fromJson<bool>(json['checked']),
+      source: serializer.fromJson<String>(json['source']),
+      isSuggestion: serializer.fromJson<bool>(json['isSuggestion']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'listId': serializer.toJson<String>(listId),
+      'productId': serializer.toJson<String?>(productId),
+      'freeText': serializer.toJson<String?>(freeText),
+      'quantity': serializer.toJson<double>(quantity),
+      'unit': serializer.toJson<String>(unit),
+      'checked': serializer.toJson<bool>(checked),
+      'source': serializer.toJson<String>(source),
+      'isSuggestion': serializer.toJson<bool>(isSuggestion),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  ShoppingListItem copyWith({
+    String? id,
+    String? householdId,
+    String? listId,
+    Value<String?> productId = const Value.absent(),
+    Value<String?> freeText = const Value.absent(),
+    double? quantity,
+    String? unit,
+    bool? checked,
+    String? source,
+    bool? isSuggestion,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => ShoppingListItem(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    listId: listId ?? this.listId,
+    productId: productId.present ? productId.value : this.productId,
+    freeText: freeText.present ? freeText.value : this.freeText,
+    quantity: quantity ?? this.quantity,
+    unit: unit ?? this.unit,
+    checked: checked ?? this.checked,
+    source: source ?? this.source,
+    isSuggestion: isSuggestion ?? this.isSuggestion,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  ShoppingListItem copyWithCompanion(ShoppingListItemsCompanion data) {
+    return ShoppingListItem(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      listId: data.listId.present ? data.listId.value : this.listId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      freeText: data.freeText.present ? data.freeText.value : this.freeText,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      checked: data.checked.present ? data.checked.value : this.checked,
+      source: data.source.present ? data.source.value : this.source,
+      isSuggestion: data.isSuggestion.present
+          ? data.isSuggestion.value
+          : this.isSuggestion,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingListItem(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('listId: $listId, ')
+          ..write('productId: $productId, ')
+          ..write('freeText: $freeText, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('checked: $checked, ')
+          ..write('source: $source, ')
+          ..write('isSuggestion: $isSuggestion, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    listId,
+    productId,
+    freeText,
+    quantity,
+    unit,
+    checked,
+    source,
+    isSuggestion,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShoppingListItem &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.listId == this.listId &&
+          other.productId == this.productId &&
+          other.freeText == this.freeText &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
+          other.checked == this.checked &&
+          other.source == this.source &&
+          other.isSuggestion == this.isSuggestion &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> listId;
+  final Value<String?> productId;
+  final Value<String?> freeText;
+  final Value<double> quantity;
+  final Value<String> unit;
+  final Value<bool> checked;
+  final Value<String> source;
+  final Value<bool> isSuggestion;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const ShoppingListItemsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.listId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.freeText = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.checked = const Value.absent(),
+    this.source = const Value.absent(),
+    this.isSuggestion = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ShoppingListItemsCompanion.insert({
+    required String id,
+    required String householdId,
+    required String listId,
+    this.productId = const Value.absent(),
+    this.freeText = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.checked = const Value.absent(),
+    this.source = const Value.absent(),
+    this.isSuggestion = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       listId = Value(listId),
+       updatedAt = Value(updatedAt);
+  static Insertable<ShoppingListItem> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? listId,
+    Expression<String>? productId,
+    Expression<String>? freeText,
+    Expression<double>? quantity,
+    Expression<String>? unit,
+    Expression<bool>? checked,
+    Expression<String>? source,
+    Expression<bool>? isSuggestion,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (listId != null) 'list_id': listId,
+      if (productId != null) 'product_id': productId,
+      if (freeText != null) 'free_text': freeText,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
+      if (checked != null) 'checked': checked,
+      if (source != null) 'source': source,
+      if (isSuggestion != null) 'is_suggestion': isSuggestion,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ShoppingListItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? listId,
+    Value<String?>? productId,
+    Value<String?>? freeText,
+    Value<double>? quantity,
+    Value<String>? unit,
+    Value<bool>? checked,
+    Value<String>? source,
+    Value<bool>? isSuggestion,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return ShoppingListItemsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      listId: listId ?? this.listId,
+      productId: productId ?? this.productId,
+      freeText: freeText ?? this.freeText,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      checked: checked ?? this.checked,
+      source: source ?? this.source,
+      isSuggestion: isSuggestion ?? this.isSuggestion,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (listId.present) {
+      map['list_id'] = Variable<String>(listId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (freeText.present) {
+      map['free_text'] = Variable<String>(freeText.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (checked.present) {
+      map['checked'] = Variable<bool>(checked.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (isSuggestion.present) {
+      map['is_suggestion'] = Variable<bool>(isSuggestion.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingListItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('listId: $listId, ')
+          ..write('productId: $productId, ')
+          ..write('freeText: $freeText, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('checked: $checked, ')
+          ..write('source: $source, ')
+          ..write('isSuggestion: $isSuggestion, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -9142,6 +10267,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $InventoryMovementsTable inventoryMovements =
       $InventoryMovementsTable(this);
   late final $BugReportsTable bugReports = $BugReportsTable(this);
+  late final $ShoppingListsTable shoppingLists = $ShoppingListsTable(this);
+  late final $ShoppingListItemsTable shoppingListItems =
+      $ShoppingListItemsTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -9162,6 +10290,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     inventoryItems,
     inventoryMovements,
     bugReports,
+    shoppingLists,
+    shoppingListItems,
     outbox,
     syncStates,
     keyValues,
@@ -13169,6 +14299,595 @@ typedef $$BugReportsTableProcessedTableManager =
       BugReport,
       PrefetchHooks Function()
     >;
+typedef $$ShoppingListsTableCreateCompanionBuilder =
+    ShoppingListsCompanion Function({
+      required String id,
+      required String householdId,
+      Value<String> name,
+      Value<bool> isDefault,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$ShoppingListsTableUpdateCompanionBuilder =
+    ShoppingListsCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> name,
+      Value<bool> isDefault,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$ShoppingListsTableFilterComposer
+    extends Composer<_$AppDatabase, $ShoppingListsTable> {
+  $$ShoppingListsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ShoppingListsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ShoppingListsTable> {
+  $$ShoppingListsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ShoppingListsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ShoppingListsTable> {
+  $$ShoppingListsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$ShoppingListsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ShoppingListsTable,
+          ShoppingList,
+          $$ShoppingListsTableFilterComposer,
+          $$ShoppingListsTableOrderingComposer,
+          $$ShoppingListsTableAnnotationComposer,
+          $$ShoppingListsTableCreateCompanionBuilder,
+          $$ShoppingListsTableUpdateCompanionBuilder,
+          (
+            ShoppingList,
+            BaseReferences<_$AppDatabase, $ShoppingListsTable, ShoppingList>,
+          ),
+          ShoppingList,
+          PrefetchHooks Function()
+        > {
+  $$ShoppingListsTableTableManager(_$AppDatabase db, $ShoppingListsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShoppingListsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShoppingListsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShoppingListsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ShoppingListsCompanion(
+                id: id,
+                householdId: householdId,
+                name: name,
+                isDefault: isDefault,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                Value<String> name = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ShoppingListsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                name: name,
+                isDefault: isDefault,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ShoppingListsTable, ShoppingList>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ShoppingListsTable,
+                    ShoppingList
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ShoppingListsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ShoppingListsTable,
+      ShoppingList,
+      $$ShoppingListsTableFilterComposer,
+      $$ShoppingListsTableOrderingComposer,
+      $$ShoppingListsTableAnnotationComposer,
+      $$ShoppingListsTableCreateCompanionBuilder,
+      $$ShoppingListsTableUpdateCompanionBuilder,
+      (
+        ShoppingList,
+        BaseReferences<_$AppDatabase, $ShoppingListsTable, ShoppingList>,
+      ),
+      ShoppingList,
+      PrefetchHooks Function()
+    >;
+typedef $$ShoppingListItemsTableCreateCompanionBuilder =
+    ShoppingListItemsCompanion Function({
+      required String id,
+      required String householdId,
+      required String listId,
+      Value<String?> productId,
+      Value<String?> freeText,
+      Value<double> quantity,
+      Value<String> unit,
+      Value<bool> checked,
+      Value<String> source,
+      Value<bool> isSuggestion,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$ShoppingListItemsTableUpdateCompanionBuilder =
+    ShoppingListItemsCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> listId,
+      Value<String?> productId,
+      Value<String?> freeText,
+      Value<double> quantity,
+      Value<String> unit,
+      Value<bool> checked,
+      Value<String> source,
+      Value<bool> isSuggestion,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$ShoppingListItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ShoppingListItemsTable> {
+  $$ShoppingListItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get freeText => $composableBuilder(
+    column: $table.freeText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get checked => $composableBuilder(
+    column: $table.checked,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ShoppingListItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ShoppingListItemsTable> {
+  $$ShoppingListItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get freeText => $composableBuilder(
+    column: $table.freeText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get checked => $composableBuilder(
+    column: $table.checked,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ShoppingListItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ShoppingListItemsTable> {
+  $$ShoppingListItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get freeText =>
+      $composableBuilder(column: $table.freeText, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<bool> get checked =>
+      $composableBuilder(column: $table.checked, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSuggestion => $composableBuilder(
+    column: $table.isSuggestion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$ShoppingListItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ShoppingListItemsTable,
+          ShoppingListItem,
+          $$ShoppingListItemsTableFilterComposer,
+          $$ShoppingListItemsTableOrderingComposer,
+          $$ShoppingListItemsTableAnnotationComposer,
+          $$ShoppingListItemsTableCreateCompanionBuilder,
+          $$ShoppingListItemsTableUpdateCompanionBuilder,
+          (
+            ShoppingListItem,
+            BaseReferences<
+              _$AppDatabase,
+              $ShoppingListItemsTable,
+              ShoppingListItem
+            >,
+          ),
+          ShoppingListItem,
+          PrefetchHooks Function()
+        > {
+  $$ShoppingListItemsTableTableManager(
+    _$AppDatabase db,
+    $ShoppingListItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShoppingListItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShoppingListItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShoppingListItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> listId = const Value.absent(),
+                Value<String?> productId = const Value.absent(),
+                Value<String?> freeText = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<bool> checked = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<bool> isSuggestion = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ShoppingListItemsCompanion(
+                id: id,
+                householdId: householdId,
+                listId: listId,
+                productId: productId,
+                freeText: freeText,
+                quantity: quantity,
+                unit: unit,
+                checked: checked,
+                source: source,
+                isSuggestion: isSuggestion,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String listId,
+                Value<String?> productId = const Value.absent(),
+                Value<String?> freeText = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<String> unit = const Value.absent(),
+                Value<bool> checked = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<bool> isSuggestion = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ShoppingListItemsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                listId: listId,
+                productId: productId,
+                freeText: freeText,
+                quantity: quantity,
+                unit: unit,
+                checked: checked,
+                source: source,
+                isSuggestion: isSuggestion,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ShoppingListItemsTable, ShoppingListItem>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ShoppingListItemsTable,
+                    ShoppingListItem
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ShoppingListItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ShoppingListItemsTable,
+      ShoppingListItem,
+      $$ShoppingListItemsTableFilterComposer,
+      $$ShoppingListItemsTableOrderingComposer,
+      $$ShoppingListItemsTableAnnotationComposer,
+      $$ShoppingListItemsTableCreateCompanionBuilder,
+      $$ShoppingListItemsTableUpdateCompanionBuilder,
+      (
+        ShoppingListItem,
+        BaseReferences<
+          _$AppDatabase,
+          $ShoppingListItemsTable,
+          ShoppingListItem
+        >,
+      ),
+      ShoppingListItem,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -13729,6 +15448,10 @@ class $AppDatabaseManager {
       $$InventoryMovementsTableTableManager(_db, _db.inventoryMovements);
   $$BugReportsTableTableManager get bugReports =>
       $$BugReportsTableTableManager(_db, _db.bugReports);
+  $$ShoppingListsTableTableManager get shoppingLists =>
+      $$ShoppingListsTableTableManager(_db, _db.shoppingLists);
+  $$ShoppingListItemsTableTableManager get shoppingListItems =>
+      $$ShoppingListItemsTableTableManager(_db, _db.shoppingListItems);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

@@ -39,9 +39,14 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
       openReview: (preview) => ref.read(routerProvider).push('/import-review', extra: preview),
     );
     _shared.start();
+    // Hintergrund-Auffrischung beim App-Start (Doku 06 §5, Schritt 5): haelt die geplanten
+    // Ablauf-Erinnerungen konsistent, auch nach einem Geraete-Neustart (der die Alarme loescht).
+    _rescheduleReminders();
   }
 
   void _sync() => ref.read(syncControllerProvider.notifier).sync();
+
+  void _rescheduleReminders() => rescheduleExpiryReminders(ref);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -65,6 +70,11 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
         _sync();
         _shared.onSignedIn();
       }
+    });
+    // Nach jeder Inventaraenderung (Doku 06 §5, Schritt 1): der aktive Bestand aendert sich bei jedem
+    // Kauf, Oeffnen, Aufbrauchen etc., der Live-Stream feuert also genau dann neu.
+    ref.listen(activeInventoryStreamProvider, (prev, next) {
+      if (next.hasValue) _rescheduleReminders();
     });
     return MaterialApp.router(
       title: 'Einkaufstracker',

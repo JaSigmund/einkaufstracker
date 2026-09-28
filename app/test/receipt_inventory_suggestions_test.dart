@@ -130,6 +130,53 @@ void main() {
     expect(await db.select(db.inventoryItems).get(), isEmpty);
     expect(await db.select(db.products).get(), isEmpty);
   });
+
+  group('Einkaufsliste -> Inventar (Doku 06 §7, Roadmap Phase 3)', () {
+    test('ein gekaufter Artikel hakt einen offenen, bestaetigten Listeneintrag desselben Produkts ab', () async {
+      final products = productRepo(db);
+      final shoppingList = shoppingListRepo(db);
+      final repo = receiptRepo(db, productRepo: products, inventoryRepo: inventoryRepo(db), shoppingListRepo: shoppingList);
+      // Erster Bon legt das Produkt an
+      await repo.saveParsed(_parse('billa_digital_04'));
+      final champignon = await (db.select(db.products)..where((p) => p.name.equals('Clever Champignon weiß'))).getSingle();
+      final listItem = await shoppingList.addManual(productId: champignon.id, unit: champignon.baseUnit);
+
+      // Zweiter Bon mit demselben Artikel (wie im bestehenden Alias-Test) loest das Abhaken aus
+      final text = File('test/fixtures/receipts/billa_digital_06.txt')
+          .readAsStringSync()
+          .replaceFirst(_firstArticle('billa_digital_06'), 'IC Clever Champignon weiß');
+      await repo.saveParsed(const BillaTextParser().parse(text));
+
+      final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals(listItem.id))).getSingle();
+      expect(row.checked, isTrue);
+    });
+
+    test('unbestaetigte Vorschlaege (isSuggestion) bleiben unangetastet', () async {
+      final products = productRepo(db);
+      final shoppingList = shoppingListRepo(db);
+      final repo = receiptRepo(db, productRepo: products, inventoryRepo: inventoryRepo(db), shoppingListRepo: shoppingList);
+      await repo.saveParsed(_parse('billa_digital_04'));
+      final champignon = await (db.select(db.products)..where((p) => p.name.equals('Clever Champignon weiß'))).getSingle();
+      await products.update(champignon.copyWith(restock: true)); // suggestDepleted verlangt ein Nachkaufprodukt
+      await shoppingList.suggestDepleted(champignon.id);
+      final suggestion = (await shoppingList.watchItems().first).single;
+      expect(suggestion.isSuggestion, isTrue);
+
+      final text = File('test/fixtures/receipts/billa_digital_06.txt')
+          .readAsStringSync()
+          .replaceFirst(_firstArticle('billa_digital_06'), 'IC Clever Champignon weiß');
+      await repo.saveParsed(const BillaTextParser().parse(text));
+
+      final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals(suggestion.id))).getSingle();
+      expect(row.checked, isFalse);
+      expect(row.isSuggestion, isTrue);
+    });
+
+    test('ohne ShoppingListRepository (Altverhalten): kein Absturz', () async {
+      final repo = receiptRepo(db, productRepo: productRepo(db), inventoryRepo: inventoryRepo(db));
+      await repo.saveParsed(_parse('billa_digital_04'));
+    });
+  });
 }
 
 String _firstArticle(String fixture) =>

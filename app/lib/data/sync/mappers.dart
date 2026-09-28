@@ -350,3 +350,51 @@ BugReportsCompanion bugReportFromRemote(Map<String, dynamic> j) => BugReportsCom
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> shoppingListToRemote(ShoppingList l) => {
+      'id': l.id,
+      'household_id': l.householdId,
+      'name': l.name,
+      'is_default': l.isDefault,
+      'updated_at': l.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ShoppingListsCompanion shoppingListFromRemote(Map<String, dynamic> j) => ShoppingListsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      name: Value(j['name'] as String? ?? 'Einkaufsliste'),
+      isDefault: Value(j['is_default'] as bool? ?? true),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> shoppingListItemToRemote(ShoppingListItem i) => {
+      'id': i.id,
+      'household_id': i.householdId,
+      'list_id': i.listId,
+      'product_id': i.productId,
+      'free_text': i.freeText,
+      'quantity': i.quantity,
+      'unit': i.unit,
+      'checked': i.checked,
+      'source': i.source,
+      'is_suggestion': i.isSuggestion,
+      'updated_at': i.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ShoppingListItemsCompanion shoppingListItemFromRemote(Map<String, dynamic> j) => ShoppingListItemsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      listId: Value(j['list_id'] as String),
+      productId: Value(j['product_id'] as String?),
+      freeText: Value(j['free_text'] as String?),
+      quantity: Value((j['quantity'] as num?)?.toDouble() ?? 1),
+      unit: Value(j['unit'] as String? ?? 'piece'),
+      checked: Value(j['checked'] as bool? ?? false),
+      source: Value(j['source'] as String? ?? 'manual'),
+      isSuggestion: Value(j['is_suggestion'] as bool? ?? false),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );

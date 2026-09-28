@@ -5,12 +5,12 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 **Die vollständige Dokumentation liegt im Obsidian-Vault:**
 `C:\Users\jakob\Documents\ClaudeBrain\02 Projekte\Einkaufstracker\` (Einstieg: `Einkaufstracker.md`, Anforderungen: `01 Lastenheft.md`)
 
-## Stand (Phase 1 abgeschlossen, 2026-09-26)
+## Stand (Phase 3 funktional fertig bis auf den Listen-Rücklauf, 2026-09-28)
 
 | Teil | Status |
 |---|---|
-| Doku (Lastenheft bis Roadmap) | Erstfassung fertig |
-| `supabase/migrations` | 0001 bis 0004 (inkl. Inventar-Ledger): 50 Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`) **und** in das echte Supabase-Projekt (Frankfurt) eingespielt, RLS dort geprüft |
+| Doku (Lastenheft bis Roadmap) | Laufend nachgeführt, siehe Roadmap für den Phasenstand |
+| `supabase/migrations` | 0001 bis 0011 (Schema, Kategorien, Ledger, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege, Fehlerberichte + Bearbeitungsstatus/Changelog); Schema-/RLS-Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`, 75 Tests) **und** gegen das echte Supabase-Projekt (Frankfurt) eingespielt. `shopping_lists`/`shopping_list_items` lagen schon seit 0001 bereit, client-seitig erst seit Phase 3 angebunden |
 | `supabase/planned` | Entwurf Essenstagebuch (Phase 7), wird nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
 | `supabase/functions/parse-receipt` | deployt, mit Deno typgeprüft, gegen echte Bons getestet (Sonnet 5 exakt, `tools/test_parse_receipt.py`); Standardmodell per Secret `RECEIPT_MODEL` |
 | `spikes/spike_scanner` | Android-Spike auf dem Handy getestet, 17 Unit-Tests (inkl. 3 echte Billa-Bons als Regression, lokal) |
@@ -18,7 +18,7 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 | `tools/metrics.py` | Kennzahlen aus dem Testkonzept (Bons je Quelle, Summenstimmigkeit, Fallback-Quote, Kosten, Kategorisierung) aus den Live-Daten, nur lesend: `python tools/metrics.py` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 2 (Code) fertig: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF digital, Teilen aus der jö-App, Foto mit lokaler OCR und Cloud-Fallback ohne Zahlungsblock), Bearbeiten vor dem Speichern, lernende Kategorisierung, Monatsauswertung mit Erklärung und „Gespart“, Übersicht mit Filter, Originalbelege. 287 Tests, signierter Release-Build läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| Flutter-App (`app/`) | Phase 2 fertig, Phase 3 funktional fertig bis auf den Rücklauf Bon→Liste (Doku 06 §7): Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (manuell, Vorschläge aus „Leer“/„Ablauf“), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 490 Tests, signierter Release-Build (aktuell v1.4.0) läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
 | CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
 
 ## Struktur
@@ -26,20 +26,21 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 ```
 Einkaufstracker/
   supabase/
-    migrations/        0001 bis 0008 (Schema, Kategorien, Ledger, Haushalt-Fix, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege)
+    migrations/        0001 bis 0011 (Schema inkl. Einkaufsliste, Kategorien, Ledger, Bon-Import, Kategorie-Aliase,
+                        Bon-Rabatte, Originalbelege, Fehlerberichte, Bearbeitungsstatus/Changelog)
     planned/           meal_diary_draft.sql (Phase 7, noch nicht produktiv)
     tests/             run_schema_tests.py (Schema + RLS ohne Docker)
     functions/
       parse-receipt/   Edge Function (Claude Vision)
-  tools/               Prototypen (parse_digital_billa.py)
+  tools/               Prototypen und einmalige SQL-Skripte (parse_digital_billa.py, changelog_*.sql, bugstatus_*.sql)
   spikes/spike_scanner Phase-0-Messapp (Scanner, OCR, Barcode, Open Food Facts)
-  app/                 Flutter-App (Phase 2)
+  app/                 Flutter-App (Phase 2 + 3)
   testdata/receipts/   Golden Set (Bon-Fotos, OCR-Rohdaten, digital/*.pdf, NICHT einchecken, siehe .gitignore)
 ```
 
 ## Nächste Schritte
 
-Phase 0, 1 und 2 (Code) sind abgeschlossen (Go/No-Go-Bericht M0 und Roadmap im Vault unter `02 Projekte/Einkaufstracker/`; Tag `m2-phase2-code`). **Offen aus Phase 2, läuft parallel:** zwei Wochen echte Bons sammeln und mit `tools/metrics.py` gegen die Ziele prüfen (Meilenstein M2), Hofer-Bons, weitere jö-PDFs, Diagnose der lokalen Foto-Erkennung. **Als Nächstes Phase 3:** Barcode-Inventar mit Haltbarkeit und Einkaufsliste.
+Phase 0 bis 2 sind abgeschlossen, Phase 3 (Inventar und Einkaufsliste) ist funktional fertig (siehe [[11 Roadmap und Meilensteine]] im Vault). **Offen aus Phase 3:** der Rücklauf Bon → Einkaufsliste (Doku 06 §7, Bon-Positionen sollen offene Listeneinträge automatisch abhaken), Ausloeser „Wiederkehrend“ für Listen-Vorschläge, die Haltbarkeits-Startwerte selbst sind noch nicht gegen Herstellerangaben/AGES verifiziert (Doku 06 §3.2), und M3 (zwei Wochen Praxistest mit den Ablauf-Erinnerungen im Alltag). **Weiterhin offen aus Phase 2, läuft parallel:** Hofer-Bons, weitere jö-PDFs fürs Golden Set, Diagnose der lokalen Foto-Erkennung. **Als Nächstes:** Phase 4 (Preisvergleich und Trends) oder die offenen Phase-3-Punkte zuerst schliessen.
 
 **Migrationen anwenden:** `npx supabase db push --dry-run`, dann `npx supabase db push --yes` (gegen das Live-Projekt, verknüpft per `supabase link`). Neue Migrationen müssen live sein, **bevor** die App-Version mit dem neuen Schema installiert wird.
 

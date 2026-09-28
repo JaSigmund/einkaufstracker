@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../products/product_form_page.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
 const _locationIcons = {
@@ -25,6 +26,12 @@ const _movementLabels = {
 };
 
 String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+/// Rueckgabewert des Bonzuordnung-Bottom-Sheets: `receiptItemId` null bedeutet "loesen".
+class _ReceiptLinkChoice {
+  const _ReceiptLinkChoice(this.receiptItemId);
+  final String? receiptItemId;
+}
 
 /// Argumente fuer /inventory-item.
 class InventoryItemArgs {
@@ -48,8 +55,21 @@ class InventoryItemDetailPage extends ConsumerStatefulWidget {
 
 class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPage> {
   late InventoryItem _item = widget.item;
+  late Product? _product = widget.product;
+  ReceiptLink? _receiptLink;
 
   InventoryRepository get _repo => ref.read(inventoryRepositoryProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReceiptLink();
+  }
+
+  Future<void> _loadReceiptLink() async {
+    final link = await _repo.receiptLinkFor(_item.receiptItemId);
+    if (mounted) setState(() => _receiptLink = link);
+  }
 
   Future<void> _refresh() async {
     final fresh = await (ref.read(databaseProvider).select(ref.read(databaseProvider).inventoryItems)
@@ -121,8 +141,79 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
   }
 
   Future<void> _open() async {
-    await _repo.open(_item.id, productDefaultOpenShelfLifeDays: widget.product?.openedShelfLifeDays);
+    await _repo.open(_item.id, productDefaultOpenShelfLifeDays: _product?.openedShelfLifeDays);
     await _refresh();
+  }
+
+  /// Produktname direkt hier umbenennen, ohne den Umweg ueber Einstellungen -> Meine Produkte (Wunsch
+  /// "intuitiver", 2026-09-28): betrifft alle Kaeufe dieses Produkts, das ist so gewollt.
+  Future<void> _renameProduct() async {
+    final product = _product;
+    if (product == null) return;
+    final ctrl = TextEditingController(text: product.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Produktname'),
+        content: TextField(key: const Key('product-name-input'), controller: ctrl, autofocus: true),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text.trim()), child: const Text('Übernehmen')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || name == product.name) return;
+    final updated = product.copyWith(name: name);
+    await ref.read(productRepositoryProvider).update(updated);
+    if (mounted) setState(() => _product = updated);
+  }
+
+  /// Fuer seltenere Aenderungen (Kategorie, Einheit, Haltbarkeit, Aliase) weiterhin das volle Formular.
+  Future<void> _editProduct() async {
+    final product = _product;
+    if (product == null) return;
+    final updated = await context.push<Product>('/product-form', extra: ProductFormArgs(existing: product));
+    if (updated != null && mounted) setState(() => _product = updated);
+  }
+
+  /// Bonzuordnung loesen oder neu setzen (Fehlerbericht "Bonzuordnung anzeigen", erweitert 2026-09-28: soll
+  /// auch aenderbar sein, nicht nur anzeigbar).
+  Future<void> _changeReceiptLink() async {
+    final candidates = await _repo.candidateReceiptLinksFor(_item.productId);
+    if (!mounted) return;
+    final choice = await showModalBottomSheet<_ReceiptLinkChoice>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            if (_receiptLink != null)
+              ListTile(
+                key: const Key('receipt-link-remove'),
+                leading: const Icon(Icons.link_off),
+                title: const Text('Zuordnung lösen'),
+                subtitle: const Text('Wird zu einem reinen Scan ohne Bon-Herkunft'),
+                onTap: () => Navigator.pop(ctx, const _ReceiptLinkChoice(null)),
+              ),
+            if (candidates.isEmpty && _receiptLink == null)
+              const Padding(padding: EdgeInsets.all(16), child: Text('Keine passenden Bon-Positionen gefunden.')),
+            for (final c in candidates)
+              ListTile(
+                key: Key('receipt-link-candidate-${c.receiptItemId}'),
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: Text(c.storeChain ?? 'Bon'),
+                subtitle: Text('${_formatDate(c.purchasedAt)} · „${c.rawText}“'),
+                trailing: c.lineTotalCents == null ? null : Text(formatEuro(c.lineTotalCents!)),
+                onTap: () => Navigator.pop(ctx, _ReceiptLinkChoice(c.receiptItemId)),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+    await _repo.setReceiptLink(_item.id, choice.receiptItemId);
+    await _refresh();
+    await _loadReceiptLink();
   }
 
   Future<void> _consumed() async {
@@ -168,8 +259,19 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.product?.name ?? 'Unbekanntes Produkt'),
+        title: InkWell(
+          key: const Key('product-name-tap'),
+          onTap: _product == null ? null : _renameProduct,
+          child: Text(_product?.name ?? 'Unbekanntes Produkt'),
+        ),
         actions: [
+          if (_product != null)
+            IconButton(
+              key: const Key('action-edit-product'),
+              tooltip: 'Weitere Produktdetails bearbeiten',
+              icon: const Icon(Icons.tune),
+              onPressed: _editProduct,
+            ),
           IconButton(
             key: const Key('action-delete'),
             tooltip: 'Löschen (falsch erfasst)',
@@ -200,6 +302,26 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
                 IconButton(key: const Key('quantity-plus'), iconSize: 32, onPressed: () => _changeQuantity(1), icon: const Icon(Icons.add_circle_outline)),
               ]),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _receiptLink != null
+                ? ListTile(
+                    key: const Key('receipt-link'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text(_receiptLink!.storeChain ?? 'Bon', style: t.textTheme.bodyMedium),
+                    subtitle: Text('${_formatDate(_receiptLink!.purchasedAt)} · „${_receiptLink!.rawText}“'),
+                    trailing: _receiptLink!.lineTotalCents == null ? null : Text(formatEuro(_receiptLink!.lineTotalCents!)),
+                    onTap: _changeReceiptLink,
+                  )
+                : TextButton.icon(
+                    key: const Key('receipt-link-add'),
+                    onPressed: _changeReceiptLink,
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('Bon zuordnen'),
+                  ),
           ),
           const SizedBox(height: 12),
           // Ablaufdatum: Ampelfarbe und Datum an einem Ort, direkt antippbar

@@ -89,6 +89,23 @@ void main() {
     });
   });
 
+  group('softDelete (Fehlerbericht "Produkt löschen", 2026-09-28)', () {
+    test('setzt deletedAt, landet in der Outbox, erscheint nicht mehr in watchAll', () async {
+      final repo = productRepo(db);
+      final p = await repo.create(name: 'Auslaufmodell');
+      await repo.softDelete(p.id);
+      final row = await (db.select(db.products)..where((x) => x.id.equals(p.id))).getSingle();
+      expect(row.deletedAt, isNotNull);
+      expect(await repo.watchAll().first, isEmpty);
+      final outbox = await db.select(db.outbox).get();
+      expect(outbox.where((o) => o.remoteTable == 'products' && o.rowId == p.id), isNotEmpty);
+    });
+
+    test('unbekanntes Produkt: kein Absturz', () async {
+      await productRepo(db).softDelete('does-not-exist');
+    });
+  });
+
   group('findOrCreateForReceiptItem', () {
     test('uebernimmt die Grundeinheit des Bon-Artikels bei der Neuanlage (Waegware)', () async {
       final repo = productRepo(db);
@@ -103,6 +120,47 @@ void main() {
       final second = await repo.findOrCreateForReceiptItem('IC DKIH Paprika Tricolore', baseUnit: 'kg');
       expect(second.id, first.id);
       expect(second.baseUnit, 'piece'); // wird nicht von der Bon-Einheit ueberschrieben
+    });
+
+    test('erkannter Produkttyp: Haltbarkeit-nach-Oeffnen, Lagerort und Datumsart werden vorbelegt (Roadmap Phase 3, Doku 06 §3.2)', () async {
+      final repo = productRepo(db);
+      final milk = await repo.findOrCreateForReceiptItem('H-VOLLMILCH 1L');
+      expect(milk.openedShelfLifeDays, 3);
+      expect(milk.defaultLocation, 'fridge');
+
+      final meat = await repo.findOrCreateForReceiptItem('Rind Hackfleisch');
+      expect(meat.defaultDateKind, 'use_by');
+    });
+
+    test('unbekannter Produkttyp: generische Standardwerte statt Rateversuch', () async {
+      final repo = productRepo(db);
+      final p = await repo.findOrCreateForReceiptItem('Klopapier 8 Rollen');
+      expect(p.openedShelfLifeDays, isNull);
+      expect(p.defaultLocation, 'pantry');
+      expect(p.defaultDateKind, 'best_before');
+    });
+  });
+
+  group('watchAliasesFor / removeAlias (Fehlerbericht "Alias ändern")', () {
+    test('zeigt gelernte Aliase, geloeste erscheinen nicht mehr', () async {
+      final repo = productRepo(db);
+      final p = await repo.findOrCreateForReceiptItem('DKIH Paprika Tricolore');
+      final aliases = await repo.watchAliasesFor(p.id).first;
+      expect(aliases, hasLength(1));
+      expect(aliases.single.aliasText, isNotEmpty);
+
+      await repo.removeAlias(aliases.single.id);
+      expect(await repo.watchAliasesFor(p.id).first, isEmpty);
+    });
+
+    test('geloester Alias: der Bon-Text wird nicht mehr automatisch zugeordnet', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('DKIH Paprika Tricolore');
+      final aliases = await repo.watchAliasesFor(first.id).first;
+      await repo.removeAlias(aliases.single.id);
+
+      final second = await repo.findOrCreateForReceiptItem('DKIH Paprika Tricolore');
+      expect(second.id, isNot(first.id)); // wird neu angelegt statt wiederverknuepft
     });
   });
 

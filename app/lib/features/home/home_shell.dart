@@ -5,6 +5,7 @@ import '../inventory/inventory_page.dart';
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
 import '../report/report_page.dart';
+import '../shopping_list/shopping_list_page.dart';
 
 /// Rahmen mit Navigation. Die Inhalte der Tabs kommen in spaeteren Phasen (siehe Roadmap).
 class HomeShell extends StatefulWidget {
@@ -71,6 +72,8 @@ class _HomeShellState extends State<HomeShell> {
           ? const InventoryPage()
           : _index == 2
           ? const ScanPage()
+          : _index == 3
+          ? const ShoppingListPage()
           : _index == 4
           ? const ReportPage()
           : Center(

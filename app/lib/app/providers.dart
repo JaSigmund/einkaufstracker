@@ -25,6 +25,9 @@ import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
+import '../data/repositories/shopping_list_repository.dart';
+import '../data/notifications/notification_scheduler.dart';
+import '../domain/notifications/expiry_reminders.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
@@ -177,10 +180,57 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
       return id;
     },
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+    onDepleted: (productId) => ref.read(shoppingListRepositoryProvider).suggestDepleted(productId),
   );
 });
 
 final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchActive());
+
+final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
+  return ShoppingListRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
+
+final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
+  return FlutterLocalNotificationsScheduler(
+    onAddToList: (productId) => ref.read(shoppingListRepositoryProvider).addFromExpiryReminder(productId),
+  );
+});
+
+/// Plant die Ablauf-Erinnerungen neu (Doku 06 §5, Schritt 1): nach jeder Inventaraenderung und beim
+/// App-Start aufgerufen. Ohne Netz (Einstellungen sind bislang online-only) bleibt die zuletzt geplante
+/// Erinnerung unveraendert bestehen, statt abzubrechen.
+Future<void> rescheduleExpiryReminders(WidgetRef ref) async {
+  final hid = await ref.read(householdIdProvider.future);
+  if (hid == null) return;
+  final HouseholdSettings settings;
+  try {
+    settings = await ref.read(settingsRepositoryProvider).load(hid);
+  } catch (_) {
+    return;
+  }
+  final items = await ref.read(inventoryRepositoryProvider).activeSnapshot();
+  final products = await ref.read(productRepositoryProvider).allSnapshot();
+  final names = {for (final p in products) p.id: p.name};
+  final now = DateTime.now();
+  final reminders = computeExpiryReminders(
+    activeItems: items,
+    productNameById: names,
+    leadDays: settings.notifyLeadDays,
+    today: DateTime.utc(now.year, now.month, now.day),
+  );
+  await ref.read(notificationSchedulerProvider).scheduleExpiryReminders(reminders, notifyTime: settings.notifyTime, leadDays: settings.notifyLeadDays);
+}
+
 final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchSuggestions());
 final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
   return BugReportRepository(
@@ -209,6 +259,9 @@ final appVersionProvider = FutureProvider<String>((ref) async {
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));
 
+final productAliasesStreamProvider =
+    StreamProvider.family((ref, String productId) => ref.watch(productRepositoryProvider).watchAliasesFor(productId));
+
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(
     ref.watch(databaseProvider),
@@ -220,6 +273,7 @@ final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     productRepo: ref.watch(productRepositoryProvider),
     inventoryRepo: ref.watch(inventoryRepositoryProvider),
+    shoppingListRepo: ref.watch(shoppingListRepositoryProvider),
   );
 });
 
