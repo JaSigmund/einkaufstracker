@@ -60,7 +60,15 @@ double? paymentCutY(List<OcrLine> lines, {double slope = 0}) {
     if (rows[i].any((l) => _paymentWords.hasMatch(l.text))) {
       final previous = i == 0 ? null : rows[i - 1];
       // Ohne Zeile davor gibt es nichts Sicheres zu senden
-      return previous == null ? null : rowBottom(previous) + margin.clamp(0, rowTop(rows[i]) - rowBottom(previous));
+      if (previous == null) return null;
+      // Fehlerbericht "Scan nicht möglich: invalid argument(s): 0" (2026-09-28, Hofer-Bon): liegen die
+      // Zahlungszeile und die Zeile davor auf einem echten, unregelmaessig fotografierten Bon so nah
+      // beieinander oder ueberlappen sich sogar (Zeile davor endet unterhalb des Beginns der Zahlungszeile),
+      // wird die Differenz negativ. `num.clamp` verlangt aber lowerLimit <= upperLimit und wirft sonst einen
+      // ArgumentError - die obere Grenze darf daher nie unter 0 fallen (dann einfach kein zusaetzlicher
+      // Rand, der Schnitt liegt direkt an der Zeile davor).
+      final available = math.max(0.0, rowTop(rows[i]) - rowBottom(previous));
+      return rowBottom(previous) + margin.clamp(0, available);
     }
   }
   return null;
