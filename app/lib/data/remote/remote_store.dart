@@ -1,5 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Nach dieser Zeit gilt ein Netzaufruf als haengen geblieben (z.B. abgerissene Mobilfunkverbindung ohne
+/// sauberen Verbindungsabbruch) und wird abgebrochen, statt die Synchronisierung fuer immer zu blockieren
+/// (Fehlerbericht "Sync bleibt bei 'Synchronisiere...' haengen", 2026-09-28).
+const _networkTimeout = Duration(seconds: 20);
+
 /// Abstraktion des Servers fuer den Sync (damit der Sync-Code ohne Netz getestet werden kann).
 abstract class RemoteStore {
   /// Zeilen mit updated_at >= [since] (Server-Format), aufsteigend nach updated_at, hoechstens [limit].
@@ -26,14 +31,14 @@ class SupabaseRemoteStore implements RemoteStore {
   Future<List<Map<String, dynamic>>> fetchChanges(String table, {String? since, int limit = 500}) async {
     final base = _client.from(table).select();
     final filtered = since == null ? base : base.gte('updated_at', since);
-    final rows = await filtered.order('updated_at', ascending: true).limit(limit);
+    final rows = await filtered.order('updated_at', ascending: true).limit(limit).timeout(_networkTimeout);
     return List<Map<String, dynamic>>.from(rows);
   }
 
   @override
   Future<void> upsert(String table, Map<String, dynamic> row) async {
     try {
-      await _client.from(table).upsert(row);
+      await _client.from(table).upsert(row).timeout(_networkTimeout);
     } on PostgrestException catch (e) {
       // 4xx/Constraint-Fehler sind Datenfehler, alles andere (Netz, Auth) bleibt eine normale Exception
       final code = int.tryParse(e.code ?? '');

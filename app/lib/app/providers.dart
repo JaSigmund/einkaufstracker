@@ -135,6 +135,7 @@ class SyncController extends Notifier<SyncStatus> {
     if (e is SocketException || e.toString().contains('ClientException') || e.toString().contains('SocketException')) {
       return 'Kein Netz, Aenderungen werden spaeter gesendet.';
     }
+    if (e is TimeoutException) return 'Verbindung hängt, wird erneut versucht.';
     if (e is AuthException) return 'Anmeldung abgelaufen, bitte neu anmelden.';
     return e.toString();
   }
