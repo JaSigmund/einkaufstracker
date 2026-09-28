@@ -2,6 +2,13 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.5 — 2026-09-28
+
+Featurevorschlag und einheitliche Rückmeldungen
+
+- Neue Option in den Einstellungen: Feature vorschlagen, neben dem bisherigen Fehler melden
+- Meine Rückmeldungen (vorher Meine Fehlerberichte) zeigt Fehlerberichte und Featurevorschläge zusammen mit eigenem Symbol und eigenen Status-Bezeichnungen
+
 ## 1.7.4 — 2026-09-28
 
 Foto-Scan stürzt nicht mehr ab
