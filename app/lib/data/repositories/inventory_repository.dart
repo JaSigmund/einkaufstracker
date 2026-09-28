@@ -138,6 +138,15 @@ class InventoryRepository {
   /// Legt einen Bon-Vorschlag an (Doku 06 §2 Punkt 1, §9 "Bon bestaetigt"): kein MHD, sondern hoechstens
   /// ein geschaetztes Ablaufdatum aus der Standardhaltbarkeit des Produkts. Bucht eine Kaufbewegung, weil der
   /// Bon selbst der Beleg ist (anders als beim Verfeinern per Scan, das keine neue Bewegung braucht).
+  ///
+  /// Idempotent ueber [receiptItemId] (Gesamtkonzept Artikel<->Bon, 2026-09-28): die ID des Eintrags wird
+  /// deterministisch aus der Bon-Position abgeleitet, damit pro Position hoechstens ein Inventar-Eintrag
+  /// existiert. Ein erneuter Aufruf fuer dieselbe Position (z.B. erneuter Import eines geloeschten Bons)
+  /// erzeugt dadurch nie eine zweite Zeile, selbst wenn eine fruehere Aufraeumung ausgeblieben ist — die
+  /// Korrektheit haengt nicht mehr davon ab, dass jede Loesch-Stelle im Code das sauber nachzieht. Wurde der
+  /// Vorschlag inzwischen vom Nutzer bestaetigt (isSuggestion = false), bleibt er unangetastet: seine Menge,
+  /// sein Lagerort und sein MHD sind bewusste Nutzerangaben, kein erneuter Bon-Import darf sie ueberschreiben
+  /// oder den Eintrag zurueck zum Vorschlag machen.
   Future<InventoryItem> createSuggestionFromReceipt({
     required String productId,
     required String receiptItemId,
@@ -150,8 +159,12 @@ class InventoryRepository {
   }) async {
     final hid = await householdId();
     final estimatedExpiry = sealedShelfLifeDays == null ? null : purchasedOn.add(Duration(days: sealedShelfLifeDays));
+    final id = _uuid.v5(Namespace.url.value, 'einkaufstracker:suggestion:$receiptItemId');
+    final existing = await (_db.select(_db.inventoryItems)..where((i) => i.id.equals(id))).getSingleOrNull();
+    if (existing != null && !existing.isSuggestion) return existing;
+
     final item = InventoryItem(
-      id: _uuid.v4(),
+      id: id,
       householdId: hid,
       productId: productId,
       receiptItemId: receiptItemId,
@@ -167,7 +180,9 @@ class InventoryRepository {
       updatedAt: DateTime.now().toUtc(),
     );
     await _putItem(item);
-    await _addMovement(inventoryItemId: item.id, productId: productId, type: 'purchase', delta: quantity, unit: unit, now: purchasedOn);
+    if (existing == null) {
+      await _addMovement(inventoryItemId: item.id, productId: productId, type: 'purchase', delta: quantity, unit: unit, now: purchasedOn);
+    }
     return item;
   }
 
