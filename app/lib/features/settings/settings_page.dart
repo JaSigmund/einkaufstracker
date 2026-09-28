@@ -198,9 +198,16 @@ class SettingsPage extends ConsumerWidget {
             onTap: () => context.push('/bug-report'),
           ),
           ListTile(
+            key: const Key('settings-feature-request'),
+            leading: const Icon(Icons.lightbulb_outline),
+            title: const Text('Feature vorschlagen'),
+            subtitle: const Text('Deine Idee kommt auf die Planungsliste, sobald sie angenommen wurde.'),
+            onTap: () => context.push('/feature-request'),
+          ),
+          ListTile(
             key: const Key('settings-bug-reports'),
             leading: const Icon(Icons.list_alt_outlined),
-            title: const Text('Meine Fehlerberichte'),
+            title: const Text('Meine Rückmeldungen'),
             onTap: () => context.push('/bug-reports'),
           ),
           ListTile(

@@ -273,12 +273,18 @@ class ProductAliases extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Fehlerbericht aus der App (Spiegel von public.bug_reports). appInfo/dataSnapshot sind als JSON-Text
-/// gespeichert (drift kennt kein natives jsonb), beim Sync wird daraus/ dahin dekodiert.
+/// Fehlerbericht oder Feature-Vorschlag aus der App (Spiegel von public.bug_reports). appInfo/dataSnapshot
+/// sind als JSON-Text gespeichert (drift kennt kein natives jsonb), beim Sync wird daraus/dahin dekodiert.
+/// Beide Arten teilen sich Tabelle und Status-Workflow (Gesamtkonzept Feedback-Warteschlange, 2026-09-28):
+/// 'confirmed' bedeutet bei einem Feature "angenommen" (Gate vor der Umsetzung), die Planungsliste ist keine
+/// eigene Tabelle, sondern die Abfrage kind='feature' AND status='confirmed'.
 @DataClassName('BugReport')
 class BugReports extends Table {
   TextColumn get id => text()();
   TextColumn get householdId => text()();
+
+  /// 'bug' | 'feature'
+  TextColumn get kind => text().withDefault(const Constant('bug'))();
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
   TextColumn get appInfo => text()();
@@ -389,7 +395,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -453,6 +459,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 11) {
             await m.addColumn(receiptItems, receiptItems.brand);
             await m.addColumn(receiptItems, receiptItems.unitPriceNormCents);
+          }
+          // 11 -> 12: Feature-Vorschlaege teilen sich die Fehlerbericht-Tabelle (kind-Feld)
+          if (from < 12) {
+            await m.addColumn(bugReports, bugReports.kind);
           }
         },
       );

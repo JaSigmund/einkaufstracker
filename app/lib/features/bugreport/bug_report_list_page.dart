@@ -12,7 +12,9 @@ import '../../data/local/database.dart';
 const _prettyJson = JsonEncoder.withIndent('  ');
 
 /// Bearbeitungsstatus wie in einem Ticket-System (Doku-Wunsch "aehnlich wie in MS Azure"): Reihenfolge,
-/// Farbe und Anzeigename je Status.
+/// Farbe und Anzeigename je Status. Fehlerbericht und Feature-Vorschlag teilen sich den Status-Enum
+/// (Gesamtkonzept Feedback-Warteschlange, 2026-09-28), aber die Bezeichnung passt sich der Art an:
+/// 'confirmed' heisst bei einem Feature "Angenommen" (die Planungsliste), bei einem Bug "Bestätigt".
 const _statusLabels = {
   'new': 'Gemeldet',
   'confirmed': 'Bestätigt',
@@ -22,6 +24,19 @@ const _statusLabels = {
   'wont_fix': 'Wird nicht behoben',
   'duplicate': 'Duplikat',
 };
+
+const _featureStatusLabels = {
+  'new': 'Vorgeschlagen',
+  'confirmed': 'Angenommen',
+  'in_progress': 'In Umsetzung',
+  'fixed': 'Umgesetzt',
+  'verified': 'Bestätigt umgesetzt',
+  'wont_fix': 'Nicht geplant',
+  'duplicate': 'Duplikat',
+};
+
+String statusLabelFor(String kind, String status) =>
+    (kind == 'feature' ? _featureStatusLabels[status] : _statusLabels[status]) ?? status;
 
 Color _statusColor(String status, ColorScheme cs) => switch (status) {
       'new' => cs.outline,
@@ -40,8 +55,9 @@ const _severityLabels = {'low': 'Niedrig', 'medium': 'Mittel', 'high': 'Hoch', '
 String reportAsText(BugReport r) {
   final buf = StringBuffer()
     ..writeln('# ${r.title}')
+    ..writeln('Art: ${r.kind == 'feature' ? 'Feature-Vorschlag' : 'Fehlerbericht'}')
     ..writeln('Gemeldet: ${formatViennaDateTime(r.createdAt)}')
-    ..writeln('Status: ${_statusLabels[r.status] ?? r.status}')
+    ..writeln('Status: ${statusLabelFor(r.kind, r.status)}')
     ..writeln();
   if (r.description != null) buf..writeln(r.description)..writeln();
   if (r.resolution != null) {
@@ -55,8 +71,9 @@ String reportAsText(BugReport r) {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
+  const _StatusChip({required this.status, this.kind = 'bug'});
   final String status;
+  final String kind;
 
   @override
   Widget build(BuildContext context) {
@@ -64,12 +81,14 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(999)),
-      child: Text(_statusLabels[status] ?? status, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
+      child: Text(statusLabelFor(kind, status), style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12)),
     );
   }
 }
 
-/// Liste der eigenen Fehlerberichte mit Status, zum Nachschauen und Kopieren (siehe [BugReportDetailPage]).
+/// Liste der eigenen Fehlerberichte und Feature-Vorschlaege mit Status, zum Nachschauen und Kopieren (siehe
+/// [BugReportDetailPage]). Beide Arten teilen sich Tabelle und Status-Workflow (Gesamtkonzept
+/// Feedback-Warteschlange, 2026-09-28), das Icon unterscheidet sie in der Liste.
 class BugReportListPage extends ConsumerWidget {
   const BugReportListPage({super.key});
 
@@ -77,22 +96,22 @@ class BugReportListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reports = ref.watch(bugReportsStreamProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Meine Fehlerberichte')),
+      appBar: AppBar(title: const Text('Meine Rückmeldungen')),
       body: reports.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Fehler: $e')),
         data: (list) => list.isEmpty
-            ? const Center(child: Text('Noch keine Fehlerberichte', key: Key('bug-list-empty')))
+            ? const Center(child: Text('Noch keine Rückmeldungen', key: Key('bug-list-empty')))
             : ListView(
                 children: [
                   for (final r in list)
                     ListTile(
                       key: Key('bug-${r.id}'),
-                      leading: const Icon(Icons.bug_report_outlined),
+                      leading: Icon(r.kind == 'feature' ? Icons.lightbulb_outline : Icons.bug_report_outlined),
                       title: Text(r.title),
                       subtitle: Text(formatViennaDateTime(r.createdAt)),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        _StatusChip(status: r.status),
+                        _StatusChip(status: r.status, kind: r.kind),
                         const SizedBox(width: 4),
                         const Icon(Icons.chevron_right),
                       ]),
@@ -134,7 +153,7 @@ class BugReportDetailPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Wrap(spacing: 8, runSpacing: 8, children: [
-            _StatusChip(status: report.status),
+            _StatusChip(status: report.status, kind: report.kind),
             if (report.severity != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

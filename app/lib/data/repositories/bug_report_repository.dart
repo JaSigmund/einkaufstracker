@@ -21,11 +21,23 @@ class BugReportRepository {
         ..orderBy([(b) => OrderingTerm.desc(b.createdAt)]))
       .watch();
 
+  /// Die Planungsliste (Gesamtkonzept Feedback-Warteschlange, 2026-09-28): angenommene, aber noch nicht
+  /// begonnene Feature-Vorschlaege, aelteste zuerst (Reihenfolge der Zusage).
+  Stream<List<BugReport>> watchPlanningList() => (_db.select(_db.bugReports)
+        ..where((b) => b.deletedAt.isNull() & b.kind.equals('feature') & b.status.equals('confirmed'))
+        ..orderBy([(b) => OrderingTerm.asc(b.createdAt)]))
+      .watch();
+
+  /// [kind]: 'bug' | 'feature' (Gesamtkonzept Feedback-Warteschlange, 2026-09-28). Ein Feature-Vorschlag
+  /// darf erst umgesetzt werden, nachdem er auf 'confirmed' gesetzt wurde (die Planungsliste); ein Bug erst,
+  /// nachdem er auf 'in_progress' gesetzt wurde — beides bewusst per SQL durch die Entwicklung, nicht vom
+  /// Client, damit ungeprueftes Feedback (auch von spaeteren Testnutzern) nie automatisch umgesetzt wird.
   Future<BugReport> create({
     required String title,
     String? description,
     required Map<String, dynamic> appInfo,
     Map<String, dynamic>? dataSnapshot,
+    String kind = 'bug',
   }) async {
     final t = title.trim();
     if (t.isEmpty) throw ArgumentError('Titel darf nicht leer sein');
@@ -34,6 +46,7 @@ class BugReportRepository {
     final report = BugReport(
       id: _uuid.v4(),
       householdId: hid,
+      kind: kind,
       title: t,
       description: description?.trim().isEmpty == true ? null : description?.trim(),
       appInfo: jsonEncode(appInfo),
