@@ -2,6 +2,12 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.3 — 2026-09-28
+
+Bonzuordnung zu gelöschtem Bon korrigiert
+
+- Die Bonzuordnung eines Inventar-Eintrags zeigt einen gelöschten Bon nicht mehr fälschlich als gültig an
+
 ## 1.7.2 — 2026-09-28
 
 Sync-Hänger wirklich behoben
