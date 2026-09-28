@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Anmeldung. Selbstregistrierung gibt es bewusst nicht (im Supabase-Projekt abgeschaltet).
@@ -24,7 +26,7 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<void> signIn(String email, String password) async {
     try {
-      await _client.auth.signInWithPassword(email: email.trim(), password: password);
+      await _client.auth.signInWithPassword(email: email.trim(), password: password).timeout(const Duration(seconds: 20));
     } on AuthException catch (e) {
       final m = e.message.toLowerCase();
       if (m.contains('invalid login')) throw SignInFailure('E-Mail oder Passwort stimmt nicht.');

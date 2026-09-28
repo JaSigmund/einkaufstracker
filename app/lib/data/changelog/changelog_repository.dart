@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Ein Eintrag im Aenderungsprotokoll der App (Doku-Wunsch "Changelog der Versionen").
@@ -25,7 +27,7 @@ class ChangelogRepository {
   final SupabaseClient _client;
 
   Future<List<ChangelogEntry>> load() async {
-    final rows = await _client.from('app_changelog').select().order('released_at', ascending: false);
+    final rows = await _client.from('app_changelog').select().order('released_at', ascending: false).timeout(const Duration(seconds: 20));
     return (rows as List).map((r) => ChangelogEntry.fromJson(r as Map<String, dynamic>)).toList();
   }
 }

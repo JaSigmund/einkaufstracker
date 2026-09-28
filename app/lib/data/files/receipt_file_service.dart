@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -7,6 +8,12 @@ import 'package:uuid/uuid.dart';
 
 import '../local/database.dart';
 import '../repositories/receipt_repository.dart';
+
+/// Nach dieser Zeit gilt ein Netzaufruf als haengen geblieben und wird abgebrochen, statt den Sync (der auf
+/// [ReceiptFileService.uploadPending] wartet) fuer immer in "Synchronisiere..." zu blockieren (Fehlerbericht
+/// "Sync bleibt haengen", 2026-09-28 — die Tabellen-Synchronisierung hatte schon ein Timeout, der
+/// Datei-Upload in den privaten Bucket noch nicht).
+const _networkTimeout = Duration(seconds: 20);
 
 /// Ort der Originaldateien auf dem Server (privater Bucket "receipts").
 abstract class RemoteFileStore {
@@ -22,14 +29,15 @@ class SupabaseFileStore implements RemoteFileStore {
   StorageFileApi get _bucket => _client.storage.from('receipts');
 
   @override
-  Future<void> upload(String path, Uint8List bytes, String contentType) =>
-      _bucket.uploadBinary(path, bytes, fileOptions: FileOptions(contentType: contentType, upsert: true));
+  Future<void> upload(String path, Uint8List bytes, String contentType) => _bucket
+      .uploadBinary(path, bytes, fileOptions: FileOptions(contentType: contentType, upsert: true))
+      .timeout(_networkTimeout);
 
   @override
-  Future<Uint8List> download(String path) => _bucket.download(path);
+  Future<Uint8List> download(String path) => _bucket.download(path).timeout(_networkTimeout);
 
   @override
-  Future<void> remove(List<String> paths) => _bucket.remove(paths);
+  Future<void> remove(List<String> paths) => _bucket.remove(paths).timeout(_networkTimeout);
 }
 
 /// Eine Datei, die zu einem Bon abgelegt werden soll (Bytes sind bereits aufbereitet).
