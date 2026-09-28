@@ -180,3 +180,24 @@ MonthReport buildMonthReport(
     discountLines: discountLines,
   );
 }
+
+/// Ausgaben je Monat und Kategorie ueber mehrere Monate (Doku 07 §2 "Trend"), aeltester Monat zuerst.
+/// [months] endet einschliesslich bei ([endYear], [endMonth]), typischerweise 6 oder 12.
+List<MonthReport> buildTrend(
+  Iterable<ReportReceipt> receipts,
+  Iterable<ReportItem> items, {
+  required int endYear,
+  required int endMonth,
+  int months = 6,
+}) {
+  final receiptList = receipts.toList();
+  final itemList = items.toList();
+  final result = <MonthReport>[];
+  for (var i = months - 1; i >= 0; i--) {
+    final offset = endMonth - 1 - i;
+    final year = endYear + (offset / 12).floor();
+    final month = offset % 12 + 1;
+    result.add(buildMonthReport(receiptList, itemList, year: year, month: month));
+  }
+  return result;
+}

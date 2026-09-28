@@ -20,6 +20,7 @@ import '../features/bugreport/bug_report_page.dart';
 import '../features/changelog/changelog_page.dart';
 import '../features/inventory/inventory_item_detail_page.dart';
 import '../features/products/stock_entry_page.dart';
+import '../features/report/trend_page.dart';
 import '../features/settings/settings_page.dart';
 import 'providers.dart';
 
@@ -74,6 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         redirect: (_, state) => state.extra is ImportPreview ? null : '/',
       ),
       GoRoute(path: '/changelog', builder: (_, _) => const ChangelogPage()),
+      GoRoute(path: '/trend', builder: (_, _) => const TrendPage()),
       GoRoute(path: '/bug-report', builder: (_, _) => const BugReportPage()),
       GoRoute(path: '/bug-reports', builder: (_, _) => const BugReportListPage()),
       GoRoute(

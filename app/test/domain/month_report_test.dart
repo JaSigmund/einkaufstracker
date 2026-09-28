@@ -154,4 +154,24 @@ void main() {
       expect(rep.totalCents, 0);
     });
   });
+
+  group('buildTrend (Doku 07 §2 "Trend")', () {
+    test('liefert die angeforderte Anzahl Monate, aeltester zuerst, ueber den Jahreswechsel', () {
+      final trend = buildTrend(
+        [_r('a', DateTime.utc(2025, 11, 15)), _r('b', DateTime.utc(2026, 1, 10)), _r('c', DateTime.utc(2026, 2, 5))],
+        [_i('a', 1, 'x', 500), _i('b', 1, 'y', 300), _i('c', 1, 'z', 200)],
+        endYear: 2026,
+        endMonth: 2,
+        months: 4,
+      );
+      expect(trend.map((r) => (r.year, r.month)), [(2025, 11), (2025, 12), (2026, 1), (2026, 2)]);
+      expect(trend.map((r) => r.totalCents), [500, 0, 300, 200]);
+    });
+
+    test('Standard: 6 Monate', () {
+      final trend = buildTrend([], [], endYear: 2026, endMonth: 3);
+      expect(trend, hasLength(6));
+      expect((trend.first.year, trend.first.month), (2025, 10));
+    });
+  });
 }
