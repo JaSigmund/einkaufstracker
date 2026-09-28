@@ -32,6 +32,10 @@ class CategoryRepository {
         ..orderBy([(c) => OrderingTerm.asc(c.sortOrder), (c) => OrderingTerm.asc(c.name)]))
       .watch();
 
+  /// Einmalige Momentaufnahme von [watchAll] (Doku 07 §5 CSV-Export), ohne eine dauerhafte Abfrage offen
+  /// zu halten.
+  Future<List<Category>> allSnapshot() => (_db.select(_db.categories)..where((c) => c.deletedAt.isNull())).get();
+
   Future<void> add(String name, {bool isStorable = true}) async {
     final n = name.trim();
     if (n.isEmpty) throw ArgumentError('Name darf nicht leer sein');

@@ -1,9 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
+import '../../data/local/database.dart';
+import '../../domain/receipt/csv_export.dart';
 import '../common/sync_status_banner.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -49,6 +55,36 @@ class SettingsPage extends ConsumerWidget {
     }
     if (!context.mounted) return;
     await _update(context, ref, {'monthly_budget_cents': cents});
+  }
+
+  /// Bon-Positionen als CSV exportieren (Doku 07 §5), zum Teilen/Speichern ueber den System-Dialog.
+  Future<void> _exportCsv(BuildContext context, WidgetRef ref) async {
+    try {
+      final receipts = ref.read(receiptRepositoryProvider);
+      final results = await Future.wait([
+        receipts.allSnapshot(),
+        receipts.allItemsSnapshot(),
+        receipts.storesSnapshot(),
+        ref.read(productRepositoryProvider).allSnapshot(),
+        ref.read(categoryRepositoryProvider).allSnapshot(),
+      ]);
+      final csv = buildReceiptItemsCsv(
+        receipts: results[0] as List<Receipt>,
+        items: results[1] as List<ReceiptItem>,
+        stores: results[2] as List<Store>,
+        products: results[3] as List<Product>,
+        categories: results[4] as List<Category>,
+      );
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/einkaufstracker_export.csv');
+      await file.writeAsString(csv);
+      if (!context.mounted) return;
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'Einkaufstracker-Export'));
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export nicht möglich.')));
+      }
+    }
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
@@ -143,6 +179,13 @@ class SettingsPage extends ConsumerWidget {
                 title: const Text('Monatsbudget'),
                 subtitle: Text(s.monthlyBudgetCents == null ? 'Kein Budget gesetzt' : 'Warnung ab ${formatEuro(s.monthlyBudgetCents!)} pro Monat'),
                 onTap: () => _editBudget(context, ref, s.monthlyBudgetCents),
+              ),
+              ListTile(
+                key: const Key('settings-csv-export'),
+                leading: const Icon(Icons.file_download_outlined),
+                title: const Text('Bon-Daten exportieren (CSV)'),
+                subtitle: const Text('Eine Zeile je Bon-Position, für Excel oder Obsidian'),
+                onTap: () => _exportCsv(context, ref),
               ),
             ]),
           ),
