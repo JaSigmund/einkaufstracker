@@ -2,6 +2,12 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.8 — 2026-09-28
+
+Eigentliche Ursache des Foto-Scan-Absturzes behoben
+
+- Ein Geometrie-Sonderfall beim Zuschneiden des Zahlungsblocks (nicht der Hofer-Parser selbst) war der eigentliche Grund für den Fehler "invalid argument(s): 0" — jetzt behoben, statt nur abgefangen
+
 ## 1.7.7 — 2026-09-28
 
 Erste Hofer-Bon-Erkennung beim Foto-Scan
