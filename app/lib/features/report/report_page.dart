@@ -82,6 +82,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
     final items = ref.watch(allItemsStreamProvider);
     final categories = ref.watch(categoriesStreamProvider).value ?? const <Category>[];
     final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
+    final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final t = Theme.of(context);
 
     if (receipts.isLoading || items.isLoading) return const Center(child: CircularProgressIndicator());
@@ -98,6 +99,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             kind: i.kind,
             rawText: i.rawText,
             categoryId: i.categoryId,
+            productId: i.productId,
             quantity: i.quantity,
             lineTotalCents: i.lineTotalCents,
           ),
@@ -192,11 +194,15 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             if (_open == c.categoryId)
               for (final a in c.items)
                 ListTile(
+                  key: Key('article-${c.categoryId}-${a.key}'),
                   dense: true,
                   contentPadding: const EdgeInsets.only(left: 32, right: 16),
                   title: Text(a.label),
                   subtitle: a.purchases == 0 ? null : Text('${a.purchases}× gekauft'),
                   trailing: Text(formatEuro(a.totalCents), style: TextStyle(color: a.totalCents < 0 ? t.colorScheme.primary : null)),
+                  onTap: a.productId == null || products[a.productId] == null
+                      ? null
+                      : () => context.push('/product-price', extra: products[a.productId]!),
                 ),
           ],
       ],

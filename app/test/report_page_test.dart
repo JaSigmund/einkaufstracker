@@ -11,12 +11,15 @@ Receipt _receipt(String id, DateTime utc, int cents) => Receipt(
       sumMismatch: false, updatedAt: DateTime.utc(2026),
     );
 
-ReceiptItem _item(String rid, String id, int no, String text, int cents, {String? cat, String kind = 'article'}) => ReceiptItem(
+ReceiptItem _item(String rid, String id, int no, String text, int cents, {String? cat, String kind = 'article', String? productId}) => ReceiptItem(
       id: id, householdId: 'h', receiptId: rid, lineNo: no, kind: kind, rawText: text, quantity: 1, quantityUnit: 'piece',
-      lineTotalCents: cents, categoryId: cat, needsReview: false, updatedAt: DateTime.utc(2026),
+      lineTotalCents: cents, categoryId: cat, productId: productId, needsReview: false, updatedAt: DateTime.utc(2026),
     );
 
 Category _cat(String id, String name) => Category(id: id, householdId: 'h', name: name, sortOrder: 0, isStorable: false, updatedAt: DateTime.utc(2026));
+
+Product _product(String id, String name) =>
+    Product(id: id, householdId: 'h', name: name, baseUnit: 'piece', defaultDateKind: 'best_before', defaultLocation: 'pantry', restock: false, updatedAt: DateTime.utc(2026));
 
 void main() {
   Widget host() => ProviderScope(
@@ -26,18 +29,20 @@ void main() {
                 _receipt('b', DateTime.utc(2026, 8, 5, 10), 300),
               ])),
           allItemsStreamProvider.overrideWith((ref) => Stream.value([
-                _item('a', 'i1', 1, 'Clever Champignon weiß', 500, cat: 'g'),
+                _item('a', 'i1', 1, 'Clever Champignon weiß', 500, cat: 'g', productId: 'p1'),
                 _item('a', 'i2', 2, 'Clever Hirtenkäse', 300, cat: 'k'),
                 _item('a', 'i4', 3, 'EXTREM AKTION', -100, cat: 'k', kind: 'discount'),
                 _item('a', 'i5', 4, 'jö Rabattsammler 20%', -50, kind: 'bill_discount'),
                 _item('b', 'i3', 1, 'Karottenbrot', 300, cat: 'b'),
               ])),
           categoriesStreamProvider.overrideWith((ref) => Stream.value([_cat('g', 'Gemüse'), _cat('k', 'Käse'), _cat('b', 'Brot & Backwaren')])),
+          productsStreamProvider.overrideWith((ref) => Stream.value([_product('p1', 'Champignon weiß')])),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(routes: [
             GoRoute(path: '/', builder: (_, _) => Scaffold(body: ReportPage(now: DateTime.utc(2026, 9, 26, 12)))),
             GoRoute(path: '/receipt/:id', builder: (_, s) => Scaffold(body: Text('DETAIL ${s.pathParameters['id']}'))),
+            GoRoute(path: '/product-price', builder: (_, s) => Scaffold(body: Text('PREIS ${(s.extra as Product).id}'))),
           ]),
         ),
       );
@@ -67,6 +72,17 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('report-total'))).data, '3,00 €');
     expect(find.text('Brot & Backwaren'), findsOneWidget);
     expect(find.text('Clever Champignon weiß'), findsNothing); // Auswahl beim Monatswechsel zurueckgesetzt
+  });
+
+  testWidgets('Tippen auf einen zugeordneten Artikel oeffnet das Artikel-Detail (Doku 07 §2)', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gemüse'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clever Champignon weiß'));
+    await tester.pumpAndSettle();
+    expect(find.text('PREIS p1'), findsOneWidget);
   });
 
   testWidgets('Monatswechsel ueber den Jahreswechsel und leerer Monat', (tester) async {

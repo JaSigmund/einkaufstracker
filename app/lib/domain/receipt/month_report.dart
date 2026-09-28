@@ -11,6 +11,7 @@ typedef ReportItem = ({
   String kind, // article | discount | bill_discount | deposit
   String rawText,
   String? categoryId,
+  String? productId,
   double quantity,
   int lineTotalCents,
 });
@@ -39,6 +40,9 @@ class ItemAggregate {
   double quantity = 0;
   int totalCents = 0;
   int purchases = 0;
+
+  /// Produkt-Zuordnung fuer den Sprung ins Artikel-Detail (Doku 07 §2), sofern eine bekannt ist.
+  String? productId;
 }
 
 class CategoryTotal {
@@ -113,13 +117,14 @@ MonthReport buildMonthReport(
   var saved = 0;
 
   void add(String receiptId, String categoryKey, String itemKey, String label, int cents, String kind,
-      {double quantity = 0, bool purchase = false}) {
+      {double quantity = 0, bool purchase = false, String? productId}) {
     final c = totals.putIfAbsent(categoryKey, () => CategoryTotal(categoryKey));
     c.totalCents += cents;
     final a = c._items.putIfAbsent(itemKey, () => ItemAggregate(itemKey, label));
     a.totalCents += cents;
     a.quantity += quantity;
     if (purchase) a.purchases++;
+    a.productId ??= productId;
     final line = (receiptId: receiptId, purchasedAtUtc: inMonth[receiptId]!, label: label, cents: cents, kind: kind);
     c.lines.add(line);
     if (kind == 'discount' || kind == 'bill_discount') {
@@ -150,7 +155,7 @@ MonthReport buildMonthReport(
       }
       final key = normalizeItemName(i.rawText);
       final k = key.isEmpty ? i.rawText : key;
-      add(id, i.categoryId ?? unassignedKey, k, i.rawText, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true);
+      add(id, i.categoryId ?? unassignedKey, k, i.rawText, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true, productId: i.productId);
       if (i.kind == 'article') {
         hasArticle = true;
         lastKey = k;
