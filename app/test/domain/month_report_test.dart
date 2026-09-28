@@ -2,7 +2,7 @@ import 'package:einkaufstracker/domain/receipt/month_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ReportItem _i(String rid, int no, String text, int cents, {String kind = 'article', String? cat, double qty = 1}) =>
-    (receiptId: rid, lineNo: no, kind: kind, rawText: text, categoryId: cat, quantity: qty, lineTotalCents: cents);
+    (receiptId: rid, lineNo: no, kind: kind, rawText: text, categoryId: cat, productId: null, quantity: qty, lineTotalCents: cents);
 
 ReportReceipt _r(String id, DateTime utc) => (id: id, purchasedAtUtc: utc);
 

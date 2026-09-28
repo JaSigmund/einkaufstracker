@@ -15,6 +15,7 @@ import '../features/receipts/receipt_detail_page.dart';
 import '../features/receipts/receipt_file_page.dart';
 import '../features/products/product_form_page.dart';
 import '../features/products/products_list_page.dart';
+import '../features/report/product_price_page.dart';
 import '../features/bugreport/bug_report_list_page.dart';
 import '../features/bugreport/bug_report_page.dart';
 import '../features/changelog/changelog_page.dart';
@@ -95,6 +96,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           return InventoryItemDetailPage(item: a.item, product: a.product);
         },
         redirect: (_, state) => state.extra is InventoryItemArgs ? null : '/',
+      ),
+      GoRoute(
+        path: '/product-price',
+        builder: (_, state) => ProductPricePage(product: state.extra as Product),
+        redirect: (_, state) => state.extra is Product ? null : '/',
       ),
       GoRoute(
         path: '/stock-entry',
