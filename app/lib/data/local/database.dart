@@ -129,12 +129,17 @@ class ReceiptItems extends Table {
   TextColumn get rawText => text()();
   TextColumn get productId => text().nullable()();
   TextColumn get categoryId => text().nullable()();
+  TextColumn get brand => text().nullable()();
   RealColumn get quantity => real().withDefault(const Constant(1))();
 
   /// 'piece' | 'kg' | 'l'
   TextColumn get quantityUnit => text().withDefault(const Constant('piece'))();
   IntColumn get unitPriceCents => integer().nullable()();
   IntColumn get lineTotalCents => integer()();
+
+  /// Grundpreis je Basiseinheit des Produkts, in Cent (Doku 07 §3.1). `null`, wenn nicht berechenbar
+  /// (kein Produkt zugeordnet oder Packware ohne bekannten Packungsinhalt).
+  IntColumn get unitPriceNormCents => integer().nullable()();
   TextColumn get taxCode => text().nullable()();
   BoolColumn get needsReview => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime()();
@@ -384,7 +389,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -443,6 +448,11 @@ class AppDatabase extends _$AppDatabase {
           if (from < 10) {
             await m.createTable(shoppingLists);
             await m.createTable(shoppingListItems);
+          }
+          // 10 -> 11: Grundpreis und Marke je Bon-Position (Phase 4)
+          if (from < 11) {
+            await m.addColumn(receiptItems, receiptItems.brand);
+            await m.addColumn(receiptItems, receiptItems.unitPriceNormCents);
           }
         },
       );

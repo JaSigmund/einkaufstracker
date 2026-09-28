@@ -209,7 +209,7 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
 /// Plant die Ablauf-Erinnerungen neu (Doku 06 §5, Schritt 1): nach jeder Inventaraenderung und beim
 /// App-Start aufgerufen. Ohne Netz (Einstellungen sind bislang online-only) bleibt die zuletzt geplante
 /// Erinnerung unveraendert bestehen, statt abzubrechen.
-Future<void> rescheduleExpiryReminders(WidgetRef ref) async {
+Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final hid = await ref.read(householdIdProvider.future);
   if (hid == null) return;
   final HouseholdSettings settings;
@@ -221,7 +221,7 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref) async {
   final items = await ref.read(inventoryRepositoryProvider).activeSnapshot();
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
-  final now = DateTime.now();
+  now ??= DateTime.now();
   final reminders = computeExpiryReminders(
     activeItems: items,
     productNameById: names,

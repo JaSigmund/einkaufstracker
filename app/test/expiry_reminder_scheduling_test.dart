@@ -44,7 +44,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await rescheduleExpiryReminders(ref);
+    await rescheduleExpiryReminders(ref, now: DateTime.utc(2026, 9, 27));
 
     expect(scheduler.lastScheduled, isNotNull);
     expect(scheduler.lastScheduled!.single.productNames, ['Vollmilch']);

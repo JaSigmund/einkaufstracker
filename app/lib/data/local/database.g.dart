@@ -3756,6 +3756,15 @@ class $ReceiptItemsTable extends ReceiptItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _brandMeta = const VerificationMeta('brand');
+  @override
+  late final GeneratedColumn<String> brand = GeneratedColumn<String>(
+    'brand',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _quantityMeta = const VerificationMeta(
     'quantity',
   );
@@ -3801,6 +3810,16 @@ class $ReceiptItemsTable extends ReceiptItems
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitPriceNormCentsMeta =
+      const VerificationMeta('unitPriceNormCents');
+  @override
+  late final GeneratedColumn<int> unitPriceNormCents = GeneratedColumn<int>(
+    'unit_price_norm_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _taxCodeMeta = const VerificationMeta(
     'taxCode',
@@ -3860,10 +3879,12 @@ class $ReceiptItemsTable extends ReceiptItems
     rawText,
     productId,
     categoryId,
+    brand,
     quantity,
     quantityUnit,
     unitPriceCents,
     lineTotalCents,
+    unitPriceNormCents,
     taxCode,
     needsReview,
     updatedAt,
@@ -3939,6 +3960,12 @@ class $ReceiptItemsTable extends ReceiptItems
         categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
       );
     }
+    if (data.containsKey('brand')) {
+      context.handle(
+        _brandMeta,
+        brand.isAcceptableOrUnknown(data['brand']!, _brandMeta),
+      );
+    }
     if (data.containsKey('quantity')) {
       context.handle(
         _quantityMeta,
@@ -3973,6 +4000,15 @@ class $ReceiptItemsTable extends ReceiptItems
       );
     } else if (isInserting) {
       context.missing(_lineTotalCentsMeta);
+    }
+    if (data.containsKey('unit_price_norm_cents')) {
+      context.handle(
+        _unitPriceNormCentsMeta,
+        unitPriceNormCents.isAcceptableOrUnknown(
+          data['unit_price_norm_cents']!,
+          _unitPriceNormCentsMeta,
+        ),
+      );
     }
     if (data.containsKey('tax_code')) {
       context.handle(
@@ -4044,6 +4080,10 @@ class $ReceiptItemsTable extends ReceiptItems
         DriftSqlType.string,
         data['${effectivePrefix}category_id'],
       ),
+      brand: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand'],
+      ),
       quantity: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}quantity'],
@@ -4060,6 +4100,10 @@ class $ReceiptItemsTable extends ReceiptItems
         DriftSqlType.int,
         data['${effectivePrefix}line_total_cents'],
       )!,
+      unitPriceNormCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_price_norm_cents'],
+      ),
       taxCode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}tax_code'],
@@ -4096,12 +4140,17 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
   final String rawText;
   final String? productId;
   final String? categoryId;
+  final String? brand;
   final double quantity;
 
   /// 'piece' | 'kg' | 'l'
   final String quantityUnit;
   final int? unitPriceCents;
   final int lineTotalCents;
+
+  /// Grundpreis je Basiseinheit des Produkts, in Cent (Doku 07 §3.1). `null`, wenn nicht berechenbar
+  /// (kein Produkt zugeordnet oder Packware ohne bekannten Packungsinhalt).
+  final int? unitPriceNormCents;
   final String? taxCode;
   final bool needsReview;
   final DateTime updatedAt;
@@ -4115,10 +4164,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     required this.rawText,
     this.productId,
     this.categoryId,
+    this.brand,
     required this.quantity,
     required this.quantityUnit,
     this.unitPriceCents,
     required this.lineTotalCents,
+    this.unitPriceNormCents,
     this.taxCode,
     required this.needsReview,
     required this.updatedAt,
@@ -4139,12 +4190,18 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<String>(categoryId);
     }
+    if (!nullToAbsent || brand != null) {
+      map['brand'] = Variable<String>(brand);
+    }
     map['quantity'] = Variable<double>(quantity);
     map['quantity_unit'] = Variable<String>(quantityUnit);
     if (!nullToAbsent || unitPriceCents != null) {
       map['unit_price_cents'] = Variable<int>(unitPriceCents);
     }
     map['line_total_cents'] = Variable<int>(lineTotalCents);
+    if (!nullToAbsent || unitPriceNormCents != null) {
+      map['unit_price_norm_cents'] = Variable<int>(unitPriceNormCents);
+    }
     if (!nullToAbsent || taxCode != null) {
       map['tax_code'] = Variable<String>(taxCode);
     }
@@ -4170,12 +4227,18 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
+      brand: brand == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brand),
       quantity: Value(quantity),
       quantityUnit: Value(quantityUnit),
       unitPriceCents: unitPriceCents == null && nullToAbsent
           ? const Value.absent()
           : Value(unitPriceCents),
       lineTotalCents: Value(lineTotalCents),
+      unitPriceNormCents: unitPriceNormCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitPriceNormCents),
       taxCode: taxCode == null && nullToAbsent
           ? const Value.absent()
           : Value(taxCode),
@@ -4201,10 +4264,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       rawText: serializer.fromJson<String>(json['rawText']),
       productId: serializer.fromJson<String?>(json['productId']),
       categoryId: serializer.fromJson<String?>(json['categoryId']),
+      brand: serializer.fromJson<String?>(json['brand']),
       quantity: serializer.fromJson<double>(json['quantity']),
       quantityUnit: serializer.fromJson<String>(json['quantityUnit']),
       unitPriceCents: serializer.fromJson<int?>(json['unitPriceCents']),
       lineTotalCents: serializer.fromJson<int>(json['lineTotalCents']),
+      unitPriceNormCents: serializer.fromJson<int?>(json['unitPriceNormCents']),
       taxCode: serializer.fromJson<String?>(json['taxCode']),
       needsReview: serializer.fromJson<bool>(json['needsReview']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -4223,10 +4288,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       'rawText': serializer.toJson<String>(rawText),
       'productId': serializer.toJson<String?>(productId),
       'categoryId': serializer.toJson<String?>(categoryId),
+      'brand': serializer.toJson<String?>(brand),
       'quantity': serializer.toJson<double>(quantity),
       'quantityUnit': serializer.toJson<String>(quantityUnit),
       'unitPriceCents': serializer.toJson<int?>(unitPriceCents),
       'lineTotalCents': serializer.toJson<int>(lineTotalCents),
+      'unitPriceNormCents': serializer.toJson<int?>(unitPriceNormCents),
       'taxCode': serializer.toJson<String?>(taxCode),
       'needsReview': serializer.toJson<bool>(needsReview),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -4243,10 +4310,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     String? rawText,
     Value<String?> productId = const Value.absent(),
     Value<String?> categoryId = const Value.absent(),
+    Value<String?> brand = const Value.absent(),
     double? quantity,
     String? quantityUnit,
     Value<int?> unitPriceCents = const Value.absent(),
     int? lineTotalCents,
+    Value<int?> unitPriceNormCents = const Value.absent(),
     Value<String?> taxCode = const Value.absent(),
     bool? needsReview,
     DateTime? updatedAt,
@@ -4260,12 +4329,16 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     rawText: rawText ?? this.rawText,
     productId: productId.present ? productId.value : this.productId,
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    brand: brand.present ? brand.value : this.brand,
     quantity: quantity ?? this.quantity,
     quantityUnit: quantityUnit ?? this.quantityUnit,
     unitPriceCents: unitPriceCents.present
         ? unitPriceCents.value
         : this.unitPriceCents,
     lineTotalCents: lineTotalCents ?? this.lineTotalCents,
+    unitPriceNormCents: unitPriceNormCents.present
+        ? unitPriceNormCents.value
+        : this.unitPriceNormCents,
     taxCode: taxCode.present ? taxCode.value : this.taxCode,
     needsReview: needsReview ?? this.needsReview,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -4285,6 +4358,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       categoryId: data.categoryId.present
           ? data.categoryId.value
           : this.categoryId,
+      brand: data.brand.present ? data.brand.value : this.brand,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       quantityUnit: data.quantityUnit.present
           ? data.quantityUnit.value
@@ -4295,6 +4369,9 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       lineTotalCents: data.lineTotalCents.present
           ? data.lineTotalCents.value
           : this.lineTotalCents,
+      unitPriceNormCents: data.unitPriceNormCents.present
+          ? data.unitPriceNormCents.value
+          : this.unitPriceNormCents,
       taxCode: data.taxCode.present ? data.taxCode.value : this.taxCode,
       needsReview: data.needsReview.present
           ? data.needsReview.value
@@ -4315,10 +4392,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
           ..write('rawText: $rawText, ')
           ..write('productId: $productId, ')
           ..write('categoryId: $categoryId, ')
+          ..write('brand: $brand, ')
           ..write('quantity: $quantity, ')
           ..write('quantityUnit: $quantityUnit, ')
           ..write('unitPriceCents: $unitPriceCents, ')
           ..write('lineTotalCents: $lineTotalCents, ')
+          ..write('unitPriceNormCents: $unitPriceNormCents, ')
           ..write('taxCode: $taxCode, ')
           ..write('needsReview: $needsReview, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4337,10 +4416,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     rawText,
     productId,
     categoryId,
+    brand,
     quantity,
     quantityUnit,
     unitPriceCents,
     lineTotalCents,
+    unitPriceNormCents,
     taxCode,
     needsReview,
     updatedAt,
@@ -4358,10 +4439,12 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
           other.rawText == this.rawText &&
           other.productId == this.productId &&
           other.categoryId == this.categoryId &&
+          other.brand == this.brand &&
           other.quantity == this.quantity &&
           other.quantityUnit == this.quantityUnit &&
           other.unitPriceCents == this.unitPriceCents &&
           other.lineTotalCents == this.lineTotalCents &&
+          other.unitPriceNormCents == this.unitPriceNormCents &&
           other.taxCode == this.taxCode &&
           other.needsReview == this.needsReview &&
           other.updatedAt == this.updatedAt &&
@@ -4377,10 +4460,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
   final Value<String> rawText;
   final Value<String?> productId;
   final Value<String?> categoryId;
+  final Value<String?> brand;
   final Value<double> quantity;
   final Value<String> quantityUnit;
   final Value<int?> unitPriceCents;
   final Value<int> lineTotalCents;
+  final Value<int?> unitPriceNormCents;
   final Value<String?> taxCode;
   final Value<bool> needsReview;
   final Value<DateTime> updatedAt;
@@ -4395,10 +4480,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     this.rawText = const Value.absent(),
     this.productId = const Value.absent(),
     this.categoryId = const Value.absent(),
+    this.brand = const Value.absent(),
     this.quantity = const Value.absent(),
     this.quantityUnit = const Value.absent(),
     this.unitPriceCents = const Value.absent(),
     this.lineTotalCents = const Value.absent(),
+    this.unitPriceNormCents = const Value.absent(),
     this.taxCode = const Value.absent(),
     this.needsReview = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -4414,10 +4501,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     required String rawText,
     this.productId = const Value.absent(),
     this.categoryId = const Value.absent(),
+    this.brand = const Value.absent(),
     this.quantity = const Value.absent(),
     this.quantityUnit = const Value.absent(),
     this.unitPriceCents = const Value.absent(),
     required int lineTotalCents,
+    this.unitPriceNormCents = const Value.absent(),
     this.taxCode = const Value.absent(),
     this.needsReview = const Value.absent(),
     required DateTime updatedAt,
@@ -4439,10 +4528,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     Expression<String>? rawText,
     Expression<String>? productId,
     Expression<String>? categoryId,
+    Expression<String>? brand,
     Expression<double>? quantity,
     Expression<String>? quantityUnit,
     Expression<int>? unitPriceCents,
     Expression<int>? lineTotalCents,
+    Expression<int>? unitPriceNormCents,
     Expression<String>? taxCode,
     Expression<bool>? needsReview,
     Expression<DateTime>? updatedAt,
@@ -4458,10 +4549,13 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
       if (rawText != null) 'raw_text': rawText,
       if (productId != null) 'product_id': productId,
       if (categoryId != null) 'category_id': categoryId,
+      if (brand != null) 'brand': brand,
       if (quantity != null) 'quantity': quantity,
       if (quantityUnit != null) 'quantity_unit': quantityUnit,
       if (unitPriceCents != null) 'unit_price_cents': unitPriceCents,
       if (lineTotalCents != null) 'line_total_cents': lineTotalCents,
+      if (unitPriceNormCents != null)
+        'unit_price_norm_cents': unitPriceNormCents,
       if (taxCode != null) 'tax_code': taxCode,
       if (needsReview != null) 'needs_review': needsReview,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -4479,10 +4573,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     Value<String>? rawText,
     Value<String?>? productId,
     Value<String?>? categoryId,
+    Value<String?>? brand,
     Value<double>? quantity,
     Value<String>? quantityUnit,
     Value<int?>? unitPriceCents,
     Value<int>? lineTotalCents,
+    Value<int?>? unitPriceNormCents,
     Value<String?>? taxCode,
     Value<bool>? needsReview,
     Value<DateTime>? updatedAt,
@@ -4498,10 +4594,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
       rawText: rawText ?? this.rawText,
       productId: productId ?? this.productId,
       categoryId: categoryId ?? this.categoryId,
+      brand: brand ?? this.brand,
       quantity: quantity ?? this.quantity,
       quantityUnit: quantityUnit ?? this.quantityUnit,
       unitPriceCents: unitPriceCents ?? this.unitPriceCents,
       lineTotalCents: lineTotalCents ?? this.lineTotalCents,
+      unitPriceNormCents: unitPriceNormCents ?? this.unitPriceNormCents,
       taxCode: taxCode ?? this.taxCode,
       needsReview: needsReview ?? this.needsReview,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -4537,6 +4635,9 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     if (categoryId.present) {
       map['category_id'] = Variable<String>(categoryId.value);
     }
+    if (brand.present) {
+      map['brand'] = Variable<String>(brand.value);
+    }
     if (quantity.present) {
       map['quantity'] = Variable<double>(quantity.value);
     }
@@ -4548,6 +4649,9 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     }
     if (lineTotalCents.present) {
       map['line_total_cents'] = Variable<int>(lineTotalCents.value);
+    }
+    if (unitPriceNormCents.present) {
+      map['unit_price_norm_cents'] = Variable<int>(unitPriceNormCents.value);
     }
     if (taxCode.present) {
       map['tax_code'] = Variable<String>(taxCode.value);
@@ -4578,10 +4682,12 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
           ..write('rawText: $rawText, ')
           ..write('productId: $productId, ')
           ..write('categoryId: $categoryId, ')
+          ..write('brand: $brand, ')
           ..write('quantity: $quantity, ')
           ..write('quantityUnit: $quantityUnit, ')
           ..write('unitPriceCents: $unitPriceCents, ')
           ..write('lineTotalCents: $lineTotalCents, ')
+          ..write('unitPriceNormCents: $unitPriceNormCents, ')
           ..write('taxCode: $taxCode, ')
           ..write('needsReview: $needsReview, ')
           ..write('updatedAt: $updatedAt, ')
@@ -12115,10 +12221,12 @@ typedef $$ReceiptItemsTableCreateCompanionBuilder =
       required String rawText,
       Value<String?> productId,
       Value<String?> categoryId,
+      Value<String?> brand,
       Value<double> quantity,
       Value<String> quantityUnit,
       Value<int?> unitPriceCents,
       required int lineTotalCents,
+      Value<int?> unitPriceNormCents,
       Value<String?> taxCode,
       Value<bool> needsReview,
       required DateTime updatedAt,
@@ -12135,10 +12243,12 @@ typedef $$ReceiptItemsTableUpdateCompanionBuilder =
       Value<String> rawText,
       Value<String?> productId,
       Value<String?> categoryId,
+      Value<String?> brand,
       Value<double> quantity,
       Value<String> quantityUnit,
       Value<int?> unitPriceCents,
       Value<int> lineTotalCents,
+      Value<int?> unitPriceNormCents,
       Value<String?> taxCode,
       Value<bool> needsReview,
       Value<DateTime> updatedAt,
@@ -12195,6 +12305,11 @@ class $$ReceiptItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get quantity => $composableBuilder(
     column: $table.quantity,
     builder: (column) => ColumnFilters(column),
@@ -12212,6 +12327,11 @@ class $$ReceiptItemsTableFilterComposer
 
   ColumnFilters<int> get lineTotalCents => $composableBuilder(
     column: $table.lineTotalCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12285,6 +12405,11 @@ class $$ReceiptItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get quantity => $composableBuilder(
     column: $table.quantity,
     builder: (column) => ColumnOrderings(column),
@@ -12302,6 +12427,11 @@ class $$ReceiptItemsTableOrderingComposer
 
   ColumnOrderings<int> get lineTotalCents => $composableBuilder(
     column: $table.lineTotalCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -12363,6 +12493,9 @@ class $$ReceiptItemsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get brand =>
+      $composableBuilder(column: $table.brand, builder: (column) => column);
+
   GeneratedColumn<double> get quantity =>
       $composableBuilder(column: $table.quantity, builder: (column) => column);
 
@@ -12378,6 +12511,11 @@ class $$ReceiptItemsTableAnnotationComposer
 
   GeneratedColumn<int> get lineTotalCents => $composableBuilder(
     column: $table.lineTotalCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
     builder: (column) => column,
   );
 
@@ -12435,10 +12573,12 @@ class $$ReceiptItemsTableTableManager
                 Value<String> rawText = const Value.absent(),
                 Value<String?> productId = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
                 Value<double> quantity = const Value.absent(),
                 Value<String> quantityUnit = const Value.absent(),
                 Value<int?> unitPriceCents = const Value.absent(),
                 Value<int> lineTotalCents = const Value.absent(),
+                Value<int?> unitPriceNormCents = const Value.absent(),
                 Value<String?> taxCode = const Value.absent(),
                 Value<bool> needsReview = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -12453,10 +12593,12 @@ class $$ReceiptItemsTableTableManager
                 rawText: rawText,
                 productId: productId,
                 categoryId: categoryId,
+                brand: brand,
                 quantity: quantity,
                 quantityUnit: quantityUnit,
                 unitPriceCents: unitPriceCents,
                 lineTotalCents: lineTotalCents,
+                unitPriceNormCents: unitPriceNormCents,
                 taxCode: taxCode,
                 needsReview: needsReview,
                 updatedAt: updatedAt,
@@ -12473,10 +12615,12 @@ class $$ReceiptItemsTableTableManager
                 required String rawText,
                 Value<String?> productId = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
                 Value<double> quantity = const Value.absent(),
                 Value<String> quantityUnit = const Value.absent(),
                 Value<int?> unitPriceCents = const Value.absent(),
                 required int lineTotalCents,
+                Value<int?> unitPriceNormCents = const Value.absent(),
                 Value<String?> taxCode = const Value.absent(),
                 Value<bool> needsReview = const Value.absent(),
                 required DateTime updatedAt,
@@ -12491,10 +12635,12 @@ class $$ReceiptItemsTableTableManager
                 rawText: rawText,
                 productId: productId,
                 categoryId: categoryId,
+                brand: brand,
                 quantity: quantity,
                 quantityUnit: quantityUnit,
                 unitPriceCents: unitPriceCents,
                 lineTotalCents: lineTotalCents,
+                unitPriceNormCents: unitPriceNormCents,
                 taxCode: taxCode,
                 needsReview: needsReview,
                 updatedAt: updatedAt,

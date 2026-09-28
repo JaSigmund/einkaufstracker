@@ -28,9 +28,9 @@ Color _dotColor(ExpiryLevel level, ColorScheme cs) => switch (level) {
       ExpiryLevel.unknown => cs.outlineVariant,
     };
 
-String _expiryText(InventoryItem item, ExpiryLevel level) {
+String _expiryText(InventoryItem item, ExpiryLevel level, DateTime today) {
   if (item.expiresOn == null) return 'Kein Ablaufdatum';
-  final days = item.expiresOn!.difference(DateTime.utc(DateTime.now().year, DateTime.now().month, DateTime.now().day)).inDays;
+  final days = item.expiresOn!.difference(DateTime.utc(today.year, today.month, today.day)).inDays;
   final label = item.dateKind == 'use_by' ? 'Zu verbrauchen bis' : 'MHD';
   if (days == 0) return '$label: heute';
   if (days == 1) return '$label: morgen';
@@ -145,7 +145,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                         Text('${_groupTitles[level]} (${items.length})', style: t.textTheme.titleSmall),
                       ]),
                     ),
-                    for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level),
+                    for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level, today: today),
                   ],
             ],
           ),
@@ -156,10 +156,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 }
 
 class _InventoryTile extends ConsumerWidget {
-  const _InventoryTile({required this.item, required this.product, required this.level});
+  const _InventoryTile({required this.item, required this.product, required this.level, required this.today});
   final InventoryItem item;
   final Product? product;
   final ExpiryLevel level;
+  final DateTime today;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -201,7 +202,7 @@ class _InventoryTile extends ConsumerWidget {
         leading: Container(width: 12, height: 12, decoration: BoxDecoration(color: _dotColor(level, t.colorScheme), shape: BoxShape.circle)),
         title: Text(product?.name ?? 'Unbekanntes Produkt'),
         subtitle: Text([
-          _expiryText(item, level),
+          _expiryText(item, level, today),
           if (item.status == 'opened') 'geöffnet',
           '${formatQuantity(item.quantity)} ${item.unit}',
         ].join(' · ')),
