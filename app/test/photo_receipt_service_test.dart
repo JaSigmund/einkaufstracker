@@ -87,6 +87,15 @@ void main() {
     expect(prepared, isEmpty);
   });
 
+  test('Hofer-Bon wird lokal erkannt (Featurevorschlag Hofer-Erkennung, 2026-09-28): kein Cloud-Aufruf noetig', () async {
+    final p = await service().read(_pages('hofer_paper_01'));
+    expect(p.source, ReceiptSources.photoLocal);
+    expect(p.receipt.chain, 'Hofer');
+    expect(p.receipt.totalCents, 1725);
+    expect(p.receipt.isTrustworthy, isTrue);
+    expect(cloud.calls, 0);
+  });
+
   test('Schlechter Scan: Cloud wird befragt, das Bild wird vor dem Zahlungsblock abgeschnitten', () async {
     final pages = _pages('billa_paper_01_scan3');
     final p = await service().read(pages);
