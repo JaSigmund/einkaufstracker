@@ -2,6 +2,12 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.4 — 2026-09-28
+
+Foto-Scan stürzt nicht mehr ab
+
+- Der Foto-Scan eines Bons stürzt nicht mehr ab, wenn die Cloud-Vorbereitung oder die lokale Texterkennung an einem ungewohnten Foto scheitert (live entdeckt an einem Hofer-Bon)
+
 ## 1.7.3 — 2026-09-28
 
 Bonzuordnung zu gelöschtem Bon korrigiert
