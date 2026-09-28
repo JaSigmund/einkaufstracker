@@ -2,6 +2,13 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.7 — 2026-09-28
+
+Erste Hofer-Bon-Erkennung beim Foto-Scan
+
+- Ein fotografierter Hofer-Bon wird jetzt direkt auf dem Handy erkannt, ohne Umweg über die Cloud
+- Erste Version, gebaut anhand eines einzelnen echten Bons (noch kein so breiter Datensatz wie bei Billa) — wird mit weiteren echten Hofer-Bons weiter geschärft
+
 ## 1.7.6 — 2026-09-28
 
 Drei gemeldete Fehler behoben
