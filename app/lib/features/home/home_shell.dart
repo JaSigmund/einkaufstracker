@@ -59,6 +59,12 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: Text(tab.label),
         actions: [
+          if (_index == 4)
+            IconButton(
+              tooltip: 'Trend über Monate',
+              icon: const Icon(Icons.show_chart),
+              onPressed: () => context.push('/trend'),
+            ),
           IconButton(
             tooltip: 'Einstellungen',
             icon: const Icon(Icons.settings_outlined),
