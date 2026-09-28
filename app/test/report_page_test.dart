@@ -61,10 +61,13 @@ void main() {
     expect(find.text('Rabatte auf den ganzen Bon'), findsOneWidget);
     expect(find.text('Nicht auf Kategorien verteilt'), findsOneWidget);
 
-    expect(find.text('Clever Champignon weiß'), findsNothing);
+    // Produkt-Zuordnung vorhanden: der Produktname wird angezeigt, nicht der rohe Bon-Text (Fehlerbericht
+    // "Alias wird nicht ueberall angewandt", 2026-09-28)
+    expect(find.text('Champignon weiß'), findsNothing);
     await tester.tap(find.text('Gemüse'));
     await tester.pumpAndSettle();
-    expect(find.text('Clever Champignon weiß'), findsOneWidget);
+    expect(find.text('Champignon weiß'), findsOneWidget);
+    expect(find.text('Clever Champignon weiß'), findsNothing);
     expect(find.text('Clever Hirtenkäse'), findsNothing);
 
     await tester.tap(find.byKey(const Key('month-prev')));
@@ -72,7 +75,7 @@ void main() {
     expect(find.text('August 2026'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('report-total'))).data, '3,00 €');
     expect(find.text('Brot & Backwaren'), findsOneWidget);
-    expect(find.text('Clever Champignon weiß'), findsNothing); // Auswahl beim Monatswechsel zurueckgesetzt
+    expect(find.text('Champignon weiß'), findsNothing); // Auswahl beim Monatswechsel zurueckgesetzt
   });
 
   testWidgets('Tippen auf einen zugeordneten Artikel oeffnet das Artikel-Detail (Doku 07 §2)', (tester) async {
@@ -81,7 +84,7 @@ void main() {
 
     await tester.tap(find.text('Gemüse'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Clever Champignon weiß'));
+    await tester.tap(find.text('Champignon weiß'));
     await tester.pumpAndSettle();
     expect(find.text('PREIS p1'), findsOneWidget);
   });

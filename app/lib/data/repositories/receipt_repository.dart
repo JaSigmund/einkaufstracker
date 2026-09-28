@@ -446,6 +446,9 @@ class ReceiptRepository {
         await _put('receipt_items', i.id, receiptItemToRemote(di),
             () => _db.into(_db.receiptItems).insertOnConflictUpdate(di.toCompanion(false)));
       }
+      // Noch unbestaetigte Inventar-Vorschlaege dieser Positionen verschwinden mit dem Bon, sonst entsteht
+      // beim erneuten Import derselben Position ein doppelter Vorschlag (Fehlerbericht 2026-09-28).
+      await inventoryRepo?.discardSuggestionsForReceiptItems(items.map((i) => i.id));
     });
     onChanged?.call();
   }

@@ -433,6 +433,39 @@ void main() {
     expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle()).deletedAt, isNull);
   });
 
+  group('discardSuggestionsForReceiptItems (Fehlerbericht "Bonartikel Vorschlag doppelt", 2026-09-28)', () {
+    test('verwirft nur unbestaetigte Vorschlaege der angegebenen Bon-Positionen', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final other = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri2', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      await repo.discardSuggestionsForReceiptItems(['ri1']);
+
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(suggestion.id))).getSingle()).deletedAt, isNotNull);
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(other.id))).getSingle()).deletedAt, isNull);
+    });
+
+    test('laesst bereits bestaetigte Inventar-Eintraege unangetastet', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 21));
+      expect(confirmed.id, suggestion.id); // verfeinert die Vorlage, jetzt keine Vorschlag mehr
+
+      await repo.discardSuggestionsForReceiptItems(['ri1']);
+      expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(confirmed.id))).getSingle()).deletedAt, isNull);
+    });
+
+    test('leere Liste: kein Effekt', () async {
+      await inventoryRepo(db).discardSuggestionsForReceiptItems(const []);
+    });
+  });
+
   group('deleteItem', () {
     test('loescht den Eintrag und seine Kaufbewegung, so als waere der Scan nie passiert', () async {
       final repo = inventoryRepo(db);

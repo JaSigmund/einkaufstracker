@@ -103,6 +103,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             rawText: i.rawText,
             categoryId: i.categoryId,
             productId: i.productId,
+            productName: i.productId == null ? null : products[i.productId]?.name,
             quantity: i.quantity,
             lineTotalCents: i.lineTotalCents,
           ),

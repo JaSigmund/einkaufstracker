@@ -124,6 +124,33 @@ void main() {
     expect((suggestion.unit, suggestion.quantity), ('kg', 0.62));
   });
 
+  group('Bon loeschen und erneut importieren (Fehlerbericht "Bonartikel Vorschlag doppelt", 2026-09-28)', () {
+    test('Loeschen verwirft die zugehoerigen unbestaetigten Vorschlaege', () async {
+      final repo = receiptRepo(db, productRepo: productRepo(db), inventoryRepo: inventoryRepo(db));
+      final saved = await repo.saveParsed(_parse('billa_digital_04'));
+      expect(await (db.select(db.inventoryItems)..where((i) => i.isSuggestion.equals(true) & i.deletedAt.isNull())).get(), isNotEmpty);
+
+      await repo.softDelete(saved.receiptId);
+
+      expect(await (db.select(db.inventoryItems)..where((i) => i.isSuggestion.equals(true) & i.deletedAt.isNull())).get(), isEmpty);
+    });
+
+    test('Erneuter Import desselben Bons erzeugt keinen doppelten Vorschlag', () async {
+      final repo = receiptRepo(db, productRepo: productRepo(db), inventoryRepo: inventoryRepo(db));
+      final saved = await repo.saveParsed(_parse('billa_digital_04'));
+      await repo.softDelete(saved.receiptId);
+
+      final again = await repo.saveParsed(_parse('billa_digital_04')); // gleiche Re-Nr -> dieselbe Bon-ID
+      expect(again.receiptId, saved.receiptId);
+
+      final champignonProduct = await (db.select(db.products)..where((p) => p.name.equals('Clever Champignon weiß'))).getSingle();
+      final active = await (db.select(db.inventoryItems)
+            ..where((i) => i.isSuggestion.equals(true) & i.productId.equals(champignonProduct.id) & i.deletedAt.isNull()))
+          .get();
+      expect(active, hasLength(1)); // nicht zwei
+    });
+  });
+
   test('Ohne Produkt-/Inventar-Repository (z.B. Altverhalten) entstehen keine Vorschlaege', () async {
     final repo = receiptRepo(db); // wie zuvor: beide Abhaengigkeiten fehlen
     await repo.saveParsed(_parse('billa_digital_04'));

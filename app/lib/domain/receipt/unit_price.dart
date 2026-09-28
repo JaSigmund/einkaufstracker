@@ -3,12 +3,16 @@
 ///
 /// - Wiegeware (Bon-Menge steht schon in der Basiseinheit, z.B. `quantityUnit == baseUnit == 'kg'`):
 ///   die Bon-Menge ist bereits die Menge in Basiseinheit.
-/// - Stückware (`baseUnit == 'piece'`, Bon-Menge in Stück): ebenso, kein Packungsinhalt nötig.
-/// - Packware mit bekanntem Inhalt (Bon-Menge in Stück, aber `baseUnit` ist kg/l): die Bon-Menge sind
-///   gekaufte Packungen, `packSize` (Inhalt je Packung, siehe [[04 Datenmodell]] `products.pack_size`)
-///   multipliziert die Menge auf die Basiseinheit hoch.
-/// - Fehlt der Packungsinhalt in diesem Fall, ist kein Grundpreis berechenbar (`null`): die Position
-///   nimmt dann am Preisvergleich nicht teil, statt einen falschen Wert zu zeigen.
+/// - Packware mit bekanntem Inhalt (Bon-Menge in Stück = Anzahl gekaufter Packungen): `packSize`
+///   (Inhalt je Packung, siehe [[04 Datenmodell]] `products.pack_size`) multipliziert die Menge auf die
+///   Basiseinheit hoch. Das gilt **auch wenn die Basiseinheit selbst 'piece' ist** (Fehlerbericht "Preis
+///   wird nicht auf Einheit heruntergerechnet", 2026-09-28): eine 4er-Packung Paprika Tricolore hat
+///   `baseUnit: 'piece'` (Grundpreis je einzelner Paprika) und `packSize: 4`, die Bon-Menge zählt aber
+///   gekaufte Packungen, nicht einzelne Paprika.
+/// - Stückware ohne Packungsinhalt (Bon-Menge in Stück = Basiseinheit direkt, z.B. einzeln gezählte
+///   Artikel): kein Packungsinhalt nötig, die Bon-Menge ist bereits die Menge in Basiseinheit.
+/// - Fehlt der Packungsinhalt bei abweichender Einheit, ist kein Grundpreis berechenbar (`null`): die
+///   Position nimmt dann am Preisvergleich nicht teil, statt einen falschen Wert zu zeigen.
 int? computeUnitPriceNormCents({
   required int lineTotalCents,
   required double quantity,
@@ -17,10 +21,10 @@ int? computeUnitPriceNormCents({
   double? packSize,
 }) {
   final double baseUnitAmount;
-  if (quantityUnit == productBaseUnit) {
-    baseUnitAmount = quantity;
-  } else if (quantityUnit == 'piece' && packSize != null && packSize > 0) {
+  if (quantityUnit == 'piece' && packSize != null && packSize > 0) {
     baseUnitAmount = quantity * packSize;
+  } else if (quantityUnit == productBaseUnit) {
+    baseUnitAmount = quantity;
   } else {
     return null;
   }

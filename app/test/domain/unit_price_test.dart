@@ -26,6 +26,13 @@ void main() {
       expect(price, 1327);
     });
 
+    test('Packware mit stueckbasierter Basiseinheit: Grundpreis je Einzelstueck, nicht je Packung '
+        '(Fehlerbericht "Preis wird nicht auf Einheit heruntergerechnet", 2026-09-28)', () {
+      // 1 Packung Paprika Tricolore (4 Stueck je Packung) fuer 249 Cent -> 62,25 -> 62 Cent je Paprika
+      final price = computeUnitPriceNormCents(lineTotalCents: 249, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'piece', packSize: 4);
+      expect(price, 62);
+    });
+
     test('Packware ohne bekannten Inhalt: kein Grundpreis statt eines falschen Werts', () {
       final price = computeUnitPriceNormCents(lineTotalCents: 129, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'l', packSize: null);
       expect(price, isNull);
