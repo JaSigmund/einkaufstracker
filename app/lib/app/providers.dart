@@ -44,6 +44,14 @@ final authRepositoryProvider =
 final settingsRepositoryProvider =
     Provider<SettingsRepository>((ref) => SupabaseSettingsRepository(ref.watch(supabaseClientProvider)));
 
+/// Einstellungen des Haushalts (in Phase 1 online, Cache folgt bei Bedarf). Geteilt zwischen der
+/// Einstellungsseite und der Monatsauswertung (Budget-Fortschritt, Doku 07 §2).
+final householdSettingsProvider = FutureProvider.autoDispose<HouseholdSettings>((ref) async {
+  final hid = await ref.watch(householdIdProvider.future);
+  if (hid == null) throw StateError('Kein Haushalt gefunden');
+  return ref.watch(settingsRepositoryProvider).load(hid);
+});
+
 /// Aktuelle Sitzung (null = nicht angemeldet). Die Sitzung liegt lokal, der Start klappt auch offline.
 final sessionProvider = StreamProvider<Session?>((ref) async* {
   final auth = ref.watch(supabaseClientProvider).auth;

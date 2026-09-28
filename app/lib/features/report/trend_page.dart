@@ -46,6 +46,7 @@ class _TrendPageState extends ConsumerState<TrendPage> {
             kind: i.kind,
             rawText: i.rawText,
             categoryId: i.categoryId,
+            productId: i.productId,
             quantity: i.quantity,
             lineTotalCents: i.lineTotalCents,
           ),
