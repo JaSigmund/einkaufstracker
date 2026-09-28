@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/categorization/categorizer.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/receipt/parsed_receipt.dart';
+import '../../domain/receipt/unit_price.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 import '../repositories/inventory_repository.dart';
@@ -221,6 +222,23 @@ class ReceiptRepository {
             suggestion = categorizer.categorize(i.rawText);
             lastArticleCategory = suggestion.categoryId;
         }
+        // Produkt-Zuordnung und Grundpreis (Doku 07 §3.1) gelten fuer JEDEN Artikel, nicht nur lagerbare
+        // Kategorien: Preisvergleich/-verlauf sollen z.B. auch fuer Brot funktionieren, das nicht im
+        // Inventar gefuehrt wird.
+        Product? product;
+        if (i.kind == ReceiptItemKind.article && productRepo != null) {
+          product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId, baseUnit: i.quantityUnit);
+        }
+        final unitPriceNormCents = product == null
+            ? null
+            : computeUnitPriceNormCents(
+                lineTotalCents: i.lineTotalCents,
+                quantity: i.quantity,
+                quantityUnit: i.quantityUnit,
+                productBaseUnit: product.baseUnit,
+                packSize: product.packSize,
+              );
+
         await putItem(ReceiptItem(
           id: _itemId(receiptId, lineNo),
           householdId: hid,
@@ -228,10 +246,13 @@ class ReceiptRepository {
           lineNo: lineNo,
           kind: i.kind.name,
           rawText: i.rawText,
+          productId: product?.id,
+          brand: product?.brand,
           quantity: i.quantity,
           quantityUnit: i.quantityUnit,
           unitPriceCents: i.unitPriceCents,
           lineTotalCents: i.lineTotalCents,
+          unitPriceNormCents: unitPriceNormCents,
           taxCode: i.taxCode,
           categoryId: suggestion.categoryId,
           needsReview: i.kind == ReceiptItemKind.article && suggestion.categoryId == null,
@@ -240,8 +261,7 @@ class ReceiptRepository {
 
         // Bon-Vorschlag im Inventar fuer lagerbare Kategorien (Doku 06 §2 Punkt 1): kein MHD, hoechstens
         // eine Schaetzung aus der Standardhaltbarkeit des Produkts.
-        if (i.kind == ReceiptItemKind.article && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
-          final product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId, baseUnit: i.quantityUnit);
+        if (product != null && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
           await inventoryRepo!.createSuggestionFromReceipt(
             productId: product.id,
             receiptItemId: _itemId(receiptId, lineNo),
