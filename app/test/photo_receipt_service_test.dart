@@ -117,6 +117,20 @@ void main() {
     expect(p.note, isNotNull);
   });
 
+  test('Bildvorbereitung fuer die Cloud wirft einen Fehler: lokales Ergebnis statt Absturz '
+      '(Fehlerbericht "Scan nicht möglich: invalid argument(s): 0", 2026-09-28)', () async {
+    final service = PhotoReceiptService(
+      repo: receiptRepo(db),
+      cloud: cloud,
+      cloudAllowed: () async => true,
+      prepare: (path, {cutY}) async => throw ArgumentError.value(0),
+    );
+    final p = await service.read(_pages('billa_paper_01_scan3'));
+    expect(p.source, ReceiptSources.photoLocal);
+    expect(cloud.calls, 0);
+    expect(p.note, contains('fehlgeschlagen'));
+  });
+
   test('Cloud nicht erreichbar (offline): lokales Ergebnis mit Hinweis statt Absturz', () async {
     cloud.answer = const CloudUnavailable('kein Netz');
     final p = await service().read(_pages('billa_paper_01_scan3'));

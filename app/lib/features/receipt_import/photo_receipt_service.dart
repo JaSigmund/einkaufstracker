@@ -44,8 +44,22 @@ class PhotoReceiptService {
   /// [onStatus] meldet die Schritte fuer die Oberflaeche ("lokal lesen", "Cloud liest mit").
   Future<ImportPreview> read(List<ScannedPage> pages, {void Function(String status)? onStatus}) async {
     onStatus?.call('Bon wird auf dem Handy gelesen …');
-    final local = _readLocal(pages);
-    final attachments = _attachments(pages);
+    final ParsedReceipt local;
+    final List<AttachmentSource> attachments;
+    try {
+      local = _readLocal(pages);
+      attachments = _attachments(pages);
+    } catch (e) {
+      // Ein ungewohntes Foto/Bon-Format darf die lokale Zeilen-Geometrie nicht zum Absturz bringen
+      // (Fehlerbericht "Scan nicht möglich: invalid argument(s): 0", 2026-09-28, Hofer-Bon): ohne
+      // verlaessliche Geometrie gibt es ohnehin keinen sicheren Zuschnitt fuer Cloud/Ablage, aber der
+      // Nutzer soll den Bon trotzdem von Hand erfassen koennen statt vor einem Absturz zu stehen.
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Der Bon konnte nicht gelesen werden.']),
+        source: ReceiptSources.photoLocal,
+        error: 'Auf dem Handy konnte der Bon nicht gelesen werden ($e). Du kannst den Bon später erneut scannen oder die Positionen von Hand eingeben.',
+      );
+    }
     if (local.isParsed && local.isTrustworthy) return _preview(local, ReceiptSources.photoLocal, attachments: attachments);
 
     // Lokal nicht sicher genug: Cloud fragen, soweit erlaubt und moeglich
@@ -69,6 +83,12 @@ class PhotoReceiptService {
       note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet.';
     } on CloudUnavailable catch (e) {
       note = 'Die Cloud ist nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
+    } catch (e) {
+      // Jeder andere Fehler bei der Cloud-Vorbereitung (z.B. Bildverarbeitung bei einem ungewohnten Foto/
+      // Bon-Format, Fehlerbericht "Scan nicht möglich: invalid argument(s): 0", 2026-09-28) darf den ganzen
+      // Scan nicht zum Absturz bringen: die Cloud ist ein optionaler Rueckfall, kein Pflichtschritt. Das
+      // lokale Ergebnis wird weiterverwendet, notfalls mit der "nicht gelesen"-Fehlermeldung unten.
+      note = 'Die Cloud-Vorbereitung ist fehlgeschlagen ($e). Das Ergebnis stammt nur aus der lokalen Erkennung.';
     }
 
     if (remote != null && remote.isParsed) {
