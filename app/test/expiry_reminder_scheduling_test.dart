@@ -52,6 +52,44 @@ void main() {
     expect(scheduler.lastLeadDays, 1);
   });
 
+  testWidgets('bezieht auch noch unbestaetigte Bon-Vorschlaege mit ein (Fehlerbericht "keine '
+      'Push-Benachrichtigung", 2026-09-28)', (tester) async {
+    final product = await productRepo(db).create(name: 'Vollmilch', baseUnit: 'l');
+    await inventoryRepo(db).createSuggestionFromReceipt(
+      productId: product.id,
+      receiptItemId: 'ri1',
+      quantity: 1,
+      unit: 'l',
+      purchasedOn: DateTime.utc(2026, 9, 27),
+      sealedShelfLifeDays: 1, // Ablauf 2026-09-28
+    );
+    final scheduler = FakeNotificationScheduler();
+    late WidgetRef ref;
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        householdIdProvider.overrideWith((r) async => 'h1'),
+        settingsRepositoryProvider.overrideWithValue(
+          FakeSettingsRepository(const HouseholdSettings(notifyTime: '07:30', notifyLeadDays: 1, allowCloudOcr: false, keepReceiptImages: true)),
+        ),
+        inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
+        productRepositoryProvider.overrideWithValue(productRepo(db)),
+        notificationSchedulerProvider.overrideWithValue(scheduler),
+      ],
+      child: MaterialApp(home: Consumer(builder: (context, r, _) {
+        ref = r;
+        return const SizedBox();
+      })),
+    ));
+    await tester.pumpAndSettle();
+
+    await rescheduleExpiryReminders(ref, now: DateTime.utc(2026, 9, 27));
+
+    expect(scheduler.lastScheduled, isNotNull);
+    expect(scheduler.lastScheduled!.single.productNames, ['Vollmilch']);
+  });
+
   testWidgets('ohne Haushalt: kein Absturz, Scheduler wird nicht aufgerufen', (tester) async {
     final scheduler = FakeNotificationScheduler();
     late WidgetRef ref;

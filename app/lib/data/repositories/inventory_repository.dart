@@ -59,6 +59,12 @@ class InventoryRepository {
         ..orderBy([(i) => OrderingTerm.desc(i.purchasedOn)]))
       .watch();
 
+  /// Einmalige Momentaufnahme von [watchSuggestions] (Fehlerbericht "keine Push-Benachrichtigung", 2026-09-28):
+  /// auch ein noch unbestaetigter Bon-Vorschlag hat bereits ein geschaetztes Ablaufdatum und soll deshalb in
+  /// die Ablauf-Erinnerungen einfliessen, nicht nur bestaetigter Bestand.
+  Future<List<InventoryItem>> suggestionsSnapshot() =>
+      (_db.select(_db.inventoryItems)..where((i) => i.deletedAt.isNull() & i.isSuggestion.equals(true))).get();
+
   Stream<List<InventoryMovement>> watchMovements(String productId) => (_db.select(_db.inventoryMovements)
         ..where((m) => m.productId.equals(productId) & m.deletedAt.isNull())
         ..orderBy([(m) => OrderingTerm.desc(m.occurredAt)]))
@@ -437,6 +443,26 @@ class InventoryRepository {
       await _putItem(item.copyWith(deletedAt: Value(now), updatedAt: now));
     }
     onChanged?.call();
+  }
+
+  /// Bestaetigte (nicht mehr als Vorschlag markierte) Inventar-Eintraege, die einer dieser Bon-Positionen
+  /// zugeordnet sind (Fehlerbericht "Bon löschen verwirft keine Zuordnung", 2026-09-28): Grundlage fuer die
+  /// Rueckfrage beim Bon-Loeschen, ob die Zuordnung mit entfernt werden soll.
+  Future<List<InventoryItem>> confirmedItemsLinkedTo(Iterable<String> receiptItemIds) async {
+    final ids = receiptItemIds.toSet();
+    if (ids.isEmpty) return const [];
+    return (_db.select(_db.inventoryItems)
+          ..where((i) => i.receiptItemId.isIn(ids) & i.isSuggestion.equals(false) & i.deletedAt.isNull()))
+        .get();
+  }
+
+  /// Loest die Bonzuordnung aller bestaetigten Eintraege zu diesen Bon-Positionen (Rueckfrage beim Loeschen):
+  /// der Bestand bleibt erhalten, verweist aber nicht mehr auf den (geloeschten) Bon.
+  Future<void> clearReceiptLinksFor(Iterable<String> receiptItemIds) async {
+    final items = await confirmedItemsLinkedTo(receiptItemIds);
+    for (final item in items) {
+      await setReceiptLink(item.id, null);
+    }
   }
 
   Future<InventoryItem> _get(String id) => (_db.select(_db.inventoryItems)..where((i) => i.id.equals(id))).getSingle();

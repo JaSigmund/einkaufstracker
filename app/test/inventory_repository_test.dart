@@ -543,6 +543,61 @@ void main() {
     });
   });
 
+  group('confirmedItemsLinkedTo / clearReceiptLinksFor (Fehlerbericht "Bon löschen verwirft keine Zuordnung", 2026-09-28)', () {
+    test('findet nur bestaetigte Eintraege der angegebenen Bon-Positionen, keine Vorschlaege', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final other = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri2', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 21));
+      expect(confirmed.id, suggestion.id); // verfeinert ri1 zum bestaetigten Eintrag
+
+      final linked = await repo.confirmedItemsLinkedTo(['ri1', 'ri2']);
+      expect(linked.map((i) => i.id), [confirmed.id]);
+      expect(other.isSuggestion, isTrue); // ri2 bleibt Vorschlag, taucht nicht auf
+    });
+
+    test('leere Liste: keine Treffer', () async {
+      expect(await inventoryRepo(db).confirmedItemsLinkedTo(const []), isEmpty);
+    });
+
+    test('clearReceiptLinksFor loest die Zuordnung, der Bestand bleibt bestehen', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 21));
+      expect(confirmed.id, suggestion.id);
+
+      await repo.clearReceiptLinksFor(['ri1']);
+
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(confirmed.id))).getSingle();
+      expect(row.receiptItemId, isNull);
+      expect(row.deletedAt, isNull); // Bestand bleibt erhalten
+    });
+  });
+
+  group('suggestionsSnapshot (Fehlerbericht "keine Push-Benachrichtigung", 2026-09-28)', () {
+    test('liefert unbestaetigte Vorschlaege, keine bestaetigten oder geloeschten Eintraege', () async {
+      final repo = inventoryRepo(db);
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      final confirmedProductId = (await productRepo(db).create(name: 'Anderes Produkt', baseUnit: 'piece')).id;
+      await repo.recordFromScan(productId: confirmedProductId, ean: '1', now: DateTime.utc(2026, 9, 21));
+      final discarded = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri2', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+      await repo.discardSuggestion(discarded.id);
+
+      final snapshot = await repo.suggestionsSnapshot();
+      expect(snapshot.map((i) => i.id), [suggestion.id]);
+    });
+  });
+
   group('deleteItem', () {
     test('loescht den Eintrag und seine Kaufbewegung, so als waere der Scan nie passiert', () async {
       final repo = inventoryRepo(db);

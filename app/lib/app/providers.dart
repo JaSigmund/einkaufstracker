@@ -227,7 +227,10 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   } catch (_) {
     return;
   }
-  final items = await ref.read(inventoryRepositoryProvider).activeSnapshot();
+  final inventoryRepo = ref.read(inventoryRepositoryProvider);
+  // Auch unbestaetigte Bon-Vorschlaege haben schon ein geschaetztes Ablaufdatum und sollen erinnert werden
+  // (Fehlerbericht "keine Push-Benachrichtigung", 2026-09-28), nicht nur per Barcode bestaetigter Bestand.
+  final items = [...await inventoryRepo.activeSnapshot(), ...await inventoryRepo.suggestionsSnapshot()];
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
   now ??= DateTime.now();

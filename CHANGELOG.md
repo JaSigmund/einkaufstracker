@@ -2,6 +2,14 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.6 — 2026-09-28
+
+Drei gemeldete Fehler behoben
+
+- Bon löschen fragt jetzt nach, ob eine bestehende Zuordnung zu einem Inventar-Eintrag mit entfernt werden soll
+- Ein erneut gescannter, zuvor gelöschter Foto-Bon wird korrekt wiedererkannt: keine doppelten Vorschläge mehr, Zuordnungen heilen sich von selbst
+- Ablauf-Erinnerungen berücksichtigen jetzt auch noch unbestätigte Bon-Vorschläge, nicht nur bereits eingescannten Bestand
+
 ## 1.7.5 — 2026-09-28
 
 Featurevorschlag und einheitliche Rückmeldungen
