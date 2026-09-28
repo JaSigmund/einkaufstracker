@@ -66,14 +66,18 @@ class InventoryRepository {
 
   /// Der Bon, aus dem ein Inventar-Eintrag als Vorschlag entstanden ist (Fehlerbericht "Bonzuordnung
   /// anzeigen", 2026-09-27). `null`, wenn der Eintrag nie einem Bon zugeordnet war (z.B. reiner Scan ohne
-  /// vorherigen Bon-Vorschlag).
+  /// vorherigen Bon-Vorschlag) — oder wenn der zugeordnete Bon inzwischen geloescht wurde: ein bestaetigter
+  /// Inventar-Eintrag behaelt seine `receiptItemId` unabhaengig vom Schicksal des Bons (Gesamtkonzept
+  /// Artikel<->Bon, 2026-09-28), ein geloeschter Bon soll dann aber nicht als "Geisterzuordnung" auftauchen.
+  /// Wird derselbe Bon spaeter erneut importiert (z.B. digitaler Bon mit stabiler Re-Nr), heilt die Zuordnung
+  /// von selbst wieder, weil die Bon-Position dieselbe ID zurueckbekommt.
   Future<ReceiptLink?> receiptLinkFor(String? receiptItemId) async {
     if (receiptItemId == null) return null;
     final row = await (_db.select(_db.receiptItems).join([
       innerJoin(_db.receipts, _db.receipts.id.equalsExp(_db.receiptItems.receiptId)),
       leftOuterJoin(_db.stores, _db.stores.id.equalsExp(_db.receipts.storeId)),
     ])
-          ..where(_db.receiptItems.id.equals(receiptItemId)))
+          ..where(_db.receiptItems.id.equals(receiptItemId) & _db.receiptItems.deletedAt.isNull() & _db.receipts.deletedAt.isNull()))
         .getSingleOrNull();
     if (row == null) return null;
     final item = row.readTable(_db.receiptItems);

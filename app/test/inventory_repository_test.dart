@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/sync/sync_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -287,6 +288,27 @@ void main() {
     test('kein receiptItemId: null statt Fehler', () async {
       final link = await inventoryRepo(db).receiptLinkFor(null);
       expect(link, isNull);
+    });
+
+    test('geloeschter Bon: null statt einer Geisterzuordnung (Gesamtkonzept Artikel<->Bon, 2026-09-28)', () async {
+      await db.into(db.receipts).insert(Receipt(
+            id: 'r1', householdId: 'h1', purchasedAt: _d(2026, 9, 20), totalCents: 249, status: 'confirmed',
+            source: 'manual', sumMismatch: false, updatedAt: DateTime.utc(2026),
+          ));
+      await db.into(db.receiptItems).insert(ReceiptItem(
+            id: 'ri1', householdId: 'h1', receiptId: 'r1', lineNo: 1, kind: 'article', rawText: 'Paprika',
+            quantity: 1, quantityUnit: 'piece', lineTotalCents: 249, needsReview: false, updatedAt: DateTime.utc(2026),
+          ));
+      // Ein bestaetigter (nicht bloss vorgeschlagener) Eintrag behaelt seine receiptItemId, wenn der Bon
+      // geloescht wird — genau deshalb muss receiptLinkFor selbst den geloeschten Bon herausfiltern.
+      final confirmed = await inventoryRepo(db).recordFromScan(productId: productId, ean: '1');
+      await inventoryRepo(db).setReceiptLink(confirmed.id, 'ri1');
+      expect(await inventoryRepo(db).receiptLinkFor('ri1'), isNotNull);
+
+      await (db.update(db.receiptItems)..where((i) => i.id.equals('ri1'))).write(ReceiptItemsCompanion(deletedAt: Value(DateTime.now().toUtc())));
+      await (db.update(db.receipts)..where((r) => r.id.equals('r1'))).write(ReceiptsCompanion(deletedAt: Value(DateTime.now().toUtc())));
+
+      expect(await inventoryRepo(db).receiptLinkFor('ri1'), isNull);
     });
   });
 
