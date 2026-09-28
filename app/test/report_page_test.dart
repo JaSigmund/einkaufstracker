@@ -1,5 +1,6 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/settings_repository.dart';
 import 'package:einkaufstracker/features/report/report_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -140,5 +141,39 @@ void main() {
     expect(find.byKey(const Key('explanation-sheet')), findsOneWidget);
     expect(find.text('Ausgaben September 2026'), findsOneWidget);
     expect(find.text('Rabatte auf den ganzen Bon'), findsWidgets);
+  });
+
+  group('Monatsbudget (Doku 07 §2)', () {
+    Widget hostWithBudget(int? budgetCents) => ProviderScope(
+          overrides: [
+            receiptsStreamProvider.overrideWith((ref) => Stream.value([_receipt('a', DateTime.utc(2026, 9, 10, 10), 700)])),
+            allItemsStreamProvider.overrideWith((ref) => Stream.value([_item('a', 'i1', 1, 'Vollmilch', 700, cat: 'g')])),
+            categoriesStreamProvider.overrideWith((ref) => Stream.value([_cat('g', 'Gemüse')])),
+            householdSettingsProvider.overrideWith((ref) async => HouseholdSettings(
+                  notifyTime: '07:30', notifyLeadDays: 1, allowCloudOcr: false, keepReceiptImages: true, monthlyBudgetCents: budgetCents,
+                )),
+          ],
+          child: MaterialApp(home: Scaffold(body: ReportPage(now: DateTime.utc(2026, 9, 26, 12)))),
+        );
+
+    testWidgets('kein Budget gesetzt: keine Budget-Karte', (tester) async {
+      await tester.pumpWidget(hostWithBudget(null));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('budget-card')), findsNothing);
+    });
+
+    testWidgets('Budget nicht ueberschritten', (tester) async {
+      await tester.pumpWidget(hostWithBudget(100000));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('budget-card')), findsOneWidget);
+      expect(find.text('7,00 € von 1.000,00 €'), findsOneWidget);
+      expect(find.textContaining('überschritten'), findsNothing);
+    });
+
+    testWidgets('Budget ueberschritten: Warnhinweis', (tester) async {
+      await tester.pumpWidget(hostWithBudget(500));
+      await tester.pumpAndSettle();
+      expect(find.text('Budget um 2,00 € überschritten'), findsOneWidget);
+    });
   });
 }

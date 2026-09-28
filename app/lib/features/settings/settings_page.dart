@@ -3,15 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
-import '../../data/repositories/settings_repository.dart';
+import '../../core/format.dart';
 import '../common/sync_status_banner.dart';
-
-/// Einstellungen des Haushalts (in Phase 1 online, Cache folgt bei Bedarf).
-final _settingsProvider = FutureProvider.autoDispose<HouseholdSettings>((ref) async {
-  final hid = await ref.watch(householdIdProvider.future);
-  if (hid == null) throw StateError('Kein Haushalt gefunden');
-  return ref.watch(settingsRepositoryProvider).load(hid);
-});
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -20,12 +13,42 @@ class SettingsPage extends ConsumerWidget {
     try {
       final hid = await ref.read(householdIdProvider.future);
       await ref.read(settingsRepositoryProvider).update(hid!, changes);
-      ref.invalidate(_settingsProvider);
+      ref.invalidate(householdSettingsProvider);
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich. Für Einstellungen wird Netz gebraucht.')));
       }
     }
+  }
+
+  /// Monatsbudget setzen oder loeschen (Doku 07 §2 "Budget"), leere Eingabe entfernt das Budget wieder.
+  Future<void> _editBudget(BuildContext context, WidgetRef ref, int? currentCents) async {
+    final controller = TextEditingController(text: currentCents == null ? '' : formatEuro(currentCents).replaceAll(' €', ''));
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Monatsbudget'),
+        content: TextField(
+          key: const Key('budget-input'),
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: 'Betrag in Euro (leer = kein Budget)', suffixText: '€'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('Speichern')),
+        ],
+      ),
+    );
+    if (result == null) return;
+    final cents = result.trim().isEmpty ? null : parseEuroCents(result);
+    if (result.trim().isNotEmpty && cents == null) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ungültiger Betrag')));
+      return;
+    }
+    if (!context.mounted) return;
+    await _update(context, ref, {'monthly_budget_cents': cents});
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
@@ -50,7 +73,7 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(_settingsProvider);
+    final settings = ref.watch(householdSettingsProvider);
     final email = ref.watch(authRepositoryProvider).currentEmail;
 
     return Scaffold(
@@ -113,6 +136,13 @@ class SettingsPage extends ConsumerWidget {
                     await _update(context, ref, {'notify_time': '$hh:$mm:00'});
                   }
                 },
+              ),
+              ListTile(
+                key: const Key('settings-budget'),
+                leading: const Icon(Icons.savings_outlined),
+                title: const Text('Monatsbudget'),
+                subtitle: Text(s.monthlyBudgetCents == null ? 'Kein Budget gesetzt' : 'Warnung ab ${formatEuro(s.monthlyBudgetCents!)} pro Monat'),
+                onTap: () => _editBudget(context, ref, s.monthlyBudgetCents),
               ),
             ]),
           ),

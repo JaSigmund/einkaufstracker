@@ -223,12 +223,15 @@ ShoppingListRepository shoppingListRepo(AppDatabase db, {String household = 'h1'
 class FakeSettingsRepository implements SettingsRepository {
   FakeSettingsRepository(this.settings);
   HouseholdSettings settings;
+  Map<String, dynamic>? lastUpdate;
 
   @override
   Future<HouseholdSettings> load(String householdId) async => settings;
 
   @override
-  Future<void> update(String householdId, Map<String, dynamic> changes) async {}
+  Future<void> update(String householdId, Map<String, dynamic> changes) async {
+    lastUpdate = changes;
+  }
 }
 
 /// Benachrichtigungs-Attrappe: haelt den zuletzt geplanten Stand fest, ohne Plattform-Kanaele

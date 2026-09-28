@@ -83,7 +83,10 @@ class _ReportPageState extends ConsumerState<ReportPage> {
     final categories = ref.watch(categoriesStreamProvider).value ?? const <Category>[];
     final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
+    final settings = ref.watch(householdSettingsProvider).value;
     final t = Theme.of(context);
+    final currentLocal = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final isCurrentMonth = _year == currentLocal.year && _month == currentLocal.month;
 
     if (receipts.isLoading || items.isLoading) return const Center(child: CircularProgressIndicator());
     if (receipts.hasError || items.hasError) return Center(child: Text('Fehler: ${receipts.error ?? items.error}'));
@@ -148,6 +151,34 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             ),
           ]),
         ),
+        if (isCurrentMonth && settings?.monthlyBudgetCents != null && settings!.monthlyBudgetCents! > 0)
+          Card(
+            key: const Key('budget-card'),
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('Monatsbudget', style: t.textTheme.titleSmall),
+                  Text('${formatEuro(total)} von ${formatEuro(settings.monthlyBudgetCents!)}', style: t.textTheme.bodySmall),
+                ]),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: (total / settings.monthlyBudgetCents!).clamp(0, 1).toDouble(),
+                  minHeight: 8,
+                  color: total > settings.monthlyBudgetCents! ? t.colorScheme.error : null,
+                ),
+                if (total > settings.monthlyBudgetCents!)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Budget um ${formatEuro(total - settings.monthlyBudgetCents!)} überschritten',
+                      style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.error),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
         if (report.savedCents > 0)
           Card(
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
