@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../data/cloud/cloud_receipt.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../domain/ocr/ocr_text.dart';
@@ -63,6 +65,11 @@ class PhotoReceiptService {
       );
     }
     if (local.isParsed && local.isTrustworthy) return _preview(local, ReceiptSources.photoLocal, attachments: attachments);
+    if (!local.isParsed) {
+      // Diagnose (Fehlerbericht "Hofer-Scan funktioniert nicht", 2026-09-28): der erkannte Text erscheint
+      // nur bei Misserfolg im Geraete-Log, damit sich der Parser gegen echte OCR-Ausgabe schaerfen laesst.
+      debugPrint('[bon-scan] lokal nicht gelesen: ${local.warnings.join('; ')}\n--- OCR-Text ---\n${_joinText(pages)}\n--- Ende ---');
+    }
 
     // Lokal nicht sicher genug: Cloud fragen, soweit erlaubt und moeglich
     String? note;
@@ -109,7 +116,7 @@ class PhotoReceiptService {
         source: ReceiptSources.photoLocal,
         attachments: attachments,
         error: 'Auf dem Handy konnte der Bon nicht gelesen werden, und die Cloud konnte nicht helfen. '
-            '${note ?? ''} Du kannst den Bon später erneut scannen oder die Positionen von Hand eingeben.'.replaceAll('  ', ' '),
+            '${note ?? ''} ${local.warnings.isEmpty ? '' : 'Grund: ${local.warnings.join('; ')}.'} Du kannst den Bon später erneut scannen oder die Positionen von Hand eingeben.'.replaceAll('  ', ' '),
       );
     }
     return _preview(local, ReceiptSources.photoLocal, attachments: attachments, note: note);
@@ -137,13 +144,12 @@ class PhotoReceiptService {
     return const [];
   }
 
-  ParsedReceipt _readLocal(List<ScannedPage> pages) {
-    final text = pages.map((p) {
-      final rows = clusterRows(p.lines, slope: estimateSlope(p.lines));
-      return ocrRowsToText(rows);
-    }).join('\n');
-    return parser(text);
-  }
+  String _joinText(List<ScannedPage> pages) => pages.map((p) {
+        final rows = clusterRows(p.lines, slope: estimateSlope(p.lines));
+        return ocrRowsToText(rows);
+      }).join('\n');
+
+  ParsedReceipt _readLocal(List<ScannedPage> pages) => parser(_joinText(pages));
 
   /// Bilder fuer die Cloud: ab der Seite mit "Summe" bzw. den ersten Zahlungsdaten wird abgeschnitten, spaetere
   /// Seiten (reiner Kundenbeleg) entfallen. Null, wenn nirgends ein sicherer Schnitt moeglich ist.

@@ -139,5 +139,16 @@ void main() {
       expect(paymentCutY(const []), isNull);
       expect(paymentCutY([const OcrLine('Zwetschken 2.75', Rect.fromLTWH(0, 0, 100, 20))]), isNull);
     });
+
+    test('Zahlungszeile ueberlappt die Zeile davor (unregelmaessiges Foto): kein Absturz statt ArgumentError '
+        '(Fehlerbericht "Scan nicht möglich: invalid argument(s): 0", 2026-09-28, Hofer-Bon)', () {
+      // Die Zeile davor endet (b=50) UNTERHALB des Beginns der Zahlungszeile (t=40): negative Differenz.
+      final lines = [
+        const OcrLine('166908 Bananen lose 1,11 A', Rect.fromLTRB(0, 0, 400, 50)),
+        const OcrLine('Visa Debit', Rect.fromLTRB(0, 40, 200, 90)),
+      ];
+      final y = paymentCutY(lines);
+      expect(y, 50); // kein zusaetzlicher Rand, Schnitt direkt an der Zeile davor
+    });
   });
 }
