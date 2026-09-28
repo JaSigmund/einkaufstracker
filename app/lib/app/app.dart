@@ -76,6 +76,11 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
     ref.listen(activeInventoryStreamProvider, (prev, next) {
       if (next.hasValue) _rescheduleReminders();
     });
+    // Auch ein neuer, noch unbestaetigter Bon-Vorschlag hat schon ein geschaetztes Ablaufdatum (Fehlerbericht
+    // "keine Push-Benachrichtigung", 2026-09-28) und muss die Erinnerungen deshalb ebenfalls neu planen.
+    ref.listen(inventorySuggestionsStreamProvider, (prev, next) {
+      if (next.hasValue) _rescheduleReminders();
+    });
     return MaterialApp.router(
       title: 'Einkaufstracker',
       theme: buildTheme(Brightness.light),

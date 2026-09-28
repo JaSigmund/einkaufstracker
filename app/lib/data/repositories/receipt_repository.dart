@@ -117,6 +117,28 @@ class ReceiptRepository {
     return candidates.firstOrNull;
   }
 
+  /// Bereits geloeschter Bon zum selben Einkauf (gleiche Summe und Kaufzeit auf zwei Minuten genau), nur
+  /// fuer Bons ohne Re-Nr relevant (Fehlerbericht "Zuordnung bei erneutem Bonscan nicht vorhanden",
+  /// 2026-09-28): ein Bon mit Re-Nr bekommt ueber [_receiptId] ohnehin immer dieselbe ID und heilt sich beim
+  /// erneuten Import von selbst (voller Upsert loescht `deletedAt`). Ein Foto-Bon ohne Re-Nr bekaeme sonst bei
+  /// jedem Import eine neue Zufalls-ID, auch wenn es derselbe Bon ist, der zuvor geloescht wurde — bestaetigte
+  /// Inventar-Eintraege blieben dann dauerhaft unverknuepft, und ein noch unbestaetigter Vorschlag wuerde
+  /// doppelt angelegt. Wird hier ein Treffer gefunden, verwendet [saveParsed] dessen ID weiter: Positionen
+  /// bekommen ueber [_itemId] dieselben IDs wie zuvor und heilen sich auf demselben Weg.
+  Future<Receipt?> _findDeletedDuplicate(ParsedReceipt r, String hid) async {
+    if (r.purchasedAtUtc == null || r.totalCents == null) return null;
+    final from = r.purchasedAtUtc!.subtract(const Duration(minutes: 2));
+    final to = r.purchasedAtUtc!.add(const Duration(minutes: 2));
+    final candidates = await (_db.select(_db.receipts)
+          ..where((x) =>
+              x.householdId.equals(hid) &
+              x.deletedAt.isNotNull() &
+              x.totalCents.equals(r.totalCents!) &
+              x.purchasedAt.isBetweenValues(from, to)))
+        .get();
+    return candidates.firstOrNull;
+  }
+
   /// Nicht geloeschte, bestaetigte Bons, neueste zuerst.
   Stream<List<Receipt>> watchAll() => (_db.select(_db.receipts)
         ..where((r) => r.deletedAt.isNull() & r.status.equals('confirmed'))
@@ -178,10 +200,11 @@ class ReceiptRepository {
     final categorizer = await _buildCategorizer(hid);
     final storableIds = productRepo != null && inventoryRepo != null ? await _storableCategoryIds(hid) : const <String>{};
     final purchasedOn = _viennaDate(r.purchasedAtUtc!);
-    final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : _uuid.v4();
 
     final existing = await findDuplicate(r);
     if (existing != null) return ReceiptSaveResult(ReceiptSaveOutcome.duplicate, existing.id);
+
+    final receiptId = r.externalId != null ? _receiptId(hid, r.externalId!) : (await _findDeletedDuplicate(r, hid))?.id ?? _uuid.v4();
 
     await _db.transaction(() async {
       // Filiale finden oder anlegen

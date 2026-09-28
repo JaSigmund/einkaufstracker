@@ -13,7 +13,7 @@ class ReceiptDetailPage extends ConsumerWidget {
 
   final String receiptId;
 
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+  Future<void> _delete(BuildContext context, WidgetRef ref, List<ReceiptItem> items) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -26,9 +26,36 @@ class ReceiptDetailPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
+
+    final inventoryRepo = ref.read(inventoryRepositoryProvider);
+    final itemIds = items.map((i) => i.id);
+    // Rueckfrage nur, wenn tatsaechlich bestaetigter Bestand zugeordnet ist (Fehlerbericht "Bon löschen
+    // verwirft keine Zuordnung", 2026-09-28): der Bestand bleibt beim Loeschen ohnehin erhalten und wird beim
+    // erneuten Scan desselben Bons automatisch wieder verknuepft, soll aber auf Wunsch auch entkoppelt werden
+    // koennen.
+    final linked = await inventoryRepo.confirmedItemsLinkedTo(itemIds);
+    var clearLinks = false;
+    if (linked.isNotEmpty && context.mounted) {
+      clearLinks = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Zuordnung entfernen?'),
+              content: Text(linked.length == 1
+                  ? 'Ein Inventar-Eintrag ist diesem Bon zugeordnet und bleibt erhalten. Soll die Zuordnung zum Bon ebenfalls entfernt werden? Sie wird sonst beim erneuten Scannen desselben Bons automatisch wiederhergestellt.'
+                  : '${linked.length} Inventar-Einträge sind diesem Bon zugeordnet und bleiben erhalten. Soll die Zuordnung zum Bon ebenfalls entfernt werden? Sie wird sonst beim erneuten Scannen desselben Bons automatisch wiederhergestellt.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Zuordnung behalten')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Zuordnung entfernen')),
+              ],
+            ),
+          ) ??
+          false;
+    }
+
     final repo = ref.read(receiptRepositoryProvider);
     final files = await repo.filesOf(receiptId);
     await repo.softDelete(receiptId);
+    if (clearLinks) await inventoryRepo.clearReceiptLinksFor(itemIds);
     // Originalbelege mitloeschen (lokal und, soweit online, im Storage)
     await ref.read(receiptFileServiceProvider).purge(files);
     if (context.mounted) {
@@ -59,7 +86,7 @@ class ReceiptDetailPage extends ConsumerWidget {
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) {
-              if (v == 'delete') _delete(context, ref);
+              if (v == 'delete') _delete(context, ref, items);
             },
             itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('Löschen'))],
           ),

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 import 'package:einkaufstracker/domain/receipt/month_summary.dart';
 import 'package:einkaufstracker/features/receipts/receipt_detail_page.dart';
@@ -189,6 +190,7 @@ void main() {
             receiptFileServiceProvider.overrideWithValue(h.files),
             storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
             receiptRepositoryProvider.overrideWithValue(h.repo),
+            inventoryRepositoryProvider.overrideWithValue(h.inventory),
           ],
           child: MaterialApp.router(
             routerConfig: GoRouter(initialLocation: '/', routes: [
@@ -253,6 +255,89 @@ void main() {
 
       expect((await db.select(db.receipts).getSingle()).deletedAt, isNotNull);
       expect(find.text('LISTE'), findsOneWidget); // zurueck auf der Liste
+    });
+
+    testWidgets('Loeschen mit bestaetigtem Inventar-Eintrag: fragt nach, ob die Zuordnung mit entfernt werden soll '
+        '(Fehlerbericht "Bon löschen verwirft keine Zuordnung", 2026-09-28)', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final repo = receiptRepo(db);
+      final holder = AppDatabaseHolder(db, repo: repo);
+      final product = await productRepo(db).create(name: 'Vollmilch', baseUnit: 'l');
+      final confirmed = await holder.inventory.recordFromScan(productId: product.id, ean: '1');
+      await holder.inventory.setReceiptLink(confirmed.id, 'i1');
+      await db.into(db.receipts).insert(_receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100).toCompanion(false));
+
+      await tester.pumpWidget(host(holder,
+          receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: [_item('i1', 1, 'Vollmilch', 100)]));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Zuordnung entfernen?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Zuordnung entfernen'));
+      await tester.pumpAndSettle();
+
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(confirmed.id))).getSingle();
+      expect(row.receiptItemId, isNull);
+      expect(row.deletedAt, isNull); // Bestand bleibt erhalten
+    });
+
+    testWidgets('Loeschen mit bestaetigtem Inventar-Eintrag: "Zuordnung behalten" laesst die Verknuepfung bestehen', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final repo = receiptRepo(db);
+      final holder = AppDatabaseHolder(db, repo: repo);
+      final product = await productRepo(db).create(name: 'Vollmilch', baseUnit: 'l');
+      final confirmed = await holder.inventory.recordFromScan(productId: product.id, ean: '1');
+      await holder.inventory.setReceiptLink(confirmed.id, 'i1');
+      await db.into(db.receipts).insert(_receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100).toCompanion(false));
+
+      await tester.pumpWidget(host(holder,
+          receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: [_item('i1', 1, 'Vollmilch', 100)]));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Zuordnung behalten'));
+      await tester.pumpAndSettle();
+
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(confirmed.id))).getSingle();
+      expect(row.receiptItemId, 'i1'); // unveraendert
+    });
+
+    testWidgets('Loeschen ohne verknuepften Bestand: keine Rueckfrage zur Zuordnung', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final repo = receiptRepo(db);
+      await db.into(db.receipts).insert(_receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100).toCompanion(false));
+      final holder = AppDatabaseHolder(db, repo: repo);
+
+      await tester.pumpWidget(host(holder, receipt: _receipt('r1', DateTime.utc(2026, 7, 2, 17, 51), 100), items: const []));
+      GoRouter.of(tester.element(find.text('LISTE'))).go('/receipt');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Löschen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Löschen'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Zuordnung entfernen?'), findsNothing);
+      expect(find.text('LISTE'), findsOneWidget);
     });
 
     testWidgets('Tippen auf einen Artikel oeffnet die Kategorieauswahl, die Wahl wird gelernt', (tester) async {
@@ -334,7 +419,9 @@ void main() {
 class AppDatabaseHolder {
   AppDatabaseHolder(AppDatabase db, {ReceiptRepository? repo})
       : repo = repo ?? receiptRepo(db),
-        files = fileService(db, FakeRemoteFileStore(), Directory.systemTemp.createTempSync('rf'), repo: repo ?? receiptRepo(db));
+        files = fileService(db, FakeRemoteFileStore(), Directory.systemTemp.createTempSync('rf'), repo: repo ?? receiptRepo(db)),
+        inventory = inventoryRepo(db);
   final ReceiptRepository repo;
   final ReceiptFileService files;
+  final InventoryRepository inventory;
 }

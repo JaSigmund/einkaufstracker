@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 import 'package:einkaufstracker/domain/receipt/billa_text_parser.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -148,6 +149,65 @@ void main() {
             ..where((i) => i.isSuggestion.equals(true) & i.productId.equals(champignonProduct.id) & i.deletedAt.isNull()))
           .get();
       expect(active, hasLength(1)); // nicht zwei
+    });
+  });
+
+  group('Bon ohne Re-Nr (Foto-Scan) loeschen und erneut scannen (Fehlerbericht "Zuordnung bei erneutem '
+      'Bonscan nicht vorhanden", 2026-09-28)', () {
+    ParsedReceipt photoReceipt() => ParsedReceipt.edited(
+          base: null,
+          chain: 'Billa',
+          purchasedAtUtc: DateTime.utc(2026, 9, 28, 10),
+          totalCents: 179,
+          items: const [
+            ParsedItem(rawText: 'Clever Vollmilch', kind: ReceiptItemKind.article, lineTotalCents: 179, quantity: 1, quantityUnit: 'piece'),
+          ],
+          bonDiscounts: const [],
+        );
+
+    test('bestaetigter Inventar-Eintrag wird nach erneutem Scan automatisch wieder verknuepft, kein Duplikat', () async {
+      final products = productRepo(db);
+      final inventory = inventoryRepo(db);
+      final repo = receiptRepo(db, productRepo: products, inventoryRepo: inventory);
+
+      final saved = await repo.saveParsed(photoReceipt());
+      final product = await (db.select(db.products)..where((p) => p.name.equals('Clever Vollmilch'))).getSingle();
+      final suggestion = await (db.select(db.inventoryItems)..where((i) => i.productId.equals(product.id))).getSingle();
+      // Nutzer bestaetigt den Vorschlag per Barcode-Scan
+      final confirmed = await inventory.recordFromScan(productId: product.id, ean: '9001234567890');
+      expect(confirmed.id, suggestion.id);
+      expect(confirmed.isSuggestion, isFalse);
+
+      await repo.softDelete(saved.receiptId);
+      expect(await inventory.receiptLinkFor(confirmed.receiptItemId), isNull); // Geisterzuordnung, wie erwartet
+
+      final again = await repo.saveParsed(photoReceipt());
+      expect(again.outcome, ReceiptSaveOutcome.saved);
+      expect(again.receiptId, saved.receiptId); // dieselbe Bon-Identitaet wird wiederverwendet
+
+      final link = await inventory.receiptLinkFor(confirmed.receiptItemId);
+      expect(link, isNotNull);
+      expect(link!.receiptId, again.receiptId);
+
+      final allForProduct = await (db.select(db.inventoryItems)..where((i) => i.productId.equals(product.id) & i.deletedAt.isNull())).get();
+      expect(allForProduct, hasLength(1)); // kein zweiter Vorschlag entstanden
+    });
+
+    test('noch unbestaetigter Vorschlag wird nach erneutem Scan reaktiviert statt verdoppelt', () async {
+      final products = productRepo(db);
+      final inventory = inventoryRepo(db);
+      final repo = receiptRepo(db, productRepo: products, inventoryRepo: inventory);
+
+      final saved = await repo.saveParsed(photoReceipt());
+      await repo.softDelete(saved.receiptId);
+
+      final again = await repo.saveParsed(photoReceipt());
+      expect(again.receiptId, saved.receiptId);
+
+      final product = await (db.select(db.products)..where((p) => p.name.equals('Clever Vollmilch'))).getSingle();
+      final active = await (db.select(db.inventoryItems)..where((i) => i.productId.equals(product.id) & i.deletedAt.isNull())).get();
+      expect(active, hasLength(1));
+      expect(active.single.isSuggestion, isTrue);
     });
   });
 
