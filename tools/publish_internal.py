@@ -25,6 +25,7 @@ from pathlib import Path
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 # Fest verdrahtet, siehe Modul-Docstring oben -- absichtlich kein CLI-Parameter.
 TRACK = "internal"
@@ -51,9 +52,8 @@ def publish(aab_path: Path, key_path: Path, notes: str) -> None:
     print(f"Edit angelegt: {edit_id}")
 
     try:
-        upload = edits.bundles().upload(
-            editId=edit_id, packageName=PACKAGE_NAME, media_body=str(aab_path)
-        ).execute()
+        media = MediaFileUpload(str(aab_path), mimetype="application/octet-stream")
+        upload = edits.bundles().upload(editId=edit_id, packageName=PACKAGE_NAME, media_body=media).execute()
         version_code = upload["versionCode"]
         print(f"Bundle hochgeladen, versionCode {version_code}")
 
