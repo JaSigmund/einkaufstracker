@@ -38,3 +38,6 @@ app/dart_defines.local.json
 # Python-Bytecode
 __pycache__/
 *.pyc
+
+# Datenbank-Backups (tools/backup.sh) enthalten alle Nutzerdaten, nie committen
+backups/
