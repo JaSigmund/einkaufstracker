@@ -106,6 +106,14 @@ class FakeAuth implements AuthRepository {
 
   @override
   Future<void> signOut() async {}
+
+  var deleteAccountCalls = 0;
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCalls++;
+    if (failWith != null) throw SignInFailure(failWith!);
+  }
 }
 
 CategoryRepository categoryRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>

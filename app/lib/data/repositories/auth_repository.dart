@@ -7,6 +7,12 @@ abstract class AuthRepository {
   String? get currentEmail;
   Future<void> signIn(String email, String password);
   Future<void> signOut();
+
+  /// Loescht das Konto unwiderruflich samt allen Haushaltsdaten (Play-Store-Pflicht "Account
+  /// Deletion", Edge Function `delete-account`). Meldet danach nicht mehr selbst ab: die Session
+  /// wird durch die Loeschung des Auth-Nutzers ungueltig, der Aufrufer soll trotzdem noch lokal
+  /// aufraeumen (siehe `SettingsPage._deleteAccount`).
+  Future<void> deleteAccount();
 }
 
 class SignInFailure implements Exception {
@@ -39,4 +45,19 @@ class SupabaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() => _client.auth.signOut();
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      final response = await _client.functions.invoke('delete-account').timeout(const Duration(seconds: 30));
+      final data = response.data;
+      if (data is! Map || data['deleted'] != true) throw SignInFailure('Konto konnte nicht gelöscht werden.');
+    } on FunctionException catch (e) {
+      throw SignInFailure('Konto konnte nicht gelöscht werden (Fehler ${e.status}).');
+    } on SignInFailure {
+      rethrow;
+    } catch (_) {
+      throw SignInFailure('Keine Verbindung. Zum Löschen wird Netz gebraucht.');
+    }
+  }
 }

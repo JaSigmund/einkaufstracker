@@ -107,6 +107,49 @@ class SettingsPage extends ConsumerWidget {
     await ref.read(authRepositoryProvider).signOut();
   }
 
+  /// Unwiderrufliche Loeschung: Rueckfrage verlangt das Eintippen von "LÖSCHEN", damit ein
+  /// versehentliches Antippen nicht reicht (Play-Store-Pflicht "Account Deletion").
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Konto endgültig löschen?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Dein Konto und alle Daten (Bons, Inventar, Einkaufsliste, Kategorien) werden unwiderruflich gelöscht. '
+                  'Das kann nicht rückgängig gemacht werden.'),
+              const SizedBox(height: 16),
+              Text('Tippe "LÖSCHEN" ein, um zu bestätigen:', style: Theme.of(ctx).textTheme.bodySmall),
+              TextField(controller: controller, onChanged: (_) => setState(() {}), autofocus: true),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+              onPressed: controller.text.trim() == 'LÖSCHEN' ? () => Navigator.pop(ctx, true) : null,
+              child: const Text('Endgültig löschen'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+      await ref.read(databaseProvider).wipe();
+      await ref.read(authRepositoryProvider).signOut();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(householdSettingsProvider);
@@ -221,6 +264,13 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.logout),
             title: const Text('Abmelden'),
             onTap: () => _signOut(context, ref),
+          ),
+          ListTile(
+            key: const Key('settings-delete-account'),
+            leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+            title: Text('Konto löschen', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            subtitle: const Text('Löscht dein Konto und alle Daten unwiderruflich'),
+            onTap: () => _deleteAccount(context, ref),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
