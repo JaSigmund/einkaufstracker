@@ -2,6 +2,12 @@
 
 Spiegelt die Tabelle `app_changelog` (angezeigt in der App unter Einstellungen → „Änderungsprotokoll“). Wird von Hand nach jedem Release aktualisiert, wenn ein neuer Eintrag per SQL angelegt wird. Fehlerberichte und ihr Bearbeitungsstatus stehen ausführlicher im Vault unter „17 Fehlerprotokoll“.
 
+## 1.7.9 — 2026-09-30
+
+Konto löschen
+
+- Neue Option in den Einstellungen: Konto löschen (mit Sicherheitsabfrage) — löscht das Konto und alle Daten unwiderruflich
+
 ## 1.7.8 — 2026-09-28
 
 Eigentliche Ursache des Foto-Scan-Absturzes behoben
