@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -127,19 +128,23 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             onTap: _isBusy ? null : _importPdf,
           ),
         ),
-        Card(
-          child: ListTile(
-            key: const Key('scan-paper'),
-            leading: const Icon(Icons.document_scanner_outlined),
-            title: const Text('Papierbon fotografieren'),
-            subtitle: const Text(
-                'Der Bon wird auf dem Handy gelesen. Nur wenn die Prüfung nicht aufgeht, hilft die Cloud, und dann ohne Zahlungsdaten.'),
-            trailing: _busy == _Busy.paper
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.chevron_right),
-            onTap: _isBusy ? null : _scanPaper,
+        // Der Dokumentenscanner (google_mlkit_document_scanner) ist eine reine Android/iOS-Funktion
+        // (ADR: ML Kit hat keine Web-Implementierung) -- im Browser (PWA) gaebe es hier nur einen
+        // kryptischen Plugin-Fehler statt eines Ergebnisses, deshalb wird die Karte dort ausgeblendet.
+        if (!kIsWeb)
+          Card(
+            child: ListTile(
+              key: const Key('scan-paper'),
+              leading: const Icon(Icons.document_scanner_outlined),
+              title: const Text('Papierbon fotografieren'),
+              subtitle: const Text(
+                  'Der Bon wird auf dem Handy gelesen. Nur wenn die Prüfung nicht aufgeht, hilft die Cloud, und dann ohne Zahlungsdaten.'),
+              trailing: _busy == _Busy.paper
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.chevron_right),
+              onTap: _isBusy ? null : _scanPaper,
+            ),
           ),
-        ),
         Card(
           child: ListTile(
             key: const Key('scan-barcode'),

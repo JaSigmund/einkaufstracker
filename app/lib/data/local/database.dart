@@ -391,8 +391,18 @@ class KeyValues extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  /// Dauerhafte Datenbank auf dem Geraet.
-  AppDatabase.persistent() : super(driftDatabase(name: 'einkaufstracker'));
+  /// Dauerhafte Datenbank auf dem Geraet. `web:` wird nur fuer die iOS-PWA gebraucht (Doku 14
+  /// iOS-Strategie, Option D) -- auf Android ohne Wirkung, drift_flutter waehlt je Plattform selbst
+  /// die passende Umsetzung. Die WASM-Datei und der Worker liegen in `web/` (aus dem drift-Paket
+  /// kopiert, siehe `tools/deploy_web.sh`-Kommentar).
+  AppDatabase.persistent()
+      : super(driftDatabase(
+          name: 'einkaufstracker',
+          web: DriftWebOptions(
+            sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+            driftWorker: Uri.parse('drift_worker.js'),
+          ),
+        ));
 
   @override
   int get schemaVersion => 12;
