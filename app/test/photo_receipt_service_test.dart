@@ -78,6 +78,61 @@ void main() {
   });
   tearDown(() => db.close());
 
+  group('readSinglePhotoViaCloud (Foto-Scan im Browser, Doku 14 iOS-Strategie Option D)', () {
+    final jpeg = Uint8List.fromList([1, 2, 3]);
+
+    test('Cloud erlaubt und Ergebnis vertrauenswuerdig: Vorschau mit Quelle photoCloud', () async {
+      final p = await service().readSinglePhotoViaCloud(jpeg);
+      expect(p.source, ReceiptSources.photoCloud);
+      expect(p.receipt.isTrustworthy, isTrue);
+      expect(p.canImport, isTrue);
+      expect(p.note, isNull);
+      expect(cloud.calls, 1);
+      expect(cloud.lastImages, [jpeg]);
+    });
+
+    test('Cloud ausgeschaltet: Fehlermeldung erklaert, dass es im Browser keine lokale Erkennung gibt', () async {
+      allowed = false;
+      final p = await service().readSinglePhotoViaCloud(jpeg);
+      expect(p.canImport, isFalse);
+      expect(p.error, contains('Browser'));
+      expect(cloud.calls, 0);
+    });
+
+    test('Ergebnis nicht vertrauenswuerdig (Summe passt nicht): trotzdem uebernehmbar, mit Hinweis', () async {
+      cloud = _FakeCloud(parsedReceiptFromCloud(_cloudJson(2319, [1000])));
+      final p = await service().readSinglePhotoViaCloud(jpeg);
+      expect(p.receipt.isTrustworthy, isFalse);
+      expect(p.canImport, isTrue);
+      expect(p.note, contains('Summe'));
+    });
+
+    test('Cloud liefert kein Ergebnis (nicht gelesen): Fehler statt Absturz', () async {
+      cloud = _FakeCloud(const ParsedReceipt.failed(['keine Summe']));
+      final p = await service().readSinglePhotoViaCloud(jpeg);
+      expect(p.canImport, isFalse);
+      expect(p.receipt.isParsed, isFalse);
+    });
+
+    test('Cloud nicht erreichbar: Fehlermeldung statt Absturz', () async {
+      cloud = _FakeCloud(Exception('offline'));
+      final p = await service().readSinglePhotoViaCloud(jpeg);
+      expect(p.canImport, isFalse);
+      expect(p.error, isNotNull);
+    });
+
+    test('Einwilligung nicht abrufbar (kein Netz): Fehlermeldung statt Absturz', () async {
+      final p = await PhotoReceiptService(
+        repo: receiptRepo(db),
+        cloud: cloud,
+        cloudAllowed: () async => throw const CloudUnavailable('kein Netz'),
+        prepare: (path, {cutY}) async => Uint8List.fromList([1, 2, 3]),
+      ).readSinglePhotoViaCloud(jpeg);
+      expect(p.canImport, isFalse);
+      expect(cloud.calls, 0);
+    });
+  });
+
   test('Sauberer Scan besteht das Pruef-Tor lokal: keine Cloud, nichts wird hochgeladen', () async {
     final p = await service().read(_pages('billa_paper_02'));
     expect(p.source, ReceiptSources.photoLocal);

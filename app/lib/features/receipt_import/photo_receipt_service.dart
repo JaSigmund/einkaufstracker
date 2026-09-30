@@ -129,6 +129,58 @@ class PhotoReceiptService {
     return ImportPreview(receipt: r, source: source, note: note, duplicateOfReceiptId: existing?.id, attachments: attachments);
   }
 
+  /// Foto-Scan im Browser (Doku 14 iOS-Strategie, Option D): ML Kit (Dokumentenscanner und lokale
+  /// Texterkennung) hat keine Web-Implementierung, ein im Browser aufgenommenes Foto geht deshalb
+  /// immer direkt an die Cloud -- ADR-003 ("lokal zuerst") gilt nur dort, wo lokale Erkennung
+  /// ueberhaupt moeglich ist. Kein Zuschnitt vor dem Zahlungsblock (B4): dafuer braeuchte es die
+  /// gleiche Zeilen-Geometrie wie beim lokalen Scan, die im Browser nicht verfuegbar ist. Stattdessen
+  /// bleibt das Foto komplett auf dem Geraet (wird nicht abgelegt) und nur das eine Bild, das der
+  /// Nutzer bewusst aufgenommen hat, geht an die Cloud.
+  Future<ImportPreview> readSinglePhotoViaCloud(Uint8List jpeg, {void Function(String status)? onStatus}) async {
+    final bool allowed;
+    try {
+      allowed = await cloudAllowed();
+    } on CloudUnavailable catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Keine Verbindung.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Die Einwilligung zur Cloud-Erkennung konnte nicht geprueft werden (${e.message}).',
+      );
+    }
+    if (!allowed) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Cloud-Erkennung ist ausgeschaltet.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Im Browser ist die Cloud-Erkennung der einzige Weg, ein Foto zu lesen (lokale Erkennung '
+            'gibt es hier nicht). Bitte in den Einstellungen aktivieren, oder die Positionen von Hand eingeben.',
+      );
+    }
+    onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
+    try {
+      final remote = await cloud.read([jpeg]);
+      if (!remote.isParsed) {
+        return ImportPreview(
+          receipt: remote,
+          source: ReceiptSources.photoCloud,
+          error: 'Der Bon konnte nicht gelesen werden. Du kannst es erneut versuchen oder die Positionen von Hand eingeben.',
+        );
+      }
+      return await _preview(remote, ReceiptSources.photoCloud, note: remote.isTrustworthy ? null : 'Die Summe passte nicht genau, bitte prüfen.');
+    } on CloudUnavailable catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Cloud nicht erreichbar.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Die Cloud ist nicht erreichbar (${e.message}).',
+      );
+    } catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Der Bon konnte nicht gelesen werden.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Der Bon konnte nicht gelesen werden ($e).',
+      );
+    }
+  }
+
   /// Fotos zum Ablegen: alle Seiten bis zur Seite mit "Summe" bzw. den Zahlungsdaten, diese abgeschnitten, spaetere
   /// Seiten (Kundenbeleg) entfallen. Ohne sicheren Schnitt wird kein Foto abgelegt (wie beim Cloud-Upload, B4).
   List<AttachmentSource> _attachments(List<ScannedPage> pages) {

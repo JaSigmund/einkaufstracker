@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app/providers.dart';
 import '../products/barcode_flow.dart';
@@ -14,10 +15,15 @@ enum _Busy { pdf, paper, barcode }
 
 /// Inhalt des Tabs "Scan": Einstiegspunkte zum Erfassen von Bons.
 class ScanPage extends ConsumerStatefulWidget {
-  const ScanPage({super.key, this.pickPdf = _pickPdfFromSystem});
+  const ScanPage({super.key, this.pickPdf = _pickPdfFromSystem, this.pickCameraPhoto = _pickCameraPhotoFromSystem});
 
   /// Liefert die Bytes des gewaehlten PDFs oder null bei Abbruch. Austauschbar fuer Tests.
   final Future<Uint8List?> Function() pickPdf;
+
+  /// Oeffnet die Kamera (Browser: Datei-Dialog mit Kamera-Vorauswahl) und liefert das Foto oder null
+  /// bei Abbruch. Nur fuer den Web-Foto-Scan gebraucht (Doku 14 iOS-Strategie, Option D), austauschbar
+  /// fuer Tests.
+  final Future<Uint8List?> Function() pickCameraPhoto;
 
   @override
   ConsumerState<ScanPage> createState() => _ScanPageState();
@@ -82,6 +88,37 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     }
   }
 
+  /// Foto-Scan im Browser (Doku 14 iOS-Strategie, Option D): kein Dokumentenscanner, keine lokale
+  /// Texterkennung (ML Kit gibt es im Web nicht), deshalb Kamera oeffnen und das eine Foto direkt
+  /// an die Cloud schicken (`PhotoReceiptService.readSinglePhotoViaCloud`).
+  Future<void> _scanPaperWeb() async {
+    setState(() {
+      _busy = _Busy.paper;
+      _status = 'Kamera wird geöffnet …';
+    });
+    ImportPreview? preview;
+    try {
+      final jpeg = await widget.pickCameraPhoto();
+      if (jpeg != null) {
+        preview = await ref.read(photoReceiptServiceProvider).readSinglePhotoViaCloud(
+          jpeg,
+          onStatus: (s) {
+            if (mounted) setState(() => _status = s);
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan nicht möglich: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+    if (preview != null && mounted) {
+      await context.push('/import-review', extra: preview);
+    }
+  }
+
   Future<void> _scanBarcode() async {
     setState(() => _busy = _Busy.barcode);
     // Die Ladeanzeige gilt nur fuer Scan und Suche, nicht fuer die Anlage-/Erfassungsseiten danach
@@ -128,23 +165,24 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             onTap: _isBusy ? null : _importPdf,
           ),
         ),
-        // Der Dokumentenscanner (google_mlkit_document_scanner) ist eine reine Android/iOS-Funktion
-        // (ADR: ML Kit hat keine Web-Implementierung) -- im Browser (PWA) gaebe es hier nur einen
-        // kryptischen Plugin-Fehler statt eines Ergebnisses, deshalb wird die Karte dort ausgeblendet.
-        if (!kIsWeb)
-          Card(
-            child: ListTile(
-              key: const Key('scan-paper'),
-              leading: const Icon(Icons.document_scanner_outlined),
-              title: const Text('Papierbon fotografieren'),
-              subtitle: const Text(
-                  'Der Bon wird auf dem Handy gelesen. Nur wenn die Prüfung nicht aufgeht, hilft die Cloud, und dann ohne Zahlungsdaten.'),
-              trailing: _busy == _Busy.paper
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.chevron_right),
-              onTap: _isBusy ? null : _scanPaper,
-            ),
+        // Im Browser (PWA) gibt es keinen Dokumentenscanner und keine lokale Texterkennung (ML Kit
+        // hat keine Web-Implementierung, Doku 14 iOS-Strategie Option D) -- die Kamera oeffnet sich
+        // trotzdem, das Foto geht dann aber immer direkt an die Cloud statt zuerst lokal gelesen zu
+        // werden.
+        Card(
+          child: ListTile(
+            key: const Key('scan-paper'),
+            leading: const Icon(Icons.document_scanner_outlined),
+            title: const Text('Papierbon fotografieren'),
+            subtitle: Text(kIsWeb
+                ? 'Foto aufnehmen, wird zur Texterkennung an die Cloud gesendet (im Browser gibt es keine lokale Erkennung).'
+                : 'Der Bon wird auf dem Handy gelesen. Nur wenn die Prüfung nicht aufgeht, hilft die Cloud, und dann ohne Zahlungsdaten.'),
+            trailing: _busy == _Busy.paper
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.chevron_right),
+            onTap: _isBusy ? null : (kIsWeb ? _scanPaperWeb : _scanPaper),
           ),
+        ),
         Card(
           child: ListTile(
             key: const Key('scan-barcode'),
@@ -169,5 +207,13 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
 Future<Uint8List?> _pickPdfFromSystem() async {
   final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: const ['pdf']);
+  return file?.readAsBytes();
+}
+
+/// image_picker oeffnet im Browser einen Datei-Dialog mit Kamera-Vorauswahl (auf Mobilgeraeten die
+/// Kamera-App direkt, auf dem Desktop die normale Dateiauswahl) -- funktioniert plattformuebergreifend,
+/// anders als der native Dokumentenscanner.
+Future<Uint8List?> _pickCameraPhotoFromSystem() async {
+  final file = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85);
   return file?.readAsBytes();
 }
