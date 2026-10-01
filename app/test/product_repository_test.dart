@@ -104,6 +104,30 @@ void main() {
     test('unbekanntes Produkt: kein Absturz', () async {
       await productRepo(db).softDelete('does-not-exist');
     });
+
+    test('Codereview-Fund 2026-10-01: loescht auch die gelernten Aliase mit', () async {
+      final repo = productRepo(db);
+      final p = await repo.findOrCreateForReceiptItem('Milch');
+      await repo.softDelete(p.id);
+      final aliases = await (db.select(db.productAliases)
+            ..where((a) => a.productId.equals(p.id))
+            ..where((a) => a.deletedAt.isNull()))
+          .get();
+      expect(aliases, isEmpty);
+    });
+
+    test('Codereview-Fund 2026-10-01: Produkt loeschen und denselben Artikel erneut (zweimal) kaufen legt kein Duplikat an und stuerzt nicht ab', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('Milch');
+      await repo.softDelete(first.id);
+
+      // Ohne den Fix bliebe der alte Alias aktiv: der zweite Kauf legt ein zweites Produkt mit demselben
+      // Alias-Text an, der dritte Kauf faende dann zwei aktive Aliase und stuerzte ab (StateError).
+      final second = await repo.findOrCreateForReceiptItem('Milch');
+      expect(second.id, isNot(first.id));
+      final third = await repo.findOrCreateForReceiptItem('Milch');
+      expect(third.id, second.id);
+    });
   });
 
   group('findOrCreateForReceiptItem', () {

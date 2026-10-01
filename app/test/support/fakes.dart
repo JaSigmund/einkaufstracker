@@ -91,8 +91,13 @@ class FakeRemoteStore implements RemoteStore {
 }
 
 class FakeAuth implements AuthRepository {
-  FakeAuth({this.failWith});
+  FakeAuth({this.failWith, this.failSignOutWith});
   final String? failWith;
+
+  /// Laesst nur `signOut()` scheitern (unabhaengig von [failWith], das signIn/deleteAccount betrifft) --
+  /// fuer Tests, die pruefen, dass eine bereits erfolgreiche Konto-Loeschung trotzdem versucht, lokal
+  /// aufzuraeumen (Codereview-Fund 2026-10-01).
+  final String? failSignOutWith;
   final signIns = <(String, String)>[];
 
   @override
@@ -104,8 +109,13 @@ class FakeAuth implements AuthRepository {
     if (failWith != null) throw SignInFailure(failWith!);
   }
 
+  var signOutCalls = 0;
+
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async {
+    signOutCalls++;
+    if (failSignOutWith != null) throw SignInFailure(failSignOutWith!);
+  }
 
   var deleteAccountCalls = 0;
 

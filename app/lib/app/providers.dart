@@ -117,6 +117,10 @@ class SyncController extends Notifier<SyncStatus> {
   }
 
   Future<void> sync() async {
+    // Codereview-Fund 2026-10-01: waehrend Abmelden/Konto-Loeschen laeuft, darf kein parallel ausgeloester
+    // Sync (2-Minuten-Timer, Connectivity-Wechsel, Tipp auf den Sync-Banner) mit der noch kurz gueltigen
+    // alten Session Daten in die gerade geleerte lokale DB zurueckschreiben -- siehe settings_page.dart.
+    if (ref.read(authTransitionInProgressProvider)) return;
     final engine = ref.read(syncEngineProvider);
     if (engine.isRunning) return;
     if (ref.read(sessionProvider).value == null) return;
@@ -305,6 +309,20 @@ final appUpdateRequiredProvider = Provider<bool>((ref) {
   if (config == null || build == null) return false;
   return isAppUpdateRequired(currentBuildNumber: build, minSupportedBuildNumber: config.minSupportedBuildNumber);
 });
+
+/// True waehrend Abmelden/Konto-Loeschen laeuft (Codereview-Fund 2026-10-01, siehe `SyncController.sync()`
+/// und `SettingsPage`). Lebt im selben langlebigen `ProviderScope` wie die ganze App (kein Neustart beim
+/// An-/Abmelden), muss also nach jeder Abmeldung/Loeschung wieder auf `false` zurueckgesetzt werden --
+/// sonst bliebe Sync fuer den Rest der App-Laufzeit blockiert, auch nach einer neuen Anmeldung.
+class AuthTransitionNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void start() => state = true;
+  void finish() => state = false;
+}
+
+final authTransitionInProgressProvider = NotifierProvider<AuthTransitionNotifier, bool>(AuthTransitionNotifier.new);
 
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));

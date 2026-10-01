@@ -72,4 +72,33 @@ void main() {
     expect(status.updateRequired, isFalse);
     expect(status.error, isNull);
   });
+
+  testWidgets('Codereview-Fund 2026-10-01: authTransitionInProgressProvider=true blockiert sync() komplett (waehrend Abmelden/Loeschen)', (tester) async {
+    late WidgetRef ref;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        sessionProvider.overrideWith((ref) => Stream.value(_fakeSession)),
+        remoteStoreProvider.overrideWithValue(FakeRemoteStore()),
+        appUpdateRequiredProvider.overrideWithValue(false),
+      ],
+      child: MaterialApp(home: Consumer(builder: (context, r, _) {
+        ref = r;
+        r.watch(sessionProvider);
+        return const SizedBox();
+      })),
+    ));
+    await tester.pumpAndSettle();
+
+    // Genau das setzt SettingsPage._signOut()/_deleteAccount() vor dem eigentlichen Aufraeumen.
+    ref.read(authTransitionInProgressProvider.notifier).start();
+    await ref.read(syncControllerProvider.notifier).sync();
+
+    // sync() haette sonst (Session vorhanden, kein Update noetig) tatsaechlich zu laufen begonnen --
+    // die Sperre muss das schon vor jeder anderen Pruefung abfangen.
+    final status = ref.read(syncControllerProvider);
+    expect(status.running, isFalse);
+    expect(status.updateRequired, isFalse);
+    expect(status.lastSync, isNull);
+  });
 }

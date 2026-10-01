@@ -115,9 +115,7 @@ class ProductRepository {
   Future<Product> findOrCreateForReceiptItem(String rawText, {String? categoryId, String baseUnit = 'piece'}) async {
     final hid = await householdId();
     final key = normalizeItemName(rawText);
-    final alias = await (_db.select(_db.productAliases)
-          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull()))
-        .getSingleOrNull();
+    final alias = await _activeAliasFor(hid, key);
     if (alias != null) {
       final p = await byId(alias.productId);
       if (p != null && p.deletedAt == null) return p;
@@ -128,9 +126,7 @@ class ProductRepository {
     // laengenabhaengige Toleranz -- siehe name_similarity.dart.
     final fuzzyMatch = closestWithinTolerance(key, await _activeAliasKeys(hid));
     if (fuzzyMatch != null) {
-      final fuzzyAlias = await (_db.select(_db.productAliases)
-            ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(fuzzyMatch) & a.deletedAt.isNull()))
-          .getSingleOrNull();
+      final fuzzyAlias = await _activeAliasFor(hid, fuzzyMatch);
       final p = fuzzyAlias == null ? null : await byId(fuzzyAlias.productId);
       if (p != null && p.deletedAt == null) {
         await _learnAlias(key, p.id, hid);
@@ -176,6 +172,19 @@ class ProductRepository {
     final t = raw.trim();
     final m = RegExp(r'^(ic|1c|io|i0|lc)\s+', caseSensitive: false).firstMatch(t);
     return (m == null ? t : t.substring(m.end)).trim();
+  }
+
+  /// Der aktive Alias zu [key] im Haushalt, falls vorhanden. `.get()` statt `.getSingleOrNull()`, damit ein
+  /// bereits bestehendes Duplikat (z.B. aus einer Alt-Installation vor dem Codereview-Fix 2026-10-01, siehe
+  /// `softDelete`) nicht den ganzen Bon-Import mit einem `StateError` abstuerzen laesst -- bei mehreren
+  /// Treffern gewinnt der zuletzt aktualisierte, der Rest wird beim naechsten `softDelete` des betroffenen
+  /// Produkts bereinigt.
+  Future<ProductAlias?> _activeAliasFor(String hid, String key) async {
+    final rows = await (_db.select(_db.productAliases)
+          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull())
+          ..orderBy([(a) => OrderingTerm.desc(a.updatedAt)]))
+        .get();
+    return rows.firstOrNull;
   }
 
   /// Alle aktiven, gelernten Alias-Schluessel des Haushalts (ADR-023: Vergleichsbasis fuer den
@@ -248,10 +257,24 @@ class ProductRepository {
   /// Loescht ein Produkt aus "Meine Produkte" (Fehlerbericht "Produkt löschen", 2026-09-28). Bestehende
   /// Bons, Inventar-Eintraege und Einkaufslisten-Positionen behalten ihre `product_id` und zeigen den Namen
   /// weiter an; nur Suche, Autovervollstaendigung und Barcode-Zuordnung ignorieren das Produkt danach.
+  ///
+  /// Loescht auch die gelernten Aliase mit (Codereview-Fund 2026-10-01): sonst bleibt ein aktiver Alias auf
+  /// das geloeschte Produkt stehen, `findOrCreateForReceiptItem` legt beim naechsten Kauf desselben Artikels
+  /// ein zweites Produkt mit demselben Alias-Text an, und ein dritter Kauf laesst die Alias-Abfrage zwei
+  /// Treffer finden statt einem -- die lokale Tabelle hat (anders als die Server-Tabelle) keine Eindeutigkeits-
+  /// Pruefung auf den Alias-Text, der ganze Bon-Import stuerzt dann ab.
   Future<void> softDelete(String id) async {
     final product = await byId(id);
     if (product == null) return;
-    final updated = product.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
+    final now = DateTime.now().toUtc();
+    final aliases = await (_db.select(_db.productAliases)
+          ..where((a) => a.productId.equals(id) & a.deletedAt.isNull()))
+        .get();
+    for (final alias in aliases) {
+      final deleted = alias.copyWith(deletedAt: Value(now), updatedAt: now);
+      await _put('product_aliases', deleted.id, productAliasToRemote(deleted), () => _db.into(_db.productAliases).insertOnConflictUpdate(deleted.toCompanion(false)));
+    }
+    final updated = product.copyWith(deletedAt: Value(now), updatedAt: now);
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
   }

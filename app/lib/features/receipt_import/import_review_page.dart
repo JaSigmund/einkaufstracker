@@ -72,7 +72,12 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
       appBar: AppBar(
         title: const Text('Bon prüfen'),
         actions: [
-          if (p.error == null && !p.isDuplicate)
+          // Codereview-Fund 2026-10-01: ein Duplikat-Verdacht (gleiche Summe, Uhrzeit auf 2 Minuten genau)
+          // kann ein Fehlalarm sein, z.B. zwei getrennte, zufaellig gleich teure Einkaeufe kurz
+          // hintereinander. Bearbeiten (Uhrzeit/Summe korrigieren) loest per `recheckDuplicate` erneut aus
+          // und ist bisher der einzige Weg, so einen Fehlalarm aufzuloesen -- ohne diesen Button war der
+          // zweite, echte Einkauf schlicht nicht speicherbar.
+          if (p.error == null)
             IconButton(key: const Key('review-edit'), tooltip: 'Bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: _saving ? null : _edit),
         ],
       ),
@@ -127,7 +132,15 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
         icon: Icons.copy_all_outlined,
         color: t.colorScheme.tertiary,
         title: 'Dieser Bon ist schon gespeichert',
-        text: 'Derselbe Einkauf (gleiche Rechnungsnummer, oder gleiche Summe und Uhrzeit) ist bereits vorhanden. Es wird nichts doppelt angelegt.',
+        text: 'Derselbe Einkauf (gleiche Rechnungsnummer, oder gleiche Summe und Uhrzeit auf 2 Minuten genau) ist '
+            'bereits vorhanden. Es wird nichts doppelt angelegt. War das ein eigener, nur zufällig gleich teurer '
+            'Einkauf? Über "Bearbeiten" oben rechts lässt sich Uhrzeit oder Summe korrigieren.',
+        extra: OutlinedButton.icon(
+          key: const Key('review-duplicate-edit'),
+          onPressed: _edit,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Bearbeiten'),
+        ),
       );
     }
 
