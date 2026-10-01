@@ -22,6 +22,9 @@ import '../features/bugreport/feature_request_page.dart';
 import '../features/changelog/changelog_page.dart';
 import '../features/inventory/inventory_item_detail_page.dart';
 import '../features/products/stock_entry_page.dart';
+import '../features/recipes/recipe_suggestions_page.dart';
+import '../features/recipes/recipe_viewer_page.dart';
+import '../domain/recipes/recipe_search_url.dart';
 import '../features/report/trend_page.dart';
 import '../features/settings/settings_page.dart';
 import 'providers.dart';
@@ -113,6 +116,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           return StockEntryPage(product: a.product, ean: a.ean);
         },
         redirect: (_, state) => state.extra is StockEntryArgs ? null : '/',
+      ),
+      GoRoute(path: '/recipe-suggestions', builder: (_, _) => const RecipeSuggestionsPage()),
+      GoRoute(
+        path: '/recipe-viewer',
+        builder: (_, state) {
+          final a = state.extra as RecipeViewerArgs;
+          return RecipeViewerPage(
+            recipeTitle: a.title,
+            url: buildRecipeSearchUrl(a.title),
+            ingredients: a.ingredients,
+            sendChatMessage: (message, chatContext) => ref.read(cookingCloudProvider).chat(message, chatContext),
+          );
+        },
+        redirect: (_, state) => state.extra is RecipeViewerArgs ? null : '/',
       ),
     ],
   );

@@ -74,4 +74,27 @@ void main() {
 
     expect(find.byKey(const Key('chat-error')), findsOneWidget);
   });
+
+  testWidgets('zweite Nachricht schickt die erste Runde als Verlauf mit (Q-22)', (tester) async {
+    final contexts = <CookingChatContext>[];
+    await tester.pumpWidget(app(sendMessage: (_, ctx) async {
+      contexts.add(ctx);
+      return 'Antwort ${contexts.length}';
+    }));
+
+    await tester.enterText(find.byKey(const Key('chat-input')), 'Erste Frage');
+    await tester.tap(find.byKey(const Key('chat-send')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('chat-input')), 'Zweite Frage');
+    await tester.tap(find.byKey(const Key('chat-send')));
+    await tester.pumpAndSettle();
+
+    expect(contexts, hasLength(2));
+    expect(contexts[0].history, isEmpty); // erste Nachricht: noch kein Verlauf
+    expect(contexts[1].history.map((m) => (m.text, m.fromUser)), [
+      ('Erste Frage', true),
+      ('Antwort 1', false),
+    ]);
+  });
 }

@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 
 /// Kontext, der automatisch (ohne Zutun des Nutzers) an jede Chat-Nachricht angehängt wird (ADR-021:
-/// "ohne den aktuellen Kontext zu beschreiben"). Aktuell nur das angezeigte Rezept und seine
-/// Zutaten — Inventar-Kontext (`buildRecipeSuggestionContext`) kommt dazu, sobald die Edge Function
-/// steht.
+/// "ohne den aktuellen Kontext zu beschreiben"): das angezeigte Rezept, seine Zutaten, und — gemäß
+/// Q-22 — ein begrenztes Fenster des bisherigen Gesprächs (die Edge Function selbst ist zustandslos,
+/// der Client hält den Verlauf und schickt ihn mit).
 class CookingChatContext {
-  const CookingChatContext({required this.recipeTitle, this.ingredients = const []});
+  const CookingChatContext({required this.recipeTitle, this.ingredients = const [], this.history = const []});
 
   final String recipeTitle;
   final List<String> ingredients;
+  final List<ChatMessage> history;
 }
 
 /// Schickt eine Chat-Nachricht samt [CookingChatContext] ab und liefert die Antwort. Austauschbar für
-/// Tests und für den (noch nicht gebauten) echten Edge-Function-Aufruf.
+/// Tests und für den echten Edge-Function-Aufruf (`SupabaseCookingCloud.chat`).
 typedef CookingChatSend = Future<String> Function(String userMessage, CookingChatContext context);
 
-/// Noch kein echter Edge-Function-Aufruf: ADR-021s offene Fragen Q-21 (Häufigkeit/Kosten), Q-22
-/// (Gesprächsverlauf) und Q-23 (Einwilligung) sind unbeantwortet. Liefert eine ehrliche Fehlermeldung
-/// im Chat statt eines stillen Fehlschlags oder einer vorgetäuschten Antwort.
+/// Standard, solange keine echte Implementierung angebunden ist (z.B. Vorschau ohne Haushalt).
+/// Liefert eine ehrliche Fehlermeldung im Chat statt eines stillen Fehlschlags.
 Future<String> cookingChatNotImplemented(String userMessage, CookingChatContext context) async {
-  throw UnimplementedError('Der Koch-Chat ist noch nicht angebunden (ADR-021, Fragen Q-21 bis Q-23 offen).');
+  throw UnimplementedError('Der Koch-Chat ist nicht verfügbar.');
 }
 
 class ChatMessage {
@@ -28,6 +28,10 @@ class ChatMessage {
   final String text;
   final bool fromUser;
 }
+
+/// Wie viele vergangene Nachrichten maximal mitgeschickt werden (Q-22: begrenztes Fenster statt
+/// vollem Verlauf, haelt die Kosten pro Nachricht beschraenkt).
+const cookingChatHistoryWindow = 6;
 
 /// Chat-Panel mit automatischem Kontext (ADR-021): der Nutzer tippt nur seine Frage, [chatContext]
 /// wird bei jeder Nachricht automatisch mitgeschickt.
@@ -50,6 +54,11 @@ class _CookingChatPanelState extends State<CookingChatPanel> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
+    // Verlauf VOR dieser Nachricht, auf das Fenster begrenzt (Q-22) -- die neue Nachricht selbst geht
+    // separat als userMessage mit, nicht nochmal im Verlauf.
+    final history = _messages.length > cookingChatHistoryWindow
+        ? _messages.sublist(_messages.length - cookingChatHistoryWindow)
+        : List<ChatMessage>.of(_messages);
     setState(() {
       _messages.add(ChatMessage(text: text, fromUser: true));
       _controller.clear();
@@ -57,7 +66,12 @@ class _CookingChatPanelState extends State<CookingChatPanel> {
       _error = null;
     });
     try {
-      final reply = await widget.sendMessage(text, widget.chatContext);
+      final contextWithHistory = CookingChatContext(
+        recipeTitle: widget.chatContext.recipeTitle,
+        ingredients: widget.chatContext.ingredients,
+        history: history,
+      );
+      final reply = await widget.sendMessage(text, contextWithHistory);
       if (!mounted) return;
       setState(() => _messages.add(ChatMessage(text: reply, fromUser: false)));
     } catch (e) {

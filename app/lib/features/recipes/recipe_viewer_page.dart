@@ -5,6 +5,13 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'cooking_chat_panel.dart';
 
+/// Argumente fuer die Route `/recipe-viewer` (per `extra`, siehe `router.dart`).
+class RecipeViewerArgs {
+  const RecipeViewerArgs({required this.title, this.ingredients = const []});
+  final String title;
+  final List<String> ingredients;
+}
+
 /// Zeigt die externe Kochanleitung zu einem Rezeptvorschlag (ADR-021, Frage Q-24): auf Android/iOS
 /// eingebettet per WebView mit einem schwebenden Chat-Button darüber, im Web/PWA-Build stattdessen
 /// per externem Browser.

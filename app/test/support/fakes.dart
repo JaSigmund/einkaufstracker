@@ -5,9 +5,12 @@ import 'package:flutter/widgets.dart' show BuildContext;
 
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
+import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
+import 'package:einkaufstracker/domain/recipes/recipe_suggestion.dart';
+import 'package:einkaufstracker/features/recipes/cooking_chat_panel.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
 import 'package:einkaufstracker/data/repositories/auth_repository.dart';
 import 'package:einkaufstracker/data/repositories/category_repository.dart';
@@ -285,3 +288,35 @@ class FakeOffClient implements OffClient {
 
 BugReportRepository bugReportRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     BugReportRepository(db, householdId: () async => household, onChanged: onChanged);
+
+/// Cloud-Attrappe fuer Rezeptvorschlaege/Koch-Chat (ADR-021).
+class FakeCookingCloud implements CookingCloud {
+  FakeCookingCloud({this.suggestions = const [], this.chatReply = 'ok', this.error});
+
+  List<RecipeSuggestion> suggestions;
+  String chatReply;
+  Exception? error;
+
+  int suggestCalls = 0;
+  List<SuggestionIngredient>? lastIngredients;
+  int chatCalls = 0;
+  String? lastMessage;
+  CookingChatContext? lastContext;
+
+  @override
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients) async {
+    suggestCalls++;
+    lastIngredients = ingredients;
+    if (error != null) throw error!;
+    return suggestions;
+  }
+
+  @override
+  Future<String> chat(String message, CookingChatContext context) async {
+    chatCalls++;
+    lastMessage = message;
+    lastContext = context;
+    if (error != null) throw error!;
+    return chatReply;
+  }
+}
