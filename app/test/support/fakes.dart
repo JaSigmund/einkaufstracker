@@ -191,9 +191,15 @@ class FakeRemoteFileStore implements RemoteFileStore {
   bool offline = false;
   int uploads = 0;
 
+  /// Laesst `upload()` warten, bis dieser Future abgeschlossen ist -- simuliert einen langsamen Netz-Upload,
+  /// um die Race Condition zwischen `uploadPending()` und einem parallelen `attach()` testbar zu machen
+  /// (Codereview-Fund 2026-10-01).
+  Future<void>? uploadGate;
+
   @override
   Future<void> upload(String path, Uint8List bytes, String contentType) async {
     if (offline) throw const SocketException('offline');
+    if (uploadGate != null) await uploadGate;
     uploads++;
     files[path] = bytes;
     contentTypes[path] = contentType;

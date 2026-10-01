@@ -399,6 +399,11 @@ class InventoryRepository {
         ean: const Value(null),
         openedOn: const Value(null),
         closedAt: const Value(null),
+        // Codereview-Fund 2026-10-01: ohne das blieb das zuvor beim Oeffnen verkuerzte Ablaufdatum stehen
+        // (z.B. Haltbarkeit-nach-Oeffnen-Tage ab einem jetzt wieder entfernten openedOn), obwohl der Eintrag
+        // als ungeoeffnet gilt -- fuehrte zu einer verfruehten/falschen Ablauf-Erinnerung und einer roten
+        // Ampel trotz noch weit entferntem MHD.
+        expiresOn: Value(computeExpiresOn(bestBefore: item.bestBefore, openShelfLifeDays: item.openShelfLifeDays)),
         updatedAt: now,
       );
       await _putItem(reverted);

@@ -22,4 +22,14 @@ void main() {
     final r = parseReceiptText(text);
     expect(r.chain, 'Billa');
   });
+
+  group('detectChainHint (Codereview-Fund 2026-10-01: Hinweis fuer die Cloud-Erkennung, wenn der lokale Parser ganz scheitert)', () {
+    test('erkennt Hofer an der Kopfzeile', () {
+      expect(detectChainHint(_fixture('hofer_photo_01')), 'Hofer');
+    });
+
+    test('faellt ohne "HOFER" in der Kopfzeile auf Billa zurueck', () {
+      expect(detectChainHint(_fixture('billa_digital_04')), 'Billa');
+    });
+  });
 }

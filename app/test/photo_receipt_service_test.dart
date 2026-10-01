@@ -44,11 +44,13 @@ class _FakeCloud implements CloudReceiptReader {
   Object answer; // ParsedReceipt oder Exception
   int calls = 0;
   List<Uint8List> lastImages = const [];
+  String? lastStoreHint;
 
   @override
-  Future<ParsedReceipt> read(List<Uint8List> jpegs) async {
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'}) async {
     calls++;
     lastImages = jpegs;
+    lastStoreHint = storeHint;
     final a = answer;
     if (a is Exception) throw a;
     return a as ParsedReceipt;
@@ -105,6 +107,9 @@ void main() {
     expect(p.receipt.isTrustworthy, isTrue);
     expect(p.receipt.totalCents, 2319);
     expect(cloud.calls, 1);
+    // Codereview-Fund 2026-10-01: war fest auf 'Billa' verdrahtet -- hier stimmt das zufaellig, siehe den
+    // eigenen detectChainHint-Test fuer einen echten Hofer-Fall.
+    expect(cloud.lastStoreHint, 'Billa');
 
     final (path, cutY) = prepared.single;
     expect(path, 'page0.jpg');

@@ -20,8 +20,11 @@ class CloudNotAllowed implements Exception {
 
 /// Liest einen Bon aus Fotos ueber die Edge Function parse-receipt (Claude Vision).
 abstract class CloudReceiptReader {
-  /// [jpegs] sind bereits verkleinert und ohne Zahlungsblock (siehe ImagePreparer).
-  Future<ParsedReceipt> read(List<Uint8List> jpegs);
+  /// [jpegs] sind bereits verkleinert und ohne Zahlungsblock (siehe ImagePreparer). [storeHint] ist eine
+  /// Vermutung des Aufrufers, welcher Haendler es ist (z.B. aus der OCR-Kopfzeile), hilft der Vision-KI beim
+  /// erwarteten Layout -- Codereview-Fund 2026-10-01: war bisher fest auf 'Billa' verdrahtet, auch fuer
+  /// Hofer- oder sonstige Bons.
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'});
 }
 
 /// Bildet die Antwort der Edge Function auf das gemeinsame Bonmodell ab.

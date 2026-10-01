@@ -87,7 +87,10 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
       await _plugin.zonedSchedule(
         _idBase + i,
         r.productNames.length == 1 ? '1 Artikel läuft bald ab' : '${r.productNames.length} Artikel laufen bald ab',
-        expiryReminderBody(r.productNames, leadDays, isOverdue: r.isOverdue),
+        // Codereview-Fund 2026-10-01: r.leadDays statt der globalen Einstellung -- bei einem
+        // Verbrauchsdatum (immer 1 Tag Vorlauf) soll der Text "morgen" sagen, nicht die laengere,
+        // eingestellte Vorlaufzeit fuer Mindesthaltbarkeitsdaten.
+        expiryReminderBody(r.productNames, r.leadDays, isOverdue: r.isOverdue),
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,

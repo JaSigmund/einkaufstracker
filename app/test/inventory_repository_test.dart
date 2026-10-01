@@ -243,6 +243,22 @@ void main() {
       expect(await repo.watchSuggestions().first, hasLength(1));
       expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // die Kaufbewegung des Bons bleibt
     });
+
+    test('Codereview-Fund 2026-10-01: ein bereits geoeffneter Eintrag bekommt beim Zurueck-zum-Vorschlag wieder das volle (nicht das verkuerzte) Ablaufdatum', () async {
+      final repo = inventoryRepo(db);
+      await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: DateTime.utc(2026, 9, 20),
+      );
+      final refined = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: DateTime.utc(2026, 11, 1), now: DateTime.utc(2026, 9, 21));
+      await repo.open(refined.id, productDefaultOpenShelfLifeDays: 3, now: DateTime.utc(2026, 10, 1));
+      final opened = await (db.select(db.inventoryItems)..where((i) => i.id.equals(refined.id))).getSingle();
+      expect(opened.expiresOn, DateTime.utc(2026, 10, 4)); // verkuerzt durch die 3 Tage nach Oeffnen
+
+      await repo.deleteItem(refined.id);
+      final reverted = await (db.select(db.inventoryItems)..where((i) => i.id.equals(refined.id))).getSingle();
+      expect(reverted.openedOn, isNull);
+      expect(reverted.expiresOn, DateTime.utc(2026, 11, 1)); // wieder das volle MHD, nicht mehr der 2026-10-04-Wert
+    });
   });
 
   group('receiptLinkFor (Fehlerbericht "Bonzuordnung anzeigen")', () {

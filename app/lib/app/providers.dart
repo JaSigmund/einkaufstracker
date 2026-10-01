@@ -282,9 +282,15 @@ final appVersionProvider = FutureProvider<String>((ref) async {
   return '${info.version} (${info.buildNumber})';
 });
 
-final currentBuildNumberProvider = FutureProvider<int>((ref) async {
+/// `null`, wenn [PackageInfo.buildNumber] nicht als Zahl lesbar ist -- Codereview-Fund 2026-10-01: ein
+/// Fallback-Wert wie `0` waere technisch "bekannt" (nicht `null`) und wuerde `appUpdateRequiredProvider`
+/// faelschlich ausloesen (jede echte Mindestversion ist `>= 1`), obwohl die eigene Version in Wahrheit nur
+/// nicht auswertbar war -- genau das Fail-closed-Verhalten, das diese Sperre laut ihrer eigenen Dokumentation
+/// nie haben sollte (auf Android bisher folgenlos, `versionCode` ist immer numerisch; relevant sobald
+/// iOS/PWA dazukommt).
+final currentBuildNumberProvider = FutureProvider<int?>((ref) async {
   final info = await PackageInfo.fromPlatform();
-  return int.tryParse(info.buildNumber) ?? 0;
+  return int.tryParse(info.buildNumber);
 });
 
 final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) => AppConfigRepository(ref.watch(supabaseClientProvider)));

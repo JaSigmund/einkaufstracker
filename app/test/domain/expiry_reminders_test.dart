@@ -4,14 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 DateTime _d(int y, int m, int d) => DateTime.utc(y, m, d);
 
-InventoryItem _item({required String productId, DateTime? expiresOn}) => InventoryItem(
+InventoryItem _item({required String productId, DateTime? expiresOn, String dateKind = 'best_before'}) => InventoryItem(
       id: 'i-$productId-${expiresOn?.toIso8601String()}',
       householdId: 'h1',
       productId: productId,
       quantity: 1,
       unit: 'piece',
       location: 'pantry',
-      dateKind: 'best_before',
+      dateKind: dateKind,
       status: 'sealed',
       isSuggestion: false,
       expiresOn: expiresOn,
@@ -120,6 +120,34 @@ void main() {
         today: today,
       );
       expect(reminders.single.isOverdue, isFalse);
+    });
+
+    test('Codereview-Fund 2026-10-01: Verbrauchsdatum (use_by) erinnert immer 1 Tag vorher, unabhaengig von der eingestellten Vorlaufzeit', () {
+      // Eingestellte Vorlaufzeit 5 Tage, aber use_by ignoriert das (dieselbe Regel wie die UI-Ampel) --
+      // ohne den Fix waere der Erinnerungstag faelschlich 5 statt 1 Tag vor dem Ablauf.
+      final reminders = computeExpiryReminders(
+        activeItems: [_item(productId: 'p1', expiresOn: _d(2026, 9, 29), dateKind: 'use_by')],
+        productNameById: {'p1': 'Hackfleisch'},
+        leadDays: 5,
+        today: today,
+      );
+      expect(reminders, hasLength(1));
+      expect(reminders.single.date, _d(2026, 9, 28)); // 1 Tag vor dem Ablauf, nicht 5
+      expect(reminders.single.leadDays, 1);
+    });
+
+    test('Codereview-Fund 2026-10-01: Mischung aus use_by und best_before am selben Tag -- der Text nennt die dringlichere (kuerzere) Vorlaufzeit', () {
+      final reminders = computeExpiryReminders(
+        activeItems: [
+          _item(productId: 'p1', expiresOn: _d(2026, 9, 28), dateKind: 'use_by'), // Erinnerung heute (1 Tag Vorlauf)
+          _item(productId: 'p2', expiresOn: _d(2026, 9, 28), dateKind: 'best_before'), // Erinnerung ebenfalls heute (1 Tag Vorlauf, Einstellung)
+        ],
+        productNameById: {'p1': 'Hackfleisch', 'p2': 'Milch'},
+        leadDays: 1,
+        today: today,
+      );
+      expect(reminders, hasLength(1));
+      expect(reminders.single.leadDays, 1);
     });
 
     test('unbekanntes Produkt (kein Name gefunden): wird uebersprungen statt Absturz', () {

@@ -59,6 +59,30 @@ void main() {
       expect(cmp.savingsPerPurchaseCents, 55); // 210 (Billa-Schnitt) - 155
     });
 
+    test('Codereview-Fund 2026-10-01: ein Haendler mit nur einem Kauf wird nicht als guenstigster angezeigt, auch wenn der Vergleich insgesamt aussagekraeftig ist', () {
+      final storesWithSpar = [...stores, (id: 's-spar', chain: 'Spar', branch: null)];
+      final receipts = [
+        (id: 'r1', storeId: 's-billa', purchasedAtUtc: DateTime.utc(2026, 9, 1)),
+        (id: 'r2', storeId: 's-billa', purchasedAtUtc: DateTime.utc(2026, 8, 1)),
+        (id: 'r3', storeId: 's-hofer', purchasedAtUtc: DateTime.utc(2026, 9, 5)),
+        (id: 'r4', storeId: 's-hofer', purchasedAtUtc: DateTime.utc(2026, 8, 5)),
+        // Spar: nur EIN Kauf, einmaliger Raeumungsverkauf, deutlich guenstiger -- darf trotzdem nicht
+        // "der guenstigste Haendler" werden, das ist statistisch nicht abgesichert.
+        (id: 'r5', storeId: 's-spar', purchasedAtUtc: DateTime.utc(2026, 9, 10)),
+      ];
+      final items = [
+        (receiptId: 'r1', productId: 'p1', unitPriceNormCents: 200, quantity: 1.0, quantityUnit: 'piece'),
+        (receiptId: 'r2', productId: 'p1', unitPriceNormCents: 220, quantity: 1.0, quantityUnit: 'piece'),
+        (receiptId: 'r3', productId: 'p1', unitPriceNormCents: 150, quantity: 1.0, quantityUnit: 'piece'),
+        (receiptId: 'r4', productId: 'p1', unitPriceNormCents: 160, quantity: 1.0, quantityUnit: 'piece'),
+        (receiptId: 'r5', productId: 'p1', unitPriceNormCents: 50, quantity: 1.0, quantityUnit: 'piece'),
+      ];
+      final cmp = buildStoreComparison(productId: 'p1', items: items, receipts: receipts, stores: storesWithSpar, now: now);
+      expect(cmp.isMeaningful, isTrue); // Billa und Hofer erreichen die Schwelle
+      expect(cmp.cheapest!.chain, 'Hofer'); // nicht Spar, trotz niedrigerem Durchschnitt
+      expect(cmp.savingsPerPurchaseCents, 55); // weiterhin Billa vs. Hofer, Spar bleibt aussen vor
+    });
+
     test('Kaeufe aelter als 180 Tage zaehlen nicht mit', () {
       final receipts = [
         (id: 'r1', storeId: 's-billa', purchasedAtUtc: DateTime.utc(2025, 1, 1)),
