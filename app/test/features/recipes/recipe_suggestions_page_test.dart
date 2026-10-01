@@ -151,7 +151,7 @@ void main() {
     expect(find.text('VIEWER: Kürbissuppe (Kürbis, Zwiebel)'), findsOneWidget);
   });
 
-  testWidgets('Vorschlag speichern: Zutat mit bekanntem Produkt wird mit productId/Menge gespeichert', (tester) async {
+  testWidgets('Vorschlag speichern: Zutat mit bekanntem Produkt wird mit productId gespeichert (Codereview-Fund 2026-10-01: keine Menge, Lagerbestand ist kein Rezeptbedarf)', (tester) async {
     final cloud = FakeCookingCloud(suggestions: const [
       RecipeSuggestion(title: 'Kürbissuppe', reason: '', matchingIngredients: ['Kürbis', 'Muskat']),
     ]);
@@ -173,7 +173,6 @@ void main() {
     expect(saved.single.title, 'Kürbissuppe');
     final kuerbis = saved.single.ingredients.firstWhere((i) => i.name == 'Kürbis');
     expect(kuerbis.productId, 'p1');
-    expect(kuerbis.quantity, 2);
     final muskat = saved.single.ingredients.firstWhere((i) => i.name == 'Muskat');
     expect(muskat.productId, isNull); // kam nicht aus dem Inventar-Kontext, keine Produkt-Zuordnung bekannt
     expect(find.textContaining('gespeichert'), findsOneWidget);

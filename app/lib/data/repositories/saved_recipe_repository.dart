@@ -11,11 +11,23 @@ class SavedRecipeRepository {
   final AppDatabase _db;
   static const _kvKey = 'saved_recipes';
 
+  /// Codereview-Fund 2026-10-01: ein einzelner beschaedigter Eintrag (z.B. durch einen kuenftigen
+  /// Formatwechsel oder einen abgebrochenen Schreibvorgang) darf nicht alle anderen mit sich reissen --
+  /// gleiches Prinzip wie beim defensiven Parsen der Cloud-Antwort (`parseRecipeSuggestions`).
   Future<List<SavedRecipe>> loadAll() async {
     final raw = await _db.getKv(_kvKey);
     if (raw == null) return const [];
     final list = jsonDecode(raw) as List;
-    return [for (final e in list) SavedRecipe.fromJson(e as Map<String, dynamic>)]..sort((a, b) => b.savedAt.compareTo(a.savedAt));
+    final recipes = <SavedRecipe>[];
+    for (final e in list) {
+      try {
+        recipes.add(SavedRecipe.fromJson(e as Map<String, dynamic>));
+      } catch (_) {
+        // dieser eine Eintrag ist nicht mehr lesbar, der Rest bleibt verfuegbar
+      }
+    }
+    recipes.sort((a, b) => b.savedAt.compareTo(a.savedAt));
+    return recipes;
   }
 
   /// Speichert oder ersetzt (gleiche `id`).

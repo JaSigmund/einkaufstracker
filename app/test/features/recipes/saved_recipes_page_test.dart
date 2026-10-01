@@ -61,7 +61,7 @@ void main() {
       id: 'r1',
       title: 'Kürbissuppe',
       sourceUrl: 'https://example.test',
-      ingredients: const [SavedIngredient(productId: 'p1', name: 'Kürbis', quantity: 1, unit: 'piece')],
+      ingredients: const [SavedIngredient(productId: 'p1', name: 'Kürbis', unit: 'piece')],
       savedAt: DateTime.utc(2026, 10, 1),
     ));
 
@@ -81,9 +81,9 @@ void main() {
       title: 'Kürbissuppe',
       sourceUrl: '',
       ingredients: const [
-        SavedIngredient(productId: 'p1', name: 'Kürbis', quantity: 1, unit: 'piece'), // im Inventar vorhanden
-        SavedIngredient(productId: 'p2', name: 'Sahne', quantity: 1, unit: 'piece'), // fehlt
-        SavedIngredient(productId: null, name: 'Muskat', quantity: 1, unit: 'piece'), // keine Produkt-Zuordnung -> immer fehlend
+        SavedIngredient(productId: 'p1', name: 'Kürbis', unit: 'piece'), // im Inventar vorhanden
+        SavedIngredient(productId: 'p2', name: 'Sahne', unit: 'piece'), // fehlt
+        SavedIngredient(productId: null, name: 'Muskat', unit: 'piece'), // keine Produkt-Zuordnung -> immer fehlend
       ],
       savedAt: DateTime.utc(2026, 10, 1),
     ));
@@ -98,6 +98,28 @@ void main() {
     expect(items, hasLength(2));
     expect(items.map((i) => i.productId ?? i.freeText), containsAll(['p2', 'Muskat']));
     expect(find.textContaining('2 fehlende Zutat'), findsOneWidget);
+  });
+
+  testWidgets('Codereview-Fund 2026-10-01: schon ein kleiner Bestand gilt als vorhanden, es wird keine Menge geraten', (tester) async {
+    await SavedRecipeRepository(db).save(SavedRecipe(
+      id: 'r1',
+      title: 'Kürbissuppe',
+      sourceUrl: '',
+      ingredients: const [SavedIngredient(productId: 'p1', name: 'Kürbis', unit: 'piece')],
+      savedAt: DateTime.utc(2026, 10, 1),
+    ));
+
+    // Nur ein winziger Rest im Inventar -- koennte fuer das Rezept zu wenig sein, das weiss die App nicht
+    // und darf deshalb nicht trotzdem "fehlend" melden (frueherer Fehler: der beim Speichern vorhandene
+    // Bestand wurde faelschlich als Rezeptbedarf behandelt).
+    await tester.pumpWidget(app(active: [_item('i1', 'p1', quantity: 0.1)]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-missing-r1')));
+    await tester.pumpAndSettle();
+
+    expect(await db.select(db.shoppingListItems).get(), isEmpty);
+    expect(find.textContaining('Schon alles im Haus'), findsOneWidget);
   });
 
   testWidgets('loeschen entfernt das Rezept aus der Liste', (tester) async {

@@ -26,6 +26,11 @@ const PRICES: Record<string, { in: number; out: number }> = {
 };
 const DEFAULT_MODEL = Deno.env.get("RECIPE_MODEL") ?? "claude-haiku-4-5-20251001";
 const MAX_INGREDIENTS = 40;
+// Codereview-Fund 2026-10-01: Anzahl der Zutaten war schon begrenzt, die Laenge jedes einzelnen Namens/
+// jeder Einheit nicht -- ein direkter API-Aufruf (nicht der normale Client) haette darueber beliebig
+// grosse Prompts und damit Kosten erzeugen koennen, ohne dass `llm_usage` das vorher verhindert haette
+// (die Tabelle protokolliert Kosten nur im Nachhinein).
+const MAX_LABEL_CHARS = 200;
 
 const SYSTEM = `Du schlaegst Rezeptideen fuer einen Haushalt vor, basierend auf Zutaten, die er gerade zuhause hat.
 Die Liste ist nach Dringlichkeit geordnet: die ersten Eintraege verderben bald und sollten bevorzugt verwertet werden.
@@ -84,7 +89,12 @@ Deno.serve(async (req) => {
     return json({ error: "invalid_input" }, 400);
   }
   if (body.ingredients.length > MAX_INGREDIENTS) return json({ error: "too_many_ingredients" }, 400);
-  if (body.ingredients.some((i) => typeof i.name !== "string" || i.name.trim().length === 0)) {
+  if (
+    body.ingredients.some((i) =>
+      typeof i.name !== "string" || i.name.trim().length === 0 || i.name.length > MAX_LABEL_CHARS ||
+      (i.unit != null && (typeof i.unit !== "string" || i.unit.length > MAX_LABEL_CHARS))
+    )
+  ) {
     return json({ error: "invalid_input" }, 400);
   }
   const model = body.model ?? DEFAULT_MODEL;

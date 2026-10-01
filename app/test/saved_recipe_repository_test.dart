@@ -26,7 +26,7 @@ void main() {
     test('speichern und laden', () async {
       final repo = SavedRecipeRepository(db);
       await repo.save(_recipe('r1', 'Kürbissuppe', ingredients: const [
-        SavedIngredient(productId: 'p1', name: 'Kürbis', quantity: 1, unit: 'piece'),
+        SavedIngredient(productId: 'p1', name: 'Kürbis', unit: 'piece'),
       ]));
 
       final all = await repo.loadAll();
@@ -70,6 +70,13 @@ void main() {
       await SavedRecipeRepository(db).save(_recipe('r1', 'Kürbissuppe'));
       final all = await SavedRecipeRepository(db).loadAll();
       expect(all, hasLength(1));
+    });
+
+    test('Codereview-Fund 2026-10-01: ein beschaedigter Eintrag reisst nicht die anderen mit', () async {
+      await db.setKv('saved_recipes', '[{"id":"r1","title":"Gut","sourceUrl":"x","ingredients":[],"savedAt":"2026-10-01T00:00:00.000Z"},{"kaputt":true}]');
+      final all = await SavedRecipeRepository(db).loadAll();
+      expect(all, hasLength(1));
+      expect(all.single.id, 'r1');
     });
   });
 }

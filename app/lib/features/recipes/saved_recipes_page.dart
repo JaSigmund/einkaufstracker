@@ -53,17 +53,21 @@ class _SavedRecipesPageState extends ConsumerState<SavedRecipesPage> {
 
     final withProduct = [
       for (final i in r.ingredients)
-        if (i.productId != null) (productId: i.productId!, productName: i.name, quantity: i.quantity, unit: i.unit),
+        if (i.productId != null) (productId: i.productId!, productName: i.name),
     ];
     final withoutProduct = r.ingredients.where((i) => i.productId == null).toList();
 
     final missing = findMissingIngredients(withProduct, available);
     final repo = ref.read(shoppingListRepositoryProvider);
+    // Codereview-Fund 2026-10-01: feste Menge 1 statt einer berechneten Luecke -- wie viel das Rezept
+    // tatsaechlich braucht, ist nicht bekannt (siehe recipe_shopping_gap.dart), der Nutzer passt die
+    // Menge bei Bedarf selbst an (Mengen-Stepper in der Einkaufsliste).
     for (final m in missing) {
-      await repo.addManual(productId: m.productId, quantity: m.missingQuantity, unit: m.unit);
+      final unit = r.ingredients.firstWhere((i) => i.productId == m.productId).unit;
+      await repo.addManual(productId: m.productId, quantity: 1, unit: unit);
     }
     for (final i in withoutProduct) {
-      await repo.addManual(freeText: i.name, quantity: i.quantity, unit: i.unit);
+      await repo.addManual(freeText: i.name, quantity: 1, unit: i.unit);
     }
 
     if (!mounted) return;

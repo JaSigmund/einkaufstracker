@@ -22,6 +22,11 @@ const DEFAULT_MODEL = Deno.env.get("RECIPE_MODEL") ?? "claude-haiku-4-5-20251001
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY = 6;
 const MAX_INGREDIENTS = 40;
+// Codereview-Fund 2026-10-01: recipe_title hatte gar keine Laengenpruefung, ingredients/history waren nur
+// in der Anzahl begrenzt, nicht in der Laenge jedes einzelnen Eintrags -- ein direkter API-Aufruf (nicht
+// der normale Client) haette darueber beliebig grosse Prompts und damit Kosten pro Nachricht erzeugen
+// koennen.
+const MAX_LABEL_CHARS = 200;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -57,6 +62,15 @@ Deno.serve(async (req) => {
     return json({ error: "invalid_input" }, 400);
   }
   if (body.message.length > MAX_MESSAGE_CHARS) return json({ error: "message_too_long" }, 400);
+  if (body.recipe_title != null && (typeof body.recipe_title !== "string" || body.recipe_title.length > MAX_LABEL_CHARS)) {
+    return json({ error: "invalid_input" }, 400);
+  }
+  if ((body.ingredients ?? []).some((i) => typeof i !== "string" || i.length > MAX_LABEL_CHARS)) {
+    return json({ error: "invalid_input" }, 400);
+  }
+  if ((body.history ?? []).some((h) => typeof h.text !== "string" || h.text.length > MAX_MESSAGE_CHARS)) {
+    return json({ error: "invalid_input" }, 400);
+  }
   const ingredients = (body.ingredients ?? []).slice(0, MAX_INGREDIENTS);
   // Serverseitig zusaetzlich kappen, unabhaengig davon, was der Client schickt (Q-22).
   const history = (body.history ?? []).slice(-MAX_HISTORY);

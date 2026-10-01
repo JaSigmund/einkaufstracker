@@ -2,22 +2,27 @@
 /// Produkt-Zuordnung (z.B. wenn die KI einen Namen nannte, der nicht im Inventar-Kontext vorkam) --
 /// solche Zutaten koennen nicht automatisch gegen das Inventar abgeglichen werden
 /// (`findMissingIngredients` erwartet eine `productId`) und gelten deshalb immer als fehlend.
+///
+/// Bewusst OHNE Mengenangabe (Codereview-Fund 2026-10-01): eine fruehere Fassung speicherte hier den
+/// Inventar-Bestand zum Speicherzeitpunkt und behandelte ihn spaeter als "vom Rezept benoetigte Menge"
+/// -- aber wie viel ein Rezept tatsaechlich braucht, kennt das System nie: `suggest-recipes` ist
+/// angewiesen, keine Mengen zu erfinden (Lebensmittelsicherheit), und der Nutzer wird beim Speichern
+/// nicht danach gefragt. Ein Lagerbestand ist keine Rezept-Menge, auch wenn beide Zahlen sind. Siehe
+/// `recipe_shopping_gap.dart`: "fehlt" heisst deshalb nur noch "kein aktiver Bestand vorhanden".
 class SavedIngredient {
-  const SavedIngredient({required this.productId, required this.name, required this.quantity, required this.unit});
+  const SavedIngredient({required this.productId, required this.name, required this.unit});
 
   final String? productId;
   final String name;
-  final double quantity;
   final String unit;
 
   factory SavedIngredient.fromJson(Map<String, dynamic> json) => SavedIngredient(
         productId: json['productId'] as String?,
         name: json['name'] as String,
-        quantity: (json['quantity'] as num?)?.toDouble() ?? 1,
         unit: json['unit'] as String? ?? 'piece',
       );
 
-  Map<String, dynamic> toJson() => {'productId': productId, 'name': name, 'quantity': quantity, 'unit': unit};
+  Map<String, dynamic> toJson() => {'productId': productId, 'name': name, 'unit': unit};
 }
 
 /// Ein gespeichertes Rezept (ADR-021, Jakobs Anforderung "Rezepte sollen auch gespeichert werden

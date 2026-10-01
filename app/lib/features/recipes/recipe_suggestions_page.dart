@@ -117,15 +117,16 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
 
   /// Speichert einen Vorschlag (Jakobs Anforderung "Rezepte sollen auch gespeichert werden können").
   /// Zutatennamen werden gegen [_lastIngredients] (der tatsächlich gesendete Inventar-Kontext)
-  /// gematcht, um `productId`/Menge/Einheit zu übernehmen — nur so kann `findMissingIngredients`
-  /// später wieder automatisch gegen das Inventar abgleichen (siehe `saved_recipe.dart`).
+  /// gematcht, um `productId`/Einheit zu übernehmen — nur so kann `findMissingIngredients` später
+  /// wieder automatisch gegen das Inventar abgleichen (siehe `saved_recipe.dart`). Keine Menge: siehe
+  /// Dokumentation dort (Codereview-Fund 2026-10-01).
   Future<void> _saveRecipe(RecipeSuggestion s) async {
     final ingredients = [
       for (final name in s.matchingIngredients)
         if (_matchByName(name) case final match?)
-          SavedIngredient(productId: match.productId, name: name, quantity: match.quantity, unit: match.unit)
+          SavedIngredient(productId: match.productId, name: name, unit: match.unit)
         else
-          SavedIngredient(productId: null, name: name, quantity: 1, unit: 'piece'),
+          SavedIngredient(productId: null, name: name, unit: 'piece'),
     ];
     await ref.read(savedRecipeRepositoryProvider).save(SavedRecipe(
           id: _uuid.v4(),
