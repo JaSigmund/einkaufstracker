@@ -5,6 +5,7 @@ import 'dart:ui' show Rect;
 
 import 'package:einkaufstracker/data/cloud/cloud_receipt.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/domain/app_update/app_update_gate.dart';
 import 'package:einkaufstracker/domain/ocr/row_cluster.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:einkaufstracker/features/receipt_import/photo_receipt_service.dart';
@@ -152,6 +153,21 @@ void main() {
     cloud.answer = const CloudNotAllowed();
     final p = await service().read(_pages('billa_paper_01_scan3'));
     expect(p.note, contains('ausgeschaltet'));
+  });
+
+  test('Update erforderlich (ADR-022): Hinweis statt Absturz, Cloud wird gar nicht erst gerufen', () async {
+    final service = PhotoReceiptService(
+      repo: receiptRepo(db),
+      cloud: cloud,
+      cloudAllowed: () async => throw const AppUpdateRequiredException(),
+      prepare: (path, {cutY}) async {
+        prepared.add((path, cutY));
+        return Uint8List.fromList([1, 2, 3]);
+      },
+    );
+    final p = await service.read(_pages('billa_paper_01_scan3'));
+    expect(p.note, contains('Update'));
+    expect(cloud.calls, 0);
   });
 
   test('Ohne erkennbare Summenzeile wird NICHTS hochgeladen (B4)', () async {

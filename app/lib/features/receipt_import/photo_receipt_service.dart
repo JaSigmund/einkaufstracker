@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/cloud/cloud_receipt.dart';
 import '../../data/repositories/receipt_repository.dart';
+import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/ocr/ocr_text.dart';
 import '../../domain/ocr/row_cluster.dart';
 import '../../domain/receipt/parsed_receipt.dart';
@@ -90,6 +91,8 @@ class PhotoReceiptService {
       }
     } on CloudNotAllowed {
       note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet.';
+    } on AppUpdateRequiredException {
+      note = 'Ein Update ist erforderlich, bevor die Cloud-Erkennung wieder verfügbar ist. Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } on CloudUnavailable catch (e) {
       note = 'Die Cloud ist nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } catch (e) {

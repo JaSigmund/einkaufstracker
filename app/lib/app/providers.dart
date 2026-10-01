@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/app_config/app_config_repository.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
@@ -27,6 +28,7 @@ import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
 import '../data/repositories/shopping_list_repository.dart';
 import '../data/notifications/notification_scheduler.dart';
+import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
@@ -95,10 +97,14 @@ final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(r
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.running = false});
+  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false});
   final DateTime? lastSync;
   final String? error;
   final bool running;
+
+  /// Die installierte Version ist zu alt fuer den aktuellen Server-Stand (ADR-022) -- Synchronisierung
+  /// bleibt bewusst aus, bis aktualisiert wurde, statt mit moeglicherweise inkompatiblen Daten weiterzumachen.
+  final bool updateRequired;
 }
 
 class SyncController extends Notifier<SyncStatus> {
@@ -114,6 +120,10 @@ class SyncController extends Notifier<SyncStatus> {
     final engine = ref.read(syncEngineProvider);
     if (engine.isRunning) return;
     if (ref.read(sessionProvider).value == null) return;
+    if (ref.read(appUpdateRequiredProvider)) {
+      state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true);
+      return;
+    }
     state = SyncStatus(lastSync: state.lastSync, running: true);
     try {
       await engine.sync();
@@ -268,6 +278,34 @@ final appVersionProvider = FutureProvider<String>((ref) async {
   return '${info.version} (${info.buildNumber})';
 });
 
+final currentBuildNumberProvider = FutureProvider<int>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return int.tryParse(info.buildNumber) ?? 0;
+});
+
+final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) => AppConfigRepository(ref.watch(supabaseClientProvider)));
+
+/// `null` bei Fehler (kein Netz, Server nicht erreichbar) statt eines Absturzes -- siehe
+/// [appUpdateRequiredProvider], das bei fehlenden Daten bewusst NICHT sperrt (fail-open).
+final appConfigProvider = FutureProvider<AppConfig?>((ref) async {
+  try {
+    return await ref.watch(appConfigRepositoryProvider).load();
+  } catch (_) {
+    return null;
+  }
+});
+
+/// True nur, wenn sowohl die eigene Build-Nummer als auch die Server-Mindestversion bekannt sind UND
+/// die eigene Version zu alt ist. Fail-open bei fehlenden Daten: ein Netzfehler beim Abrufen der
+/// Konfiguration selbst darf nicht faelschlich alle Online-Funktionen sperren, das widerspraeche dem
+/// Offline-first-Ansatz der App (ADR-004).
+final appUpdateRequiredProvider = Provider<bool>((ref) {
+  final config = ref.watch(appConfigProvider).value;
+  final build = ref.watch(currentBuildNumberProvider).value;
+  if (config == null || build == null) return false;
+  return isAppUpdateRequired(currentBuildNumber: build, minSupportedBuildNumber: config.minSupportedBuildNumber);
+});
+
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));
 
@@ -359,6 +397,9 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
     cloud: ref.watch(cloudReceiptReaderProvider),
     // Einwilligung liegt beim Server (household_settings)
     cloudAllowed: () async {
+      // Zuerst pruefen, nicht erst nach einem Netzfehler verstecken (ADR-022): eine zu alte Version
+      // soll gar nicht erst versuchen, mit dem Server zu sprechen.
+      if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
       try {
         final id = await ref.read(householdIdProvider.future);
         if (id == null) return false;
