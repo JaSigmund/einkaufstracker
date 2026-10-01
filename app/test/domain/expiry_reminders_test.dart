@@ -72,14 +72,54 @@ void main() {
       expect(reminders, isEmpty);
     });
 
-    test('Erinnerungstag in der Vergangenheit (schon abgelaufen): kein Eintrag', () {
+    test('verpasster Erinnerungstag (App zwischendurch nicht geoeffnet): wird auf heute nachgeholt statt verworfen', () {
+      // Erinnerungstag waere vor 5 Tagen gewesen (Fehlerbericht "keine Push-Benachrichtigung",
+      // zweiter Anlauf: das durfte nicht mehr stillschweigend verloren gehen).
       final reminders = computeExpiryReminders(
-        activeItems: [_item(productId: 'p1', expiresOn: today.subtract(const Duration(days: 5)))],
+        activeItems: [_item(productId: 'p1', expiresOn: today.subtract(const Duration(days: 4)))],
         productNameById: {'p1': 'Alt'},
         leadDays: 1,
         today: today,
       );
+      expect(reminders, hasLength(1));
+      expect(reminders.single.date, today);
+      expect(reminders.single.isOverdue, isTrue);
+      expect(reminders.single.productNames, ['Alt']);
+    });
+
+    test('mehrere verpasste Tage landen gemeinsam im heutigen Eintrag', () {
+      final reminders = computeExpiryReminders(
+        activeItems: [
+          _item(productId: 'p1', expiresOn: today.subtract(const Duration(days: 1))), // Erinnerungstag gestern (-1 Tag Vorlauf)
+          _item(productId: 'p2', expiresOn: today.subtract(const Duration(days: 4))), // Erinnerungstag vor 5 Tagen
+        ],
+        productNameById: {'p1': 'Alt1', 'p2': 'Alt2'},
+        leadDays: 1,
+        today: today,
+      );
+      expect(reminders, hasLength(1));
+      expect(reminders.single.date, today);
+      expect(reminders.single.productNames, containsAll(['Alt1', 'Alt2']));
+    });
+
+    test('laenger als der Horizont ueberfaellig: kein Eintrag (kein endloses Nachholen uralter Posten)', () {
+      final reminders = computeExpiryReminders(
+        activeItems: [_item(productId: 'p1', expiresOn: today.subtract(const Duration(days: 40)))],
+        productNameById: {'p1': 'Uralt'},
+        leadDays: 1,
+        today: today,
+      );
       expect(reminders, isEmpty);
+    });
+
+    test('genau heute faelliger Erinnerungstag ist NICHT ueberfaellig', () {
+      final reminders = computeExpiryReminders(
+        activeItems: [_item(productId: 'p1', expiresOn: today.add(const Duration(days: 1)))], // Erinnerung heute, leadDays=1
+        productNameById: {'p1': 'Frisch'},
+        leadDays: 1,
+        today: today,
+      );
+      expect(reminders.single.isOverdue, isFalse);
     });
 
     test('unbekanntes Produkt (kein Name gefunden): wird uebersprungen statt Absturz', () {
@@ -104,6 +144,14 @@ void main() {
 
     test('Vorlaufzeit > 1 Tag', () {
       expect(expiryReminderBody(['Käse'], 3), 'Käse läuft in 3 Tagen ab.');
+    });
+
+    test('nachgeholte (ueberfaellige) Erinnerung: ehrliche Formulierung statt falschem "laeuft morgen ab"', () {
+      expect(expiryReminderBody(['Milch'], 1, isOverdue: true), 'Milch ist bereits fällig oder abgelaufen.');
+    });
+
+    test('nachgeholte Erinnerung, mehrere Artikel: Mehrzahl', () {
+      expect(expiryReminderBody(['Milch', 'Joghurt'], 1, isOverdue: true), 'Milch, Joghurt sind bereits fällig oder abgelaufen.');
     });
   });
 }
