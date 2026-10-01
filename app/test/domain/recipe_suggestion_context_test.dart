@@ -70,5 +70,10 @@ void main() {
     test('leeres Inventar: leere Liste', () {
       expect(buildRecipeSuggestionContext(const [], today: today), isEmpty);
     });
+
+    test('productId bleibt erhalten (fuer spaeteren Inventar-Abgleich beim Speichern)', () {
+      final result = buildRecipeSuggestionContext([_item('p1', 'Joghurt')], today: today);
+      expect(result.single.productId, 'p1');
+    });
   });
 }

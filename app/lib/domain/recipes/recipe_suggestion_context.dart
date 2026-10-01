@@ -13,10 +13,13 @@ typedef InventoryIngredient = ({
 });
 
 /// Eine Zutat fuer den Rezeptvorschlag-Prompt: Menge, Einheit und wie dringend sie verwertet werden
-/// sollte (Ampel aus `expiry.dart`).
+/// sollte (Ampel aus `expiry.dart`). `productId` bleibt erhalten, damit ein spaeter gespeichertes
+/// Rezept (`SavedRecipe`) die Zutat wieder auf das Produkt zurueckfuehren kann (fuer den
+/// Inventar-Abgleich beim Hinzufuegen fehlender Zutaten zur Einkaufsliste, siehe `recipe_shopping_gap.dart`).
 class RecipeIngredient {
-  const RecipeIngredient({required this.productName, required this.quantity, required this.unit, required this.urgency});
+  const RecipeIngredient({required this.productId, required this.productName, required this.quantity, required this.unit, required this.urgency});
 
+  final String productId;
   final String productName;
   final double quantity;
   final String unit;
@@ -58,8 +61,8 @@ List<RecipeIngredient> buildRecipeSuggestionContext(
   }
 
   final list = [
-    for (final (name, quantity, unit, urgency) in byProduct.values)
-      RecipeIngredient(productName: name, quantity: quantity, unit: unit, urgency: urgency),
+    for (final entry in byProduct.entries)
+      RecipeIngredient(productId: entry.key, productName: entry.value.$1, quantity: entry.value.$2, unit: entry.value.$3, urgency: entry.value.$4),
   ];
   list.sort((a, b) => _urgencyRank(a.urgency).compareTo(_urgencyRank(b.urgency)));
   return list;

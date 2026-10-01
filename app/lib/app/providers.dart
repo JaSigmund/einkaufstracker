@@ -27,6 +27,7 @@ import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
+import '../data/repositories/saved_recipe_repository.dart';
 import '../data/repositories/shopping_list_repository.dart';
 import '../data/notifications/notification_scheduler.dart';
 import '../domain/notifications/expiry_reminders.dart';
@@ -209,6 +210,9 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
+
+/// Rein lokal, kein Sync -- siehe Doku-Kommentar in `saved_recipe.dart`.
+final savedRecipeRepositoryProvider = Provider<SavedRecipeRepository>((ref) => SavedRecipeRepository(ref.watch(databaseProvider)));
 
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
 

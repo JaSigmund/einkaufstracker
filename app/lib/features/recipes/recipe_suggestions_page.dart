@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../app/providers.dart';
 import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
+import '../../domain/recipes/recipe_search_url.dart';
 import '../../domain/recipes/recipe_suggestion.dart';
 import '../../domain/recipes/recipe_suggestion_context.dart';
+import '../../domain/recipes/saved_recipe.dart';
 import 'recipe_viewer_page.dart';
 
 const _cloudNoticeKv = 'cooking_cloud_notice_seen';
@@ -24,6 +27,9 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   bool _loading = false;
   String? _error;
   List<RecipeSuggestion>? _suggestions;
+  List<RecipeIngredient> _lastIngredients = const [];
+  final _savedTitles = <String>{};
+  final _uuid = const Uuid();
 
   @override
   void initState() {
@@ -65,7 +71,11 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
         for (final i in ingredients) (name: i.productName, quantity: i.quantity, unit: i.unit),
       ]);
       if (!mounted) return;
-      setState(() => _suggestions = result);
+      setState(() {
+        _suggestions = result;
+        _lastIngredients = ingredients;
+        _savedTitles.clear();
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = _friendlyError(e));
@@ -105,6 +115,37 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     context.push('/recipe-viewer', extra: RecipeViewerArgs(title: s.title, ingredients: s.matchingIngredients));
   }
 
+  /// Speichert einen Vorschlag (Jakobs Anforderung "Rezepte sollen auch gespeichert werden können").
+  /// Zutatennamen werden gegen [_lastIngredients] (der tatsächlich gesendete Inventar-Kontext)
+  /// gematcht, um `productId`/Menge/Einheit zu übernehmen — nur so kann `findMissingIngredients`
+  /// später wieder automatisch gegen das Inventar abgleichen (siehe `saved_recipe.dart`).
+  Future<void> _saveRecipe(RecipeSuggestion s) async {
+    final ingredients = [
+      for (final name in s.matchingIngredients)
+        if (_matchByName(name) case final match?)
+          SavedIngredient(productId: match.productId, name: name, quantity: match.quantity, unit: match.unit)
+        else
+          SavedIngredient(productId: null, name: name, quantity: 1, unit: 'piece'),
+    ];
+    await ref.read(savedRecipeRepositoryProvider).save(SavedRecipe(
+          id: _uuid.v4(),
+          title: s.title,
+          sourceUrl: buildRecipeSearchUrl(s.title),
+          ingredients: ingredients,
+          savedAt: DateTime.now().toUtc(),
+        ));
+    if (!mounted) return;
+    setState(() => _savedTitles.add(s.title));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${s.title}" gespeichert.')));
+  }
+
+  RecipeIngredient? _matchByName(String name) {
+    for (final i in _lastIngredients) {
+      if (i.productName == name) return i;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -115,7 +156,17 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rezeptvorschläge')),
+      appBar: AppBar(
+        title: const Text('Rezeptvorschläge'),
+        actions: [
+          IconButton(
+            key: const Key('open-saved-recipes'),
+            tooltip: 'Meine Rezepte',
+            icon: const Icon(Icons.bookmarks_outlined),
+            onPressed: () => context.push('/saved-recipes'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -144,8 +195,16 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
                 child: ListTile(
                   title: Text(s.title),
                   subtitle: Text(s.reason.isEmpty ? s.matchingIngredients.join(', ') : s.reason),
-                  trailing: const Icon(Icons.chevron_right),
                   onTap: () => _openRecipe(s),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(
+                      key: Key('save-${s.title}'),
+                      tooltip: _savedTitles.contains(s.title) ? 'Gespeichert' : 'Rezept speichern',
+                      icon: Icon(_savedTitles.contains(s.title) ? Icons.bookmark : Icons.bookmark_outline),
+                      onPressed: _savedTitles.contains(s.title) ? null : () => _saveRecipe(s),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ]),
                 ),
               ),
         ],

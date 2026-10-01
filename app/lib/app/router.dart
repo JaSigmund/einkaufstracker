@@ -24,6 +24,7 @@ import '../features/inventory/inventory_item_detail_page.dart';
 import '../features/products/stock_entry_page.dart';
 import '../features/recipes/recipe_suggestions_page.dart';
 import '../features/recipes/recipe_viewer_page.dart';
+import '../features/recipes/saved_recipes_page.dart';
 import '../domain/recipes/recipe_search_url.dart';
 import '../features/report/trend_page.dart';
 import '../features/settings/settings_page.dart';
@@ -131,6 +132,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
         redirect: (_, state) => state.extra is RecipeViewerArgs ? null : '/',
       ),
+      GoRoute(path: '/saved-recipes', builder: (_, _) => const SavedRecipesPage()),
     ],
   );
 });

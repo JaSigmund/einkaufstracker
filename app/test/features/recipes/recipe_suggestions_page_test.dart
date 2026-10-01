@@ -1,6 +1,7 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/saved_recipe_repository.dart';
 import 'package:einkaufstracker/domain/recipes/recipe_suggestion.dart';
 import 'package:einkaufstracker/features/recipes/recipe_suggestions_page.dart';
 import 'package:einkaufstracker/features/recipes/recipe_viewer_page.dart';
@@ -63,6 +64,7 @@ void main() {
           activeInventoryStreamProvider.overrideWith((ref) => Stream.value(active)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           cookingCloudProvider.overrideWithValue(cloud),
+          savedRecipeRepositoryProvider.overrideWithValue(SavedRecipeRepository(db)),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [
@@ -74,6 +76,7 @@ void main() {
                 return Scaffold(body: Text('VIEWER: ${a.title} (${a.ingredients.join(", ")})'));
               },
             ),
+            GoRoute(path: '/saved-recipes', builder: (_, _) => const Scaffold(body: Text('SAVED-RECIPES'))),
           ]),
         ),
       );
@@ -146,6 +149,45 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('VIEWER: Kürbissuppe (Kürbis, Zwiebel)'), findsOneWidget);
+  });
+
+  testWidgets('Vorschlag speichern: Zutat mit bekanntem Produkt wird mit productId/Menge gespeichert', (tester) async {
+    final cloud = FakeCookingCloud(suggestions: const [
+      RecipeSuggestion(title: 'Kürbissuppe', reason: '', matchingIngredients: ['Kürbis', 'Muskat']),
+    ]);
+    await tester.pumpWidget(app(
+      active: [_item('i1', 'p1', quantity: 2)],
+      products: [_product('p1', 'Kürbis')],
+      cloud: cloud,
+    ));
+    await tester.pumpAndSettle();
+    await _dismissFirstUseNoticeIfShown(tester);
+    await tester.tap(find.byKey(const Key('fetch-suggestions')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('save-Kürbissuppe')));
+    await tester.pumpAndSettle();
+
+    final saved = await SavedRecipeRepository(db).loadAll();
+    expect(saved, hasLength(1));
+    expect(saved.single.title, 'Kürbissuppe');
+    final kuerbis = saved.single.ingredients.firstWhere((i) => i.name == 'Kürbis');
+    expect(kuerbis.productId, 'p1');
+    expect(kuerbis.quantity, 2);
+    final muskat = saved.single.ingredients.firstWhere((i) => i.name == 'Muskat');
+    expect(muskat.productId, isNull); // kam nicht aus dem Inventar-Kontext, keine Produkt-Zuordnung bekannt
+    expect(find.textContaining('gespeichert'), findsOneWidget);
+  });
+
+  testWidgets('Symbol in der App-Leiste fuehrt zu "Meine Rezepte"', (tester) async {
+    await tester.pumpWidget(app(active: const [], products: const [], cloud: FakeCookingCloud()));
+    await tester.pumpAndSettle();
+    await _dismissFirstUseNoticeIfShown(tester);
+
+    await tester.tap(find.byKey(const Key('open-saved-recipes')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SAVED-RECIPES'), findsOneWidget);
   });
 
   testWidgets('Hinweis erscheint beim Oeffnen einmalig, nicht beim naechsten Mal', (tester) async {
