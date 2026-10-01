@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../app/providers.dart';
 import '../products/barcode_flow.dart';
 import 'receipt_import_service.dart';
+import 'web_photo_crop_page.dart';
 
 enum _Busy { pdf, paper, barcode }
 
@@ -99,13 +100,19 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     ImportPreview? preview;
     try {
       final jpeg = await widget.pickCameraPhoto();
-      if (jpeg != null) {
-        preview = await ref.read(photoReceiptServiceProvider).readSinglePhotoViaCloud(
-          jpeg,
-          onStatus: (s) {
-            if (mounted) setState(() => _status = s);
-          },
-        );
+      if (jpeg != null && mounted) {
+        // Codereview-Fund 2026-10-01 (Go/No-Go B4): ohne On-Device-Texterkennung im Browser muss ein
+        // Mensch den Zahlungsblock markieren, bevor irgendetwas von diesem Foto die Cloud erreicht.
+        final cutY = await Navigator.of(context).push<double>(MaterialPageRoute(builder: (_) => WebPhotoCropPage(jpeg: jpeg)));
+        if (cutY != null && mounted) {
+          preview = await ref.read(photoReceiptServiceProvider).readSinglePhotoViaCloud(
+            jpeg,
+            cutY: cutY,
+            onStatus: (s) {
+              if (mounted) setState(() => _status = s);
+            },
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -213,7 +220,15 @@ Future<Uint8List?> _pickPdfFromSystem() async {
 /// image_picker oeffnet im Browser einen Datei-Dialog mit Kamera-Vorauswahl (auf Mobilgeraeten die
 /// Kamera-App direkt, auf dem Desktop die normale Dateiauswahl) -- funktioniert plattformuebergreifend,
 /// anders als der native Dokumentenscanner.
+///
+/// Codereview-Fund 2026-10-01: ein Timeout als Netz, falls ein Browser das Abbrechen des Kamera-/
+/// Dateidialogs nicht zuverlaessig meldet (image_picker_for_web ist dafuer je nach Browser bekanntlich
+/// nicht immer konsistent) -- sonst bliebe die Ladeanzeige fuer immer haengen, ohne dass der Nutzer es
+/// erneut versuchen kann. Grosszuegig bemessen, damit ein echtes Fotografieren nicht abgebrochen wird.
 Future<Uint8List?> _pickCameraPhotoFromSystem() async {
-  final file = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85);
+  final file = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85).timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => null,
+      );
   return file?.readAsBytes();
 }

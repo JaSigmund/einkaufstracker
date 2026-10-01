@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/cloud/cloud_receipt.dart';
+import '../../data/ocr/image_prep.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../domain/ocr/ocr_text.dart';
 import '../../domain/ocr/row_cluster.dart';
@@ -132,11 +133,14 @@ class PhotoReceiptService {
   /// Foto-Scan im Browser (Doku 14 iOS-Strategie, Option D): ML Kit (Dokumentenscanner und lokale
   /// Texterkennung) hat keine Web-Implementierung, ein im Browser aufgenommenes Foto geht deshalb
   /// immer direkt an die Cloud -- ADR-003 ("lokal zuerst") gilt nur dort, wo lokale Erkennung
-  /// ueberhaupt moeglich ist. Kein Zuschnitt vor dem Zahlungsblock (B4): dafuer braeuchte es die
-  /// gleiche Zeilen-Geometrie wie beim lokalen Scan, die im Browser nicht verfuegbar ist. Stattdessen
-  /// bleibt das Foto komplett auf dem Geraet (wird nicht abgelegt) und nur das eine Bild, das der
-  /// Nutzer bewusst aufgenommen hat, geht an die Cloud.
-  Future<ImportPreview> readSinglePhotoViaCloud(Uint8List jpeg, {void Function(String status)? onStatus}) async {
+  /// ueberhaupt moeglich ist.
+  ///
+  /// [cutY] (Codereview-Fund 2026-10-01, Go/No-Go B4 "Zahlungsdaten verlassen nie das Geraet"): die
+  /// automatische Zeilen-Geometrie aus der On-Device-Texterkennung gibt es im Browser nicht, deshalb
+  /// markiert hier ein Mensch von Hand den Schnittpunkt (`WebPhotoCropPage`). Erforderlich, nicht
+  /// optional -- ohne diesen Schritt darf kein Foto die Cloud erreichen, genau wie nativ ein fehlender
+  /// Schnittpunkt den Upload verhindert (siehe `_cloudImages`).
+  Future<ImportPreview> readSinglePhotoViaCloud(Uint8List jpeg, {required double cutY, void Function(String status)? onStatus}) async {
     final bool allowed;
     try {
       allowed = await cloudAllowed();
@@ -156,8 +160,18 @@ class PhotoReceiptService {
       );
     }
     onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
+    final Uint8List cropped;
     try {
-      final remote = await cloud.read([jpeg]);
+      cropped = prepareForCloudBytes(jpeg, cutY: cutY);
+    } catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Das Foto konnte nicht zugeschnitten werden.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Das Foto konnte nicht verarbeitet werden ($e). Bitte erneut versuchen.',
+      );
+    }
+    try {
+      final remote = await cloud.read([cropped]);
       if (!remote.isParsed) {
         return ImportPreview(
           receipt: remote,
