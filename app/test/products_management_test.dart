@@ -110,6 +110,49 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Keine Produkte gefunden'), findsOneWidget);
     });
+
+    testWidgets('unterschiedliche Produkte: kein Duplikat-Hinweis (ADR-023)', (tester) async {
+      final repo = productRepo(db);
+      final milk = await repo.create(name: 'Vollmilch');
+      final paprika = await repo.create(name: 'Paprika Tricolore');
+      await tester.pumpWidget(app(products: [milk, paprika]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('duplicate-suggestions')), findsNothing);
+    });
+
+    testWidgets('aehnliche Produktnamen: Duplikat-Vorschlag erscheint, aber ohne automatische Zusammenfuehrung (ADR-023)', (tester) async {
+      final repo = productRepo(db);
+      final red = await repo.create(name: 'Paprika rot');
+      final yellow = await repo.create(name: 'Paprika gelb');
+      await tester.pumpWidget(app(products: [red, yellow]));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('duplicate-suggestions')), findsOneWidget);
+      expect(find.byKey(Key('duplicate-${red.id}-${yellow.id}')), findsOneWidget);
+      // beide bleiben als eigene Zeilen bestehen, solange niemand aktiv zusammenfuehrt
+      final rows = await (db.select(db.products)..where((p) => p.deletedAt.isNull())).get();
+      expect(rows, hasLength(2));
+    });
+
+    testWidgets('Vorschlag antippen und bestaetigen fuehrt die beiden Produkte zusammen (ADR-023)', (tester) async {
+      final repo = productRepo(db);
+      final red = await repo.create(name: 'Paprika rot');
+      final yellow = await repo.create(name: 'Paprika gelb');
+      await tester.pumpWidget(app(products: [red, yellow]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(Key('duplicate-merge-${red.id}-${yellow.id}')));
+      await tester.pumpAndSettle();
+      expect(find.text('Produkte zusammenführen?'), findsOneWidget);
+      // find.text waere hier zweideutig: der Vorschlags-Button im Hintergrund traegt denselben Text.
+      await tester.tap(find.widgetWithText(FilledButton, 'Zusammenführen'));
+      await tester.pumpAndSettle();
+
+      final survivor = await repo.byId(red.id);
+      final dropped = await repo.byId(yellow.id);
+      expect(survivor!.deletedAt, isNull);
+      expect(dropped!.deletedAt, isNotNull);
+    });
   });
 
   group('ProductFormPage: Alias-Verwaltung', () {

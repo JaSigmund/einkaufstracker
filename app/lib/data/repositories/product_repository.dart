@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/categorization/name_similarity.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
@@ -121,6 +122,22 @@ class ProductRepository {
       final p = await byId(alias.productId);
       if (p != null && p.deletedAt == null) return p;
     }
+
+    // Kein exakter Treffer: ein einzelnes OCR-Leerzeichen oder ein Tippfehler darf trotzdem kein neues
+    // Duplikat anlegen (ADR-023, Fehlerbericht "Faschiertes"/"Faschi ertes", 2026-10-01). Konservative,
+    // laengenabhaengige Toleranz -- siehe name_similarity.dart.
+    final fuzzyMatch = closestWithinTolerance(key, await _activeAliasKeys(hid));
+    if (fuzzyMatch != null) {
+      final fuzzyAlias = await (_db.select(_db.productAliases)
+            ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(fuzzyMatch) & a.deletedAt.isNull()))
+          .getSingleOrNull();
+      final p = fuzzyAlias == null ? null : await byId(fuzzyAlias.productId);
+      if (p != null && p.deletedAt == null) {
+        await _learnAlias(key, p.id, hid);
+        return p;
+      }
+    }
+
     // Waegware (Obst, Gemuese, Kaese am Stueck ...) steht im Bon in kg: das gleich als Grundeinheit setzen,
     // statt bei "Stueck" zu bleiben (Fehlerbericht "Bonartikel bearbeiten", 2026-09-27).
     // Haltbarkeit nach dem Oeffnen, Lagerort und Datumsart aus den Startwerten der Roadmap-Phase 3
@@ -160,6 +177,14 @@ class ProductRepository {
     final m = RegExp(r'^(ic|1c|io|i0|lc)\s+', caseSensitive: false).firstMatch(t);
     return (m == null ? t : t.substring(m.end)).trim();
   }
+
+  /// Alle aktiven, gelernten Alias-Schluessel des Haushalts (ADR-023: Vergleichsbasis fuer den
+  /// Fuzzy-Match, bevor ein neues Produkt angelegt wird).
+  Future<List<String>> _activeAliasKeys(String hid) => (_db.selectOnly(_db.productAliases)
+        ..addColumns([_db.productAliases.aliasText])
+        ..where(_db.productAliases.householdId.equals(hid) & _db.productAliases.deletedAt.isNull()))
+      .map((r) => r.read(_db.productAliases.aliasText)!)
+      .get();
 
   Future<void> _learnAlias(String key, String productId, String householdId) async {
     final a = ProductAlias(id: _uuid.v4(), householdId: householdId, aliasText: key, productId: productId, hits: 1, updatedAt: DateTime.now().toUtc());

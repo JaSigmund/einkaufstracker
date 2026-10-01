@@ -139,6 +139,24 @@ void main() {
       expect(p.defaultLocation, 'pantry');
       expect(p.defaultDateKind, 'best_before');
     });
+
+    test('ADR-023: ein OCR-Leerzeichen mitten im Wort legt kein Duplikat an (Fehlerbericht "Faschiertes", 2026-10-01)', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('Faschiertes 1kg');
+      final second = await repo.findOrCreateForReceiptItem('Faschi ertes 1kg'); // kaputtes Leerzeichen
+      expect(second.id, first.id);
+
+      // Der kaputte Text wurde als zusaetzlicher Alias gelernt: ein drittes Mal trifft schon Stufe 1 (exakt).
+      final aliases = await repo.watchAliasesFor(first.id).first;
+      expect(aliases.map((a) => a.aliasText), containsAll(['faschiertes', 'faschi ertes']));
+    });
+
+    test('ADR-023: aehnliche, aber tatsaechlich unterschiedliche Produkte bleiben getrennt', () async {
+      final repo = productRepo(db);
+      final red = await repo.findOrCreateForReceiptItem('Paprika rot');
+      final yellow = await repo.findOrCreateForReceiptItem('Paprika gelb');
+      expect(yellow.id, isNot(red.id));
+    });
   });
 
   group('watchAliasesFor / removeAlias (Fehlerbericht "Alias ändern")', () {
