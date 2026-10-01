@@ -31,6 +31,17 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   final _plugin = FlutterLocalNotificationsPlugin();
   var _initialized = false;
 
+  /// Codereview-Fund 2026-10-02 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an, auch nicht nach
+  /// Neustart"): `scheduleExpiryReminders` wird bei JEDER Aenderung des aktiven Bestands oder der
+  /// Bon-Vorschlaege neu aufgerufen -- laut Log teils mehrmals pro Sekunde (z.B. beim App-Start oder
+  /// durch den periodischen Sync-Timer). Fuer einen nachgeholten (ueberfaelligen) Tag wird unten die
+  /// Erinnerung relativ zu "jetzt" um 5 Sekunden verschoben (siehe Kommentar dort) -- kommt der naechste
+  /// Aufruf schneller als diese 5 Sekunden, wird der gerade erst geplante Alarm storniert und wieder um
+  /// 5 Sekunden verschoben, immer wieder, ohne dass er je auslöst. Bleibt der Inhalt (Artikel, Tag,
+  /// Einstellungen) zwischen zwei Aufrufen unveraendert, aendert sich auch nichts am noetigen Alarm --
+  /// so ein Aufruf wird hier uebersprungen, statt den laufenden Alarm grundlos neu aufzusetzen.
+  String? _lastSignature;
+
   @override
   Future<void> initialize() async {
     if (_initialized) return;
@@ -62,6 +73,12 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   @override
   Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays}) async {
     await initialize();
+    final signature = '$notifyTime|$leadDays|${reminders.map((r) {
+      final dateStr = '${r.date.year}-${r.date.month}-${r.date.day}';
+      return '$dateStr:${r.isOverdue}:${r.leadDays}:${r.productIds.join(',')}';
+    }).join(';')}';
+    if (signature == _lastSignature) return;
+    _lastSignature = signature;
     for (var i = 0; i < _horizonDays; i++) {
       await _plugin.cancel(_idBase + i);
     }
