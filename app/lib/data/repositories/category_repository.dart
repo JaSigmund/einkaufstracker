@@ -69,8 +69,11 @@ class CategoryRepository {
     if (n.isEmpty) throw ArgumentError('Name darf nicht leer sein');
     final row = await (_db.select(_db.categories)..where((c) => c.id.equals(id))).getSingle();
     if (row.name == n) return;
+    // Codereview-Fund 2026-10-01: deletedAt.isNull() fehlte hier -- anders als add() (das eine geloeschte
+    // Kategorie gleichen Namens reaktiviert) wurde eine Umbenennung auf einen laengst geloeschten,
+    // unsichtbaren Namen bisher faelschlich als Duplikat abgelehnt.
     final clash = await (_db.select(_db.categories)
-          ..where((c) => c.householdId.equals(row.householdId) & c.name.equals(n) & c.id.equals(id).not()))
+          ..where((c) => c.householdId.equals(row.householdId) & c.name.equals(n) & c.id.equals(id).not() & c.deletedAt.isNull()))
         .getSingleOrNull();
     if (clash != null) throw DuplicateCategoryException(n);
     await _write(row.copyWith(name: n, updatedAt: DateTime.now().toUtc()));
