@@ -77,12 +77,17 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
 
     for (var i = 0; i < reminders.length && i < _horizonDays; i++) {
       final r = reminders[i];
-      final scheduled = tz.TZDateTime(tz.local, r.date.year, r.date.month, r.date.day, hour, minute);
-      if (scheduled.isBefore(tz.TZDateTime.now(tz.local))) continue;
+      var scheduled = tz.TZDateTime(tz.local, r.date.year, r.date.month, r.date.day, hour, minute);
+      final now = tz.TZDateTime.now(tz.local);
+      // Die Uhrzeit fuer den (ggf. nachgeholten, siehe computeExpiryReminders) heutigen Erinnerungstag
+      // ist schon vorbei: sofort erinnern statt den ganzen Tag zu verlieren (Fehlerbericht "keine
+      // Push-Benachrichtigung", zweiter Anlauf 2026-10-01 -- die erste Korrektur deckte nur
+      // Bon-Vorschlaege ab, nicht verpasste Erinnerungstage).
+      if (scheduled.isBefore(now)) scheduled = now.add(const Duration(seconds: 5));
       await _plugin.zonedSchedule(
         _idBase + i,
         r.productNames.length == 1 ? '1 Artikel läuft bald ab' : '${r.productNames.length} Artikel laufen bald ab',
-        expiryReminderBody(r.productNames, leadDays),
+        expiryReminderBody(r.productNames, leadDays, isOverdue: r.isOverdue),
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
