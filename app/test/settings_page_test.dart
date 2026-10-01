@@ -242,4 +242,13 @@ void main() {
     // Fehlermeldung zurueck statt abzustuerzen.
     expect(find.text('Export nicht möglich.'), findsOneWidget);
   });
+
+  // Hinweis zum Fix "Erinnerungszeit aendern wirkt nicht sofort" (Codereview-Fund 2026-10-01,
+  // SettingsPage._update): kein Widget-Test dafuer -- der Material-TimePicker-Dialog, der sich dabei
+  // oeffnet, haelt in diesem Projekt (gleiche Grenze wie bei ReceiptEditPage's Datum/Uhrzeit-Picker)
+  // eine laufende Animation, auf die pumpAndSettle() nie "settelt" (beobachtet: 10 Minuten bis zum
+  // Timeout, auch mit einzelnen pump()-Aufrufen statt pumpAndSettle() weiterhin ein haengender Timer
+  // beim Dispose). Die eigentliche Logik (`rescheduleExpiryReminders`) ist bereits in
+  // expiry_reminder_scheduling_test.dart abgedeckt; der Fix selbst ist eine einzelne, bedingte
+  // Zeile in `_update`.
 }

@@ -46,7 +46,16 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
 
   void _sync() => ref.read(syncControllerProvider.notifier).sync();
 
-  void _rescheduleReminders() => rescheduleExpiryReminders(ref);
+  // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an, auch nicht nach
+  // Neustart"): dieser Aufruf lief bisher komplett unbeobachtet ("fire and forget") -- ein Fehler darin
+  // (z.B. keine Benachrichtigungs-Berechtigung, Plugin-Ausnahme) wurde nirgends sichtbar, auch nicht in
+  // einer Debug-Session. `debugPrint` erscheint in `flutter logs`/`adb logcat`, ohne die Oberflaeche mit
+  // einer Fehlermeldung zu stoeren (das laeuft im Hintergrund, der Nutzer hat nichts angefordert).
+  void _rescheduleReminders() {
+    rescheduleExpiryReminders(ref).catchError((Object e, StackTrace st) {
+      debugPrint('[expiry-reminders] Neuplanen fehlgeschlagen: $e\n$st');
+    });
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

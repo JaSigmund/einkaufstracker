@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -234,11 +235,15 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
 /// Erinnerung unveraendert bestehen, statt abzubrechen.
 Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final hid = await ref.read(householdIdProvider.future);
-  if (hid == null) return;
+  if (hid == null) {
+    debugPrint('[expiry-reminders] kein Haushalt bekannt, nichts geplant');
+    return;
+  }
   final HouseholdSettings settings;
   try {
     settings = await ref.read(settingsRepositoryProvider).load(hid);
-  } catch (_) {
+  } catch (e) {
+    debugPrint('[expiry-reminders] Einstellungen nicht ladbar, alter Plan bleibt bestehen: $e');
     return;
   }
   final inventoryRepo = ref.read(inventoryRepositoryProvider);
@@ -253,6 +258,15 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
+  );
+  // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): sichtbar machen, WAS
+  // ueberhaupt berechnet wurde, bevor es an den Plugin-Scheduler geht -- ohne das war nicht zu
+  // unterscheiden, ob gar nichts geplant wurde (Domain-Logik/Daten) oder der Plan die Oberflaeche/den
+  // Nutzer nie erreicht hat (Betriebssystem-Ebene: Berechtigung, Kanal, Akku-Optimierung).
+  debugPrint(
+    '[expiry-reminders] ${items.length} aktive Posten/Vorschlaege, ${reminders.length} Erinnerungstag(e) '
+    'geplant (notifyTime=${settings.notifyTime}, leadDays=${settings.notifyLeadDays})'
+    '${reminders.isEmpty ? '' : ': ${reminders.map((r) => '${r.date.toIso8601String().substring(0, 10)}=${r.productNames}').join(', ')}'}',
   );
   await ref.read(notificationSchedulerProvider).scheduleExpiryReminders(reminders, notifyTime: settings.notifyTime, leadDays: settings.notifyLeadDays);
 }

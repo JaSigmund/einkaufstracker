@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -39,7 +40,13 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
       onDidReceiveNotificationResponse: _onResponse,
     );
-    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): das Ergebnis bisher
+    // nirgends sichtbar gemacht -- verweigerte Benachrichtigungs-Berechtigung (Android 13+) ist ein sehr
+    // naheliegender Grund dafuer, dass GEPLANTE Erinnerungen trotzdem nie als Benachrichtigung erscheinen,
+    // ganz ohne Fehler an anderer Stelle.
+    final granted =
+        await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    debugPrint('[expiry-reminders] Benachrichtigungs-Berechtigung: $granted');
     _initialized = true;
   }
 
@@ -96,6 +103,7 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         payload: r.productIds.join(','),
       );
+      debugPrint('[expiry-reminders] id ${_idBase + i} geplant fuer $scheduled (jetzt: $now)');
     }
   }
 }

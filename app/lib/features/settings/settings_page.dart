@@ -20,6 +20,14 @@ class SettingsPage extends ConsumerWidget {
       final hid = await ref.read(householdIdProvider.future);
       await ref.read(settingsRepositoryProvider).update(hid!, changes);
       ref.invalidate(householdSettingsProvider);
+      // Codereview-Fund 2026-10-01 (Fehlerbericht "Erinnerungszeit aendern wirkt nicht sofort"): ohne das
+      // blieb eine bereits geplante Ablauf-Erinnerung mit der ALTEN Uhrzeit/Vorlaufzeit aktiv, bis die App
+      // neu gestartet wird oder sich das Inventar aendert -- `rescheduleExpiryReminders` laeuft sonst nur
+      // bei genau diesen beiden Ausloesern (siehe `app/app.dart`), eine Einstellungsaenderung war keiner
+      // davon.
+      if (changes.containsKey('notify_time') || changes.containsKey('notify_lead_days')) {
+        await rescheduleExpiryReminders(ref);
+      }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich. Für Einstellungen wird Netz gebraucht.')));
@@ -231,7 +239,7 @@ class SettingsPage extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('Ablauf-Erinnerung um'),
-                subtitle: Text('${s.notifyTime} Uhr, ${s.notifyLeadDays} Tag(e) vorher (Erinnerungen folgen in Phase 3)'),
+                subtitle: Text('${s.notifyTime} Uhr, ${s.notifyLeadDays} Tag(e) vorher'),
                 onTap: () async {
                   final parts = s.notifyTime.split(':');
                   final picked = await showTimePicker(
