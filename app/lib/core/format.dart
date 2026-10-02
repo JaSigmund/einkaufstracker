@@ -79,6 +79,9 @@ String formatDayHeading(DateTime day, DateTime today) {
 
 const _monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
+/// Monat als Ueberschrift: "Oktober 2026".
+String formatMonthTitle(int year, int month) => '${_monthNamesLong[month - 1]} $year';
+
 /// Woche als Zeitraum: "28. Sep – 4. Okt" (Montag bis Sonntag), mit Jahr, wenn es nicht das laufende ist.
 String formatWeekRange(DateTime monday, DateTime today) {
   final end = DateTime(monday.year, monday.month, monday.day + 6);

@@ -58,6 +58,14 @@ class NutrientAmounts {
   final double? sugarG;
   final double? fiberG;
   final double? saltG;
+
+  /// Alle bekannten Werte mit [factor] multipliziert; Unbekanntes bleibt unbekannt (`null`).
+  NutrientAmounts scaled(double factor) {
+    double? f(double? v) => v == null ? null : v * factor;
+    return NutrientAmounts(
+      kcal: f(kcal), proteinG: f(proteinG), fatG: f(fatG), carbsG: f(carbsG), sugarG: f(sugarG), fiberG: f(fiberG), saltG: f(saltG),
+    );
+  }
 }
 
 /// Reine Dreisatzrechnung: `amountG / 100 * Wert je 100`. Fehlende Einzelwerte bleiben `null`

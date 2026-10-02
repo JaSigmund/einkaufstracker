@@ -438,6 +438,26 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     });
   }
 
+  /// Rechnet das Gericht auf eine andere Portionenzahl um (Doku 15 §3.2: "Portionen anpassen, Mengen werden
+  /// skaliert"): alle Mengen werden mit neu/alt multipliziert und "Portionen gekocht" gesetzt. Von Hand eingetragene
+  /// Naehrwerte (absolute Werte der ganzen Portion) werden mit skaliert, Zutaten ohne Menge bleiben ohne Menge.
+  Future<void> _scalePortions() async {
+    final current = _parsePositive(_made.text) ?? 1;
+    final target = await showDialog<double>(context: context, builder: (_) => _ScaleDialog(current: current));
+    if (target == null || !mounted || target == current) return;
+    final factor = target / current;
+    setState(() {
+      for (final r in _rows) {
+        if (_isManual(r)) {
+          r.manual = r.manual!.scaled(factor);
+        } else {
+          r.quantity = (r.quantity * factor * 1000).round() / 1000;
+        }
+      }
+      _made.text = formatQuantity(target);
+    });
+  }
+
   Future<void> _editIngredient(int index) async {
     if (_isManual(_rows[index])) return _editManual(index);
     final row = _rows[index];
@@ -632,6 +652,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           child: Wrap(spacing: 8, children: [
             TextButton.icon(key: const Key('meal-add-ingredient'), onPressed: _addIngredient, icon: const Icon(Icons.add), label: const Text('Zutat hinzufügen')),
             TextButton.icon(key: const Key('meal-add-manual'), onPressed: _addManual, icon: const Icon(Icons.edit_note), label: const Text('Nährwerte eintragen')),
+            if (_rows.isNotEmpty)
+              TextButton.icon(key: const Key('meal-scale'), onPressed: _scalePortions, icon: const Icon(Icons.scale_outlined), label: const Text('Portionen umrechnen')),
           ]),
         ),
         if (_rows.isNotEmpty) _totalsCard(t, totals),
@@ -773,6 +795,55 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             ),
         ]),
       ),
+    );
+  }
+}
+
+/// Fragt die neue Portionenzahl ab, auf die das Gericht umgerechnet werden soll.
+class _ScaleDialog extends StatefulWidget {
+  const _ScaleDialog({required this.current});
+  final double current;
+
+  @override
+  State<_ScaleDialog> createState() => _ScaleDialogState();
+}
+
+class _ScaleDialogState extends State<_ScaleDialog> {
+  late final _controller = TextEditingController(text: formatQuantity(widget.current));
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_controller.text.replaceAll(',', '.').trim());
+    if (v == null || !v.isFinite || v <= 0 || v > 100) return setState(() => _error = 'Bitte eine Portionenzahl zwischen 0 und 100 eingeben.');
+    Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Portionen umrechnen'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Das Gericht ist für ${formatQuantity(widget.current)} Portion(en) erfasst. Alle Mengen werden auf die neue Zahl umgerechnet.'),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('scale-servings'),
+          controller: _controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: 'Neue Portionenzahl', errorText: _error),
+          onSubmitted: (_) => _submit(),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(key: const Key('scale-ok'), onPressed: _submit, child: const Text('Umrechnen')),
+      ],
     );
   }
 }
