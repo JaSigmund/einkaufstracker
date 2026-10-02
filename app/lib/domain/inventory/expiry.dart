@@ -16,6 +16,14 @@ DateTime? computeExpiresOn({DateTime? bestBefore, DateTime? openedOn, int? openS
 
 DateTime _dateOnly(DateTime d) => DateTime.utc(d.year, d.month, d.day);
 
+/// Vorlaufzeit fuer eine Ablauf-Ampel/-Erinnerung: ein Verbrauchsdatum wird erst einen Tag vorher "bald
+/// faellig", unabhaengig von der eingestellten Vorlaufzeit fuer Mindesthaltbarkeitsdaten (Doku 06 §3.1).
+/// Gemeinsam genutzt von [expiryLevel] (UI-Ampel) und `computeExpiryReminders` (Push-Benachrichtigung,
+/// `expiry_reminders.dart`) -- Codereview-Fund 2026-10-01: vorher hatte nur die Ampel diese Sonderregel,
+/// die Benachrichtigung kam dadurch bei einem Verbrauchsdatum zu frueh, bevor die App selbst den Eintrag
+/// ueberhaupt als "bald faellig" anzeigte.
+int effectiveLeadDays(String dateKind, int leadDays) => dateKind == 'use_by' ? 1 : leadDays;
+
 /// Ampel eines Inventareintrags.
 enum ExpiryLevel {
   /// Kein Ablaufdatum bekannt (z.B. Bon-Vorschlag ohne MHD und ohne Standardwert).
@@ -35,7 +43,7 @@ ExpiryLevel expiryLevel({
 }) {
   if (expiresOn == null) return ExpiryLevel.unknown;
   final days = _dateOnly(expiresOn).difference(_dateOnly(today)).inDays;
-  final lead = dateKind == 'use_by' ? 1 : leadDays;
+  final lead = effectiveLeadDays(dateKind, leadDays);
   if (days < 0) return ExpiryLevel.expired;
   if (days <= lead) return ExpiryLevel.soon;
   return ExpiryLevel.ok;

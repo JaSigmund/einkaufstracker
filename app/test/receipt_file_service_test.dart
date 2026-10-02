@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -67,6 +68,29 @@ void main() {
     expect(await svc.uploadPending(), 1);
     expect(remote.files.values.single, _bytes([7, 7]));
     expect(remote.contentTypes.values.single, 'image/jpeg');
+  });
+
+  test('Codereview-Fund 2026-10-01: attach() waehrend ein laufender uploadPending() noch auf das Netz wartet, geht nicht verloren (Lost Update)', () async {
+    final svc = fileService(db, remote, dir);
+    await svc.attach(receiptId, [ReceiptAttachment(kind: 'pdf', bytes: _bytes([1]), pageNo: 1)]);
+
+    final gate = Completer<void>();
+    remote.uploadGate = gate.future;
+    final uploadFuture = svc.uploadPending(); // haengt jetzt in remote.upload() fest
+
+    // Waehrend der Upload der ersten Datei noch laeuft, kommt eine zweite dazu (z.B. ein zweiter Bon wird
+    // direkt danach gescannt). Ohne den Fix wuerde uploadPending() beim Fertigwerden die Warteschlange mit
+    // seiner eigenen (veralteten) Kopie ueberschreiben und diese zweite Datei aus der Warteschlange werfen,
+    // obwohl sie nie hochgeladen wurde.
+    await svc.attach(receiptId, [ReceiptAttachment(kind: 'pdf', bytes: _bytes([2]), pageNo: 2)]);
+
+    gate.complete();
+    expect(await uploadFuture, 1); // nur die erste Datei war zu diesem Zeitpunkt bekannt
+    expect(remote.uploads, 1);
+
+    // Die zweite Datei muss noch in der Warteschlange stehen und beim naechsten Mal hochgeladen werden.
+    expect(await svc.uploadPending(), 1);
+    expect(remote.uploads, 2);
   });
 
   test('Mehrere Seiten: eine Datei je Seite, dieselbe Seite zweimal ergibt keine zweite Datei', () async {

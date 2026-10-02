@@ -80,15 +80,25 @@ class StoreComparison {
   /// (Doku 07 §3.2) — erst dann ist ein Vergleich aussagekraeftig statt Zufall.
   final bool isMeaningful;
 
+  /// Nur Haendler, deren eigener Durchschnitt selbst schon auf mindestens zwei Kaeufen beruht (Codereview-
+  /// Fund 2026-10-01): sonst koennte ein einzelner, nicht abgesicherter Kauf (z.B. ein einmaliger
+  /// Rauemungsverkauf) als "guenstigster Haendler" erscheinen, obwohl [isMeaningful] nur verlangt, dass
+  /// IRGENDWELCHE zwei Haendler die Schwelle erreichen, nicht der jeweils ausgewaehlte selbst.
+  List<StoreGrundpreis> get _reliableStores => stores.where((s) => s.purchaseCount >= 2).toList();
+
   StoreGrundpreis? get cheapest {
-    if (!isMeaningful || stores.isEmpty) return null;
-    return stores.reduce((a, b) => a.avgCents <= b.avgCents ? a : b);
+    if (!isMeaningful) return null;
+    final reliable = _reliableStores;
+    if (reliable.isEmpty) return null;
+    return reliable.reduce((a, b) => a.avgCents <= b.avgCents ? a : b);
   }
 
   /// Ersparnis je Kauf beim guenstigsten Haendler gegenueber dem teuersten, in Cent je Basiseinheit.
   int? get savingsPerPurchaseCents {
-    if (!isMeaningful || stores.length < 2) return null;
-    final sorted = [...stores]..sort((a, b) => a.avgCents.compareTo(b.avgCents));
+    if (!isMeaningful) return null;
+    final reliable = _reliableStores;
+    if (reliable.length < 2) return null;
+    final sorted = [...reliable]..sort((a, b) => a.avgCents.compareTo(b.avgCents));
     return sorted.last.avgCents - sorted.first.avgCents;
   }
 }

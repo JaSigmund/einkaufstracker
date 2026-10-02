@@ -1,6 +1,6 @@
--- GEPLANT (Phase 7, nach dem MVP): Essenstagebuch, Rezepte, Naehrwerte.
--- Liegt bewusst NICHT in migrations/, damit `supabase db push` es nicht einspielt.
--- Wird von supabase/tests/run_schema_tests.py trotzdem auf Einspielbarkeit geprueft.
+-- Essenstagebuch, Rezepte, Naehrwerte (Phase 7a Fundament).
+-- Vormals supabase/planned/meal_diary_draft.sql (seit Phase 3 als Entwurf getestet, unveraendert
+-- eingespielt), jetzt ergaenzt um die globale BLS-Referenztabelle (bls_foods).
 -- Doku: ClaudeBrain/02 Projekte/Einkaufstracker/15 Essenstagebuch und Naehrwerte.md
 
 create type public.meal_type   as enum ('breakfast', 'lunch', 'dinner', 'snack', 'drink');
@@ -150,3 +150,33 @@ select
   count(*)                 as days_logged
 from public.v_daily_nutrition
 group by 1, 2;
+
+-- ---------------------------------------------------------------------------
+-- Bundeslebensmittelschluessel (BLS) 4.0: globale, schreibgeschuetzte Referenztabelle fuer
+-- generische Lebensmittel ohne Barcode (Paprika, Reis roh, ...), je 100 g/ml wie im Original.
+-- Lizenz CC BY 4.0, Pflicht-Namensnennung: "Max Rubner-Institut (2025): Bundeslebensmittelschluessel
+-- (BLS), Version 4.0 -- Deutsche Naehrstoffdatenbank". bls_code ist der stabile externe Schluessel
+-- (siehe tools/import_bls_foods.py), bewusst keine surrogate uuid, damit ein spaeterer Re-Import
+-- (neue BLS-Version) dieselben Zeilen per on conflict aktualisiert statt zu duplizieren.
+-- Gleiches Zugriffsmuster wie default_categories/app_config: lesbar fuer alle angemeldeten Nutzer,
+-- kein Insert/Update/Delete fuer Clients -- Pflege ausschliesslich von Hand ueber tools/bls_foods_import.sql.
+-- ---------------------------------------------------------------------------
+create table public.bls_foods (
+  bls_code    text primary key,
+  name_de     text not null,
+  name_en     text,
+  kcal        numeric(8,2),
+  protein_g   numeric(8,2),
+  fat_g       numeric(8,2),
+  sat_fat_g   numeric(8,2),
+  carbs_g     numeric(8,2),
+  sugar_g     numeric(8,2),
+  fiber_g     numeric(8,2),
+  salt_g      numeric(8,3),
+  imported_at timestamptz not null default now()
+);
+create index on public.bls_foods (lower(name_de));
+
+alter table public.bls_foods enable row level security;
+create policy bls_foods_read on public.bls_foods
+  for select using (auth.role() = 'authenticated');

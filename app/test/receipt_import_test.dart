@@ -5,6 +5,7 @@ import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/core/format.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
+import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:einkaufstracker/domain/receipt/vienna_time.dart';
 import 'package:einkaufstracker/features/receipt_import/import_review_page.dart';
 import 'package:einkaufstracker/features/receipt_import/receipt_import_service.dart';
@@ -47,6 +48,34 @@ void main() {
       expect(again.canImport, isFalse);
       expect(() => s.save(again), throwsStateError);
       expect((await db.select(db.receipts).get()).length, 1);
+    });
+
+    test('Codereview-Fund 2026-10-01: Duplikat-Fehlalarm (zwei echte, zufaellig gleich teure Foto-Einkaeufe ohne Re-Nr) laesst sich per Bearbeiten (Uhrzeit korrigieren) aufloesen', () async {
+      final s = service();
+      final purchasedAt = DateTime.utc(2026, 10, 1, 18, 0);
+      // Fotobons haben keine Re-Nr (externalId): findDuplicate erkennt sie nur ueber Summe + Uhrzeit auf
+      // 2 Minuten genau -- genau das Szenario aus dem Codereview-Fund, anders als bei einem digitalen
+      // PDF-Bon mit Re-Nr (dort greift die externalId-Pruefung zuerst und bleibt davon unberuehrt).
+      ParsedReceipt coffeeAt(DateTime t) =>
+          ParsedReceipt.edited(base: null, items: const [], bonDiscounts: const [], totalCents: 299, purchasedAtUtc: t);
+
+      final first = ImportPreview(receipt: coffeeAt(purchasedAt), source: ReceiptSources.photoLocal);
+      await s.save(first);
+
+      // Zweiter, echter Einkauf eine Minute spaeter: gleiche Summe, faellt ins 2-Minuten-Fenster -> Fehlalarm.
+      final secondReceipt = coffeeAt(purchasedAt.add(const Duration(minutes: 1)));
+      final second = ImportPreview(receipt: secondReceipt, duplicateOfReceiptId: (await s.recheckDuplicate(ImportPreview(receipt: secondReceipt))).duplicateOfReceiptId, source: ReceiptSources.photoLocal);
+      expect(second.isDuplicate, isTrue);
+
+      // Genau das macht der "Bearbeiten"-Weg in ImportReviewPage._edit(): Uhrzeit um mehr als 2 Minuten
+      // verschieben, dann erneut pruefen.
+      final nudged = coffeeAt(purchasedAt.add(const Duration(minutes: 11)));
+      final rechecked = await s.recheckDuplicate(ImportPreview(receipt: nudged, source: second.source));
+      expect(rechecked.isDuplicate, isFalse);
+      expect(rechecked.canImport, isTrue);
+
+      await s.save(rechecked);
+      expect((await db.select(db.receipts).get()).length, 2);
     });
 
     test('Kein lesbares PDF: Fehlermeldung statt Absturz', () async {
@@ -155,7 +184,7 @@ void main() {
       expect((await db.select(db.receipts).get()), isEmpty); // nichts gespeichert
     });
 
-    testWidgets('Duplikat: Hinweis, keine Speichern-Schaltflaeche', (tester) async {
+    testWidgets('Duplikat: Hinweis, keine Speichern-Schaltflaeche, aber Bearbeiten moeglich (Codereview-Fund 2026-10-01)', (tester) async {
       final s = service(text: _fixture('billa_digital_04'));
       await s.save(await s.preview(_bytes));
       final again = await s.preview(_bytes);
@@ -163,6 +192,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Dieser Bon ist schon gespeichert'), findsOneWidget);
       expect(find.text('Speichern'), findsNothing);
+      // Ohne diesen Weg war ein zweiter, echter (nur zufaellig gleich teurer) Einkauf gar nicht speicherbar.
+      expect(find.byKey(const Key('review-edit')), findsOneWidget);
+      expect(find.byKey(const Key('review-duplicate-edit')), findsOneWidget);
     });
 
     testWidgets('Lesefehler: verstaendliche Meldung, keine Speichern-Schaltflaeche', (tester) async {

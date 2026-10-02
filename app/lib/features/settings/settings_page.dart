@@ -20,6 +20,14 @@ class SettingsPage extends ConsumerWidget {
       final hid = await ref.read(householdIdProvider.future);
       await ref.read(settingsRepositoryProvider).update(hid!, changes);
       ref.invalidate(householdSettingsProvider);
+      // Codereview-Fund 2026-10-01 (Fehlerbericht "Erinnerungszeit aendern wirkt nicht sofort"): ohne das
+      // blieb eine bereits geplante Ablauf-Erinnerung mit der ALTEN Uhrzeit/Vorlaufzeit aktiv, bis die App
+      // neu gestartet wird oder sich das Inventar aendert -- `rescheduleExpiryReminders` laeuft sonst nur
+      // bei genau diesen beiden Ausloesern (siehe `app/app.dart`), eine Einstellungsaenderung war keiner
+      // davon.
+      if (changes.containsKey('notify_time') || changes.containsKey('notify_lead_days')) {
+        await rescheduleExpiryReminders(ref);
+      }
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich. Für Einstellungen wird Netz gebraucht.')));
@@ -103,8 +111,20 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
-    await ref.read(databaseProvider).wipe();
-    await ref.read(authRepositoryProvider).signOut();
+    // Codereview-Fund 2026-10-01: blockiert einen parallel ausgeloesten Sync (Timer, Connectivity, Tipp auf
+    // den Banner), solange die lokale DB geleert wird -- sonst koennte er mit der noch gueltigen Session
+    // Daten zurueckschreiben, bevor signOut() sie ungueltig macht (Privacy-Risiko bei Geraete-Weitergabe).
+    ref.read(authTransitionInProgressProvider.notifier).start();
+    try {
+      await ref.read(databaseProvider).wipe();
+      await ref.read(authRepositoryProvider).signOut();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abmelden nicht möglich: $e')));
+      }
+    } finally {
+      ref.read(authTransitionInProgressProvider.notifier).finish();
+    }
   }
 
   /// Unwiderrufliche Loeschung: Rueckfrage verlangt das Eintippen von "LÖSCHEN", damit ein
@@ -139,15 +159,32 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
+    ref.read(authTransitionInProgressProvider.notifier).start();
     try {
       await ref.read(authRepositoryProvider).deleteAccount();
-      await ref.read(databaseProvider).wipe();
-      await ref.read(authRepositoryProvider).signOut();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
+      ref.read(authTransitionInProgressProvider.notifier).finish();
+      return;
     }
+    // Ab hier ist das Konto serverseitig bereits unwiderruflich geloescht (Codereview-Fund 2026-10-01):
+    // wipe()/signOut() laufen deshalb unabhaengig voneinander und werfen nicht mehr, egal ob der jeweils
+    // andere Schritt klappt -- sonst bliebe bei einem Fehler z.B. in wipe() eine scheinbar gueltige Session
+    // mit den Daten des geloeschten Kontos auf dem Geraet stehen, ohne Weg zurueck ueber die UI (ein
+    // erneuter Loeschversuch scheitert, das Konto existiert ja schon nicht mehr).
+    try {
+      await ref.read(databaseProvider).wipe();
+    } catch (_) {
+      // best effort, siehe oben
+    }
+    try {
+      await ref.read(authRepositoryProvider).signOut();
+    } catch (_) {
+      // best effort, siehe oben
+    }
+    ref.read(authTransitionInProgressProvider.notifier).finish();
   }
 
   @override
@@ -202,7 +239,7 @@ class SettingsPage extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('Ablauf-Erinnerung um'),
-                subtitle: Text('${s.notifyTime} Uhr, ${s.notifyLeadDays} Tag(e) vorher (Erinnerungen folgen in Phase 3)'),
+                subtitle: Text('${s.notifyTime} Uhr, ${s.notifyLeadDays} Tag(e) vorher'),
                 onTap: () async {
                   final parts = s.notifyTime.split(':');
                   final picked = await showTimePicker(
@@ -261,6 +298,7 @@ class SettingsPage extends ConsumerWidget {
           ),
           const Divider(),
           ListTile(
+            key: const Key('settings-sign-out'),
             leading: const Icon(Icons.logout),
             title: const Text('Abmelden'),
             onTap: () => _signOut(context, ref),

@@ -90,6 +90,27 @@ void main() {
       expect(r.items.any((i) => i.rawText.startsWith('2 x')), isFalse);
     });
 
+    test('Codereview-Fund 2026-10-01: ein positiv bepreister "AKTION"-Artikel ist kein Rabatt (nur negative Betraege sind Rabatte)', () {
+      const text = '''
+Billa AG
+Datum: 01.10.2026          Zeit: 18:00
+
+Milch                     H       1.50
+AKTION Paradeiser 1kg     H       1.99
+Summe EUR                         3.49
+''';
+      final r = _parser.parse(text);
+      expect(r.isParsed, isTrue, reason: r.warnings.join('; '));
+      final aktion = r.items.firstWhere((i) => i.rawText.startsWith('AKTION'));
+      expect(aktion.kind, ReceiptItemKind.article);
+      expect(aktion.lineTotalCents, 199);
+
+      // Ein echter (negativ bepreister) Rabatt mit demselben Namensmuster bleibt weiterhin erkannt.
+      final r2 = _parser.parse(text.replaceFirst('1.99', '-1.99'));
+      final realDiscount = r2.items.firstWhere((i) => i.rawText.startsWith('AKTION'));
+      expect(realDiscount.kind, ReceiptItemKind.discount);
+    });
+
     test('Mengenrabatt "NIMM MEHR" ist ein Rabatt, Pfandartikel in Klasse D ein Pfand', () {
       final r = _parser.parse(_fixture('billa_digital_03'));
       final nimm = r.items.where((i) => i.rawText.startsWith('NIMM MEHR')).toList();

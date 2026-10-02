@@ -42,6 +42,18 @@ void main() {
       expect(() => productRepo(db).create(name: '   '), throwsArgumentError);
     });
 
+    test('nutrientsPer100 ohne nutrientsSource wird abgelehnt (Phase 7a: Quelle muss explizit sein)', () {
+      expect(
+        () => productRepo(db).create(name: 'Paprika', nutrientsPer100: {'kcal': 30}),
+        throwsArgumentError,
+      );
+    });
+
+    test('nutrientsPer100 mit nutrientsSource wird uebernommen', () async {
+      final p = await productRepo(db).create(name: 'Paprika', nutrientsPer100: {'kcal': 30}, nutrientsBasis: 'g', nutrientsSource: 'bls');
+      expect(p.nutrientsSource, 'bls');
+    });
+
     test('Marke ist leer/whitespace: wird zu null', () async {
       final p = await productRepo(db).create(name: 'X', brand: '   ');
       expect(p.brand, isNull);
@@ -104,6 +116,30 @@ void main() {
     test('unbekanntes Produkt: kein Absturz', () async {
       await productRepo(db).softDelete('does-not-exist');
     });
+
+    test('Codereview-Fund 2026-10-01: loescht auch die gelernten Aliase mit', () async {
+      final repo = productRepo(db);
+      final p = await repo.findOrCreateForReceiptItem('Milch');
+      await repo.softDelete(p.id);
+      final aliases = await (db.select(db.productAliases)
+            ..where((a) => a.productId.equals(p.id))
+            ..where((a) => a.deletedAt.isNull()))
+          .get();
+      expect(aliases, isEmpty);
+    });
+
+    test('Codereview-Fund 2026-10-01: Produkt loeschen und denselben Artikel erneut (zweimal) kaufen legt kein Duplikat an und stuerzt nicht ab', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('Milch');
+      await repo.softDelete(first.id);
+
+      // Ohne den Fix bliebe der alte Alias aktiv: der zweite Kauf legt ein zweites Produkt mit demselben
+      // Alias-Text an, der dritte Kauf faende dann zwei aktive Aliase und stuerzte ab (StateError).
+      final second = await repo.findOrCreateForReceiptItem('Milch');
+      expect(second.id, isNot(first.id));
+      final third = await repo.findOrCreateForReceiptItem('Milch');
+      expect(third.id, second.id);
+    });
   });
 
   group('findOrCreateForReceiptItem', () {
@@ -138,6 +174,24 @@ void main() {
       expect(p.openedShelfLifeDays, isNull);
       expect(p.defaultLocation, 'pantry');
       expect(p.defaultDateKind, 'best_before');
+    });
+
+    test('ADR-023: ein OCR-Leerzeichen mitten im Wort legt kein Duplikat an (Fehlerbericht "Faschiertes", 2026-10-01)', () async {
+      final repo = productRepo(db);
+      final first = await repo.findOrCreateForReceiptItem('Faschiertes 1kg');
+      final second = await repo.findOrCreateForReceiptItem('Faschi ertes 1kg'); // kaputtes Leerzeichen
+      expect(second.id, first.id);
+
+      // Der kaputte Text wurde als zusaetzlicher Alias gelernt: ein drittes Mal trifft schon Stufe 1 (exakt).
+      final aliases = await repo.watchAliasesFor(first.id).first;
+      expect(aliases.map((a) => a.aliasText), containsAll(['faschiertes', 'faschi ertes']));
+    });
+
+    test('ADR-023: aehnliche, aber tatsaechlich unterschiedliche Produkte bleiben getrennt', () async {
+      final repo = productRepo(db);
+      final red = await repo.findOrCreateForReceiptItem('Paprika rot');
+      final yellow = await repo.findOrCreateForReceiptItem('Paprika gelb');
+      expect(yellow.id, isNot(red.id));
     });
   });
 

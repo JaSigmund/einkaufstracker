@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -31,6 +31,17 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   final _plugin = FlutterLocalNotificationsPlugin();
   var _initialized = false;
 
+  /// Codereview-Fund 2026-10-02 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an, auch nicht nach
+  /// Neustart"): `scheduleExpiryReminders` wird bei JEDER Aenderung des aktiven Bestands oder der
+  /// Bon-Vorschlaege neu aufgerufen -- laut Log teils mehrmals pro Sekunde (z.B. beim App-Start oder
+  /// durch den periodischen Sync-Timer). Fuer einen nachgeholten (ueberfaelligen) Tag wird unten die
+  /// Erinnerung relativ zu "jetzt" um 5 Sekunden verschoben (siehe Kommentar dort) -- kommt der naechste
+  /// Aufruf schneller als diese 5 Sekunden, wird der gerade erst geplante Alarm storniert und wieder um
+  /// 5 Sekunden verschoben, immer wieder, ohne dass er je auslöst. Bleibt der Inhalt (Artikel, Tag,
+  /// Einstellungen) zwischen zwei Aufrufen unveraendert, aendert sich auch nichts am noetigen Alarm --
+  /// so ein Aufruf wird hier uebersprungen, statt den laufenden Alarm grundlos neu aufzusetzen.
+  String? _lastSignature;
+
   @override
   Future<void> initialize() async {
     if (_initialized || kIsWeb) return;
@@ -40,7 +51,13 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
       onDidReceiveNotificationResponse: _onResponse,
     );
-    await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): das Ergebnis bisher
+    // nirgends sichtbar gemacht -- verweigerte Benachrichtigungs-Berechtigung (Android 13+) ist ein sehr
+    // naheliegender Grund dafuer, dass GEPLANTE Erinnerungen trotzdem nie als Benachrichtigung erscheinen,
+    // ganz ohne Fehler an anderer Stelle.
+    final granted =
+        await _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+    debugPrint('[expiry-reminders] Benachrichtigungs-Berechtigung: $granted');
     _initialized = true;
   }
 
@@ -60,6 +77,12 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
     // Statt eines kryptischen Plattform-Fehlers wird die Planung auf Web bewusst uebersprungen.
     if (kIsWeb) return;
     await initialize();
+    final signature = '$notifyTime|$leadDays|${reminders.map((r) {
+      final dateStr = '${r.date.year}-${r.date.month}-${r.date.day}';
+      return '$dateStr:${r.isOverdue}:${r.leadDays}:${r.productIds.join(',')}';
+    }).join(';')}';
+    if (signature == _lastSignature) return;
+    _lastSignature = signature;
     for (var i = 0; i < _horizonDays; i++) {
       await _plugin.cancel(_idBase + i);
     }
@@ -82,17 +105,26 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
 
     for (var i = 0; i < reminders.length && i < _horizonDays; i++) {
       final r = reminders[i];
-      final scheduled = tz.TZDateTime(tz.local, r.date.year, r.date.month, r.date.day, hour, minute);
-      if (scheduled.isBefore(tz.TZDateTime.now(tz.local))) continue;
+      var scheduled = tz.TZDateTime(tz.local, r.date.year, r.date.month, r.date.day, hour, minute);
+      final now = tz.TZDateTime.now(tz.local);
+      // Die Uhrzeit fuer den (ggf. nachgeholten, siehe computeExpiryReminders) heutigen Erinnerungstag
+      // ist schon vorbei: sofort erinnern statt den ganzen Tag zu verlieren (Fehlerbericht "keine
+      // Push-Benachrichtigung", zweiter Anlauf 2026-10-01 -- die erste Korrektur deckte nur
+      // Bon-Vorschlaege ab, nicht verpasste Erinnerungstage).
+      if (scheduled.isBefore(now)) scheduled = now.add(const Duration(seconds: 5));
       await _plugin.zonedSchedule(
         _idBase + i,
         r.productNames.length == 1 ? '1 Artikel läuft bald ab' : '${r.productNames.length} Artikel laufen bald ab',
-        expiryReminderBody(r.productNames, leadDays),
+        // Codereview-Fund 2026-10-01: r.leadDays statt der globalen Einstellung -- bei einem
+        // Verbrauchsdatum (immer 1 Tag Vorlauf) soll der Text "morgen" sagen, nicht die laengere,
+        // eingestellte Vorlaufzeit fuer Mindesthaltbarkeitsdaten.
+        expiryReminderBody(r.productNames, r.leadDays, isOverdue: r.isOverdue),
         scheduled,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         payload: r.productIds.join(','),
       );
+      debugPrint('[expiry-reminders] id ${_idBase + i} geplant fuer $scheduled (jetzt: $now)');
     }
   }
 }

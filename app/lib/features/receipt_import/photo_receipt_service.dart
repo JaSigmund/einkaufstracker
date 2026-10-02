@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import '../../data/cloud/cloud_receipt.dart';
 import '../../data/ocr/image_prep.dart';
 import '../../data/repositories/receipt_repository.dart';
+import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/ocr/ocr_text.dart';
 import '../../domain/ocr/row_cluster.dart';
 import '../../domain/receipt/parsed_receipt.dart';
@@ -86,11 +87,16 @@ class PhotoReceiptService {
               'Zahlungsblock nicht abschneiden. Bitte den Bon neu fotografieren, mit der Zeile "Summe" gut lesbar.';
         } else {
           onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
-          remote = await cloud.read(images);
+          // Codereview-Fund 2026-10-01: war fest auf 'Billa' verdrahtet, auch fuer Hofer-Bons -- dieselbe
+          // einfache Kopfzeilen-Heuristik wie parseReceiptText, da der volle Parser hier ja gerade
+          // gescheitert ist.
+          remote = await cloud.read(images, storeHint: detectChainHint(_joinText(pages)));
         }
       }
     } on CloudNotAllowed {
       note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet.';
+    } on AppUpdateRequiredException {
+      note = 'Ein Update ist erforderlich, bevor die Cloud-Erkennung wieder verfügbar ist. Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } on CloudUnavailable catch (e) {
       note = 'Die Cloud ist nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } catch (e) {

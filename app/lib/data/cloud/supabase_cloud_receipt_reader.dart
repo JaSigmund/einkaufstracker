@@ -16,13 +16,13 @@ class SupabaseCloudReceiptReader implements CloudReceiptReader {
   final Future<String> Function() _householdId;
 
   @override
-  Future<ParsedReceipt> read(List<Uint8List> jpegs) async {
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'}) async {
     final household = await _householdId();
     try {
       final response = await _client.functions
           .invoke(
             'parse-receipt',
-            body: {'household_id': household, 'images': [for (final j in jpegs) base64Encode(j)], 'store_hint': 'Billa'},
+            body: {'household_id': household, 'images': [for (final j in jpegs) base64Encode(j)], 'store_hint': storeHint},
           )
           .timeout(const Duration(seconds: 60));
       final data = response.data;
