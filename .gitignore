@@ -41,3 +41,7 @@ __pycache__/
 
 # Datenbank-Backups (tools/backup.sh) enthalten alle Nutzerdaten, nie committen
 backups/
+
+# BLS-Rohdaten (tools/import_bls_foods.py): grosse Fremddatei, jederzeit neu von blsdb.de ladbar --
+# eingecheckt wird nur das erzeugte tools/bls_foods_import.sql
+tools/bls_source/
