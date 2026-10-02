@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,11 +84,16 @@ class _Row {
 /// dem Inventar, aus der Lebensmitteldatenbank oder als Freitext. Beim Speichern wird der Bestand FEFO abgezogen,
 /// beim Bearbeiten der alte Abzug per Gegenbuchung zurueckgenommen und neu gerechnet.
 class MealFormPage extends ConsumerStatefulWidget {
-  const MealFormPage({super.key, this.existing, this.template, this.leftover = false});
+  const MealFormPage({super.key, this.existing, this.template, this.leftover = false, this.photosAvailable = !kIsWeb});
 
   final Meal? existing;
   final Meal? template;
   final bool leftover;
+
+  /// Mahlzeitenfotos brauchen lokalen Dateispeicher (`MealPhotoService`), den es in der Web-Version (PWA) nicht gibt.
+  /// Dort fehlt der Foto-Bereich samt Foto-Analyse, statt bei jedem Speichern zu scheitern. Als Parameter statt einer
+  /// festverdrahteten `kIsWeb`-Abfrage, damit beide Faelle testbar sind.
+  final bool photosAvailable;
 
   @override
   ConsumerState<MealFormPage> createState() => _MealFormPageState();
@@ -649,6 +655,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   }
 
   Widget _photoSection(ThemeData t) {
+    if (!widget.photosAvailable) return const SizedBox.shrink();
     final Widget preview;
     if (_newPhoto != null) {
       preview = Image.memory(_newPhoto!, key: const Key('meal-photo-preview'), fit: BoxFit.cover, gaplessPlayback: true);
