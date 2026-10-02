@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/app_update/app_update_gate.dart';
+
 /// Kontext, der automatisch (ohne Zutun des Nutzers) an jede Chat-Nachricht angehängt wird (ADR-021:
 /// "ohne den aktuellen Kontext zu beschreiben"): das angezeigte Rezept, seine Zutaten, und — gemäß
 /// Q-22 — ein begrenztes Fenster des bisherigen Gesprächs (die Edge Function selbst ist zustandslos,
@@ -76,7 +78,8 @@ class _CookingChatPanelState extends State<CookingChatPanel> {
       setState(() => _messages.add(ChatMessage(text: reply, fromUser: false)));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Nachricht konnte nicht gesendet werden: $e');
+      // Update-Sperre (ADR-022): hier hilft nur ein Update, deshalb ohne "konnte nicht gesendet werden"-Praefix.
+      setState(() => _error = e is AppUpdateRequiredException ? e.toString() : 'Nachricht konnte nicht gesendet werden: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }

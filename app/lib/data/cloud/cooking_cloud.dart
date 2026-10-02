@@ -17,6 +17,14 @@ class CookingCloudNotAllowed implements Exception {
   String toString() => 'Cloud-Auswertung ist in den Einstellungen ausgeschaltet.';
 }
 
+/// Das Tageslimit fuer KI-Anfragen des Haushalts ist erreicht (HTTP 429 der Edge Functions, Doku 09 §2).
+/// Anders als [CookingCloudUnavailable] hilft hier kein erneuter Versuch, erst am naechsten Tag wieder.
+class CookingCloudDailyLimit implements Exception {
+  const CookingCloudDailyLimit();
+  @override
+  String toString() => 'Das Tageslimit für KI-Anfragen ist erreicht. Morgen geht es wieder.';
+}
+
 /// Ein benoetigtes Zutat fuer einen Rezeptvorschlag-Aufruf.
 typedef SuggestionIngredient = ({String name, double? quantity, String? unit});
 

@@ -462,6 +462,8 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
 /// (dieselbe household_settings.allow_cloud_ocr wie bei der Bon-Cloud-Erkennung, Q-23).
 final cookingCloudProvider = Provider<CookingCloud>(
   (ref) => SupabaseCookingCloud(ref.watch(supabaseClientProvider), () async {
+    // Update-Sperre (ADR-022) wie bei der Bon-Cloud: zuerst pruefen, bevor irgendein Netzzugriff passiert.
+    if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
     final id = await ref.read(householdIdProvider.future);
     if (id == null) throw const CookingCloudUnavailable('kein Haushalt');
     return id;

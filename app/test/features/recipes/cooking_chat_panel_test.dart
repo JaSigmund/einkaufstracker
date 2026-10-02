@@ -1,3 +1,4 @@
+import 'package:einkaufstracker/domain/app_update/app_update_gate.dart';
 import 'package:einkaufstracker/features/recipes/cooking_chat_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -73,6 +74,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('chat-error')), findsOneWidget);
+  });
+
+  testWidgets('Update-Sperre (ADR-022): Hinweis auf das Update, ohne "konnte nicht gesendet werden"', (tester) async {
+    await tester.pumpWidget(app(sendMessage: (_, _) async => throw const AppUpdateRequiredException()));
+
+    await tester.enterText(find.byKey(const Key('chat-input')), 'Hallo?');
+    await tester.tap(find.byKey(const Key('chat-send')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('chat-error'))).data, const AppUpdateRequiredException().toString());
   });
 
   testWidgets('zweite Nachricht schickt die erste Runde als Verlauf mit (Q-22)', (tester) async {

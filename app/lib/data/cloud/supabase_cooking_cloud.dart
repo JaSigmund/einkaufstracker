@@ -7,6 +7,16 @@ import '../../domain/recipes/recipe_suggestion.dart';
 import '../../features/recipes/cooking_chat_panel.dart';
 import 'cooking_cloud.dart';
 
+/// Ordnet die Antwort einer Edge Function (HTTP-Status und JSON-Fehlerdetails) der passenden Ausnahme zu:
+/// 403 `cloud_ocr_not_allowed` = vom Nutzer ausgeschaltet, 429 `daily_limit_reached` = Tageslimit, alles
+/// andere = vorerst nicht verfuegbar. Reine Funktion, damit sie ohne Netzwerk testbar ist.
+Exception cookingCloudExceptionFor(int status, Object? details) {
+  final error = details is Map ? details['error'] : null;
+  if (status == 403 && error == 'cloud_ocr_not_allowed') return const CookingCloudNotAllowed();
+  if (status == 429 && error == 'daily_limit_reached') return const CookingCloudDailyLimit();
+  return CookingCloudUnavailable('Fehler $status');
+}
+
 /// Ruft die Edge Functions `suggest-recipes` und `cooking-chat` auf (ADR-021).
 class SupabaseCookingCloud implements CookingCloud {
   SupabaseCookingCloud(this._client, this._householdId);
@@ -67,13 +77,7 @@ class SupabaseCookingCloud implements CookingCloud {
     }
   }
 
-  Exception _mapFunctionException(FunctionException e) {
-    final details = e.details;
-    if (e.status == 403 && details is Map && details['error'] == 'cloud_ocr_not_allowed') {
-      return const CookingCloudNotAllowed();
-    }
-    return CookingCloudUnavailable('Fehler ${e.status}');
-  }
+  Exception _mapFunctionException(FunctionException e) => cookingCloudExceptionFor(e.status, e.details);
 
   Exception _mapGenericError(Object e) {
     final text = e.toString();

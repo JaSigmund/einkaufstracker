@@ -2,6 +2,7 @@ import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/saved_recipe_repository.dart';
+import 'package:einkaufstracker/domain/app_update/app_update_gate.dart';
 import 'package:einkaufstracker/domain/recipes/recipe_suggestion.dart';
 import 'package:einkaufstracker/features/recipes/recipe_suggestions_page.dart';
 import 'package:einkaufstracker/features/recipes/recipe_viewer_page.dart';
@@ -113,6 +114,23 @@ void main() {
 
     expect(cloud.suggestCalls, 0);
     expect(find.byKey(const Key('suggestions-error')), findsOneWidget);
+  });
+
+  testWidgets('Update-Sperre (ADR-022): klarer Hinweis auf das Update statt "gerade nicht verfuegbar"', (tester) async {
+    final cloud = FakeCookingCloud(error: const AppUpdateRequiredException());
+    await tester.pumpWidget(app(
+      active: [_item('i1', 'p1')],
+      products: [_product('p1', 'Kürbis')],
+      cloud: cloud,
+    ));
+    await tester.pumpAndSettle();
+    await _dismissFirstUseNoticeIfShown(tester);
+
+    await tester.tap(find.byKey(const Key('fetch-suggestions')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('suggestions-error'))).data, const AppUpdateRequiredException().toString());
+    expect(find.textContaining('gerade nicht verfügbar'), findsNothing);
   });
 
   testWidgets('Fehler der Cloud: Fehlermeldung statt Absturz', (tester) async {

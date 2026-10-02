@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../app/providers.dart';
 import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
+import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/recipes/recipe_search_url.dart';
 import '../../domain/recipes/recipe_suggestion.dart';
 import '../../domain/recipes/recipe_suggestion_context.dart';
@@ -85,7 +86,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   }
 
   String _friendlyError(Object e) {
-    if (e is CookingCloudNotAllowed) return e.toString();
+    if (e is CookingCloudNotAllowed || e is CookingCloudDailyLimit || e is AppUpdateRequiredException) return e.toString();
     if (e is CookingCloudUnavailable) return 'Vorschläge gerade nicht verfügbar (${e.message}).';
     return 'Vorschläge gerade nicht verfügbar.';
   }

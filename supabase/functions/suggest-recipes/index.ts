@@ -32,6 +32,10 @@ const MAX_INGREDIENTS = 40;
 // (die Tabelle protokolliert Kosten nur im Nachhinein).
 const MAX_LABEL_CHARS = 200;
 
+// Tageslimit je Haushalt ueber alle KI-Funktionen (siehe Block 3b). Grosszuegig fuer normale Nutzung (ein
+// Kochabend mit Chat sind ein paar Dutzend Nachrichten), aber eine harte Obergrenze fuer die Kosten.
+const DAILY_CALL_LIMIT = 40;
+
 const SYSTEM = `Du schlaegst Rezeptideen fuer einen Haushalt vor, basierend auf Zutaten, die er gerade zuhause hat.
 Die Liste ist nach Dringlichkeit geordnet: die ersten Eintraege verderben bald und sollten bevorzugt verwertet werden.
 
@@ -110,6 +114,19 @@ Deno.serve(async (req) => {
   if (setErr || !settings) return json({ error: "forbidden" }, 403);
   if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
 
+  // 3b) Tageslimit je Haushalt (Doku 09 §2, Missbrauchsschutz): zaehlt ALLE KI-Aufrufe der letzten 24 Stunden
+  //     ueber llm_usage (Bon-Erkennung, Rezeptvorschlaege, Koch-Chat teilen sich die Tabelle). llm_usage
+  //     protokolliert Kosten sonst nur im Nachhinein -- ohne dieses Limit koennte ein direkter API-Aufruf
+  //     beliebig oft Kosten erzeugen. Schlaegt die Zaehlung selbst fehl, wird abgelehnt statt blind zugelassen.
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { count: usedToday, error: countErr } = await admin
+    .from("llm_usage")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", body.household_id)
+    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  if (countErr) return json({ error: "usage_check_failed" }, 500);
+  if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
+
   // 4) Claude
   const ingredientLines = body.ingredients
     .map((i) => `- ${i.name}${i.quantity ? ` (${i.quantity}${i.unit ? " " + i.unit : ""})` : ""}`)
@@ -144,7 +161,6 @@ Deno.serve(async (req) => {
 
   // 5) Nutzung protokollieren (service role, gleiche Tabelle wie bei parse-receipt)
   const price = PRICES[model];
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   await admin.from("llm_usage").insert({
     household_id: body.household_id,
     receipt_id: null,
