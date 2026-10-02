@@ -4,7 +4,8 @@
 // Ablauf: JWT pruefen -> Eingabe pruefen (Foto, Produktliste) -> Mitgliedschaft + Einwilligung pruefen
 //         (household_settings.allow_cloud_ocr, dieselbe Einstellung wie bei den Bons und den Rezeptvorschlaegen)
 //         -> Tageslimit ueber llm_usage -> Foto + Produktnamen an Claude mit erzwungenem Tool-Schema
-//         -> Antwort bereinigen (sanitize.ts) -> Nutzung in llm_usage protokollieren -> JSON zurueck.
+//         -> Antwort bereinigen (sanitize.ts) -> Zutaten den Naehrwerten der Lebensmitteldatenbank zuordnen (analyze.ts, resolve.ts:
+//         SQL-Suche, bei Bedarf kurze zweite KI-Auswahl aus echten Kandidaten) -> Nutzung in llm_usage protokollieren -> JSON zurueck.
 //
 // Die Antwort ist immer nur ein VORSCHLAG zum Bearbeiten (Doku 15 §6: Mengen aus einem Foto sind Schaetzungen mit
 // hoher Streuung). Die Function legt das Foto nirgends ab; es liegt nur fuer die Dauer des Aufrufs im Speicher. Was Anthropic mit API-Eingaben tut, regeln deren Bedingungen.
@@ -14,6 +15,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { MEAL_TYPES, parseRequest, sanitizeAnalysis } from "./sanitize.ts";
+import { resolveIngredients, type Usage } from "./analyze.ts";
+import { buildChoosePrompt, CHOOSE_SYSTEM, CHOOSE_TOOL, type ChooseItem, type FoodRow, parseFoodRow } from "./resolve.ts";
 
 // Gleiche Preistabelle wie parse-receipt (Stand 2026-09; vor Produktivbetrieb gegen die offizielle Preisliste pruefen).
 const PRICES: Record<string, { in: number; out: number }> = {
@@ -28,8 +31,10 @@ const DAILY_CALL_LIMIT = 40;
 const SYSTEM = `Du erkennst auf dem Foto einer Mahlzeit, was gegessen wird, und schaetzt die Zutaten fuer ein Ernaehrungstagebuch.
 
 Regeln:
-- Nenne einen kurzen Gerichtsnamen (dish_title) und die erkennbaren Zutaten im ROHZUSTAND (z.B. "Reis" statt "gekochter Reis"; die Menge bezieht sich auf das rohe Gewicht, soweit schaetzbar).
-- est_amount_g ist die geschaetzte Menge der Zutat in Gramm fuer das GANZE sichtbare Gericht. Wenn du eine Menge gar nicht schaetzen kannst, gib 0 an. Raten ist erlaubt, aber trage dann eine niedrige confidence ein.
+- Nenne einen kurzen Gerichtsnamen (dish_title) und die erkennbaren Zutaten mit dem gaengigen deutschen Namen, ohne Zusaetze und ohne den Zustand im Namen (z.B. "Reis", "Haehnchenbrust", "Paprika rot", nicht "gekochter Reis").
+- state ist der Zustand, wie die Zutat auf dem Foto zu sehen ist: "raw" (roh, z.B. Salat, Obst, rohes Gemuese), "cooked" (gekocht, gebraten, gedaempft: Reis, Nudeln, Fleisch, gegartes Gemuese), "ready_made" (fertig Gekauftes oder Zubereitetes wie Pommes, Pizza, Burger, Cola, Wurst) oder "unknown".
+- kind ist "drink" fuer Getraenke (dann gilt die Menge in Millilitern), sonst "food".
+- est_amount_g ist die geschaetzte Menge der Zutat in Gramm (Getraenke in Millilitern) fuer das GANZE sichtbare Gericht, so wie sie auf dem Teller oder im Glas liegt, also gekochter Reis gekocht gewogen. Wenn du eine Menge gar nicht schaetzen kannst, gib 0 an. Raten ist erlaubt, aber trage dann eine niedrige confidence ein.
 - meal_type_guess ist "unknown", wenn die Tageszeit nicht erkennbar ist; servings_visible ist 0, wenn du die Portionen nicht zaehlen kannst.
 - confidence liegt zwischen 0 und 1 und beschreibt, wie sicher du dir bei dieser Zutat bist (Zutat erkannt UND Menge plausibel).
 - Du bekommst eine Liste von Produkten aus dem Vorrat des Haushalts mit ID. Wenn eine erkannte Zutat eindeutig zu einem dieser Produkte passt, trage dessen ID in inventory_product_id ein, sonst einen leeren Text. Erfinde niemals IDs.
@@ -58,8 +63,10 @@ const TOOL = {
             inventory_product_id: { type: "string" },
             est_amount_g: { type: "number" },
             confidence: { type: "number" },
+            kind: { type: "string", enum: ["food", "drink"] },
+            state: { type: "string", enum: ["raw", "cooked", "ready_made", "unknown"] },
           },
-          required: ["name", "inventory_product_id", "est_amount_g", "confidence"],
+          required: ["name", "inventory_product_id", "est_amount_g", "confidence", "kind", "state"],
         },
       },
       notes: { type: "string" },
@@ -70,6 +77,36 @@ const TOOL = {
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+/// Zweiter, kurzer KI-Aufruf ohne Bild: waehlt je Zutat einen der vorgelegten Kandidaten der Lebensmitteldatenbank (resolve.ts).
+/// Ein Fehler hier ist kein Fehler der Analyse: `null`, und die Zutaten bleiben "unbekannt".
+async function chooseFoods(model: string, items: ChooseItem[]): Promise<{ choices: unknown; usage: Usage } | null> {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 800,
+      system: CHOOSE_SYSTEM,
+      tools: [CHOOSE_TOOL],
+      tool_choice: { type: "tool", name: "submit_choices" },
+      messages: [{ role: "user", content: buildChoosePrompt(items) }],
+    }),
+  });
+  if (!resp.ok) {
+    console.error("choose_anthropic_error", resp.status, await resp.text());
+    return null;
+  }
+  const result = await resp.json();
+  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
+  if (!toolUse) return null;
+  const u = result.usage ?? { input_tokens: 0, output_tokens: 0 };
+  return { choices: toolUse.input, usage: { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0 } };
+}
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -167,10 +204,38 @@ Deno.serve(async (req) => {
   });
 
   const analysis = sanitizeAnalysis(toolUse.input, new Set(body.products.map((p) => p.id)));
+
+  // 6) Zutaten den Naehrwerten der Lebensmitteldatenbank zuordnen (Phase N1, ADR-031)
+  const resolution = await resolveIngredients(analysis.ingredients.map((i) => ({ name: i.name, state: i.state })), {
+    search: async (q: string): Promise<FoodRow[]> => {
+      const { data, error } = await admin.rpc("search_bls_foods", { q, n: 8, p_household: body.household_id });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(parseFoodRow).filter((r: FoodRow | null): r is FoodRow => r !== null);
+    },
+    choose: (items: ChooseItem[]) => chooseFoods(model, items),
+  });
+  let total: Usage = { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens };
+  let totalCost = cost;
+  if (resolution.usage) {
+    const chooseCost = resolution.usage.input_tokens * price.in + resolution.usage.output_tokens * price.out;
+    await admin.from("llm_usage").insert({
+      household_id: body.household_id,
+      receipt_id: null,
+      model,
+      input_tokens: resolution.usage.input_tokens,
+      output_tokens: resolution.usage.output_tokens,
+      cost_micro_usd: chooseCost,
+      duration_ms: Date.now() - started,
+    });
+    total = { input_tokens: total.input_tokens + resolution.usage.input_tokens, output_tokens: total.output_tokens + resolution.usage.output_tokens };
+    totalCost += chooseCost;
+  }
+  console.log("resolved", resolution.stats);
+
   return json({
-    analysis,
+    analysis: { ...analysis, ingredients: analysis.ingredients.map((i, idx) => ({ ...i, match: resolution.matches[idx] })) },
     model,
-    usage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost_micro_usd: cost },
+    usage: { input_tokens: total.input_tokens, output_tokens: total.output_tokens, cost_micro_usd: totalCost },
     duration_ms: Date.now() - started,
   });
 });

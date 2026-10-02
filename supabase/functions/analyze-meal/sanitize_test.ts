@@ -78,7 +78,7 @@ Deno.test("sanitizeAnalysis: normale Antwort bleibt erhalten", () => {
     dish_title: "Reispfanne",
     meal_type_guess: "dinner",
     servings_visible: 2,
-    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8 }],
+    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8, kind: "food", state: null }],
     notes: "Oel nicht sichtbar",
   });
 });
@@ -141,4 +141,23 @@ Deno.test("sanitizeAnalysis: Muell als Antwort ergibt eine leere, gueltige Analy
 Deno.test("sanitizeAnalysis: lange Texte werden gekuerzt", () => {
   const a = sanitizeAnalysis({ dish_title: "t".repeat(500), notes: "n".repeat(900), ingredients: [{ name: "z".repeat(900) }] }, new Set());
   assertEquals([a.dish_title.length, a.notes?.length, a.ingredients[0].name.length], [120, 500, 200]);
+});
+
+Deno.test("sanitizeAnalysis: kind und state werden gelesen, Unbekanntes wird zu food und null", () => {
+  const a = sanitizeAnalysis({
+    ingredients: [
+      { name: "Cola", inventory_product_id: "", est_amount_g: 330, confidence: 0.9, kind: "drink", state: "ready_made" },
+      { name: "Reis", inventory_product_id: "", est_amount_g: 180, confidence: 0.7, kind: "food", state: "cooked" },
+      { name: "Salat", inventory_product_id: "", est_amount_g: 60, confidence: 0.6, kind: "food", state: "raw" },
+      { name: "Sosse", inventory_product_id: "", est_amount_g: 0, confidence: 0.2, kind: "sauce", state: "unknown" },
+      { name: "Etwas", inventory_product_id: "", est_amount_g: 0, confidence: 0.2 },
+    ],
+  }, new Set());
+  assertEquals(a.ingredients.map((i) => [i.kind, i.state]), [
+    ["drink", "ready_made"],
+    ["food", "cooked"],
+    ["food", "raw"],
+    ["food", null],
+    ["food", null],
+  ]);
 });
