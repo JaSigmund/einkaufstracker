@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/app_config/app_config_repository.dart';
 import '../data/files/meal_photo_service.dart';
 import '../data/household/household_invites.dart';
+import '../domain/sync/sync_conflicts.dart';
 import '../domain/sync/sync_schedule.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
@@ -111,10 +112,14 @@ final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(r
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false});
+  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false, this.conflicts = const []});
   final DateTime? lastSync;
   final String? error;
   final bool running;
+
+  /// Aenderungen dieses Geraets, die beim Senden eine neuere fremde Aenderung ueberschrieben haben (ADR-018) und die der
+  /// Nutzer noch nicht bestaetigt hat. Last-write-wins bleibt, es geschieht nur nicht mehr unbemerkt.
+  final List<SyncConflict> conflicts;
 
   /// Die installierte Version ist zu alt fuer den aktuellen Server-Stand (ADR-022) -- Synchronisierung
   /// bleibt bewusst aus, bis aktualisiert wurde, statt mit moeglicherweise inkompatiblen Daten weiterzumachen.
@@ -139,13 +144,13 @@ class SyncController extends Notifier<SyncStatus> {
     if (engine.isRunning) return;
     if (ref.read(sessionProvider).value == null) return;
     if (ref.read(appUpdateRequiredProvider)) {
-      state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true);
+      state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true, conflicts: state.conflicts);
       return;
     }
-    state = SyncStatus(lastSync: state.lastSync, running: true);
+    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts);
     try {
-      await engine.sync();
-      state = SyncStatus(lastSync: DateTime.now());
+      final result = await engine.sync();
+      state = SyncStatus(lastSync: DateTime.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts));
       // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
       // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
       await ref.read(receiptRepositoryProvider).categorizeMissing();
@@ -155,11 +160,17 @@ class SyncController extends Notifier<SyncStatus> {
       // Mitgliederzahl fuer den Takt (ADR-018), im Hintergrund und ohne den Sync zu verzoegern
       unawaited(ref.read(householdSizeProvider.notifier).refreshIfStale());
     } catch (e) {
-      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e));
+      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), conflicts: state.conflicts);
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
       _retry?.cancel();
       _retry = Timer(const Duration(seconds: 15), sync);
     }
+  }
+
+  /// Der Nutzer hat den Hinweis auf ueberschriebene fremde Aenderungen gesehen.
+  void dismissConflicts() {
+    if (state.conflicts.isEmpty) return;
+    state = SyncStatus(lastSync: state.lastSync, error: state.error, running: state.running, updateRequired: state.updateRequired);
   }
 
   String _friendly(Object e) {
