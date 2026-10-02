@@ -65,10 +65,15 @@ class FakeRemoteStore implements RemoteStore {
   /// Wie oft [fetchUpdatedAt] gerufen wurde (Konflikterkennung beim Senden, ADR-018).
   int updatedAtLookups = 0;
 
+  /// Tabellen, bei denen nur [fetchUpdatedAt] mit einem unerwarteten Fehler scheitert (z.B. Rechte); Senden und
+  /// Holen gehen weiter.
+  final failLookupFor = <String>{};
+
   @override
   Future<Map<String, String>> fetchUpdatedAt(String tableName, List<String> ids) async {
     if (offline) throw const SocketException('offline');
     updatedAtLookups++;
+    if (failLookupFor.contains(tableName)) throw StateError('unerwartete Antwort');
     return {
       for (final id in ids)
         if (table(tableName)[id] case final row?) id: row['updated_at'] as String,

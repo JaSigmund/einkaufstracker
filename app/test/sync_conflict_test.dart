@@ -167,6 +167,39 @@ void main() {
     expect(remote.updatedAtLookups, 0, reason: 'nur product_barcodes wartet, und die hat keine Spalte id');
   });
 
+  test('scheitert nur die Abfrage der Zeitstempel (unerwartete Antwort, Rechte): gesendet wird trotzdem, kein Konflikt gemeldet', () async {
+    final id = await shared();
+    await categoryRepo(a).rename(id, 'Früchte');
+    await engineA.sync();
+    await categoryRepo(b).rename(id, 'Fruits'); // waere ein Konflikt
+    remote.failLookupFor.add('categories');
+    final r = await engineB.sync();
+    expect(r.pushed, 1, reason: 'die Erkennung darf das Senden nie verhindern');
+    expect(r.conflicts, isEmpty);
+    expect(remote.table('categories')[id]!['name'], 'Fruits');
+    expect(await b.select(b.outbox).get(), isEmpty);
+  });
+
+  test('scheitert die Abfrage nur bei einer Tabelle, bleiben die Konflikte der anderen erhalten', () async {
+    final id = await shared();
+    await productRepo(a).create(name: 'Reis', baseUnit: 'kg');
+    await engineA.sync();
+    await engineB.sync();
+    final onA = (await a.select(a.products).get()).single;
+    await categoryRepo(a).rename(id, 'Früchte');
+    await productRepo(a).update(onA.copyWith(name: 'Basmati', updatedAt: DateTime.now().toUtc()));
+    await engineA.sync();
+
+    await categoryRepo(b).rename(id, 'Fruits');
+    final onB = (await b.select(b.products).get()).single;
+    await productRepo(b).update(onB.copyWith(name: 'Langkorn', updatedAt: DateTime.now().toUtc()));
+    remote.failLookupFor.add('products');
+    final r = await engineB.sync();
+
+    expect({for (final c in r.conflicts) c.table}, {'categories'});
+    expect(r.pushed, 2);
+  });
+
   test('Netzfehler bei der Abfrage bricht den Sync ab wie jeder andere, die Aenderung bleibt in der Outbox', () async {
     final id = await shared();
     await categoryRepo(a).rename(id, 'Früchte');
