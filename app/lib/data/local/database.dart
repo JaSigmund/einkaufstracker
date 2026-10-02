@@ -329,6 +329,18 @@ class MealIngredients extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Richtwerte der Naehrwerte je Haushalt (Spiegel von public.nutrition_targets, LH-MEAL-09). Hoechstens eine Zeile
+/// je Haushalt; `targets` ist das Server-JSON `{"kcal": {"min": .., "max": ..}, ...}` als Text.
+@DataClassName('NutritionTargetRow')
+class NutritionTargetRows extends Table {
+  TextColumn get householdId => text()();
+  TextColumn get targets => text().withDefault(const Constant('{}'))();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {householdId};
+}
+
 /// Gelernte Zuordnung "normalisierter Bon-Text -> Produkt" (Spiegel von public.product_aliases, ADR-010).
 /// Anders als category_aliases haendlerabhaengig (storeId), weil derselbe Kurztext bei zwei Haendlern
 /// verschiedene Produkte meinen kann; storeId null = haendlerunabhaengig gelernt.
@@ -459,8 +471,8 @@ class KeyValues extends Table {
 
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
-  ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, BugReports, ShoppingLists,
-  ShoppingListItems, Outbox, SyncStates, KeyValues,
+  ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
+  ShoppingLists, ShoppingListItems, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -479,7 +491,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -557,6 +569,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(meals);
             await m.createTable(mealIngredients);
             await m.addColumn(inventoryMovements, inventoryMovements.mealId);
+          }
+          // 14 -> 15: Richtwerte fuer die Naehrwerte (Phase 7d)
+          if (from < 15) {
+            await m.createTable(nutritionTargetRows);
           }
         },
       );

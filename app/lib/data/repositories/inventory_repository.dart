@@ -77,6 +77,11 @@ class InventoryRepository {
   Future<List<InventoryItem>> suggestionsSnapshot() =>
       (_db.select(_db.inventoryItems)..where((i) => i.deletedAt.isNull() & i.isSuggestion.equals(true))).get();
 
+  /// Alle nicht geloeschten Bewegungen ab [since] (Grundlage der Verbrauchsbilanz, die rein clientseitig rechnet).
+  Stream<List<InventoryMovement>> watchMovementsSince(DateTime since) => (_db.select(_db.inventoryMovements)
+        ..where((m) => m.deletedAt.isNull() & m.occurredAt.isBiggerOrEqualValue(since)))
+      .watch();
+
   Stream<List<InventoryMovement>> watchMovements(String productId) => (_db.select(_db.inventoryMovements)
         ..where((m) => m.productId.equals(productId) & m.deletedAt.isNull())
         ..orderBy([(m) => OrderingTerm.desc(m.occurredAt)]))

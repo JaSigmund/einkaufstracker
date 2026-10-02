@@ -491,3 +491,15 @@ ShoppingListItemsCompanion shoppingListItemFromRemote(Map<String, dynamic> j) =>
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> nutritionTargetToRemote(NutritionTargetRow r) => {
+      'household_id': r.householdId,
+      'targets': jsonDecode(r.targets),
+      'updated_at': r.updatedAt.toUtc().toIso8601String(),
+    };
+
+NutritionTargetRowsCompanion nutritionTargetFromRemote(Map<String, dynamic> j) => NutritionTargetRowsCompanion(
+      householdId: Value(j['household_id'] as String),
+      targets: Value(jsonEncode(j['targets'] ?? const <String, dynamic>{})),
+      updatedAt: Value(_dt(j['updated_at'])!),
+    );

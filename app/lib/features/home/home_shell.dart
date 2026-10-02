@@ -73,6 +73,12 @@ class _HomeShellState extends State<HomeShell> {
               icon: const Icon(Icons.restaurant_menu_outlined),
               onPressed: () => context.push('/recipe-suggestions'),
             ),
+          if (_index == 5)
+            IconButton(
+              tooltip: 'Richtwerte',
+              icon: const Icon(Icons.tune),
+              onPressed: () => context.push('/nutrition-targets'),
+            ),
           if (_index == 4)
             IconButton(
               tooltip: 'Trend über Monate',
