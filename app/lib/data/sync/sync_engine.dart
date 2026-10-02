@@ -9,7 +9,8 @@ import 'mappers.dart';
 /// Beschreibt, wie eine Serverzeile einer Tabelle lokal gespeichert wird.
 class SyncTableDef {
   const SyncTableDef(this.remoteName, this.applyRemote, {String Function(Map<String, dynamic> json)? idOf})
-      : idOf = idOf ?? _defaultId;
+      : idOf = idOf ?? _defaultId,
+        hasPlainId = idOf == null;
   final String remoteName;
   final Future<void> Function(AppDatabase db, Map<String, dynamic> json) applyRemote;
 
@@ -17,6 +18,10 @@ class SyncTableDef {
   /// Standard ist die Spalte "id"; Tabellen ohne diese Spalte (zusammengesetzter Primaerschluessel) geben eine
   /// eigene Funktion an.
   final String Function(Map<String, dynamic> json) idOf;
+
+  /// Die Tabelle hat eine eigene Spalte "id" als Primaerschluessel (nicht zusammengesetzt). Nur dann kann die
+  /// Konflikterkennung die Zeile ueber `id` beim Server nachschlagen.
+  final bool hasPlainId;
 
   static String _defaultId(Map<String, dynamic> j) => j['id'] as String;
 }
@@ -47,11 +52,16 @@ final syncTables = <SyncTableDef>[
   SyncTableDef('shopping_list_items', (db, j) => db.into(db.shoppingListItems).insertOnConflictUpdate(shoppingListItemFromRemote(j))),
 ];
 
+/// Eine Aenderung dieses Geraets hat beim Senden eine neuere Aenderung ueberschrieben, die jemand anderes (ein anderes
+/// Geraet oder ein anderes Haushaltsmitglied) seit dem letzten Holen gemacht hat (ADR-018: Last-write-wins, aber sichtbar).
+typedef SyncConflict = ({String table, String rowId});
+
 class SyncResult {
-  const SyncResult({this.pushed = 0, this.skipped = 0, this.pulled = 0});
+  const SyncResult({this.pushed = 0, this.skipped = 0, this.pulled = 0, this.conflicts = const []});
   final int pushed;
   final int skipped;
   final int pulled;
+  final List<SyncConflict> conflicts;
 }
 
 /// Offline-first-Sync nach Doku 03 §2.3: erst die Outbox nach oben schicken, dann Aenderungen holen.
@@ -65,6 +75,11 @@ class SyncEngine {
   bool _running = false;
   bool get isRunning => _running;
 
+  /// Server-Zeitstempel der Zeilen, die dieses Geraet in dieser Sitzung selbst geschrieben hat (Schluessel
+  /// "tabelle:id"). Ohne sie wuerde ein eigener, noch nicht wieder geholter Schreibvorgang bei der naechsten Aenderung
+  /// derselben Zeile als fremde Aenderung gelten.
+  final _ownWrites = <String, DateTime>{};
+
   /// Fuehrt einen kompletten Sync aus. Netzfehler werden weitergereicht (die Outbox bleibt erhalten).
   Future<SyncResult> sync() async {
     if (_running) return const SyncResult();
@@ -72,18 +87,55 @@ class SyncEngine {
     try {
       final push = await _push();
       final pulled = await _pull();
-      return SyncResult(pushed: push.$1, skipped: push.$2, pulled: pulled);
+      return SyncResult(pushed: push.pushed, skipped: push.skipped, pulled: pulled, conflicts: push.conflicts);
     } finally {
       _running = false;
     }
   }
 
-  Future<(int, int)> _push() async {
+  /// Findet die Zeilen, die beim Senden eine neuere fremde Aenderung ueberschreiben wuerden (ADR-018).
+  ///
+  /// Je Tabelle mit wartenden Aenderungen EINE Anfrage nach den Server-Zeitstempeln. Eine Zeile gilt als Konflikt, wenn
+  /// ihr `updated_at` beim Server NEUER ist als alles, was dieses Geraet von ihr weiss: der Stand des letzten Holens der
+  /// Tabelle und der eigene letzte Schreibvorgang. Zeilen, die es beim Server noch nicht gibt (neu angelegt), und Tabellen,
+  /// die noch nie geholt wurden (erster Sync), sind kein Konflikt. Gesendet wird trotzdem, die Aenderung gewinnt.
+  Future<List<SyncConflict>> _detectConflicts(List<OutboxEntry> entries) async {
+    final idsByTable = <String, Set<String>>{};
+    for (final e in entries) {
+      final def = syncTables.where((t) => t.remoteName == e.remoteTable).firstOrNull;
+      if (def == null || !def.hasPlainId) continue;
+      idsByTable.putIfAbsent(e.remoteTable, () => {}).add(e.rowId);
+    }
+    final conflicts = <SyncConflict>[];
+    for (final MapEntry(key: table, value: ids) in idsByTable.entries) {
+      final state = await (_db.select(_db.syncStates)..where((t) => t.remoteTable.equals(table))).getSingleOrNull();
+      final lastPulled = state?.lastPulledAt == null ? null : DateTime.tryParse(state!.lastPulledAt!);
+      if (lastPulled == null) continue;
+      final idList = ids.toList();
+      for (var i = 0; i < idList.length; i += 100) {
+        final chunk = idList.sublist(i, i + 100 > idList.length ? idList.length : i + 100);
+        final serverAt = await _remote.fetchUpdatedAt(table, chunk);
+        for (final MapEntry(key: id, value: stamp) in serverAt.entries) {
+          final remoteAt = DateTime.tryParse(stamp);
+          if (remoteAt == null) continue;
+          final own = _ownWrites['$table:$id'];
+          final known = own != null && own.isAfter(lastPulled) ? own : lastPulled;
+          if (remoteAt.isAfter(known)) conflicts.add((table: table, rowId: id));
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  Future<({int pushed, int skipped, List<SyncConflict> conflicts})> _push() async {
     var pushed = 0, skipped = 0;
     final entries = await (_db.select(_db.outbox)..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
+    final conflicts = await _detectConflicts(entries);
     for (final e in entries) {
       try {
-        await _remote.upsert(e.remoteTable, jsonDecode(e.payload) as Map<String, dynamic>);
+        final stamp = await _remote.upsert(e.remoteTable, jsonDecode(e.payload) as Map<String, dynamic>);
+        final at = stamp == null ? null : DateTime.tryParse(stamp);
+        if (at != null) _ownWrites['${e.remoteTable}:${e.rowId}'] = at;
         await (_db.delete(_db.outbox)..where((t) => t.id.equals(e.id))).go();
         pushed++;
       } on RemoteDataException catch (ex) {
@@ -95,7 +147,7 @@ class SyncEngine {
       }
       // Netzwerk- oder Auth-Fehler: bewusst nicht gefangen, der Sync bricht ab und versucht es spaeter erneut
     }
-    return (pushed, skipped);
+    return (pushed: pushed, skipped: skipped, conflicts: conflicts);
   }
 
   Future<int> _pull() async {

@@ -10,8 +10,13 @@ abstract class RemoteStore {
   /// Zeilen mit updated_at >= [since] (Server-Format), aufsteigend nach updated_at, hoechstens [limit].
   Future<List<Map<String, dynamic>>> fetchChanges(String table, {String? since, int limit = 500});
 
-  /// Legt eine Zeile an oder aktualisiert sie (Primaerschluessel id).
-  Future<void> upsert(String table, Map<String, dynamic> row);
+  /// Legt eine Zeile an oder aktualisiert sie (Primaerschluessel id). Liefert den `updated_at` der geschriebenen Zeile
+  /// (Server-Zeit, vom Trigger gesetzt), `null` wenn der Server ihn nicht mitgibt.
+  Future<String?> upsert(String table, Map<String, dynamic> row);
+
+  /// `updated_at` der Zeilen mit diesen IDs (Server-Format). Zeilen, die es nicht gibt, fehlen im Ergebnis. Grundlage der
+  /// Konflikterkennung beim Senden (ADR-018): hat jemand anderes die Zeile seit dem letzten Holen geaendert?
+  Future<Map<String, String>> fetchUpdatedAt(String table, List<String> ids);
 }
 
 /// Ein Fehler des Servers wegen der Daten selbst (z.B. Unique-Verletzung), nicht wegen des Netzes.
@@ -36,9 +41,17 @@ class SupabaseRemoteStore implements RemoteStore {
   }
 
   @override
-  Future<void> upsert(String table, Map<String, dynamic> row) async {
+  Future<Map<String, String>> fetchUpdatedAt(String table, List<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await _client.from(table).select('id, updated_at').inFilter('id', ids).timeout(_networkTimeout);
+    return {for (final r in rows) r['id'] as String: r['updated_at'] as String};
+  }
+
+  @override
+  Future<String?> upsert(String table, Map<String, dynamic> row) async {
     try {
-      await _client.from(table).upsert(row).timeout(_networkTimeout);
+      final written = await _client.from(table).upsert(row).select('updated_at').timeout(_networkTimeout);
+      return written.isEmpty ? null : written.first['updated_at'] as String?;
     } on PostgrestException catch (e) {
       // 4xx/Constraint-Fehler sind Datenfehler, alles andere (Netz, Auth) bleibt eine normale Exception
       final code = int.tryParse(e.code ?? '');

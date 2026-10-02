@@ -47,20 +47,44 @@ class FakeRemoteStore implements RemoteStore {
   /// true = naechster Aufruf wirft einen Netzfehler
   bool offline = false;
 
+  /// true = nur das Holen von Aenderungen scheitert (Senden geht): das Netz bricht zwischen Senden und Holen ab
+  bool failFetch = false;
+
   int upsertCalls = 0;
 
   Map<String, Map<String, dynamic>> table(String name) => tables.putIfAbsent(name, () => {});
 
   @override
   Future<List<Map<String, dynamic>>> fetchChanges(String tableName, {String? since, int limit = 500}) async {
-    if (offline) throw const SocketException('offline');
+    if (offline || failFetch) throw const SocketException('offline');
     final rows = table(tableName).values.where((r) => since == null || (r['updated_at'] as String).compareTo(since) >= 0).toList()
       ..sort((a, b) => (a['updated_at'] as String).compareTo(b['updated_at'] as String));
     return rows.take(limit).map((r) => Map<String, dynamic>.from(r)).toList();
   }
 
+  /// Wie oft [fetchUpdatedAt] gerufen wurde (Konflikterkennung beim Senden, ADR-018).
+  int updatedAtLookups = 0;
+
   @override
-  Future<void> upsert(String tableName, Map<String, dynamic> row) async {
+  Future<Map<String, String>> fetchUpdatedAt(String tableName, List<String> ids) async {
+    if (offline) throw const SocketException('offline');
+    updatedAtLookups++;
+    return {
+      for (final id in ids)
+        if (table(tableName)[id] case final row?) id: row['updated_at'] as String,
+    };
+  }
+
+  /// Simuliert, dass ein anderes Geraet oder Haushaltsmitglied die Zeile beim Server geaendert hat (neuer `updated_at`,
+  /// ohne dass dieses Geraet sie schon geholt haette).
+  void simulateOtherEdit(String tableName, String id, Map<String, dynamic> changes) {
+    final stored = table(tableName)[id]!;
+    stored.addAll(changes);
+    stored['updated_at'] = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
+  }
+
+  @override
+  Future<String?> upsert(String tableName, Map<String, dynamic> row) async {
     if (offline) throw const SocketException('offline');
     upsertCalls++;
     if (tableName == 'categories') {
@@ -94,7 +118,8 @@ class FakeRemoteStore implements RemoteStore {
       row = {...row, 'expires_on': expiresOn == null ? null : '${expiresOn.year.toString().padLeft(4, '0')}-${expiresOn.month.toString().padLeft(2, '0')}-${expiresOn.day.toString().padLeft(2, '0')}'};
     }
     final stored = Map<String, dynamic>.from(row);
-    stored['updated_at'] = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
+    final stamp = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
+    stored['updated_at'] = stamp;
     // Tabellen ohne Spalte "id": zusammengesetzter bzw. Haushalts-Primaerschluessel wie am Server
     final key = switch (tableName) {
       'product_barcodes' => '${row['household_id']}:${row['ean']}',
@@ -102,6 +127,7 @@ class FakeRemoteStore implements RemoteStore {
       _ => row['id'] as String,
     };
     table(tableName)[key] = stored;
+    return stamp;
   }
 }
 
@@ -487,8 +513,11 @@ class FakeHouseholdInviteRepository implements HouseholdInviteRepository {
     invites.removeWhere((i) => i.id == id);
   }
 
+  var memberCountCalls = 0;
+
   @override
   Future<int> memberCount() async {
+    memberCountCalls++;
     if (failWith != null) throw failWith!;
     return members;
   }

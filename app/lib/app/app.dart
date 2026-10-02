@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/sync/sync_schedule.dart';
 import '../features/receipt_import/shared_pdf_importer.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -25,8 +26,9 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Zusaetzlich zum Sync nach jeder Aenderung: regelmaessig und beim Zurueckkehren in die App
-    _timer = Timer.periodic(const Duration(minutes: 2), (_) => _sync());
+    // Zusaetzlich zum Sync nach jeder Aenderung: regelmaessig und beim Zurueckkehren in die App. Der Takt ist kurz, ob
+    // wirklich synchronisiert wird, entscheidet die Haushaltsgroesse (ADR-018: allein alle 2 Minuten, zu mehreren alle 30 s).
+    _timer = Timer.periodic(syncTickPeriod, (_) => _syncIfDue());
     // Sobald das Netz zurueckkommt (z.B. Flugmodus aus), sofort synchronisieren
     _connectivity = Connectivity().onConnectivityChanged.listen((results) {
       if (results.any((r) => r != ConnectivityResult.none)) _sync();
@@ -45,6 +47,12 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
   }
 
   void _sync() => ref.read(syncControllerProvider.notifier).sync();
+
+  void _syncIfDue() {
+    final last = ref.read(syncControllerProvider).lastSync;
+    final since = last == null ? null : DateTime.now().difference(last);
+    if (isSyncDue(members: ref.read(householdSizeProvider), sinceLastSync: since)) _sync();
+  }
 
   // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an, auch nicht nach
   // Neustart"): dieser Aufruf lief bisher komplett unbeobachtet ("fire and forget") -- ein Fehler darin
