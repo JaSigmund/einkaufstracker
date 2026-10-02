@@ -467,6 +467,44 @@ def main():
     db("delete from household_invites where accepted_at is null")
 
 
+    # --- Vertrag App <-> Schema: Zeilen, die die App fuers Essenstagebuch zum Server schickt -----------------------
+    # `app/test/payload_contract_test.dart` erzeugt sie mit den echten Repositories (Mahlzeit anlegen, aendern, loeschen,
+    # Abzug und Gegenbuchung, Richtwerte) aus der Outbox. Hier laufen sie in der Reihenfolge des Syncs in das echte Schema:
+    # eine Spalte, die es nicht gibt, ein abgelehntes Enum oder eine verletzte Check-Regel faellt sonst erst auf dem Geraet
+    # auf, wenn alle Mahlzeiten als "Datenfehler" in der Outbox haengen bleiben.
+    import json
+    from psycopg.types.json import Jsonb
+
+    fixture = pathlib.Path(__file__).parent / "fixtures" / "app_payloads.json"
+    entries = json.loads(fixture.read_text(encoding="utf-8"))["entries"]
+    jsonb_cols = {(t, c) for t, c in db("select table_name, column_name from information_schema.columns "
+                                        "where table_schema='public' and data_type='jsonb'")[0]}
+    contract_failures = []
+    for e in entries:
+        table, row = e["table"], dict(e["payload"])
+        if "household_id" in row:
+            row["household_id"] = str(ha)
+        cols = list(row)
+        vals = [Jsonb(row[c]) if (table, c) in jsonb_cols and row[c] is not None else row[c] for c in cols]
+        key = "household_id" if table == "nutrition_targets" else "id"
+        updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c != key)
+        sql = (f"insert into public.{table} ({', '.join(cols)}) values ({', '.join(['%s'] * len(cols))}) "
+               f"on conflict ({key}) do update set {updates}")
+        try:
+            db(sql, vals)
+        except psycopg.Error as ex:
+            contract_failures.append(f"{table}: {str(ex).splitlines()[0]}")
+    tables_in_fixture = {e["table"] for e in entries}
+    check("Vertrag: Fixture enthaelt Tagebuch, Ledger und Richtwerte",
+          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets"} <= tables_in_fixture, str(tables_in_fixture))
+    check(f"Vertrag: alle {len(entries)} Zeilen der App werden vom echten Schema angenommen", not contract_failures, "; ".join(contract_failures[:3]))
+    meal_ids = [e["payload"]["id"] for e in entries if e["table"] == "meals"]
+    check("Vertrag: die eingespielten Mahlzeiten liegen in der Datenbank (Soft-Delete eingeschlossen)",
+          one("select count(*) from meals where id = any(%s::uuid[])", (meal_ids,)) == len(set(meal_ids)))
+    check("Vertrag: Gegenbuchung der geloeschten Mahlzeit ist mit meal_id verknuepft",
+          one("select count(*) from inventory_movements where type='adjustment' and meal_id = any(%s::uuid[])", (meal_ids,)) >= 1)
+
+
     # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
     planned_ok = True
     try:
