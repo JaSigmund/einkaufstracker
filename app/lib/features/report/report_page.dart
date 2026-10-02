@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/receipt/month_report.dart';
 import '../../domain/receipt/vienna_time.dart';
+import 'report_items.dart';
 
 const _monthNames = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
@@ -92,25 +93,13 @@ class _ReportPageState extends ConsumerState<ReportPage> {
     if (receipts.hasError || items.hasError) return Center(child: Text('Fehler: ${receipts.error ?? items.error}'));
 
     final receiptList = receipts.value!;
-    final report = buildMonthReport(
-      [for (final r in receiptList) (id: r.id, purchasedAtUtc: r.purchasedAt)],
-      [
-        for (final i in items.value!)
-          (
-            receiptId: i.receiptId,
-            lineNo: i.lineNo,
-            kind: i.kind,
-            rawText: i.rawText,
-            categoryId: i.categoryId,
-            productId: i.productId,
-            productName: i.productId == null ? null : products[i.productId]?.name,
-            quantity: i.quantity,
-            lineTotalCents: i.lineTotalCents,
-          ),
-      ],
-      year: _year,
-      month: _month,
-    );
+    final reportReceipts = [for (final r in receiptList) (id: r.id, purchasedAtUtc: r.purchasedAt)];
+    // Von jemand anderem bezahlte Positionen (ADR-020) zaehlen nicht zu Summe, Budget und Kategorien.
+    final split = reportItemsOf(items.value!, products: products);
+    final report = buildMonthReport(reportReceipts, split.own, year: _year, month: _month);
+    final excludedCents = split.excluded.isEmpty
+        ? 0
+        : buildMonthReport(reportReceipts, split.excluded, year: _year, month: _month).totalCents;
     final nameOf = {for (final c in categories) c.id: c.name};
     String nameFor(CategoryTotal c) => c.categoryId == unassignedKey
         ? 'Nicht zugeordnet'
@@ -152,6 +141,17 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             ),
           ]),
         ),
+        if (excludedCents != 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Center(
+              child: Text(
+                'Ohne ${formatEuro(excludedCents)}, die jemand anderes bezahlt hat',
+                key: const Key('report-excluded'),
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+              ),
+            ),
+          ),
         if (isCurrentMonth && settings?.monthlyBudgetCents != null && settings!.monthlyBudgetCents! > 0)
           Card(
             key: const Key('budget-card'),

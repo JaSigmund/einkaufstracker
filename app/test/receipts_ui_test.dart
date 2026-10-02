@@ -32,6 +32,7 @@ Receipt _receipt(String id, DateTime utc, int cents, {String? store = 's1', bool
 final _store = Store(id: 's1', householdId: 'h', chain: 'Billa', branch: '0643', updatedAt: DateTime.utc(2026));
 
 ReceiptItem _item(String id, int no, String text, int cents, {String kind = 'article', double qty = 1, int? unit}) => ReceiptItem(
+      excluded: false,
       id: id,
       householdId: 'h',
       receiptId: 'r1',

@@ -14,6 +14,7 @@ Receipt _receipt(String id, String storeId, DateTime purchasedAt) =>
 Store _store(String id, String chain) => Store(id: id, householdId: 'h', chain: chain, updatedAt: DateTime.utc(2026));
 
 ReceiptItem _item(String rid, String id, int unitPriceNormCents) => ReceiptItem(
+      excluded: false,
       id: id, householdId: 'h', receiptId: rid, lineNo: 1, kind: 'article', rawText: 'Vollmilch', quantity: 1, quantityUnit: 'piece',
       lineTotalCents: 129, productId: 'p1', unitPriceNormCents: unitPriceNormCents, needsReview: false, updatedAt: DateTime.utc(2026),
     );

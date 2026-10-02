@@ -3847,6 +3847,21 @@ class $ReceiptItemsTable extends ReceiptItems
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _excludedMeta = const VerificationMeta(
+    'excluded',
+  );
+  @override
+  late final GeneratedColumn<bool> excluded = GeneratedColumn<bool>(
+    'excluded',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("excluded" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -3887,6 +3902,7 @@ class $ReceiptItemsTable extends ReceiptItems
     unitPriceNormCents,
     taxCode,
     needsReview,
+    excluded,
     updatedAt,
     deletedAt,
   ];
@@ -4025,6 +4041,12 @@ class $ReceiptItemsTable extends ReceiptItems
         ),
       );
     }
+    if (data.containsKey('excluded')) {
+      context.handle(
+        _excludedMeta,
+        excluded.isAcceptableOrUnknown(data['excluded']!, _excludedMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -4112,6 +4134,10 @@ class $ReceiptItemsTable extends ReceiptItems
         DriftSqlType.bool,
         data['${effectivePrefix}needs_review'],
       )!,
+      excluded: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}excluded'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -4153,6 +4179,10 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
   final int? unitPriceNormCents;
   final String? taxCode;
   final bool needsReview;
+
+  /// Von jemand anderem bezahlt (ADR-020 "Rechnungen teilen"): zaehlt nicht zur eigenen Auswertung,
+  /// bleibt aber auf dem Bon sichtbar und wandert normal ins Inventar.
+  final bool excluded;
   final DateTime updatedAt;
   final DateTime? deletedAt;
   const ReceiptItem({
@@ -4172,6 +4202,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     this.unitPriceNormCents,
     this.taxCode,
     required this.needsReview,
+    required this.excluded,
     required this.updatedAt,
     this.deletedAt,
   });
@@ -4206,6 +4237,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       map['tax_code'] = Variable<String>(taxCode);
     }
     map['needs_review'] = Variable<bool>(needsReview);
+    map['excluded'] = Variable<bool>(excluded);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -4243,6 +4275,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
           ? const Value.absent()
           : Value(taxCode),
       needsReview: Value(needsReview),
+      excluded: Value(excluded),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -4272,6 +4305,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       unitPriceNormCents: serializer.fromJson<int?>(json['unitPriceNormCents']),
       taxCode: serializer.fromJson<String?>(json['taxCode']),
       needsReview: serializer.fromJson<bool>(json['needsReview']),
+      excluded: serializer.fromJson<bool>(json['excluded']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
@@ -4296,6 +4330,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       'unitPriceNormCents': serializer.toJson<int?>(unitPriceNormCents),
       'taxCode': serializer.toJson<String?>(taxCode),
       'needsReview': serializer.toJson<bool>(needsReview),
+      'excluded': serializer.toJson<bool>(excluded),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
@@ -4318,6 +4353,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     Value<int?> unitPriceNormCents = const Value.absent(),
     Value<String?> taxCode = const Value.absent(),
     bool? needsReview,
+    bool? excluded,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
   }) => ReceiptItem(
@@ -4341,6 +4377,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
         : this.unitPriceNormCents,
     taxCode: taxCode.present ? taxCode.value : this.taxCode,
     needsReview: needsReview ?? this.needsReview,
+    excluded: excluded ?? this.excluded,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
@@ -4376,6 +4413,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
       needsReview: data.needsReview.present
           ? data.needsReview.value
           : this.needsReview,
+      excluded: data.excluded.present ? data.excluded.value : this.excluded,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
@@ -4400,6 +4438,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
           ..write('unitPriceNormCents: $unitPriceNormCents, ')
           ..write('taxCode: $taxCode, ')
           ..write('needsReview: $needsReview, ')
+          ..write('excluded: $excluded, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
           ..write(')'))
@@ -4424,6 +4463,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
     unitPriceNormCents,
     taxCode,
     needsReview,
+    excluded,
     updatedAt,
     deletedAt,
   );
@@ -4447,6 +4487,7 @@ class ReceiptItem extends DataClass implements Insertable<ReceiptItem> {
           other.unitPriceNormCents == this.unitPriceNormCents &&
           other.taxCode == this.taxCode &&
           other.needsReview == this.needsReview &&
+          other.excluded == this.excluded &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
 }
@@ -4468,6 +4509,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
   final Value<int?> unitPriceNormCents;
   final Value<String?> taxCode;
   final Value<bool> needsReview;
+  final Value<bool> excluded;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> rowid;
@@ -4488,6 +4530,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     this.unitPriceNormCents = const Value.absent(),
     this.taxCode = const Value.absent(),
     this.needsReview = const Value.absent(),
+    this.excluded = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4509,6 +4552,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     this.unitPriceNormCents = const Value.absent(),
     this.taxCode = const Value.absent(),
     this.needsReview = const Value.absent(),
+    this.excluded = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4536,6 +4580,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     Expression<int>? unitPriceNormCents,
     Expression<String>? taxCode,
     Expression<bool>? needsReview,
+    Expression<bool>? excluded,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
@@ -4558,6 +4603,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
         'unit_price_norm_cents': unitPriceNormCents,
       if (taxCode != null) 'tax_code': taxCode,
       if (needsReview != null) 'needs_review': needsReview,
+      if (excluded != null) 'excluded': excluded,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4581,6 +4627,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     Value<int?>? unitPriceNormCents,
     Value<String?>? taxCode,
     Value<bool>? needsReview,
+    Value<bool>? excluded,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? rowid,
@@ -4602,6 +4649,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
       unitPriceNormCents: unitPriceNormCents ?? this.unitPriceNormCents,
       taxCode: taxCode ?? this.taxCode,
       needsReview: needsReview ?? this.needsReview,
+      excluded: excluded ?? this.excluded,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
@@ -4659,6 +4707,9 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
     if (needsReview.present) {
       map['needs_review'] = Variable<bool>(needsReview.value);
     }
+    if (excluded.present) {
+      map['excluded'] = Variable<bool>(excluded.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -4690,6 +4741,7 @@ class ReceiptItemsCompanion extends UpdateCompanion<ReceiptItem> {
           ..write('unitPriceNormCents: $unitPriceNormCents, ')
           ..write('taxCode: $taxCode, ')
           ..write('needsReview: $needsReview, ')
+          ..write('excluded: $excluded, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
@@ -12275,6 +12327,7 @@ typedef $$ReceiptItemsTableCreateCompanionBuilder =
       Value<int?> unitPriceNormCents,
       Value<String?> taxCode,
       Value<bool> needsReview,
+      Value<bool> excluded,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -12297,6 +12350,7 @@ typedef $$ReceiptItemsTableUpdateCompanionBuilder =
       Value<int?> unitPriceNormCents,
       Value<String?> taxCode,
       Value<bool> needsReview,
+      Value<bool> excluded,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -12388,6 +12442,11 @@ class $$ReceiptItemsTableFilterComposer
 
   ColumnFilters<bool> get needsReview => $composableBuilder(
     column: $table.needsReview,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get excluded => $composableBuilder(
+    column: $table.excluded,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12491,6 +12550,11 @@ class $$ReceiptItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get excluded => $composableBuilder(
+    column: $table.excluded,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12573,6 +12637,9 @@ class $$ReceiptItemsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get excluded =>
+      $composableBuilder(column: $table.excluded, builder: (column) => column);
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -12627,6 +12694,7 @@ class $$ReceiptItemsTableTableManager
                 Value<int?> unitPriceNormCents = const Value.absent(),
                 Value<String?> taxCode = const Value.absent(),
                 Value<bool> needsReview = const Value.absent(),
+                Value<bool> excluded = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -12647,6 +12715,7 @@ class $$ReceiptItemsTableTableManager
                 unitPriceNormCents: unitPriceNormCents,
                 taxCode: taxCode,
                 needsReview: needsReview,
+                excluded: excluded,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,
@@ -12669,6 +12738,7 @@ class $$ReceiptItemsTableTableManager
                 Value<int?> unitPriceNormCents = const Value.absent(),
                 Value<String?> taxCode = const Value.absent(),
                 Value<bool> needsReview = const Value.absent(),
+                Value<bool> excluded = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -12689,6 +12759,7 @@ class $$ReceiptItemsTableTableManager
                 unitPriceNormCents: unitPriceNormCents,
                 taxCode: taxCode,
                 needsReview: needsReview,
+                excluded: excluded,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,

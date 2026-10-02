@@ -121,21 +121,50 @@ class ReceiptDetailPage extends ConsumerWidget {
           const Divider(height: 1),
           for (final i in items)
             ListTile(
+              key: Key('item-${i.id}'),
               dense: true,
-              title: Text(i.rawText),
+              // Ausgeschlossene Positionen (ADR-020) bleiben sichtbar, aber durchgestrichen und grau: der
+              // Nutzer soll weiterhin sehen, was auf dem Bon stand.
+              title: Text(i.rawText, style: i.excluded ? _excludedStyle(t) : null),
               subtitle: _sub(i, categoryName) == null ? null : Text(_sub(i, categoryName)!),
               // Rabatte auf Bon-Ebene haben keine Kategorie und werden anteilig verrechnet
               onTap: i.kind == 'bill_discount' || (i.kind == 'discount' && i.categoryId == null) ? null : () => _pickCategory(context, ref, i, categories),
-              trailing: Text(formatEuro(i.lineTotalCents), style: TextStyle(color: i.lineTotalCents < 0 ? t.colorScheme.primary : null)),
+              trailing: Text(
+                formatEuro(i.lineTotalCents),
+                style: i.excluded ? _excludedStyle(t) : TextStyle(color: i.lineTotalCents < 0 ? t.colorScheme.primary : null),
+              ),
             ),
           const Divider(height: 1),
           ListTile(
             title: Text('Summe', style: t.textTheme.titleSmall),
             trailing: Text(formatEuro(items.fold<int>(0, (s, i) => s + i.lineTotalCents)), key: const Key('items-sum')),
           ),
+          if (items.any((i) => i.excluded))
+            ListTile(
+              dense: true,
+              title: const Text('davon von anderen bezahlt'),
+              subtitle: const Text('zählt nicht zu deinen Ausgaben'),
+              trailing: Text(
+                formatEuro(items.where((i) => i.excluded).fold<int>(0, (s, i) => s + i.lineTotalCents)),
+                key: const Key('items-excluded-sum'),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  TextStyle _excludedStyle(ThemeData t) => TextStyle(decoration: TextDecoration.lineThrough, color: t.colorScheme.outline);
+
+  /// Schalter "Von jemand anderem bezahlt" (ADR-020): wirkt nur auf diese Position (und bei einem Artikel auf
+  /// die Rabatte direkt darunter), nicht auf gleiche Artikel anderer Bons.
+  Future<void> _toggleExcluded(BuildContext context, WidgetRef ref, ReceiptItem item, bool excluded) async {
+    await ref.read(receiptRepositoryProvider).setItemExcluded(item.id, excluded);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(excluded ? 'Ausgeschlossen: zählt nicht zu deinen Ausgaben' : 'Zählt wieder zu deinen Ausgaben'),
+      ));
+    }
   }
 
   Future<void> _pickCategory(BuildContext context, WidgetRef ref, ReceiptItem item, List<Category> categories) async {
@@ -148,6 +177,17 @@ class ReceiptDetailPage extends ConsumerWidget {
           child: ListView(
             shrinkWrap: true,
             children: [
+              SwitchListTile(
+                key: const Key('item-excluded-switch'),
+                value: item.excluded,
+                title: const Text('Von jemand anderem bezahlt'),
+                subtitle: const Text('Zählt nicht zu deinen Ausgaben, bleibt aber auf dem Bon und im Inventar.'),
+                onChanged: (v) {
+                  Navigator.pop(ctx);
+                  _toggleExcluded(context, ref, item, v);
+                },
+              ),
+              const Divider(height: 1),
               ListTile(title: Text(item.rawText, style: Theme.of(ctx).textTheme.titleMedium), subtitle: const Text('Kategorie wählen. Die App merkt sich die Zuordnung für gleiche Artikel.')),
               for (final c in categories)
                 ListTile(
@@ -176,6 +216,7 @@ class ReceiptDetailPage extends ConsumerWidget {
       if (i.kind == 'discount') 'Rabatt',
       if (i.kind == 'bill_discount') 'Rabatt auf den ganzen Bon',
       if (i.kind == 'deposit') 'Pfand',
+      if (i.excluded) 'von anderem bezahlt',
     ];
     return parts.isEmpty ? null : parts.join(' · ');
   }

@@ -1,6 +1,5 @@
--- ENTWURF, NICHT EINGESPIELT (ADR-020 "Ausgeschlossene Bon-Positionen / Rechnungen teilen").
--- Liegt bewusst NICHT in migrations/, damit `supabase db push` es nicht einspielt -- UI und
--- Repository-Anbindung sind noch nicht gebaut (siehe feature/rechnung-ausschliessen).
+-- Ausgeschlossene Bon-Positionen (ADR-020 "Rechnungen teilen", Feature-Request bestaetigt 2026-10-01).
+-- Vormals Entwurf supabase/planned/receipt_item_excluded_draft.sql.
 -- Doku: ClaudeBrain/02 Projekte/Einkaufstracker/12 Entscheidungen (ADR).md, ADR-020
 
 alter table public.receipt_items

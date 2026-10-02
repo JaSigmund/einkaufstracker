@@ -27,6 +27,7 @@ ReceiptItem _item(
   String quantityUnit = 'piece',
 }) =>
     ReceiptItem(
+      excluded: false,
       id: id, householdId: 'h', receiptId: rid, lineNo: no, kind: 'article', rawText: text, quantity: quantity, quantityUnit: quantityUnit,
       lineTotalCents: cents, productId: productId, categoryId: categoryId, unitPriceNormCents: unitPriceNormCents, needsReview: false,
       updatedAt: DateTime.utc(2026),

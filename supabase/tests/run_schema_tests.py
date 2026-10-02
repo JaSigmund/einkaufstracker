@@ -227,8 +227,17 @@ def main():
           not raises("insert into receipt_items (household_id, receipt_id, line_no, raw_text, kind, line_total_cents) "
                      "values (%s,%s,2,'jö Rabattsammler 20%%','bill_discount',-451)", (ha, rid2)))
 
+    # --- Ausgeschlossene Bon-Positionen (0015, ADR-020) ---------------------------------------
+    check("Ausschluss: neue Positionen sind standardmaessig nicht ausgeschlossen",
+          one("select excluded from receipt_items where receipt_id=%s and line_no=2", (rid2,)) is False)
+    db("update receipt_items set excluded = true where receipt_id=%s and line_no=2", (rid2,), user=A)
+    check("Ausschluss: Haushaltsmitglied kann eine Position ausschliessen",
+          one("select excluded from receipt_items where receipt_id=%s and line_no=2", (rid2,)) is True)
+    _, other_rowcount = db("update receipt_items set excluded = false where receipt_id=%s and line_no=2", (rid2,), user=B)
+    check("RLS: B kann den Ausschluss einer Position von A nicht aendern (RLS filtert, 0 betroffen)", other_rowcount == 0)
+
     # --- Originalbelege (0008) ----------------------------------------------------------------
-    file_sql = ("insert into receipt_files (household_id, receipt_id, kind, storage_path) values (%s,%s,%s,%s)")
+    file_sql =("insert into receipt_files (household_id, receipt_id, kind, storage_path) values (%s,%s,%s,%s)")
     db(file_sql, (ha, rid2, "pdf", f"{ha}/{rid2}/x.pdf"))
     check("Beleg: unbekannte Art wird abgelehnt", raises(file_sql, (ha, rid2, "video", "x")))
     check("RLS: B sieht keine Belege von A", one("select count(*) from receipt_files", user=B) == 0)

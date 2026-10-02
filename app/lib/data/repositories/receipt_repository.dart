@@ -274,6 +274,7 @@ class ReceiptRepository {
               );
 
         await putItem(ReceiptItem(
+          excluded: false,
           id: _itemId(receiptId, lineNo),
           householdId: hid,
           receiptId: receiptId,
@@ -316,6 +317,7 @@ class ReceiptRepository {
       for (final d in r.bonDiscounts) {
         lineNo++;
         await putItem(ReceiptItem(
+          excluded: false,
           id: _itemId(receiptId, lineNo),
           householdId: hid,
           receiptId: receiptId,
@@ -380,6 +382,43 @@ class ReceiptRepository {
       }
     });
     onChanged?.call();
+    return changed;
+  }
+
+  /// Markiert eine Bon-Position als "von jemand anderem bezahlt" (ADR-020 "Rechnungen teilen") oder hebt das
+  /// wieder auf. Anders als [setItemCategory] wirkt das nur auf genau diese Position, nicht auf gleiche Artikel:
+  /// wer diesmal fuer jemanden bezahlt hat, hat das nicht fuer jeden kuenftigen Kauf getan.
+  ///
+  /// Bei einem Artikel wandern Rabatte mit, die direkt darunter stehen (`kind == 'discount'`, sie beziehen sich
+  /// wie in [categorizeMissing] auf den Artikel darueber): sonst wuerde der Rabatt eines ausgeschlossenen Artikels
+  /// die eigene Ausgabe senken. Rabatte auf den ganzen Bon (`bill_discount`) bleiben unberuehrt, siehe ADR-020.
+  /// Rueckgabe: Anzahl der geaenderten Positionen (Artikel plus mitgenommene Rabatte).
+  Future<int> setItemExcluded(String itemId, bool excluded) async {
+    final now = DateTime.now().toUtc();
+    var changed = 0;
+    await _db.transaction(() async {
+      final item = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(itemId))).getSingle();
+      if (item.kind == billDiscountKind) return;
+      final affected = [item];
+      if (item.kind == 'article') {
+        final following = await (_db.select(_db.receiptItems)
+              ..where((i) => i.receiptId.equals(item.receiptId) & i.deletedAt.isNull() & i.lineNo.isBiggerThanValue(item.lineNo))
+              ..orderBy([(i) => OrderingTerm.asc(i.lineNo)]))
+            .get();
+        for (final next in following) {
+          if (next.kind != 'discount') break;
+          affected.add(next);
+        }
+      }
+      for (final it in affected) {
+        if (it.excluded == excluded) continue;
+        final updated = it.copyWith(excluded: excluded, updatedAt: now);
+        await _put('receipt_items', it.id, receiptItemToRemote(updated),
+            () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
+        changed++;
+      }
+    });
+    if (changed > 0) onChanged?.call();
     return changed;
   }
 

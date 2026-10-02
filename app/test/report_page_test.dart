@@ -13,6 +13,7 @@ Receipt _receipt(String id, DateTime utc, int cents) => Receipt(
     );
 
 ReceiptItem _item(String rid, String id, int no, String text, int cents, {String? cat, String kind = 'article', String? productId}) => ReceiptItem(
+      excluded: false,
       id: id, householdId: 'h', receiptId: rid, lineNo: no, kind: kind, rawText: text, quantity: 1, quantityUnit: 'piece',
       lineTotalCents: cents, categoryId: cat, productId: productId, needsReview: false, updatedAt: DateTime.utc(2026),
     );
