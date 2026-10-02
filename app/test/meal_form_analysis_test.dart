@@ -141,6 +141,18 @@ void main() {
       expect(find.text('Foto in der Cloud auswerten?'), findsOneWidget);
     });
 
+    testWidgets('der Hinweis nennt, was gesendet wird, und sichert keine Loeschung bei Anthropic zu', (tester) async {
+      await openWithPhoto(tester);
+      await tester.tap(find.byKey(const Key('meal-analyze')));
+      await tester.pumpAndSettle();
+      final content = tester.widget<AlertDialog>(find.byType(AlertDialog)).content as Text;
+      final text = content.data!;
+      expect(text, contains('Foto und die Namen deiner Produkte'));
+      expect(text, contains('Anthropic'));
+      expect(text, contains('Bedingungen'), reason: 'Aufbewahrung bei Anthropic regeln deren Bedingungen');
+      expect(text, isNot(contains('nicht gespeichert')), reason: 'eine Zusicherung ueber Anthropic koennen wir nicht geben');
+    });
+
     testWidgets('Bestaetigen sendet, und danach kommt der Hinweis nicht mehr', (tester) async {
       cloud.analysis = reispfanne();
       await openWithPhoto(tester);

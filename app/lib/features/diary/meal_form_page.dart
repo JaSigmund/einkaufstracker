@@ -258,8 +258,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Foto in der Cloud auswerten?'),
         content: const Text(
-          'Das Foto und die Namen deiner Produkte werden zur Auswertung an Claude (Anthropic) geschickt. Das Foto wird dort '
-          'nicht gespeichert. Die Einstellung „Cloud-Auswertung erlauben“ gilt auch hierfür. '
+          'Das Foto und die Namen deiner Produkte werden zur Auswertung an Claude (Anthropic) geschickt. Die App legt das Foto '
+          'dafür nicht zusätzlich auf dem Server ab; wie lange Anthropic Eingaben aufbewahrt, regeln deren eigene Bedingungen. '
+          'Die Einstellung „Cloud-Auswertung erlauben“ gilt auch hierfür. '
           'Der Vorschlag ist eine Schätzung, du prüfst und änderst ihn, bevor etwas gespeichert wird.',
         ),
         actions: [
