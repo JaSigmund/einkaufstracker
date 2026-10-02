@@ -11,6 +11,7 @@ import '../../domain/receipt/vienna_time.dart';
 import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
+import 'meal_photo.dart';
 import 'target_rows.dart';
 
 /// Inhalt des Tabs "Tagebuch" (Doku 15 §3.5, Phase 7b/7d): Mahlzeiten nach Tagen, je Tag mit Naehrwertsumme,
@@ -117,7 +118,12 @@ class DiaryPage extends ConsumerWidget {
         for (final m in (byDay[day]!..sort((a, b) => b.eatenAt.compareTo(a.eatenAt))))
           ListTile(
             key: Key('meal-${m.id}'),
-            leading: Icon(mealTypeIcon(m.mealType)),
+            leading: m.photoPath == null
+                ? Icon(mealTypeIcon(m.mealType))
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: MealPhoto(meal: m, size: 44, placeholder: Icon(mealTypeIcon(m.mealType))),
+                  ),
             title: Text(m.title),
             subtitle: Text([
               formatViennaTime(m.eatenAt),

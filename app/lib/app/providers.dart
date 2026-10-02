@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_config/app_config_repository.dart';
+import '../data/files/meal_photo_service.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
@@ -14,6 +15,7 @@ import '../data/cloud/cooking_cloud.dart';
 import '../data/cloud/supabase_cloud_receipt_reader.dart';
 import '../data/cloud/supabase_cooking_cloud.dart';
 import '../data/ocr/image_prep.dart';
+import '../data/photos/photo_picker.dart';
 import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
 import '../data/nutrition/bls_food_search.dart';
@@ -145,6 +147,7 @@ class SyncController extends Notifier<SyncStatus> {
       await ref.read(receiptRepositoryProvider).categorizeMissing();
       // Wartende Belege (Fotos, PDFs) hochladen, jetzt wo das Netz da ist
       await ref.read(receiptFileServiceProvider).uploadPending();
+      await ref.read(mealPhotoServiceProvider).uploadPending();
     } catch (e) {
       state = SyncStatus(lastSync: state.lastSync, error: _friendly(e));
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
@@ -255,6 +258,19 @@ final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>(
 });
 
 final nutritionTargetsProvider = StreamProvider((ref) => ref.watch(nutritionTargetsRepositoryProvider).watch());
+
+/// Essensfotos zu Mahlzeiten: lokal ablegen, danach in den privaten Bucket `meals` hochladen.
+final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {
+  return MealPhotoService(
+    db: ref.watch(databaseProvider),
+    meals: ref.watch(mealRepositoryProvider),
+    remote: SupabaseFileStore(ref.watch(supabaseClientProvider), bucket: 'meals'),
+    baseDir: getApplicationDocumentsDirectory,
+  );
+});
+
+/// Foto aufnehmen oder aus der Galerie waehlen (in Tests ersetzbar).
+final mealPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto);
 
 /// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
 final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));
