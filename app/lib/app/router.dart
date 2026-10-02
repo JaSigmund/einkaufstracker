@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/login_page.dart';
 import '../features/categories/categories_page.dart';
+import '../features/diary/meal_form_page.dart';
 import '../features/home/home_shell.dart';
 import '../features/receipt_import/import_review_page.dart';
 import '../features/receipt_import/receipt_edit_page.dart';
@@ -105,6 +106,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/product-price',
         builder: (_, state) => ProductPricePage(product: state.extra as Product),
         redirect: (_, state) => state.extra is Product ? null : '/',
+      ),
+      GoRoute(
+        path: '/meal-form',
+        builder: (_, state) => MealFormPage(existing: (state.extra as MealFormArgs?)?.existing),
       ),
       GoRoute(
         path: '/stock-entry',

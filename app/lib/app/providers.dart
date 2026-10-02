@@ -14,6 +14,7 @@ import '../data/cloud/supabase_cloud_receipt_reader.dart';
 import '../data/ocr/image_prep.dart';
 import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
+import '../data/nutrition/bls_food_search.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
@@ -24,6 +25,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../data/changelog/changelog_repository.dart';
 import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
+import '../data/repositories/meal_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
@@ -209,6 +211,27 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
 });
 
 final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchActive());
+
+/// Essenstagebuch (Phase 7, Doku 15): Mahlzeiten, Zutaten und Inventarabzug.
+final mealRepositoryProvider = Provider<MealRepository>((ref) {
+  return MealRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    inventory: ref.watch(inventoryRepositoryProvider),
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final mealsStreamProvider = StreamProvider((ref) => ref.watch(mealRepositoryProvider).watchMeals());
+
+final mealIngredientsStreamProvider = StreamProvider((ref) => ref.watch(mealRepositoryProvider).watchIngredients());
+
+/// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
+final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));
 
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   return ShoppingListRepository(
