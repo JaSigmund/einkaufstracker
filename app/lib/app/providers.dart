@@ -10,7 +10,9 @@ import '../data/app_config/app_config_repository.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
+import '../data/cloud/cooking_cloud.dart';
 import '../data/cloud/supabase_cloud_receipt_reader.dart';
+import '../data/cloud/supabase_cooking_cloud.dart';
 import '../data/ocr/image_prep.dart';
 import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
@@ -27,10 +29,12 @@ import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
+import '../data/repositories/saved_recipe_repository.dart';
 import '../data/repositories/shopping_list_repository.dart';
 import '../data/notifications/notification_scheduler.dart';
 import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
+import '../features/recipes/cooking_chat_panel.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
@@ -221,6 +225,9 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
+
+/// Rein lokal, kein Sync -- siehe Doku-Kommentar in `saved_recipe.dart`.
+final savedRecipeRepositoryProvider = Provider<SavedRecipeRepository>((ref) => SavedRecipeRepository(ref.watch(databaseProvider)));
 
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
 
@@ -449,4 +456,21 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
     },
     prepare: prepareForCloud,
   ),
+);
+
+/// Ruft `suggest-recipes`/`cooking-chat` auf (ADR-021). Einwilligung wird serverseitig geprueft
+/// (dieselbe household_settings.allow_cloud_ocr wie bei der Bon-Cloud-Erkennung, Q-23).
+final cookingCloudProvider = Provider<CookingCloud>(
+  (ref) => SupabaseCookingCloud(ref.watch(supabaseClientProvider), () async {
+    // Update-Sperre (ADR-022) wie bei der Bon-Cloud: zuerst pruefen, bevor irgendein Netzzugriff passiert.
+    if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
+    final id = await ref.read(householdIdProvider.future);
+    if (id == null) throw const CookingCloudUnavailable('kein Haushalt');
+    return id;
+  }),
+);
+
+/// Fertige [CookingChatSend]-Funktion fuer `CookingChatPanel`/`RecipeViewerPage`.
+final cookingChatSendProvider = Provider<CookingChatSend>(
+  (ref) => (message, context) => ref.read(cookingCloudProvider).chat(message, context),
 );
