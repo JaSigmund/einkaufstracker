@@ -276,6 +276,7 @@ void main() {
             updatedAt: DateTime.utc(2026),
           ));
       await db.into(db.receiptItems).insert(ReceiptItem(
+            excluded: false,
             id: 'ri1',
             householdId: 'h1',
             receiptId: 'r1',
@@ -312,6 +313,7 @@ void main() {
             source: 'manual', sumMismatch: false, updatedAt: DateTime.utc(2026),
           ));
       await db.into(db.receiptItems).insert(ReceiptItem(
+            excluded: false,
             id: 'ri1', householdId: 'h1', receiptId: 'r1', lineNo: 1, kind: 'article', rawText: 'Paprika',
             quantity: 1, quantityUnit: 'piece', lineTotalCents: 249, needsReview: false, updatedAt: DateTime.utc(2026),
           ));
@@ -341,6 +343,7 @@ void main() {
             updatedAt: DateTime.utc(2026),
           ));
       await db.into(db.receiptItems).insert(ReceiptItem(
+            excluded: false,
             id: id,
             householdId: 'h1',
             receiptId: receiptId,

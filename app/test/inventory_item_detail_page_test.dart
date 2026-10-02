@@ -83,6 +83,7 @@ void main() {
           updatedAt: DateTime.utc(2026),
         ));
     await db.into(db.receiptItems).insert(ReceiptItem(
+          excluded: false,
           id: 'ri1',
           householdId: 'h1',
           receiptId: 'r1',
@@ -177,6 +178,7 @@ void main() {
             updatedAt: DateTime.utc(2026),
           ));
       await db.into(db.receiptItems).insert(ReceiptItem(
+            excluded: false,
             id: id,
             householdId: 'h1',
             receiptId: 'r-$id',

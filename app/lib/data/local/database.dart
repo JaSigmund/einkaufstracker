@@ -142,6 +142,10 @@ class ReceiptItems extends Table {
   IntColumn get unitPriceNormCents => integer().nullable()();
   TextColumn get taxCode => text().nullable()();
   BoolColumn get needsReview => boolean().withDefault(const Constant(false))();
+
+  /// Von jemand anderem bezahlt (ADR-020 "Rechnungen teilen"): zaehlt nicht zur eigenen Auswertung,
+  /// bleibt aber auf dem Bon sichtbar und wandert normal ins Inventar.
+  BoolColumn get excluded => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
@@ -405,7 +409,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -473,6 +477,10 @@ class AppDatabase extends _$AppDatabase {
           // 11 -> 12: Feature-Vorschlaege teilen sich die Fehlerbericht-Tabelle (kind-Feld)
           if (from < 12) {
             await m.addColumn(bugReports, bugReports.kind);
+          }
+          // 12 -> 13: ausgeschlossene Bon-Positionen (ADR-020)
+          if (from < 13) {
+            await m.addColumn(receiptItems, receiptItems.excluded);
           }
         },
       );

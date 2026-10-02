@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/receipt/month_report.dart';
 import '../../domain/receipt/vienna_time.dart';
+import 'report_items.dart';
 
 const _monthNamesShort = ['Jän', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
@@ -38,20 +39,7 @@ class _TrendPageState extends ConsumerState<TrendPage> {
     final local = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
     final trend = buildTrend(
       [for (final r in receipts.value!) (id: r.id, purchasedAtUtc: r.purchasedAt)],
-      [
-        for (final i in items.value!)
-          (
-            receiptId: i.receiptId,
-            lineNo: i.lineNo,
-            kind: i.kind,
-            rawText: i.rawText,
-            categoryId: i.categoryId,
-            productId: i.productId,
-            productName: null,
-            quantity: i.quantity,
-            lineTotalCents: i.lineTotalCents,
-          ),
-      ],
+      reportItemsOf(items.value!).own, // von jemand anderem bezahlte Positionen zaehlen nicht (ADR-020)
       endYear: local.year,
       endMonth: local.month,
       months: _months,

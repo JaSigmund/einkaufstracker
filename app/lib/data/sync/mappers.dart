@@ -157,6 +157,7 @@ Map<String, dynamic> receiptItemToRemote(ReceiptItem i) => {
       'unit_price_norm_cents': i.unitPriceNormCents,
       'tax_code': i.taxCode,
       'needs_review': i.needsReview,
+      'excluded': i.excluded,
       'updated_at': i.updatedAt.toUtc().toIso8601String(),
       'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
     };
@@ -178,6 +179,7 @@ ReceiptItemsCompanion receiptItemFromRemote(Map<String, dynamic> j) => ReceiptIt
       unitPriceNormCents: Value((j['unit_price_norm_cents'] as num?)?.toInt()),
       taxCode: Value(j['tax_code'] as String?),
       needsReview: Value(j['needs_review'] as bool? ?? false),
+      excluded: Value(j['excluded'] as bool? ?? false),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
