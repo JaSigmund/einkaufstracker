@@ -7,7 +7,7 @@
 //         -> Antwort bereinigen (sanitize.ts) -> Nutzung in llm_usage protokollieren -> JSON zurueck.
 //
 // Die Antwort ist immer nur ein VORSCHLAG zum Bearbeiten (Doku 15 §6: Mengen aus einem Foto sind Schaetzungen mit
-// hoher Streuung). Das Foto wird nicht gespeichert; es liegt nur fuer die Dauer des Aufrufs im Speicher.
+// hoher Streuung). Die Function legt das Foto nirgends ab; es liegt nur fuer die Dauer des Aufrufs im Speicher. Was Anthropic mit API-Eingaben tut, regeln deren Bedingungen.
 //
 // Benoetigte Secrets:  ANTHROPIC_API_KEY, optional MEAL_MODEL
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
