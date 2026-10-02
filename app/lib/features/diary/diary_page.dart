@@ -6,9 +6,12 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
+import '../../domain/nutrition/nutrition_targets.dart';
 import '../../domain/receipt/vienna_time.dart';
+import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
+import 'target_rows.dart';
 
 /// Inhalt des Tabs "Tagebuch" (Doku 15 §3.5, Phase 7b/7d): Mahlzeiten nach Tagen, je Tag mit Naehrwertsumme,
 /// oben der Durchschnitt der laufenden Woche. Tage ohne Eintrag stehen nicht da: sie gelten als "nicht erfasst",
@@ -37,6 +40,8 @@ class DiaryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final meals = ref.watch(mealsStreamProvider);
     final ingredients = ref.watch(mealIngredientsStreamProvider);
+    // Richtwerte sind optional: bis sie geladen sind (oder falls das Laden scheitert) zeigt die Seite sie einfach nicht
+    final targets = ref.watch(nutritionTargetsProvider).value ?? const NutritionTargets();
     final t = Theme.of(context);
 
     final Widget body;
@@ -45,7 +50,7 @@ class DiaryPage extends ConsumerWidget {
     } else if (meals.hasError || ingredients.hasError) {
       body = Center(child: Text('Fehler: ${meals.error ?? ingredients.error}'));
     } else {
-      body = _content(context, t, meals.value!, ingredients.value!);
+      body = _content(context, t, meals.value!, ingredients.value!, targets);
     }
 
     return Scaffold(
@@ -59,7 +64,7 @@ class DiaryPage extends ConsumerWidget {
     );
   }
 
-  Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients) {
+  Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients, NutritionTargets targets) {
     if (meals.isEmpty) {
       return Center(
         child: Padding(
@@ -104,9 +109,11 @@ class DiaryPage extends ConsumerWidget {
     }
 
     return ListView(padding: const EdgeInsets.only(bottom: 96), children: [
-      if (currentWeek != null) _weekCard(t, currentWeek),
+      if (currentWeek != null)
+        _weekCard(t, currentWeek, targets, partial: days.any((d) => !d.day.isBefore(currentWeek.weekStart) && d.dataQuality < 1)),
+      BalanceCard(now: now),
       for (final day in dayKeys) ...[
-        _dayHeader(t, day, today, dayInfo[day]),
+        _dayHeader(t, day, today, dayInfo[day], targets),
         for (final m in (byDay[day]!..sort((a, b) => b.eatenAt.compareTo(a.eatenAt))))
           ListTile(
             key: Key('meal-${m.id}'),
@@ -127,7 +134,7 @@ class DiaryPage extends ConsumerWidget {
 
   String _countText(int n) => n == 1 ? '1 Zutat' : '$n Zutaten';
 
-  Widget _weekCard(ThemeData t, WeekNutrition w) {
+  Widget _weekCard(ThemeData t, WeekNutrition w, NutritionTargets targets, {required bool partial}) {
     final a = w.averagePerDay;
     return Card(
       key: const Key('diary-week'),
@@ -142,6 +149,7 @@ class DiaryPage extends ConsumerWidget {
             '${formatNutrientGrams(a.proteinG)} Eiweiß · ${formatNutrientGrams(a.fatG)} Fett · ${formatNutrientGrams(a.carbsG)} Kohlenhydrate',
             style: t.textTheme.bodySmall,
           ),
+          TargetRows(totals: a, targets: targets, keyPrefix: 'week', partial: partial),
           const SizedBox(height: 4),
           Text(
             '${w.daysLogged == 1 ? '1 Tag' : '${w.daysLogged} Tage'} erfasst${w.hasEstimates ? ', enthält Schätzwerte' : ''}',
@@ -152,7 +160,7 @@ class DiaryPage extends ConsumerWidget {
     );
   }
 
-  Widget _dayHeader(ThemeData t, DateTime day, DateTime today, DayNutrition? info) {
+  Widget _dayHeader(ThemeData t, DateTime day, DateTime today, DayNutrition? info, NutritionTargets targets) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -164,6 +172,7 @@ class DiaryPage extends ConsumerWidget {
             key: Key('day-totals-${day.year}-${day.month}-${day.day}'),
             style: t.textTheme.bodySmall,
           ),
+          TargetRows(totals: info.totals, targets: targets, keyPrefix: 'day-${day.year}-${day.month}-${day.day}', partial: info.dataQuality < 1),
           if (info.dataQuality < 1 || info.hasEstimates)
             Text(
               [

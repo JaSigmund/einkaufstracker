@@ -28,6 +28,7 @@ import '../data/changelog/changelog_repository.dart';
 import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/meal_repository.dart';
+import '../data/repositories/nutrition_targets_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
@@ -233,6 +234,27 @@ final mealRepositoryProvider = Provider<MealRepository>((ref) {
 final mealsStreamProvider = StreamProvider((ref) => ref.watch(mealRepositoryProvider).watchMeals());
 
 final mealIngredientsStreamProvider = StreamProvider((ref) => ref.watch(mealRepositoryProvider).watchIngredients());
+
+/// Ledger-Bewegungen der letzten 12 Wochen fuer die Verbrauchsbilanz (LH-MEAL-10).
+final balanceMovementsProvider = StreamProvider((ref) {
+  final since = DateTime.now().toUtc().subtract(const Duration(days: 7 * 12));
+  return ref.watch(inventoryRepositoryProvider).watchMovementsSince(since);
+});
+
+/// Vom Nutzer gesetzte Richtwerte fuer die Naehrwerte (LH-MEAL-09).
+final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>((ref) {
+  return NutritionTargetsRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final nutritionTargetsProvider = StreamProvider((ref) => ref.watch(nutritionTargetsRepositoryProvider).watch());
 
 /// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
 final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));

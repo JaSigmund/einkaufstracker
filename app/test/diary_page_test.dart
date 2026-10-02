@@ -1,6 +1,7 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/features/diary/diary_page.dart';
+import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
 import 'package:einkaufstracker/features/diary/meal_form_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,8 +23,11 @@ void main() {
   // Freitag, 2. Oktober 2026, 12:00 UTC; die Woche beginnt am Montag, 28. September
   final now = DateTime.utc(2026, 10, 2, 12);
 
-  Widget host(List<Meal> meals, List<MealIngredient> ingredients) => ProviderScope(
+  Widget host(List<Meal> meals, List<MealIngredient> ingredients, {NutritionTargets targets = const NutritionTargets()}) => ProviderScope(
         overrides: [
+          nutritionTargetsProvider.overrideWith((ref) => Stream.value(targets)),
+          balanceMovementsProvider.overrideWith((ref) => Stream.value(const <InventoryMovement>[])),
+          productsStreamProvider.overrideWith((ref) => Stream.value(const <Product>[])),
           mealsStreamProvider.overrideWith((ref) => Stream.value(meals)),
           mealIngredientsStreamProvider.overrideWith((ref) => Stream.value(ingredients)),
         ],
@@ -137,5 +141,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Heute'), findsOneWidget);
     expect(find.text('01:30 · Mittagessen · 1 Zutat'), findsOneWidget);
+  });
+
+  group('Richtwerte (LH-MEAL-09)', () {
+    final targets = const NutritionTargets()
+        .withTarget(NutrientKey.kcal, const NutrientTarget(min: 1800, max: 2200))
+        .withTarget(NutrientKey.proteinG, const NutrientTarget(min: 60));
+
+    testWidgets('ohne Richtwerte erscheinen keine Vergleichszeilen', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 1000)]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('target-row-day-2026-10-2-kcal')), findsNothing);
+      expect(find.byKey(const Key('target-row-week-kcal')), findsNothing);
+    });
+
+    testWidgets('nur Naehrwerte mit Richtwert werden verglichen, neutral benannt', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 2500, protein: 40)], targets: targets));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-day-2026-10-2-kcal')), matching: find.byType(Text))).data,
+          'Energie 2.500 kcal · 1.800–2.200 kcal (darüber)');
+      expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-day-2026-10-2-protein_g')), matching: find.byType(Text))).data,
+          'Eiweiß 40 g · mindestens 60 g (darunter)');
+      expect(find.byKey(const Key('target-row-day-2026-10-2-salt_g')), findsNothing);
+    });
+
+    testWidgets('im Bereich: kein Zusatz in Klammern', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 2000, protein: 70)], targets: targets));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-day-2026-10-2-kcal')), matching: find.byType(Text))).data,
+          'Energie 2.000 kcal · 1.800–2.200 kcal');
+    });
+
+    testWidgets('fehlen Naehrwerte einzelner Zutaten, heisst der Tageswert "mindestens"', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 900), _ing('i2', 'm1')], targets: targets));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-day-2026-10-2-kcal')), matching: find.byType(Text))).data,
+          startsWith('Energie mindestens 900 kcal'));
+    });
+
+    testWidgets('Wochenkarte vergleicht den Tagesdurchschnitt mit dem Richtwert', (tester) async {
+      await tester.pumpWidget(host(
+        [_meal('a', DateTime.utc(2026, 10, 2, 10)), _meal('b', DateTime.utc(2026, 10, 1, 10))],
+        [_ing('i1', 'a', kcal: 2000), _ing('i2', 'b', kcal: 1000)],
+        targets: targets,
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-week-kcal')), matching: find.byType(Text))).data,
+          'Energie 1.500 kcal · 1.800–2.200 kcal (darunter)');
+    });
   });
 }

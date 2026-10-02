@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/login_page.dart';
 import '../features/categories/categories_page.dart';
+import '../features/diary/balance_page.dart';
 import '../features/diary/meal_form_page.dart';
+import '../features/diary/targets_page.dart';
 import '../features/home/home_shell.dart';
 import '../features/receipt_import/import_review_page.dart';
 import '../features/receipt_import/receipt_edit_page.dart';
@@ -115,6 +117,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/meal-form',
         builder: (_, state) => MealFormPage(existing: (state.extra as MealFormArgs?)?.existing),
       ),
+      GoRoute(path: '/nutrition-targets', builder: (_, _) => const TargetsPage()),
+      GoRoute(path: '/balance', builder: (_, _) => const BalancePage()),
       GoRoute(
         path: '/stock-entry',
         builder: (_, state) {

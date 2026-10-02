@@ -1,3 +1,4 @@
+import '../domain/nutrition/nutrition_targets.dart';
 import '../domain/receipt/vienna_time.dart';
 
 /// Geldbetrag in Euro mit Komma und Tausenderpunkt, z.B. 123456 -> "1.234,56 €", -86 -> "-0,86 €".
@@ -47,6 +48,18 @@ String formatNutrientGrams(double g) {
   return '${s.replaceAll('.', ',')} g';
 }
 
+/// Ein Naehrwert mit Einheit: kcal mit Tausenderpunkt, alles andere in Gramm.
+String formatNutrient(NutrientKey key, double value) => key == NutrientKey.kcal ? formatKcal(value) : formatNutrientGrams(value);
+
+/// Richtwert als Text: "1.800–2.200 kcal", "mindestens 60 g" oder "höchstens 6 g".
+String formatTarget(NutrientKey key, NutrientTarget target) {
+  String n(double v) => key == NutrientKey.kcal ? formatKcal(v).replaceAll(' kcal', '') : formatQuantity(v);
+  final unit = key.unit;
+  if (target.min != null && target.max != null) return '${n(target.min!)}–${n(target.max!)} $unit';
+  if (target.min != null) return 'mindestens ${n(target.min!)} $unit';
+  return 'höchstens ${n(target.max!)} $unit';
+}
+
 const _weekdayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 const _monthNamesLong = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
@@ -62,6 +75,22 @@ String formatDayHeading(DateTime day, DateTime today) {
   if (diff == 1) return 'Gestern';
   final base = '${_weekdayNames[d.weekday - 1]}, ${d.day}. ${_monthNamesLong[d.month - 1]}';
   return d.year == t.year ? base : '$base ${d.year}';
+}
+
+const _monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+/// Woche als Zeitraum: "28. Sep – 4. Okt" (Montag bis Sonntag), mit Jahr, wenn es nicht das laufende ist.
+String formatWeekRange(DateTime monday, DateTime today) {
+  final end = DateTime(monday.year, monday.month, monday.day + 6);
+  String part(DateTime d) => '${d.day}. ${_monthNamesShort[d.month - 1]}';
+  final range = '${part(monday)} – ${part(end)}';
+  return end.year == today.year ? range : '$range ${end.year}';
+}
+
+/// Masse aus Gramm: unter 1 kg als "320 g", sonst "3,1 kg".
+String formatMassG(double g) {
+  if (g < 1000) return '${g.round()} g';
+  return '${(g / 1000).toStringAsFixed(1).replaceAll('.', ',')} kg';
 }
 
 /// Uhrzeit eines UTC-Zeitpunkts in Wiener Ortszeit als "19:05".
