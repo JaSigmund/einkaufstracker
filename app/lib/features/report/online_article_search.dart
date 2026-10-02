@@ -20,28 +20,33 @@ String onlineArticleDetail(OnlineArticle a) {
   return parts.join(' · ');
 }
 
-/// Sucht zu einem Produkt den passenden Online-Artikel eines Haendlers (ADR-019). Der Nutzer bestaetigt selbst: der Feed
-/// hat keine EAN, ein automatisches Zuordnen waere unzuverlaessig und wuerde falsche Preise als Vergleich zeigen.
-/// Liefert den gewaehlten Artikel oder `null`.
-Future<OnlineArticle?> showOnlineArticleSearch(
+/// Sucht zu einem Produkt passende Online-Artikel eines Haendlers (ADR-019). Der Nutzer bestaetigt selbst: der Feed hat keine
+/// EAN, ein automatisches Zuordnen waere unzuverlaessig und wuerde falsche Preise als Vergleich zeigen. Es lassen sich mehrere
+/// Artikel auf einmal waehlen (Bio-Paprika und normale Paprika sind dasselbe Produkt), schon zugeordnete sind markiert.
+/// Liefert die gewaehlten neuen Artikel oder `null`, wenn nichts gewaehlt wurde.
+Future<List<OnlineArticle>?> showOnlineArticleSearch(
   BuildContext context, {
   required String store,
   required String initialQuery,
   required String productBaseUnit,
+  Set<String> alreadyLinked = const {},
 }) =>
-    showModalBottomSheet<OnlineArticle>(
+    showModalBottomSheet<List<OnlineArticle>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _OnlineArticleSearch(store: store, initialQuery: initialQuery, productBaseUnit: productBaseUnit),
+      builder: (_) => _OnlineArticleSearch(store: store, initialQuery: initialQuery, productBaseUnit: productBaseUnit, alreadyLinked: alreadyLinked),
     );
 
 class _OnlineArticleSearch extends ConsumerStatefulWidget {
-  const _OnlineArticleSearch({required this.store, required this.initialQuery, required this.productBaseUnit});
+  const _OnlineArticleSearch({required this.store, required this.initialQuery, required this.productBaseUnit, required this.alreadyLinked});
 
   final String store;
   final String initialQuery;
   final String productBaseUnit;
+
+  /// `externalId`s, die dieses Produkt bei diesem Haendler schon hat.
+  final Set<String> alreadyLinked;
 
   @override
   ConsumerState<_OnlineArticleSearch> createState() => _OnlineArticleSearchState();
@@ -51,6 +56,7 @@ class _OnlineArticleSearchState extends ConsumerState<_OnlineArticleSearch> {
   late final _controller = TextEditingController(text: widget.initialQuery);
   Timer? _debounce;
   List<OnlineArticle> _results = const [];
+  final _selected = <String, OnlineArticle>{};
   var _loading = false;
   var _failed = false;
   var _token = 0;
@@ -102,6 +108,14 @@ class _OnlineArticleSearchState extends ConsumerState<_OnlineArticleSearch> {
     }
   }
 
+  void _toggle(OnlineArticle a, bool selected) => setState(() {
+        if (selected) {
+          _selected[a.externalId] = a;
+        } else {
+          _selected.remove(a.externalId);
+        }
+      });
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -126,10 +140,27 @@ class _OnlineArticleSearchState extends ConsumerState<_OnlineArticleSearch> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Wähle den Artikel, der zu deinem Produkt passt. Nur du bestätigst die Zuordnung.', style: t.textTheme.bodySmall),
+              child: Text(
+                'Wähle alle Artikel, die für dich dasselbe Produkt sind (z. B. Bio und normal). Nur du bestätigst die Zuordnung.',
+                style: t.textTheme.bodySmall,
+              ),
             ),
           ),
           Expanded(child: _body(t, label)),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const Key('online-search-done'),
+                  onPressed: () => Navigator.pop(context, _selected.isEmpty ? null : _selected.values.toList()),
+                  child: Text(_selected.isEmpty ? 'Schließen' : 'Hinzufügen (${_selected.length})'),
+                ),
+              ),
+            ),
+          ),
         ]),
       ),
     );
@@ -145,12 +176,17 @@ class _OnlineArticleSearchState extends ConsumerState<_OnlineArticleSearch> {
     }
     return ListView(children: [
       for (final a in _results)
-        ListTile(
+        CheckboxListTile(
           key: Key('online-result-${a.store}-${a.externalId}'),
+          value: widget.alreadyLinked.contains(a.externalId) || _selected.containsKey(a.externalId),
+          onChanged: widget.alreadyLinked.contains(a.externalId) ? null : (v) => _toggle(a, v ?? false),
+          controlAffinity: ListTileControlAffinity.leading,
           title: Text(a.name),
-          subtitle: Text(onlineArticleDetail(a)),
-          trailing: Text(formatEuro(a.priceCents), style: t.textTheme.titleSmall),
-          onTap: () => Navigator.pop(context, a),
+          subtitle: Text([
+            onlineArticleDetail(a),
+            if (widget.alreadyLinked.contains(a.externalId)) 'schon zugeordnet',
+          ].where((p) => p.isNotEmpty).join(' · ')),
+          secondary: Text(formatEuro(a.priceCents), style: t.textTheme.titleSmall),
         ),
     ]);
   }

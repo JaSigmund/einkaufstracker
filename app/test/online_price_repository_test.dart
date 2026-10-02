@@ -50,18 +50,54 @@ void main() {
       expect(cached.available, isTrue);
     });
 
-    test('derselbe Haendler noch einmal: die Verknuepfung wird umgestellt, es bleibt eine aktive Zeile', () async {
+    test('mehrere Artikel desselben Haendlers (Bio und normal): je eine aktive Zeile', () async {
       final repo = repoOf();
-      await repo.link('p1', onlineArticle());
-      final first = (await activeLinks()).single;
-      await repo.link('p1', onlineArticle(externalId: '00-2', name: 'Ja! Natürlich Vollmilch', priceCents: 189, unitPriceNormCents: 189));
+      await repo.link('p1', onlineArticle(externalId: '00-1', name: 'Ja! Natürlich Bio-Paprika', priceCents: 249, unitPriceNormCents: 249));
+      await repo.link('p1', onlineArticle(externalId: '00-2', name: 'Clever Paprika Rot', priceCents: 199, unitPriceNormCents: 199));
 
       final links = await activeLinks();
-      expect(links, hasLength(1), reason: 'der Server erlaubt je Produkt und Haendler nur eine aktive Zeile');
-      expect(links.single.id, first.id);
-      expect(links.single.externalId, '00-2');
-      expect(links.single.linkedName, 'Ja! Natürlich Vollmilch');
-      expect((await outbox()).map((e) => e['row']).toSet(), {first.id}, reason: 'beide Aenderungen betreffen dieselbe Zeile');
+      expect(links.map((l) => l.externalId).toSet(), {'00-1', '00-2'});
+      expect(links.map((l) => l.id).toSet(), hasLength(2));
+      expect(await db.select(db.onlinePriceCache).get(), hasLength(2));
+      expect((await outbox()).map((e) => e['row']).toSet(), hasLength(2));
+    });
+
+    test('derselbe Artikel noch einmal: keine zweite Zeile, nichts in der Outbox, der geholte Stand im Zwischenspeicher bleibt', () async {
+      remote.articles = [onlineArticle()];
+      final repo = repoOf();
+      await repo.link('p1', onlineArticle());
+      await repo.refresh(force: true);
+      final before = await db.select(db.onlinePriceCache).getSingle();
+      expect(before.feedUpdatedAt, isNotNull);
+      final queued = (await outbox()).length;
+
+      await repo.link('p1', onlineArticle(priceCents: 999));
+
+      expect(await activeLinks(), hasLength(1));
+      expect((await outbox()).length, queued);
+      expect(await db.select(db.onlinePriceCache).getSingle(), before, reason: 'ein zweites Verknuepfen ueberschreibt den Zwischenspeicher nicht');
+    });
+
+    test('linkAll: mehrere Artikel in einer Transaktion, onChanged nur einmal', () async {
+      var calls = 0;
+      final repo = onlinePriceRepo(db, remote, onChanged: () => calls++, now: () => clock);
+      await repo.linkAll('p1', [
+        onlineArticle(externalId: '00-1'),
+        onlineArticle(externalId: '00-2'),
+        onlineArticle(store: 'spar', externalId: '2020'),
+      ]);
+      expect(await activeLinks(), hasLength(3));
+      expect(calls, 1);
+
+      await repo.linkAll('p1', [onlineArticle(externalId: '00-1')]);
+      expect(calls, 1, reason: 'nichts Neues, kein Sync-Anstoss');
+    });
+
+    test('dasselbe Produkt bei zwei Produkten: der Artikel kann an beiden haengen', () async {
+      final repo = repoOf();
+      await repo.link('p1', onlineArticle());
+      await repo.link('p2', onlineArticle());
+      expect(await activeLinks(), hasLength(2));
     });
 
     test('anderer Haendler fuer dasselbe Produkt: zweite Verknuepfung; anderes Produkt: eigene', () async {

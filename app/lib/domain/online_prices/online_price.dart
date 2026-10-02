@@ -100,3 +100,42 @@ OnlinePriceFreshness onlinePriceFreshness({required bool available, required Dat
 /// Beide Preise lassen sich nur vergleichen, wenn sie dieselbe Basiseinheit haben (kg mit kg, l mit l, Stk mit Stk).
 bool onlineUnitsComparable(String productBaseUnit, String? onlineBaseUnit) =>
     onlineBaseUnit != null && onlineBaseUnitOf(productBaseUnit) == onlineBaseUnit;
+
+/// Ein einem Produkt zugeordneter Online-Artikel mit seinem zuletzt bekannten Preis. Ein Produkt kann mehrere haben, auch beim
+/// selben Haendler: Bio-Paprika und normale Paprika sind bei Billa zwei Artikel, fuer den Einkauf aber dasselbe Produkt.
+class LinkedOnlinePrice {
+  const LinkedOnlinePrice({
+    required this.store,
+    required this.externalId,
+    required this.name,
+    required this.priceCents,
+    required this.baseUnit,
+    required this.unitPriceNormCents,
+    required this.freshness,
+  });
+
+  final String store;
+  final String externalId;
+  final String name;
+  final int? priceCents;
+  final String? baseUnit;
+  final int? unitPriceNormCents;
+  final OnlinePriceFreshness freshness;
+}
+
+/// Der guenstigste Artikel nach Grundpreis. Es zaehlen nur Artikel mit berechnetem Grundpreis in der Basiseinheit des Produkts
+/// (kg mit kg), die noch im Online-Sortiment sind. Bei gleichem Grundpreis gewinnt der niedrigere Preis, dann der erste.
+/// `null`, wenn kein Artikel vergleichbar ist.
+LinkedOnlinePrice? cheapestOnlinePrice(Iterable<LinkedOnlinePrice> items, String productBaseUnit) {
+  LinkedOnlinePrice? best;
+  for (final i in items) {
+    if (i.freshness == OnlinePriceFreshness.discontinued) continue;
+    if (i.unitPriceNormCents == null || !onlineUnitsComparable(productBaseUnit, i.baseUnit)) continue;
+    if (best == null ||
+        i.unitPriceNormCents! < best.unitPriceNormCents! ||
+        (i.unitPriceNormCents == best.unitPriceNormCents && (i.priceCents ?? 1 << 30) < (best.priceCents ?? 1 << 30))) {
+      best = i;
+    }
+  }
+  return best;
+}
