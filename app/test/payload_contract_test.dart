@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
+import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
@@ -86,6 +87,13 @@ Future<List<Map<String, dynamic>>> _collect() async {
       .withTarget(NutrientKey.kcal, const NutrientTarget(min: 1800, max: 2200))
       .withTarget(NutrientKey.saltG, const NutrientTarget(max: 6)));
 
+  // Online-Preise (ADR-019): zuordnen, auf einen anderen Artikel umstellen, bei einem anderen Haendler zuordnen, loesen
+  final online = OnlinePriceRepository(db, FakeOnlinePriceRemote(), householdId: () async => 'h1');
+  await online.link(reis.id, onlineArticle(externalId: '00-1', name: 'Clever Vollmilch'));
+  await online.link(reis.id, onlineArticle(externalId: '00-2', name: 'Ja! Natürlich Vollmilch', priceCents: 189));
+  await online.link(reis.id, onlineArticle(store: 'spar', externalId: '2020', name: 'A-zwei Vollmilch'));
+  await online.unlink((await online.activeLinks()).firstWhere((l) => l.store == 'spar').id);
+
   final outbox = await (db.select(db.outbox)..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
   return [for (final e in outbox) {'table': e.remoteTable, 'payload': jsonDecode(e.payload)}];
 }
@@ -123,7 +131,7 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
@@ -136,5 +144,7 @@ void main() {
     expect({for (final i in rows('meal_ingredients')) i['source']}, containsAll(['photo_ai', 'estimate', 'inventory', 'manual']));
     expect(rows('meal_ingredients').any((i) => i['confidence'] != null), isTrue);
     expect(rows('meal_ingredients').any((i) => i['product_id'] == null && i['free_text'] != null), isTrue);
+    expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
+    expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
   });
 }

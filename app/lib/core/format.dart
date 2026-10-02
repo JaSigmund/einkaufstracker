@@ -31,6 +31,13 @@ String formatViennaDateTime(DateTime utc) {
   return '${two(d.day)}.${two(d.month)}.${d.year}, ${two(d.hour)}:${two(d.minute)} Uhr';
 }
 
+/// UTC-Zeitpunkt als Datum "02.07.2026" in Wiener Ortszeit.
+String formatViennaDate(DateTime utc) {
+  final d = utcToViennaLocal(utc);
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(d.day)}.${two(d.month)}.${d.year}';
+}
+
 /// Menge ohne unnoetige Nachkommastellen: 2 -> "2", 0.986 -> "0,986".
 String formatQuantity(double q) {
   final s = q == q.roundToDouble() ? q.toInt().toString() : q.toString();

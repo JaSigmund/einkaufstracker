@@ -20,8 +20,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release).
-  const olderVersions = [9, 10, 11, 12, 13];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -72,5 +72,34 @@ void main() {
     expect(await db.select(db.nutritionTargetRows).get(), isEmpty);
     await db.into(db.nutritionTargetRows).insert(NutritionTargetRowsCompanion.insert(householdId: 'h1', updatedAt: DateTime.utc(2026)));
     expect(await db.select(db.nutritionTargetRows).get(), hasLength(1));
+  });
+
+  test('Daten aus Version 15 bleiben beim Hochziehen erhalten, die Online-Preis-Tabellen sind leer und nutzbar', () async {
+    final schema = await verifier.schemaAt(15);
+    schema.rawDatabase.execute(
+      "INSERT INTO products (id, household_id, name, updated_at) VALUES ('p1', 'h1', 'Vollmilch', '2026-09-01T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meals (id, household_id, eaten_at, meal_type, title, servings_eaten, servings_made, source, is_estimate, updated_at) "
+      "VALUES ('m1', 'h1', '2026-09-02T10:00:00.000Z', 'lunch', 'Reis', 1.0, 1.0, 'manual', 0, '2026-09-02T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    expect((await db.select(db.products).getSingle()).name, 'Vollmilch');
+    expect((await db.select(db.meals).getSingle()).title, 'Reis');
+    expect(await db.select(db.productOnlineLinks).get(), isEmpty);
+    expect(await db.select(db.onlinePriceCache).get(), isEmpty);
+
+    await db.into(db.productOnlineLinks).insert(ProductOnlineLinksCompanion.insert(
+          id: 'l1', householdId: 'h1', productId: 'p1', store: 'billa', externalId: '00-1', linkedName: 'Clever Vollmilch', updatedAt: DateTime.utc(2026, 10, 2),
+        ));
+    await db.into(db.onlinePriceCache).insert(OnlinePriceCacheCompanion.insert(
+          store: 'billa', externalId: '00-1', name: 'Clever Vollmilch', fetchedAt: DateTime.utc(2026, 10, 2),
+        ));
+    expect(await db.select(db.productOnlineLinks).get(), hasLength(1));
+    expect((await db.select(db.onlinePriceCache).getSingle()).available, isTrue, reason: 'Standardwert: verfuegbar');
   });
 }

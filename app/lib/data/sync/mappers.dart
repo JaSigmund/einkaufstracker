@@ -406,6 +406,28 @@ ProductAliasesCompanion productAliasFromRemote(Map<String, dynamic> j) => Produc
       deletedAt: Value(_dt(j['deleted_at'])),
     );
 
+Map<String, dynamic> productOnlineLinkToRemote(ProductOnlineLink l) => {
+      'id': l.id,
+      'household_id': l.householdId,
+      'product_id': l.productId,
+      'store': l.store,
+      'external_id': l.externalId,
+      'linked_name': l.linkedName,
+      'updated_at': l.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
+    };
+
+ProductOnlineLinksCompanion productOnlineLinkFromRemote(Map<String, dynamic> j) => ProductOnlineLinksCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      productId: Value(j['product_id'] as String),
+      store: Value(j['store'] as String),
+      externalId: Value(j['external_id'] as String),
+      linkedName: Value(j['linked_name'] as String),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
 Map<String, dynamic> bugReportToRemote(BugReport b) => {
       'id': b.id,
       'household_id': b.householdId,

@@ -33,6 +33,8 @@ final syncTables = <SyncTableDef>[
   SyncTableDef('product_barcodes', (db, j) => db.into(db.productBarcodes).insertOnConflictUpdate(productBarcodeFromRemote(j)),
       idOf: (j) => '${j['household_id']}:${j['ean']}'),
   SyncTableDef('product_aliases', (db, j) => db.into(db.productAliases).insertOnConflictUpdate(productAliasFromRemote(j))),
+  // Online-Preise (ADR-019): zeigt auf Produkte, deshalb nach den Produkten
+  SyncTableDef('product_online_links', (db, j) => db.into(db.productOnlineLinks).insertOnConflictUpdate(productOnlineLinkFromRemote(j))),
   SyncTableDef('bug_reports', (db, j) => db.into(db.bugReports).insertOnConflictUpdate(bugReportFromRemote(j))),
   // Reihenfolge wichtig: Fremdschluessel (Bon -> Filiale, Position -> Bon) zeigen auf zuvor gelieferte Zeilen
   SyncTableDef('stores', (db, j) => db.into(db.stores).insertOnConflictUpdate(storeFromRemote(j))),

@@ -6,7 +6,7 @@ library;
 String conflictAreaLabel(String table) => switch (table) {
       'shopping_lists' || 'shopping_list_items' => 'Einkaufsliste',
       'inventory_items' || 'inventory_movements' => 'Inventar',
-      'products' || 'product_barcodes' || 'product_aliases' => 'Produkte',
+      'products' || 'product_barcodes' || 'product_aliases' || 'product_online_links' => 'Produkte',
       'receipts' || 'receipt_items' || 'receipt_files' || 'stores' => 'Bons',
       'categories' || 'category_aliases' => 'Kategorien',
       'meals' || 'meal_ingredients' => 'Tagebuch',
