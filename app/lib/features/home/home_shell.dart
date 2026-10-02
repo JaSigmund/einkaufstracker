@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../common/app_update_banner.dart';
+import '../diary/diary_page.dart';
 import '../inventory/inventory_page.dart';
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
@@ -51,6 +52,12 @@ class _HomeShellState extends State<HomeShell> {
           selected: Icons.bar_chart,
           hint: 'Ausgaben nach Kategorie (Phase 2)',
         ),
+        (
+          label: 'Tagebuch',
+          icon: Icons.restaurant_menu_outlined,
+          selected: Icons.restaurant_menu,
+          hint: 'Essenstagebuch und Nährwerte (Phase 7)',
+        ),
       ];
 
   @override
@@ -93,6 +100,8 @@ class _HomeShellState extends State<HomeShell> {
                 ? const ShoppingListPage()
                 : _index == 4
                 ? const ReportPage()
+                : _index == 5
+                ? const DiaryPage()
                 : Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -125,6 +134,8 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        // Sechs Ziele passen nur mit Beschriftung des gewaehlten Tabs auf schmale Handys
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: [

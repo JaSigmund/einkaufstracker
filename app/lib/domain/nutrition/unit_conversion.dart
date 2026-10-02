@@ -1,9 +1,8 @@
 /// Einheiten-Umrechnung fuers Essenstagebuch (Doku 15 Essenstagebuch und Naehrwerte, §5.3).
 ///
-/// Vorbereitung fuer Phase 7 (noch nicht verdrahtet): das Inventar fuehrt Mengen in `kg`, `l`
-/// oder `piece` (siehe `base_unit`-Enum), Naehrwerte stehen je Produkt aber "je 100 g" ODER
-/// "je 100 ml" (`products.nutrients_basis`). Diese Funktion bringt eine erfasste Menge auf die
-/// Einheit, die zur Naehrwert-Basis des jeweiligen Produkts passt.
+/// Das Inventar fuehrt Mengen in `kg`, `l` oder `piece` (siehe `base_unit`-Enum), Naehrwerte stehen je Produkt
+/// aber "je 100 g" ODER "je 100 ml" (`products.nutrients_basis`). Diese Funktion bringt eine erfasste Menge
+/// auf die Einheit, die zur Naehrwert-Basis des jeweiligen Produkts passt.
 library;
 
 /// Standardwerte fuer Loeffel-Schnelleingaben (Doku 15 §5.3), grob geschaetzt.

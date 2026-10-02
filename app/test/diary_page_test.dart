@@ -1,0 +1,141 @@
+import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/features/diary/diary_page.dart';
+import 'package:einkaufstracker/features/diary/meal_form_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+
+/// Tagebuch-Tab (Doku 15 §3.5, Phase 7b/7d): Tage, Tageswerte, Wochendurchschnitt, Datenqualitaet.
+Meal _meal(String id, DateTime utc, {String title = 'Mahlzeit', String type = 'lunch', double eaten = 1, double made = 1, bool estimate = false}) => Meal(
+      id: id, householdId: 'h1', eatenAt: utc, mealType: type, title: title, servingsEaten: eaten, servingsMade: made,
+      source: 'manual', isEstimate: estimate, updatedAt: DateTime.utc(2026),
+    );
+
+MealIngredient _ing(String id, String mealId, {double? kcal, double? protein}) => MealIngredient(
+      id: id, householdId: 'h1', mealId: mealId, freeText: 'Zutat', quantity: 1, unit: 'kg', source: 'manual',
+      kcal: kcal, proteinG: protein, updatedAt: DateTime.utc(2026),
+    );
+
+void main() {
+  // Freitag, 2. Oktober 2026, 12:00 UTC; die Woche beginnt am Montag, 28. September
+  final now = DateTime.utc(2026, 10, 2, 12);
+
+  Widget host(List<Meal> meals, List<MealIngredient> ingredients) => ProviderScope(
+        overrides: [
+          mealsStreamProvider.overrideWith((ref) => Stream.value(meals)),
+          mealIngredientsStreamProvider.overrideWith((ref) => Stream.value(ingredients)),
+        ],
+        child: MaterialApp.router(
+          routerConfig: GoRouter(routes: [
+            GoRoute(path: '/', builder: (_, _) => Scaffold(body: DiaryPage(now: now))),
+            GoRoute(
+              path: '/meal-form',
+              builder: (_, s) {
+                final a = s.extra as MealFormArgs;
+                return Scaffold(body: Text(a.existing == null ? 'NEU' : 'BEARBEITEN ${a.existing!.title}'));
+              },
+            ),
+          ]),
+        ),
+      );
+
+  testWidgets('ohne Mahlzeiten: Hinweis statt leerer Liste, Knopf zum Anlegen vorhanden', (tester) async {
+    await tester.pumpWidget(host(const [], const []));
+    await tester.pumpAndSettle();
+    expect(find.text('Noch keine Mahlzeit'), findsOneWidget);
+    expect(find.byKey(const Key('diary-add')), findsOneWidget);
+    expect(find.byKey(const Key('diary-week')), findsNothing);
+  });
+
+  testWidgets('Knopf "Mahlzeit" oeffnet das Formular fuer einen neuen Eintrag', (tester) async {
+    await tester.pumpWidget(host(const [], const []));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('diary-add')));
+    await tester.pumpAndSettle();
+    expect(find.text('NEU'), findsOneWidget);
+  });
+
+  testWidgets('zeigt Tagesueberschrift, Tageswerte und die Mahlzeit mit Uhrzeit, Typ, Zutaten und kcal', (tester) async {
+    await tester.pumpWidget(host(
+      [_meal('m1', DateTime.utc(2026, 10, 2, 10, 30), title: 'Reispfanne', type: 'lunch')],
+      [_ing('i1', 'm1', kcal: 525, protein: 10.5), _ing('i2', 'm1', kcal: 100)],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Heute'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('day-totals-2026-10-2'))).data, startsWith('625 kcal · 11 g Eiweiß'));
+    expect(find.text('Reispfanne'), findsOneWidget);
+    expect(find.text('12:30 · Mittagessen · 2 Zutaten'), findsOneWidget);
+    expect(find.text('625 kcal'), findsOneWidget);
+    expect(find.byKey(const Key('day-quality-2026-10-2')), findsNothing, reason: 'alle Zutaten haben Naehrwerte');
+  });
+
+  testWidgets('Datenqualitaet: fehlende Naehrwerte und Schaetzwerte werden benannt (FR-17)', (tester) async {
+    await tester.pumpWidget(host(
+      [_meal('m1', DateTime.utc(2026, 10, 2, 10), estimate: true)],
+      [_ing('i1', 'm1', kcal: 100), _ing('i2', 'm1')],
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('day-quality-2026-10-2'))).data, 'Nährwerte für 1 von 2 Zutaten bekannt · enthält Schätzwerte');
+    expect(find.textContaining('geschätzt'), findsWidgets);
+  });
+
+  testWidgets('Mahlzeit ganz ohne Naehrwerte zeigt keine kcal (nicht "0 kcal", FR-15)', (tester) async {
+    await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1')]));
+    await tester.pumpAndSettle();
+    expect(find.text('0 kcal'), findsNothing);
+  });
+
+  testWidgets('Portionsanteil: 1 von 4 Portionen zaehlt zu einem Viertel', (tester) async {
+    await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10), eaten: 1, made: 4)], [_ing('i1', 'm1', kcal: 800)]));
+    await tester.pumpAndSettle();
+    expect(find.text('200 kcal'), findsWidgets);
+  });
+
+  testWidgets('mehrere Tage: neuester zuerst, Gestern und Wochentag-Ueberschriften; Tage ohne Eintrag fehlen', (tester) async {
+    await tester.pumpWidget(host(
+      [_meal('a', DateTime.utc(2026, 10, 2, 10), title: 'Heute-Essen'), _meal('b', DateTime.utc(2026, 10, 1, 10), title: 'Gestern-Essen'), _meal('c', DateTime.utc(2026, 9, 28, 10), title: 'Montag-Essen')],
+      [_ing('i1', 'a', kcal: 100), _ing('i2', 'b', kcal: 100), _ing('i3', 'c', kcal: 100)],
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Heute'), findsOneWidget);
+    expect(find.text('Gestern'), findsOneWidget);
+    expect(find.text('Montag, 28. September'), findsOneWidget);
+    expect(find.text('Donnerstag, 1. Oktober'), findsNothing);
+    final heute = tester.getTopLeft(find.text('Heute-Essen')).dy;
+    final gestern = tester.getTopLeft(find.text('Gestern-Essen')).dy;
+    expect(heute, lessThan(gestern), reason: 'neuester Tag oben');
+  });
+
+  testWidgets('Wochenkarte: Durchschnitt ueber die erfassten Tage der laufenden Woche, Vorwoche zaehlt nicht', (tester) async {
+    await tester.pumpWidget(host(
+      [
+        _meal('a', DateTime.utc(2026, 10, 2, 10)), // Fr, 2000
+        _meal('b', DateTime.utc(2026, 10, 1, 10)), // Do, 1000
+        _meal('c', DateTime.utc(2026, 9, 25, 10)), // Vorwoche, darf nicht eingehen
+      ],
+      [_ing('i1', 'a', kcal: 2000), _ing('i2', 'b', kcal: 1000), _ing('i3', 'c', kcal: 5000)],
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('diary-week-kcal'))).data, 'Ø 1.500 kcal pro erfasstem Tag');
+    expect(find.text('2 Tage erfasst'), findsOneWidget);
+  });
+
+  testWidgets('Tippen auf eine Mahlzeit oeffnet sie zum Bearbeiten', (tester) async {
+    await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10), title: 'Reispfanne')], [_ing('i1', 'm1', kcal: 1)]));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('meal-m1')));
+    await tester.pumpAndSettle();
+    expect(find.text('BEARBEITEN Reispfanne'), findsOneWidget);
+  });
+
+  testWidgets('Tagesgrenze in Wiener Zeit: 23:30 UTC gehoert im Sommer schon zum Folgetag', (tester) async {
+    // 2026-10-01 23:30 UTC = 2026-10-02 01:30 MESZ, also "Heute"
+    await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 1, 23, 30), title: 'Nachtsnack')], [_ing('i1', 'm1', kcal: 100)]));
+    await tester.pumpAndSettle();
+    expect(find.text('Heute'), findsOneWidget);
+    expect(find.text('01:30 · Mittagessen · 1 Zutat'), findsOneWidget);
+  });
+}
