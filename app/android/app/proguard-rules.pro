@@ -17,3 +17,12 @@
 -keep class com.google_mlkit_document_scanner.** { *; }
 -keep class com.google_mlkit_commons.** { *; }
 -keep class com.google_mlkit_text_recognition.** { *; }
+
+# flutter_local_notifications (Fehlerbericht "Ablauf-Erinnerung kommt nicht an", 2026-10-02): das Plugin
+# serialisiert geplante Erinnerungen intern mit Gson und ruft seinen BroadcastReceiver ueber den
+# Klassennamen auf, um die Erinnerung beim Ausloesen des Alarms zu posten. Ohne diese Regeln benennt/
+# entfernt R8 im Release-Build genau diese Klassen: die Planung (reiner Dart/Plugin-Methodenkanal-Aufruf)
+# schlaegt dadurch NICHT fehl und wird korrekt geloggt, aber beim Ausloesen des Alarms findet Android die
+# Receiver-Klasse nicht mehr -- die Benachrichtigung erscheint nie, ganz ohne sichtbaren Fehler.
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
+-keep class com.google.gson.** { *; }
