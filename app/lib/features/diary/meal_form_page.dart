@@ -6,10 +6,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
+import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/meal_repository.dart';
+import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
+import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'ingredient_picker.dart';
@@ -24,7 +27,7 @@ class MealFormArgs {
 
 /// Eine Zutat im Formular, noch nicht gespeichert.
 class _Row {
-  _Row({this.product, this.freeText, required this.quantity, required this.unit, this.per100, this.per100Basis, this.manual, this.deduct = false, this.source});
+  _Row({this.product, this.freeText, required this.quantity, required this.unit, this.per100, this.per100Basis, this.manual, this.deduct = false, this.source, this.confidence});
 
   Product? product;
   String? freeText;
@@ -35,6 +38,9 @@ class _Row {
   NutrientAmounts? manual;
   bool deduct;
   String? source;
+
+  /// Sicherheit der Foto-Analyse (0 bis 1), nur bei Zutaten aus einem KI-Vorschlag.
+  double? confidence;
 
   String get label => product?.name ?? freeText ?? 'Zutat';
 
@@ -48,6 +54,7 @@ class _Row {
         per100Basis: per100Basis,
         manualNutrients: manual,
         deduct: deduct && product != null,
+        confidence: confidence,
       );
 
   /// Naehrwerte dieser Zutat, wie sie beim Speichern berechnet wuerden; `null`, wenn unbekannt.
@@ -93,6 +100,14 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   /// Das vorhandene Foto soll beim Speichern entfernt werden.
   var _photoRemoved = false;
   var _saving = false;
+
+  /// Foto-Analyse laeuft, und der Hinweis nach einem angewendeten Vorschlag.
+  var _analyzing = false;
+  var _analysisApplied = false;
+  String? _analysisNotes;
+
+  /// `manual` | `photo_ai` | `recipe`: woher die Mahlzeit stammt. Nach einem angewendeten KI-Vorschlag `photo_ai`.
+  late String _source = widget.existing?.source ?? 'manual';
   String? _error;
 
   bool get _isEdit => widget.existing != null;
@@ -164,8 +179,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         per100: per100,
         per100Basis: per100 == null ? null : 'g',
         manual: manual,
-        deduct: i.source == 'inventory',
+        deduct: i.source == 'inventory' || i.inventoryItemId != null,
         source: i.source,
+        confidence: i.confidence,
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
@@ -208,6 +224,130 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     } catch (e) {
       return 'Die Mahlzeit ist gespeichert, das Foto konnte nicht abgelegt werden: $e';
     }
+  }
+
+  static const _analysisNoticeKv = 'meal_analysis_notice_seen';
+
+  /// Einmaliger Hinweis vor dem ersten Senden eines Fotos (Doku 15 §6: dieselbe Einwilligungslogik wie bei den Bons,
+  /// aber ein Foto ist etwas anderes als Text, deshalb wird hier ausdruecklich bestaetigt).
+  Future<bool> _confirmFirstUse() async {
+    final db = ref.read(databaseProvider);
+    if (await db.getKv(_analysisNoticeKv) == 'true') return true;
+    if (!mounted) return false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Foto in der Cloud auswerten?'),
+        content: const Text(
+          'Das Foto und die Namen deiner Produkte werden zur Auswertung an Claude (Anthropic) geschickt. Das Foto wird dort '
+          'nicht gespeichert. Die Einstellung „Cloud-Auswertung erlauben“ gilt auch hierfür. '
+          'Der Vorschlag ist eine Schätzung, du prüfst und änderst ihn, bevor etwas gespeichert wird.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(key: const Key('meal-analyze-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Senden')),
+        ],
+      ),
+    );
+    if (ok != true) return false;
+    await db.setKv(_analysisNoticeKv, 'true');
+    return true;
+  }
+
+  String _analysisError(Object e) {
+    if (e is CookingCloudNotAllowed || e is CookingCloudDailyLimit || e is AppUpdateRequiredException) return e.toString();
+    if (e is CookingCloudUnavailable) return 'Die Foto-Analyse ist gerade nicht verfügbar (${e.message}).';
+    return 'Die Foto-Analyse ist gerade nicht verfügbar.';
+  }
+
+  /// Foto-KI (Phase 7c): schlaegt Gericht, Mahlzeitentyp und Zutaten mit geschaetzten Mengen vor. Nichts davon wird
+  /// ohne Pruefung uebernommen: die Zutaten erscheinen als normale Zeilen und lassen sich aendern oder entfernen.
+  Future<void> _analyze() async {
+    final photo = _newPhoto ?? (widget.existing == null ? null : await ref.read(mealPhotoServiceProvider).bytes(widget.existing!));
+    if (photo == null) return setState(() => _error = 'Das Foto ist gerade nicht verfügbar.');
+    if (!await _confirmFirstUse() || !mounted) return;
+
+    final products = ref.read(productsStreamProvider).value ?? const <Product>[];
+    final active = ref.read(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+    final inStock = {for (final i in active) i.productId};
+    // Produkte im Vorrat zuerst: sie sind die wahrscheinlichsten Treffer und bleiben bei der Obergrenze erhalten.
+    final live = products.where((p) => p.deletedAt == null).toList()
+      ..sort((a, b) => (inStock.contains(b.id) ? 1 : 0).compareTo(inStock.contains(a.id) ? 1 : 0));
+    final offered = [for (final p in live.take(80)) (id: p.id, name: p.name)];
+
+    setState(() {
+      _analyzing = true;
+      _error = null;
+    });
+    try {
+      final analysis = await ref.read(mealAnalysisCloudProvider).analyze(photo, offered);
+      if (!mounted) return;
+      _applyAnalysis(analysis, {for (final p in live) p.id: p}, inStock);
+    } catch (e) {
+      if (mounted) setState(() => _error = _analysisError(e));
+    } finally {
+      if (mounted) setState(() => _analyzing = false);
+    }
+  }
+
+  void _applyAnalysis(MealAnalysis a, Map<String, Product> byId, Set<String> inStock) {
+    if (a.isEmpty) {
+      setState(() => _error = a.notes ?? 'Auf dem Foto ist keine Mahlzeit zu erkennen.');
+      return;
+    }
+    setState(() {
+      if (_title.text.trim().isEmpty && a.dishTitle.isNotEmpty) _title.text = a.dishTitle;
+      if (!_isEdit && a.mealType != null) _type = a.mealType!;
+      if (a.servingsVisible != null) _made.text = formatQuantity(a.servingsVisible!);
+      for (final i in a.ingredients) {
+        final product = i.inventoryProductId == null ? null : byId[i.inventoryProductId];
+        _rows.add(_Row(
+          product: product,
+          freeText: product == null ? i.name : null,
+          quantity: i.estimatedGrams ?? 0,
+          unit: product != null && product.baseUnit == 'l' ? EntryUnit.ml : EntryUnit.g,
+          deduct: product != null && inStock.contains(product.id),
+          source: 'photo_ai',
+          confidence: i.confidence,
+        ));
+      }
+      // FR-17: Mengen aus einem Foto sind Schaetzungen und muessen in allen Auswertungen erkennbar sein.
+      _estimate = true;
+      _source = 'photo_ai';
+      _analysisApplied = true;
+      _analysisNotes = a.notes;
+    });
+  }
+
+  /// Sucht zu einer Zutat ohne Naehrwerte (z.B. aus der Foto-Analyse) ein Produkt oder einen BLS-Treffer und
+  /// uebernimmt dessen Naehrwerte; die erfasste Menge bleibt.
+  Future<void> _lookupNutrients(int index) async {
+    final row = _rows[index];
+    final picked = await showIngredientPicker(context, initialQuery: row.label);
+    if (picked == null || !mounted) return;
+    setState(() {
+      final product = picked.product;
+      final bls = picked.bls;
+      if (product != null) {
+        final active = ref.read(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+        row
+          ..product = product
+          ..freeText = null
+          ..per100 = null
+          ..per100Basis = null
+          ..deduct = active.any((i) => i.productId == product.id);
+        if (product.baseUnit == 'l' && row.unit == EntryUnit.g) row.unit = EntryUnit.ml;
+      } else if (bls != null) {
+        row
+          ..product = null
+          ..freeText = bls.nameDe
+          ..per100 = bls.per100
+          ..per100Basis = 'g'
+          ..deduct = false;
+      } else {
+        row.freeText = picked.freeText;
+      }
+    });
   }
 
   Future<void> _pickDateTime() async {
@@ -285,6 +425,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     final made = _parsePositive(_made.text);
     if (title.isEmpty) return setState(() => _error = 'Bitte einen Titel eingeben.');
     if (eaten == null || made == null) return setState(() => _error = 'Portionen müssen größer als 0 sein.');
+    final missing = _rows.where((r) => r.quantity <= 0).firstOrNull;
+    if (missing != null) return setState(() => _error = 'Bei „${missing.label}“ fehlt die Menge. Tippe die Zutat an und trage sie ein.');
     setState(() {
       _saving = true;
       _error = null;
@@ -297,7 +439,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       servingsEaten: eaten,
       servingsMade: made,
       isEstimate: _estimate,
-      source: widget.existing?.source ?? 'manual',
+      source: _source,
       ingredients: [for (final r in _rows) r.toDraft()],
     );
     try {
@@ -362,6 +504,10 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    // Abonnieren, damit beide Streams schon Werte haben, wenn spaeter ein Knopf sie per ref.read abfragt (Bestandshinweis,
+    // Foto-Vorschlag): ein StreamProvider liefert beim ersten Lesen noch nichts (siehe ADR-021, Fund 2026-10-01).
+    ref.watch(productsStreamProvider);
+    ref.watch(activeInventoryStreamProvider);
     final totals = _totals();
     return Scaffold(
       appBar: AppBar(
@@ -480,6 +626,13 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             label: const Text('Aus Galerie'),
           ),
           if (_hasPhoto)
+            FilledButton.tonalIcon(
+              key: const Key('meal-analyze'),
+              onPressed: _analyzing ? null : _analyze,
+              icon: const Icon(Icons.auto_awesome),
+              label: Text(_analyzing ? 'Foto wird ausgewertet…' : 'Zutaten vom Foto vorschlagen'),
+            ),
+          if (_hasPhoto)
             TextButton.icon(
               key: const Key('meal-photo-remove'),
               onPressed: () => setState(() {
@@ -490,6 +643,24 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
               label: const Text('Foto entfernen'),
             ),
         ]),
+        if (_analyzing) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(key: Key('meal-analyzing'))),
+        if (_analysisApplied)
+          Card(
+            key: const Key('meal-analysis-info'),
+            margin: const EdgeInsets.only(top: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Vorschlag aus dem Foto', style: t.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                const Text(
+                  'Die Mengen sind Schätzungen, bitte prüfen. Öl, Butter, Gewürze und die Basis von Soßen sieht man auf einem '
+                  'Foto nicht: fehlt etwas?',
+                ),
+                if (_analysisNotes != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(_analysisNotes!, key: const Key('meal-analysis-notes'), style: t.textTheme.bodySmall)),
+              ]),
+            ),
+          ),
       ]),
     );
   }
@@ -497,11 +668,12 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   Widget _ingredientTile(int i, ThemeData t) {
     final r = _rows[i];
     final n = r.nutrients;
-    final amount = '${formatQuantity(r.quantity)} ${r.unit.label}';
+    final amount = r.quantity <= 0 ? 'Menge eintragen' : '${formatQuantity(r.quantity)} ${r.unit.label}';
     final parts = <String>[
       amount,
       if (n?.kcal != null) formatKcal(n!.kcal!) else 'Nährwerte unbekannt',
       if (r.deduct && r.product != null) 'vom Bestand',
+      if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
     ];
     return ListTile(
       key: Key('ingredient-row-$i'),
@@ -510,7 +682,12 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       leading: Icon(r.product != null ? Icons.kitchen_outlined : Icons.eco_outlined, size: 20),
       title: Text(r.label),
       subtitle: Text(parts.join(' · ')),
-      trailing: IconButton(key: Key('ingredient-remove-$i'), tooltip: 'Entfernen', icon: const Icon(Icons.close), onPressed: () => setState(() => _rows.removeAt(i))),
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        // Ohne bekannte Naehrwerte: direkt ein Produkt oder einen Datenbank-Treffer dazu suchen
+        if (n == null)
+          IconButton(key: Key('ingredient-lookup-$i'), tooltip: 'Nährwerte suchen', icon: const Icon(Icons.search), onPressed: () => _lookupNutrients(i)),
+        IconButton(key: Key('ingredient-remove-$i'), tooltip: 'Entfernen', icon: const Icon(Icons.close), onPressed: () => setState(() => _rows.removeAt(i))),
+      ]),
       onTap: () => _editIngredient(i),
     );
   }

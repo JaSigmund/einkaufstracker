@@ -35,11 +35,14 @@ class IngredientQuantity {
   final bool deduct;
 }
 
-Future<PickedIngredient?> showIngredientPicker(BuildContext context) => showModalBottomSheet<PickedIngredient>(
+/// [initialQuery] fuellt das Suchfeld vor und startet die Suche sofort, z.B. mit dem Namen einer Zutat, die die
+/// Foto-Analyse ohne Naehrwerte erkannt hat.
+Future<PickedIngredient?> showIngredientPicker(BuildContext context, {String initialQuery = ''}) =>
+    showModalBottomSheet<PickedIngredient>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => const _IngredientPickerSheet(),
+      builder: (_) => _IngredientPickerSheet(initialQuery: initialQuery),
     );
 
 /// Fragt Menge und Einheit einer Zutat ab. [canDeduct] blendet "Vom Bestand abziehen" ein (nur bei Produkten),
@@ -150,7 +153,9 @@ class _QuantityDialogState extends State<_QuantityDialog> {
 }
 
 class _IngredientPickerSheet extends ConsumerStatefulWidget {
-  const _IngredientPickerSheet();
+  const _IngredientPickerSheet({this.initialQuery = ''});
+
+  final String initialQuery;
 
   @override
   ConsumerState<_IngredientPickerSheet> createState() => _IngredientPickerSheetState();
@@ -163,6 +168,21 @@ class _IngredientPickerSheetState extends ConsumerState<_IngredientPickerSheet> 
   List<BlsFood> _bls = const [];
   var _blsLoading = false;
   String? _blsError;
+
+  @override
+  void initState() {
+    super.initState();
+    final q = widget.initialQuery.trim();
+    if (q.isEmpty) return;
+    _search.text = q;
+    _query = q;
+    if (q.length >= blsSearchMinChars) {
+      _blsLoading = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchBls(q);
+      });
+    }
+  }
 
   @override
   void dispose() {

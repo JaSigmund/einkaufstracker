@@ -12,6 +12,7 @@ import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
 import '../data/cloud/cooking_cloud.dart';
+import '../data/cloud/meal_analysis_cloud.dart';
 import '../data/cloud/supabase_cloud_receipt_reader.dart';
 import '../data/cloud/supabase_cooking_cloud.dart';
 import '../data/ocr/image_prep.dart';
@@ -524,6 +525,17 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
 final cookingCloudProvider = Provider<CookingCloud>(
   (ref) => SupabaseCookingCloud(ref.watch(supabaseClientProvider), () async {
     // Update-Sperre (ADR-022) wie bei der Bon-Cloud: zuerst pruefen, bevor irgendein Netzzugriff passiert.
+    if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
+    final id = await ref.read(householdIdProvider.future);
+    if (id == null) throw const CookingCloudUnavailable('kein Haushalt');
+    return id;
+  }),
+);
+
+/// Foto-Analyse einer Mahlzeit (Phase 7c). Einwilligung und Tageslimit prueft der Server, die Update-Sperre
+/// (ADR-022) wie bei den Rezeptvorschlaegen schon vor dem Netzzugriff.
+final mealAnalysisCloudProvider = Provider<MealAnalysisCloud>(
+  (ref) => SupabaseMealAnalysisCloud(ref.watch(supabaseClientProvider), () async {
     if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
     final id = await ref.read(householdIdProvider.future);
     if (id == null) throw const CookingCloudUnavailable('kein Haushalt');
