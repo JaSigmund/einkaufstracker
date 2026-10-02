@@ -27,7 +27,7 @@ create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
 create schema auth;
-create table auth.users (id uuid primary key default gen_random_uuid(), email text);
+create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_app_meta_data jsonb not null default '{}');
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create function auth.role() returns text language sql stable as
@@ -41,11 +41,16 @@ create function storage.foldername(name text) returns text[] language sql immuta
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 """
 
+DEFAULT_PRIVILEGES = """
+alter default privileges in schema public grant all on tables to authenticated, service_role;
+alter default privileges in schema public grant execute on functions to authenticated, service_role;
+"""
+
 GRANTS = """
 grant all on all tables in schema public to authenticated, service_role;
 grant all on all tables in schema storage to authenticated, service_role;
 grant select on all tables in schema auth to service_role;
-grant execute on all functions in schema public, auth, storage to authenticated, service_role;
+grant execute on all functions in schema auth, storage to authenticated, service_role;
 """
 
 A = "11111111-1111-1111-1111-111111111111"
@@ -98,6 +103,7 @@ def main():
 
     # --- Aufbau ---------------------------------------------------------------
     db(SUPABASE_STUBS)
+    db(DEFAULT_PRIVILEGES)
     for m in MIGRATIONS:
         db(m.read_text(encoding="utf-8"))
         print(f"Migration {m.name} eingespielt")
@@ -362,6 +368,104 @@ def main():
     _, updated_rowcount = db("update bls_foods set kcal=0 where bls_code='TEST01'", user=A)
     check("bls_foods: authentifizierter Nutzer darf nicht aendern (RLS filtert die Zeile, 0 betroffen)",
           updated_rowcount == 0)
+
+    # --- Haushalts-Einladungen (0017, Phase 6, ADR-017 Option A) -----------------------------------------------
+    import re
+    codes = [one("select new_invite_code()") for _ in range(300)]
+    check("Einladungscode: 12 Zeichen aus dem Alphabet ohne I, L, O, 0, 1",
+          all(re.fullmatch(r"[A-HJKMNP-Z2-9]{12}", c) for c in codes), codes[0])
+    check("Einladungscode: 300 Codes sind alle verschieden", len(set(codes)) == 300)
+
+    ins_inv = "insert into household_invites (household_id, invited_by, email) values (%s,%s,%s)"
+    check("Einladung: Mitglied A kann in den eigenen Haushalt einladen", not raises(ins_inv, (ha, A, "neu@test.at"), user=A))
+    check("Einladung: Code wird automatisch vergeben (12 Zeichen)",
+          re.fullmatch(r"[A-Z0-9]{12}", one("select token from household_invites where email='neu@test.at'")) is not None)
+    check("Einladung: B kann nicht in Haushalt A einladen (RLS)", raises(ins_inv, (ha, B, "fremd@test.at"), user=B))
+    check("Einladung: A kann nicht im Namen von B einladen (invited_by = auth.uid())", raises(ins_inv, (ha, B, "x@test.at"), user=A))
+    check("Einladung: Rolle owner wird abgelehnt (nur member)",
+          raises("insert into household_invites (household_id, invited_by, email, role) values (%s,%s,'o@test.at','owner')", (ha, A), user=A))
+    check("Einladung: E-Mail muss klein geschrieben und ohne Leerzeichen am Rand sein", raises(ins_inv, (ha, A, "Gross@Test.at"), user=A))
+    check("Einladung: E-Mail muss wie eine Adresse aussehen", raises(ins_inv, (ha, A, "keine-adresse"), user=A))
+    check("Einladung: zweite offene Einladung fuer dieselbe Adresse wird abgelehnt", raises(ins_inv, (ha, A, "neu@test.at"), user=A))
+    check("RLS: B sieht keine Einladungen von A", one("select count(*) from household_invites", user=B) == 0)
+    check("RLS: A sieht die eigenen Einladungen", one("select count(*) from household_invites", user=A) == 1)
+    check("Einladung: Client kann Code und Ablauf nicht aendern (keine Update-Policy, 0 betroffen)",
+          db("update household_invites set expires_at = now() + interval '1 year'", user=A)[1] == 0)
+
+    for fn in ("peek_invite('X','x@test.at')", "redeem_invite('X', gen_random_uuid())"):
+        check(f"Einladung: authentifizierter Client darf {fn.split('(')[0]} nicht aufrufen", raises(f"select * from {fn}", user=A))
+    check("Einladung: service_role darf pruefen und einloesen",
+          one("select has_function_privilege('service_role', 'public.peek_invite(text,text)', 'execute')")
+          and one("select has_function_privilege('service_role', 'public.redeem_invite(text,uuid)', 'execute')"))
+
+    def peek(token, email):
+        return db("select status, household_id from peek_invite(%s,%s)", (token, email))[0][0]
+
+    token = one("select token from household_invites where email='neu@test.at'")
+    check("Pruefen: unbekannter Code -> not_found", peek("AAAAAAAAAAAA", "neu@test.at")[0] == "not_found")
+    check("Pruefen: Code mit Kleinbuchstaben und Leerzeichen wird normalisiert, Adresse ebenso -> ok",
+          peek(f" {token.lower()} ", " Neu@Test.at ") == ("ok", ha))
+    check("Pruefen: falsche Adresse -> email_mismatch", peek(token, "anders@test.at")[0] == "email_mismatch")
+    check("Pruefen: Fehlversuch wird gezaehlt (nicht mit der Ausnahme zurueckgerollt)",
+          one("select failed_attempts from household_invites where token=%s", (token,)) == 1)
+    for _ in range(4):
+        peek(token, "anders@test.at")
+    check("Pruefen: nach 5 Fehlversuchen ist der Code gesperrt, auch mit richtiger Adresse", peek(token, "neu@test.at")[0] == "locked")
+    db("update household_invites set failed_attempts = 0 where token=%s", (token,))
+
+    db(ins_inv, (ha, A, "spaet@test.at"))
+    t_exp = one("select token from household_invites where email='spaet@test.at'")
+    db("update household_invites set expires_at = now() - interval '1 minute' where token=%s", (t_exp,))
+    check("Pruefen: abgelaufene Einladung -> expired", peek(t_exp, "spaet@test.at")[0] == "expired")
+
+    # Annahme: eingeladener Nutzer entsteht per Admin-API mit app_metadata.invited_to, bekommt keinen eigenen Haushalt
+    households_before = one("select count(*) from households")
+    NEW = "33333333-3333-3333-3333-333333333333"
+    db("insert into auth.users (id, email, raw_app_meta_data) values (%s, 'neu@test.at', jsonb_build_object('invited_to', %s::text))", (NEW, str(ha)))
+    check("Signup-Trigger: eingeladener Nutzer (invited_to) bekommt keinen eigenen Haushalt",
+          one("select count(*) from households") == households_before and one("select count(*) from household_members where user_id=%s", (NEW,)) == 0)
+    check("Einloesen: gibt den Haushalt zurueck", str(one("select redeem_invite(%s, %s)", (token.lower(), NEW))) == str(ha))
+    check("Einloesen: Mitgliedschaft mit Rolle member",
+          db("select role::text from household_members where user_id=%s and household_id=%s", (NEW, ha))[0][0][0] == "member")
+    check("Einloesen: Einladung ist als angenommen markiert (Zeitpunkt und Nutzer)",
+          db("select accepted_at is not null, accepted_by = %s from household_invites where token=%s", (NEW, token))[0][0] == (True, True))
+    check("Einloesen: derselbe Code ein zweites Mal wird abgelehnt", raises("select redeem_invite(%s, %s)", (token, A)))
+    check("Pruefen: eingeloeste Einladung -> used", peek(token, "neu@test.at")[0] == "used")
+    check("Einloesen: abgelaufene Einladung wird abgelehnt", raises("select redeem_invite(%s, %s)", (t_exp, B)))
+    check("Neues Mitglied sieht die Daten des Haushalts (RLS ueber household_members)",
+          one("select count(*) from stores", user=NEW) == one("select count(*) from stores where household_id=%s", (ha,)))
+    check("Neues Mitglied sieht den Haushalt von B nicht", one("select count(*) from stores where household_id=%s", (hb,), user=NEW) == 0)
+    check("Angenommene Einladung kann nicht mehr zurueckgezogen werden (0 betroffen)",
+          db("delete from household_invites where token=%s", (token,), user=A)[1] == 0)
+
+    db(ins_inv, (ha, A, "zurueck@test.at"))
+    check("Offene Einladung kann das Mitglied zurueckziehen",
+          db("delete from household_invites where email='zurueck@test.at'", user=A)[1] == 1)
+    check("B kann Einladungen von A nicht zurueckziehen", db("delete from household_invites where email='spaet@test.at'", user=B)[1] == 0)
+
+    db("insert into auth.users (id, email) values (gen_random_uuid(), 'normal@test.at')")
+    check("Signup-Trigger: normale Registrierung legt weiterhin einen Haushalt an", one("select count(*) from households") == households_before + 1)
+
+    # Haushaltsgroesse: ab 10 Mitgliedern keine Annahme mehr
+    db("delete from household_invites where accepted_at is null")
+    members_now = one("select count(*) from household_members where household_id=%s", (ha,))
+    for i in range(10 - members_now):
+        db("insert into auth.users (id, email, raw_app_meta_data) values (gen_random_uuid(), %s, jsonb_build_object('invited_to', %s::text)) ",
+           (f"m{i}@test.at", str(ha)))
+        uid = one("select id from auth.users where email=%s", (f"m{i}@test.at",))
+        db("insert into household_members (household_id, user_id) values (%s,%s)", (ha, uid))
+    db(ins_inv, (ha, A, "elfte@test.at"))
+    t_full = one("select token from household_invites where email='elfte@test.at'")
+    check("Haushalt mit 10 Mitgliedern: Pruefen meldet full", peek(t_full, "elfte@test.at")[0] == "full")
+    check("Haushalt mit 10 Mitgliedern: Einloesen wird abgelehnt", raises("select redeem_invite(%s, %s)", (t_full, B)))
+
+    # Hoechstens 20 offene Einladungen je Haushalt (Missbrauchsschutz)
+    db("delete from household_invites where accepted_at is null")
+    for i in range(20):
+        db(ins_inv, (ha, A, f"bulk{i}@test.at"))
+    check("Hoechstens 20 offene Einladungen je Haushalt", raises(ins_inv, (ha, A, "bulk21@test.at"), user=A))
+    db("delete from household_invites where accepted_at is null")
+
 
     # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
     planned_ok = True

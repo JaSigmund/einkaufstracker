@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -94,6 +95,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     child: _busy
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Anmelden'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    key: const Key('login-accept-invite'),
+                    onPressed: _busy ? null : () => context.push('/accept-invite'),
+                    child: const Text('Einladung annehmen'),
                   ),
                 ],
               ),

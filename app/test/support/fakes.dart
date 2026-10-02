@@ -8,6 +8,7 @@ import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
 import 'package:einkaufstracker/data/cloud/meal_analysis_cloud.dart';
 import 'package:einkaufstracker/data/files/meal_photo_service.dart';
+import 'package:einkaufstracker/data/household/household_invites.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
@@ -443,5 +444,64 @@ class FakeMealAnalysisCloud implements MealAnalysisCloud {
     lastProducts = products;
     if (error != null) throw error!;
     return analysis;
+  }
+}
+
+/// Einladungen im Speicher (Phase 6). [failWith] laesst den naechsten Aufruf scheitern.
+class FakeHouseholdInviteRepository implements HouseholdInviteRepository {
+  FakeHouseholdInviteRepository({List<HouseholdInvite>? invites, this.members = 1}) : invites = invites ?? [];
+
+  final List<HouseholdInvite> invites;
+  int members;
+  InviteFailure? failWith;
+  final created = <String>[];
+  final revoked = <String>[];
+  var _n = 0;
+
+  @override
+  Future<List<HouseholdInvite>> pending() async {
+    if (failWith != null) throw failWith!;
+    return List.of(invites);
+  }
+
+  @override
+  Future<HouseholdInvite> create(String email) async {
+    if (failWith != null) throw failWith!;
+    created.add(email);
+    _n++;
+    final invite = HouseholdInvite(
+      id: 'inv$_n',
+      email: email,
+      token: 'ABCDEFGHJKM${'NPQRSTUVWXYZ'[_n % 12]}',
+      expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
+      createdAt: DateTime.now().toUtc(),
+    );
+    invites.insert(0, invite);
+    return invite;
+  }
+
+  @override
+  Future<void> revoke(String id) async {
+    if (failWith != null) throw failWith!;
+    revoked.add(id);
+    invites.removeWhere((i) => i.id == id);
+  }
+
+  @override
+  Future<int> memberCount() async {
+    if (failWith != null) throw failWith!;
+    return members;
+  }
+}
+
+/// "Einladung annehmen" ohne Netz: merkt sich die Aufrufe, scheitert auf Wunsch.
+class FakeAcceptInviteApi implements AcceptInviteApi {
+  InviteFailure? error;
+  final calls = <({String code, String email, String password})>[];
+
+  @override
+  Future<void> accept({required String code, required String email, required String password}) async {
+    calls.add((code: code, email: email, password: password));
+    if (error != null) throw error!;
   }
 }
