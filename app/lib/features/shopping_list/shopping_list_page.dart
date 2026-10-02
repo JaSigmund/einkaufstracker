@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/receipt/price_history.dart';
+import '../../domain/shopping_list/list_price_estimate.dart';
 
 String _sourceLabel(String source) => switch (source) {
       'depleted' => 'Aufgebraucht',
@@ -73,12 +75,38 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
     }
   }
 
+  /// "Noch zu kaufen: ca. 12,40 €" nach dem zuletzt bezahlten Preis. Eintraege ohne bekannten Preis (neues Produkt, frei
+  /// getippt) zaehlen nicht mit und werden genannt, damit die Summe nie vollstaendiger wirkt, als sie ist.
+  Widget _estimateCard(ThemeData t, ListTotalEstimate estimate) {
+    return Card(
+      key: const Key('shopping-estimate'),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Noch zu kaufen: ca. ${formatEuro(estimate.totalCents)}', key: const Key('shopping-estimate-total'), style: t.textTheme.titleMedium),
+          Text('nach dem zuletzt bezahlten Preis', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          if (!estimate.isComplete)
+            Text(
+              estimate.itemsWithoutPrice == 1
+                  ? '1 Artikel ohne bekannten Preis ist nicht eingerechnet.'
+                  : '${estimate.itemsWithoutPrice} Artikel ohne bekannten Preis sind nicht eingerechnet.',
+              key: const Key('shopping-estimate-missing'),
+              style: t.textTheme.bodySmall,
+            ),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final items = ref.watch(shoppingListItemsStreamProvider).value ?? const <ShoppingListItem>[];
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final categoryNames = {for (final c in ref.watch(categoriesStreamProvider).value ?? const <Category>[]) c.id: c.name};
+    final receiptItems = ref.watch(allItemsStreamProvider).value ?? const <ReceiptItem>[];
+    final receipts = ref.watch(receiptsStreamProvider).value ?? const <Receipt>[];
 
     String labelOf(ShoppingListItem i) => i.freeText ?? products[i.productId]?.name ?? 'Unbekanntes Produkt';
     String categoryOf(ShoppingListItem i) {
@@ -97,6 +125,22 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
     for (final list in grouped.values) {
       list.sort((a, b) => labelOf(a).toLowerCase().compareTo(labelOf(b).toLowerCase()));
     }
+    // Summenschaetzung (ADR-030): offene Eintraege mit dem zuletzt bezahlten Grundpreis des Produkts
+    final latestPrice = latestUnitPriceByProduct(
+      items: [
+        for (final i in receiptItems)
+          (receiptId: i.receiptId, productId: i.productId, unitPriceNormCents: i.unitPriceNormCents, quantity: i.quantity, quantityUnit: i.quantityUnit),
+      ],
+      receipts: [for (final r in receipts) (id: r.id, storeId: r.storeId, purchasedAtUtc: r.purchasedAt)],
+    );
+    final estimate = estimateShoppingListTotal([
+      for (final i in active)
+        (
+          quantity: i.quantity,
+          packSize: i.productId == null ? null : products[i.productId]?.packSize,
+          lastUnitPriceNormCents: i.productId == null ? null : latestPrice[i.productId],
+        ),
+    ]);
     final groupNames = grouped.keys.toList()
       ..sort((a, b) {
         if (a == 'Ohne Kategorie') return 1;
@@ -110,6 +154,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 8),
             children: [
+              if (estimate.itemsWithPrice > 0) _estimateCard(t, estimate),
               if (suggestions.isNotEmpty) ...[
                 Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Vorschläge', style: t.textTheme.titleSmall)),
                 for (final s in suggestions)

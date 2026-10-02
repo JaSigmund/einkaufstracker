@@ -346,6 +346,12 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
 /// Rein lokal, kein Sync -- siehe Doku-Kommentar in `saved_recipe.dart`.
 final savedRecipeRepositoryProvider = Provider<SavedRecipeRepository>((ref) => SavedRecipeRepository(ref.watch(databaseProvider)));
 
+/// Ist-Soll-Abgleich eines Bons: Listeneintraege, die dieser Bon abgehakt hat, geschaetzt gegen bezahlt (Wettbewerbsanalyse,
+/// ADR-030). `null`, wenn es keinen Vergleich gibt.
+final listComparisonProvider = FutureProvider.autoDispose.family<ListComparison?, String>(
+  (ref, receiptId) => ref.watch(shoppingListRepositoryProvider).comparisonFor(receiptId),
+);
+
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
 
 final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {

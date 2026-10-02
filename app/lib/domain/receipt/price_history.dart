@@ -39,6 +39,32 @@ List<PricePoint> buildPriceHistory({
   return points;
 }
 
+/// Der zuletzt bezahlte Grundpreis (Cent je Basiseinheit) je Produkt, ueber alle Haendler hinweg: der neueste Kauf
+/// mit berechnetem Grundpreis gewinnt. [excludeReceiptId] laesst einen Bon aussen vor (der Vergleich "geschaetzt gegen
+/// bezahlt" braucht den Preis VOR diesem Einkauf). Produkte ohne Kauf mit Grundpreis fehlen im Ergebnis.
+Map<String, int> latestUnitPriceByProduct({
+  required Iterable<PriceHistoryItem> items,
+  required Iterable<PriceHistoryReceipt> receipts,
+  String? excludeReceiptId,
+}) {
+  final receiptById = {for (final r in receipts) r.id: r};
+  final latestAt = <String, DateTime>{};
+  final latest = <String, int>{};
+  for (final i in items) {
+    final productId = i.productId;
+    final price = i.unitPriceNormCents;
+    if (productId == null || price == null || i.receiptId == excludeReceiptId) continue;
+    final receipt = receiptById[i.receiptId];
+    if (receipt == null) continue;
+    final known = latestAt[productId];
+    if (known == null || receipt.purchasedAtUtc.isAfter(known)) {
+      latestAt[productId] = receipt.purchasedAtUtc;
+      latest[productId] = price;
+    }
+  }
+  return latest;
+}
+
 /// Grundpreis-Statistik eines Haendlers fuer den Vergleich (Doku 07 §3.2).
 class StoreGrundpreis {
   StoreGrundpreis(this.chain)
