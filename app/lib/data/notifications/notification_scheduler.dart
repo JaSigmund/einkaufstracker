@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -44,7 +44,7 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
 
   @override
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized || kIsWeb) return;
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Vienna'));
     await _plugin.initialize(
@@ -72,6 +72,10 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
 
   @override
   Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays}) async {
+    // Browser koennen keine zeitgesteuerten Hintergrund-Benachrichtigungen (ADR-007-Update, iOS-PWA):
+    // ohne eigenen Push-Server (Phase 6, FCM) gibt es dafuer keine verlaessliche Web-Entsprechung.
+    // Statt eines kryptischen Plattform-Fehlers wird die Planung auf Web bewusst uebersprungen.
+    if (kIsWeb) return;
     await initialize();
     final signature = '$notifyTime|$leadDays|${reminders.map((r) {
       final dateStr = '${r.date.year}-${r.date.month}-${r.date.day}';
