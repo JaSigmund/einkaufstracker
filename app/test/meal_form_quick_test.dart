@@ -274,4 +274,101 @@ void main() {
       expect(selected, hasLength(1));
     });
   });
+
+  group('Portionen umrechnen (Doku 15 §3.2)', () {
+    Future<Meal> vierPortionen() => meals.create(MealDraft(
+          title: 'Reispfanne',
+          eatenAt: DateTime.utc(2026, 9, 20, 18),
+          servingsEaten: 1,
+          servingsMade: 4,
+          ingredients: [
+            IngredientDraft(productId: reis.id, quantity: 200, entryUnit: EntryUnit.g),
+            const IngredientDraft(freeText: 'Nachspeise', quantity: 1, entryUnit: EntryUnit.piece, source: 'estimate', manualNutrients: NutrientAmounts(kcal: 400, proteinG: 8)),
+          ],
+        ));
+
+    Future<void> scaleTo(WidgetTester tester, String value) async {
+      await tester.tap(find.byKey(const Key('meal-scale')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('scale-servings')), value);
+      await tester.tap(find.byKey(const Key('scale-ok')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('ohne Zutaten gibt es keinen Knopf', (tester) async {
+      await open(tester, host());
+      expect(find.byKey(const Key('meal-scale')), findsNothing);
+    });
+
+    testWidgets('von 4 auf 2 Portionen: Mengen halbiert, Handeingabe mit, Portionen gekocht gesetzt', (tester) async {
+      final original = await vierPortionen();
+      await open(tester, host(template: original));
+      await scaleTo(tester, '2');
+      expect(find.text('100 g · 350 kcal · vom Bestand'), findsOneWidget);
+      expect(find.text('Handeingabe · 200 kcal'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('meal-servings-made'))).controller!.text, '2');
+      expect(tester.widget<TextField>(find.byKey(const Key('meal-servings-eaten'))).controller!.text, '1', reason: 'der eigene Anteil bleibt');
+    });
+
+    testWidgets('hochrechnen: von 4 auf 6 Portionen (Faktor 1,5)', (tester) async {
+      final original = await vierPortionen();
+      await open(tester, host(template: original));
+      await scaleTo(tester, '6');
+      expect(find.text('300 g · 1.050 kcal · vom Bestand'), findsOneWidget);
+    });
+
+    testWidgets('Speichern nach dem Umrechnen zieht die umgerechnete Menge vom Bestand ab', (tester) async {
+      final original = await vierPortionen();
+      final before = (await db.select(db.inventoryItems).get()).single.quantity;
+      await open(tester, host(template: original));
+      await scaleTo(tester, '2');
+      await tester.tap(find.byKey(const Key('meal-save')));
+      await tester.pumpAndSettle();
+      final copy = (await db.select(db.meals).get()).firstWhere((m) => m.id != original.id);
+      expect(copy.servingsMade, 2);
+      final after = (await db.select(db.inventoryItems).get()).single.quantity;
+      expect(after, closeTo(before - 0.1, 1e-9), reason: '100 g statt 200 g');
+    });
+
+    testWidgets('ungueltige Eingabe (0, Text, zu gross) bleibt im Dialog und aendert nichts', (tester) async {
+      final original = await vierPortionen();
+      await open(tester, host(template: original));
+      for (final bad in ['0', 'viele', '-2', '500']) {
+        await tester.tap(find.byKey(const Key('meal-scale')));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('scale-servings')), bad);
+        await tester.tap(find.byKey(const Key('scale-ok')));
+        await tester.pumpAndSettle();
+        expect(find.text('Bitte eine Portionenzahl zwischen 0 und 100 eingeben.'), findsOneWidget, reason: bad);
+        await tester.tap(find.text('Abbrechen'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('200 g · 700 kcal · vom Bestand'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('meal-servings-made'))).controller!.text, '4');
+    });
+
+    testWidgets('dieselbe Zahl oder Abbrechen aendert nichts', (tester) async {
+      final original = await vierPortionen();
+      await open(tester, host(template: original));
+      await scaleTo(tester, '4');
+      expect(find.text('200 g · 700 kcal · vom Bestand'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('meal-scale')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Abbrechen'));
+      await tester.pumpAndSettle();
+      expect(find.text('200 g · 700 kcal · vom Bestand'), findsOneWidget);
+    });
+
+    testWidgets('Handeingabe ohne weitere Zutaten wird mit umgerechnet', (tester) async {
+      await open(tester, host());
+      await tester.enterText(find.byKey(const Key('meal-title')), 'Test');
+      await tester.tap(find.byKey(const Key('meal-add-manual')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('manual-kcal')), '300');
+      await tester.tap(find.byKey(const Key('manual-ok')));
+      await tester.pumpAndSettle();
+      await scaleTo(tester, '2');
+      expect(find.text('Handeingabe · 600 kcal'), findsOneWidget);
+    });
+  });
 }

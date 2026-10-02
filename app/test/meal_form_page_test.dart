@@ -59,6 +59,10 @@ void main() {
       );
 
   Future<void> open(WidgetTester tester, Widget app) async {
+    // Hoher Bildschirm: die Liste baut ihre Zeilen lazy, die Summenkarte unter den Knoepfen liegt sonst ausserhalb
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(app);
     await tester.pumpAndSettle();
     GoRouter.of(tester.element(find.text('START'))).push('/form');

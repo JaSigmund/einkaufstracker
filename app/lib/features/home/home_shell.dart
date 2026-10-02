@@ -75,6 +75,12 @@ class _HomeShellState extends State<HomeShell> {
             ),
           if (_index == 5)
             IconButton(
+              tooltip: 'Journal',
+              icon: const Icon(Icons.auto_stories_outlined),
+              onPressed: () => context.push('/journal'),
+            ),
+          if (_index == 5)
+            IconButton(
               tooltip: 'Richtwerte',
               icon: const Icon(Icons.tune),
               onPressed: () => context.push('/nutrition-targets'),
