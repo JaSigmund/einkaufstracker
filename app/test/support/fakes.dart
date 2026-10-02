@@ -487,8 +487,11 @@ class FakeHouseholdInviteRepository implements HouseholdInviteRepository {
     invites.removeWhere((i) => i.id == id);
   }
 
+  var memberCountCalls = 0;
+
   @override
   Future<int> memberCount() async {
+    memberCountCalls++;
     if (failWith != null) throw failWith!;
     return members;
   }
