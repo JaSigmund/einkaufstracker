@@ -95,6 +95,10 @@ class SyncEngine {
 
   /// Findet die Zeilen, die beim Senden eine neuere fremde Aenderung ueberschreiben wuerden (ADR-018).
   ///
+  /// **Best effort:** Die Erkennung ist ein Hinweis fuer den Nutzer und darf das Senden nie verhindern. Scheitert die
+  /// Abfrage einer Tabelle (Netz, Rechte, unerwartete Antwort), gilt diese Tabelle als "ohne Befund" und es wird normal
+  /// gesendet; ein echter Netzfehler faellt dann beim Senden selbst auf, wie vorher.
+  ///
   /// Je Tabelle mit wartenden Aenderungen EINE Anfrage nach den Server-Zeitstempeln. Eine Zeile gilt als Konflikt, wenn
   /// ihr `updated_at` beim Server NEUER ist als alles, was dieses Geraet von ihr weiss: der Stand des letzten Holens der
   /// Tabelle und der eigene letzte Schreibvorgang. Zeilen, die es beim Server noch nicht gibt (neu angelegt), und Tabellen,
@@ -112,17 +116,23 @@ class SyncEngine {
       final lastPulled = state?.lastPulledAt == null ? null : DateTime.tryParse(state!.lastPulledAt!);
       if (lastPulled == null) continue;
       final idList = ids.toList();
-      for (var i = 0; i < idList.length; i += 100) {
-        final chunk = idList.sublist(i, i + 100 > idList.length ? idList.length : i + 100);
-        final serverAt = await _remote.fetchUpdatedAt(table, chunk);
-        for (final MapEntry(key: id, value: stamp) in serverAt.entries) {
-          final remoteAt = DateTime.tryParse(stamp);
-          if (remoteAt == null) continue;
-          final own = _ownWrites['$table:$id'];
-          final known = own != null && own.isAfter(lastPulled) ? own : lastPulled;
-          if (remoteAt.isAfter(known)) conflicts.add((table: table, rowId: id));
+      final found = <SyncConflict>[];
+      try {
+        for (var i = 0; i < idList.length; i += 100) {
+          final chunk = idList.sublist(i, i + 100 > idList.length ? idList.length : i + 100);
+          final serverAt = await _remote.fetchUpdatedAt(table, chunk);
+          for (final MapEntry(key: id, value: stamp) in serverAt.entries) {
+            final remoteAt = DateTime.tryParse(stamp);
+            if (remoteAt == null) continue;
+            final own = _ownWrites['$table:$id'];
+            final known = own != null && own.isAfter(lastPulled) ? own : lastPulled;
+            if (remoteAt.isAfter(known)) found.add((table: table, rowId: id));
+          }
         }
+      } on Object {
+        continue; // siehe oben: kein Befund fuer diese Tabelle, gesendet wird trotzdem
       }
+      conflicts.addAll(found);
     }
     return conflicts;
   }
