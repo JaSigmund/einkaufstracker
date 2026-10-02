@@ -9508,6 +9508,279 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
   }
 }
 
+class $NutritionTargetRowsTable extends NutritionTargetRows
+    with TableInfo<$NutritionTargetRowsTable, NutritionTargetRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NutritionTargetRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetsMeta = const VerificationMeta(
+    'targets',
+  );
+  @override
+  late final GeneratedColumn<String> targets = GeneratedColumn<String>(
+    'targets',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [householdId, targets, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'nutrition_target_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NutritionTargetRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('targets')) {
+      context.handle(
+        _targetsMeta,
+        targets.isAcceptableOrUnknown(data['targets']!, _targetsMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {householdId};
+  @override
+  NutritionTargetRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NutritionTargetRow(
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      targets: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}targets'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NutritionTargetRowsTable createAlias(String alias) {
+    return $NutritionTargetRowsTable(attachedDatabase, alias);
+  }
+}
+
+class NutritionTargetRow extends DataClass
+    implements Insertable<NutritionTargetRow> {
+  final String householdId;
+  final String targets;
+  final DateTime updatedAt;
+  const NutritionTargetRow({
+    required this.householdId,
+    required this.targets,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['household_id'] = Variable<String>(householdId);
+    map['targets'] = Variable<String>(targets);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  NutritionTargetRowsCompanion toCompanion(bool nullToAbsent) {
+    return NutritionTargetRowsCompanion(
+      householdId: Value(householdId),
+      targets: Value(targets),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory NutritionTargetRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NutritionTargetRow(
+      householdId: serializer.fromJson<String>(json['householdId']),
+      targets: serializer.fromJson<String>(json['targets']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'householdId': serializer.toJson<String>(householdId),
+      'targets': serializer.toJson<String>(targets),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  NutritionTargetRow copyWith({
+    String? householdId,
+    String? targets,
+    DateTime? updatedAt,
+  }) => NutritionTargetRow(
+    householdId: householdId ?? this.householdId,
+    targets: targets ?? this.targets,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  NutritionTargetRow copyWithCompanion(NutritionTargetRowsCompanion data) {
+    return NutritionTargetRow(
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      targets: data.targets.present ? data.targets.value : this.targets,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NutritionTargetRow(')
+          ..write('householdId: $householdId, ')
+          ..write('targets: $targets, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(householdId, targets, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NutritionTargetRow &&
+          other.householdId == this.householdId &&
+          other.targets == this.targets &&
+          other.updatedAt == this.updatedAt);
+}
+
+class NutritionTargetRowsCompanion extends UpdateCompanion<NutritionTargetRow> {
+  final Value<String> householdId;
+  final Value<String> targets;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const NutritionTargetRowsCompanion({
+    this.householdId = const Value.absent(),
+    this.targets = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NutritionTargetRowsCompanion.insert({
+    required String householdId,
+    this.targets = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : householdId = Value(householdId),
+       updatedAt = Value(updatedAt);
+  static Insertable<NutritionTargetRow> custom({
+    Expression<String>? householdId,
+    Expression<String>? targets,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (householdId != null) 'household_id': householdId,
+      if (targets != null) 'targets': targets,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NutritionTargetRowsCompanion copyWith({
+    Value<String>? householdId,
+    Value<String>? targets,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return NutritionTargetRowsCompanion(
+      householdId: householdId ?? this.householdId,
+      targets: targets ?? this.targets,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (targets.present) {
+      map['targets'] = Variable<String>(targets.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NutritionTargetRowsCompanion(')
+          ..write('householdId: $householdId, ')
+          ..write('targets: $targets, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BugReportsTable extends BugReports
     with TableInfo<$BugReportsTable, BugReport> {
   @override
@@ -12437,6 +12710,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MealIngredientsTable mealIngredients = $MealIngredientsTable(
     this,
   );
+  late final $NutritionTargetRowsTable nutritionTargetRows =
+      $NutritionTargetRowsTable(this);
   late final $BugReportsTable bugReports = $BugReportsTable(this);
   late final $ShoppingListsTable shoppingLists = $ShoppingListsTable(this);
   late final $ShoppingListItemsTable shoppingListItems =
@@ -12462,6 +12737,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     inventoryMovements,
     meals,
     mealIngredients,
+    nutritionTargetRows,
     bugReports,
     shoppingLists,
     shoppingListItems,
@@ -17048,6 +17324,197 @@ typedef $$MealIngredientsTableProcessedTableManager =
       MealIngredient,
       PrefetchHooks Function()
     >;
+typedef $$NutritionTargetRowsTableCreateCompanionBuilder =
+    NutritionTargetRowsCompanion Function({
+      required String householdId,
+      Value<String> targets,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$NutritionTargetRowsTableUpdateCompanionBuilder =
+    NutritionTargetRowsCompanion Function({
+      Value<String> householdId,
+      Value<String> targets,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$NutritionTargetRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $NutritionTargetRowsTable> {
+  $$NutritionTargetRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targets => $composableBuilder(
+    column: $table.targets,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NutritionTargetRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $NutritionTargetRowsTable> {
+  $$NutritionTargetRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targets => $composableBuilder(
+    column: $table.targets,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NutritionTargetRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NutritionTargetRowsTable> {
+  $$NutritionTargetRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targets =>
+      $composableBuilder(column: $table.targets, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$NutritionTargetRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NutritionTargetRowsTable,
+          NutritionTargetRow,
+          $$NutritionTargetRowsTableFilterComposer,
+          $$NutritionTargetRowsTableOrderingComposer,
+          $$NutritionTargetRowsTableAnnotationComposer,
+          $$NutritionTargetRowsTableCreateCompanionBuilder,
+          $$NutritionTargetRowsTableUpdateCompanionBuilder,
+          (
+            NutritionTargetRow,
+            BaseReferences<
+              _$AppDatabase,
+              $NutritionTargetRowsTable,
+              NutritionTargetRow
+            >,
+          ),
+          NutritionTargetRow,
+          PrefetchHooks Function()
+        > {
+  $$NutritionTargetRowsTableTableManager(
+    _$AppDatabase db,
+    $NutritionTargetRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NutritionTargetRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NutritionTargetRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$NutritionTargetRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> householdId = const Value.absent(),
+                Value<String> targets = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NutritionTargetRowsCompanion(
+                householdId: householdId,
+                targets: targets,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String householdId,
+                Value<String> targets = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NutritionTargetRowsCompanion.insert(
+                householdId: householdId,
+                targets: targets,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$NutritionTargetRowsTable, NutritionTargetRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $NutritionTargetRowsTable,
+                    NutritionTargetRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NutritionTargetRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NutritionTargetRowsTable,
+      NutritionTargetRow,
+      $$NutritionTargetRowsTableFilterComposer,
+      $$NutritionTargetRowsTableOrderingComposer,
+      $$NutritionTargetRowsTableAnnotationComposer,
+      $$NutritionTargetRowsTableCreateCompanionBuilder,
+      $$NutritionTargetRowsTableUpdateCompanionBuilder,
+      (
+        NutritionTargetRow,
+        BaseReferences<
+          _$AppDatabase,
+          $NutritionTargetRowsTable,
+          NutritionTargetRow
+        >,
+      ),
+      NutritionTargetRow,
+      PrefetchHooks Function()
+    >;
 typedef $$BugReportsTableCreateCompanionBuilder = BugReportsCompanion Function({
   required String id,
   required String householdId,
@@ -18605,6 +19072,8 @@ class $AppDatabaseManager {
       $$MealsTableTableManager(_db, _db.meals);
   $$MealIngredientsTableTableManager get mealIngredients =>
       $$MealIngredientsTableTableManager(_db, _db.mealIngredients);
+  $$NutritionTargetRowsTableTableManager get nutritionTargetRows =>
+      $$NutritionTargetRowsTableTableManager(_db, _db.nutritionTargetRows);
   $$BugReportsTableTableManager get bugReports =>
       $$BugReportsTableTableManager(_db, _db.bugReports);
   $$ShoppingListsTableTableManager get shoppingLists =>

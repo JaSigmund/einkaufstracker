@@ -40,6 +40,8 @@ final syncTables = <SyncTableDef>[
   // Essenstagebuch (Phase 7): Zutaten zeigen auf ihre Mahlzeit, deshalb zuerst die Mahlzeiten
   SyncTableDef('meals', (db, j) => db.into(db.meals).insertOnConflictUpdate(mealFromRemote(j))),
   SyncTableDef('meal_ingredients', (db, j) => db.into(db.mealIngredients).insertOnConflictUpdate(mealIngredientFromRemote(j))),
+  SyncTableDef('nutrition_targets', (db, j) => db.into(db.nutritionTargetRows).insertOnConflictUpdate(nutritionTargetFromRemote(j)),
+      idOf: (j) => j['household_id'] as String),
   // Fremdschluessel: shopping_list_items -> shopping_lists, deshalb zuerst die Liste
   SyncTableDef('shopping_lists', (db, j) => db.into(db.shoppingLists).insertOnConflictUpdate(shoppingListFromRemote(j))),
   SyncTableDef('shopping_list_items', (db, j) => db.into(db.shoppingListItems).insertOnConflictUpdate(shoppingListItemFromRemote(j))),

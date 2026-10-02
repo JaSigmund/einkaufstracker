@@ -20,6 +20,7 @@ import 'package:einkaufstracker/data/products/off_client.dart';
 import 'package:einkaufstracker/data/repositories/bug_report_repository.dart';
 import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
+import 'package:einkaufstracker/data/repositories/nutrition_targets_repository.dart';
 import 'package:einkaufstracker/data/repositories/product_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
@@ -90,7 +91,12 @@ class FakeRemoteStore implements RemoteStore {
     }
     final stored = Map<String, dynamic>.from(row);
     stored['updated_at'] = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
-    final key = tableName == 'product_barcodes' ? '${row['household_id']}:${row['ean']}' : row['id'] as String;
+    // Tabellen ohne Spalte "id": zusammengesetzter bzw. Haushalts-Primaerschluessel wie am Server
+    final key = switch (tableName) {
+      'product_barcodes' => '${row['household_id']}:${row['ean']}',
+      'nutrition_targets' => row['household_id'] as String,
+      _ => row['id'] as String,
+    };
     table(tableName)[key] = stored;
   }
 }
@@ -247,6 +253,9 @@ InventoryRepository inventoryRepo(AppDatabase db,
 
 MealRepository mealRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged, InventoryRepository? inventory}) =>
     MealRepository(db, householdId: () async => household, inventory: inventory ?? inventoryRepo(db, household: household), onChanged: onChanged);
+
+NutritionTargetsRepository nutritionTargetsRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    NutritionTargetsRepository(db, householdId: () async => household, onChanged: onChanged);
 
 ShoppingListRepository shoppingListRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     ShoppingListRepository(db, householdId: () async => household, onChanged: onChanged);
