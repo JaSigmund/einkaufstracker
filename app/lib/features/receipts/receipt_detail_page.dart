@@ -72,6 +72,7 @@ class ReceiptDetailPage extends ConsumerWidget {
     final files = ref.watch(receiptFilesStreamProvider(receiptId)).value ?? const <ReceiptFile>[];
     final categories = (ref.watch(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
     final categoryName = {for (final c in categories) c.id: c.name};
+    final comparison = ref.watch(listComparisonProvider(receiptId)).value;
     final t = Theme.of(context);
 
     if (receipt == null || receipt.deletedAt != null) {
@@ -108,6 +109,16 @@ class ReceiptDetailPage extends ConsumerWidget {
               child: Text(
                 'Beim Import stimmten nicht alle Prüfungen. Die Positionen sollten mit dem Original verglichen werden.',
                 style: TextStyle(color: t.colorScheme.onErrorContainer),
+              ),
+            ),
+          if (comparison != null)
+            Card(
+              key: const Key('receipt-list-comparison'),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListTile(
+                leading: const Icon(Icons.checklist_outlined),
+                title: Text(comparison.items == 1 ? '1 Artikel von der Einkaufsliste' : '${comparison.items} Artikel von der Einkaufsliste'),
+                subtitle: Text(formatEstimateVsActual(comparison.result), key: const Key('receipt-list-comparison-text')),
               ),
             ),
           for (final f in files)

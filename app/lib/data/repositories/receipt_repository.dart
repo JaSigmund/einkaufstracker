@@ -309,7 +309,7 @@ class ReceiptRepository {
           );
           // Schliesst den Kreis Liste -> Einkauf -> Bon (Doku 06 §7): offene, bereits bestaetigte
           // Eintraege desselben Produkts gelten damit als erledigt.
-          await shoppingListRepo?.checkOffForProduct(product.id);
+          await shoppingListRepo?.checkOffForProduct(product.id, receiptId: receiptId, paidCents: i.lineTotalCents);
         }
       }
       // Rabatte auf Bon-Ebene (z.B. jö Rabattsammler) als eigene Positionen ohne Steuerbuchstaben,

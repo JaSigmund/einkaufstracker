@@ -16,9 +16,17 @@ void main() {
   setUp(() => db = memoryDb());
   tearDown(() => db.close());
 
-  Widget app({List<ShoppingListItem> items = const [], List<Product> products = const [], List<Category> categories = const []}) =>
+  Widget app({
+    List<ShoppingListItem> items = const [],
+    List<Product> products = const [],
+    List<Category> categories = const [],
+    List<ReceiptItem> receiptItems = const [],
+    List<Receipt> receipts = const [],
+  }) =>
       ProviderScope(
         overrides: [
+          allItemsStreamProvider.overrideWith((ref) => Stream.value(receiptItems)),
+          receiptsStreamProvider.overrideWith((ref) => Stream.value(receipts)),
           databaseProvider.overrideWithValue(db),
           shoppingListRepositoryProvider.overrideWithValue(shoppingListRepo(db)),
           productRepositoryProvider.overrideWithValue(productRepo(db)),
@@ -200,5 +208,103 @@ void main() {
 
     final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals('i1'))).getSingle();
     expect(row.deletedAt, isNotNull);
+  });
+
+  group('Summenschaetzung (ADR-030)', () {
+    Product product(String id, {double? packSize, String baseUnit = 'kg'}) => Product(
+          id: id, householdId: 'h1', name: 'Produkt $id', baseUnit: baseUnit, packSize: packSize,
+          defaultDateKind: 'best_before', defaultLocation: 'pantry', restock: false, updatedAt: DateTime.utc(2026),
+        );
+
+    ShoppingListItem item(String id, {String? productId, String? freeText, double quantity = 1, bool checked = false, bool suggestion = false}) => ShoppingListItem(
+          id: id, householdId: 'h1', listId: 'l1', productId: productId, freeText: freeText, quantity: quantity, unit: 'kg',
+          checked: checked, source: 'manual', isSuggestion: suggestion, updatedAt: DateTime.utc(2026),
+        );
+
+    Receipt receipt(String id, DateTime at) => Receipt(
+          id: id, householdId: 'h1', purchasedAt: at, totalCents: 100, status: 'confirmed', source: 'manual', sumMismatch: false, updatedAt: DateTime.utc(2026),
+        );
+
+    ReceiptItem bought(String id, String receiptId, String productId, int unitPriceNormCents) => ReceiptItem(
+          excluded: false, id: id, householdId: 'h1', receiptId: receiptId, lineNo: 1, kind: 'article', rawText: 'x', productId: productId,
+          quantity: 1, quantityUnit: 'kg', lineTotalCents: unitPriceNormCents, unitPriceNormCents: unitPriceNormCents, needsReview: false, updatedAt: DateTime.utc(2026),
+        );
+
+    String total(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('shopping-estimate-total'))).data!;
+
+    testWidgets('ohne bekannten Preis keine Karte', (tester) async {
+      await tester.pumpWidget(app(items: [item('i1', productId: 'p1')], products: [product('p1')]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shopping-estimate')), findsNothing);
+    });
+
+    testWidgets('Packung mit Inhalt: Anzahl mal Inhalt mal Grundpreis, in Euro', (tester) async {
+      // 2 Packungen a 0,5 kg, Grundpreis 600 Cent/kg -> 1 kg * 600 = 6,00 EUR
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1', quantity: 2)],
+        products: [product('p1', packSize: 0.5)],
+        receipts: [receipt('r1', DateTime.utc(2026, 9, 1))],
+        receiptItems: [bought('ri1', 'r1', 'p1', 600)],
+      ));
+      await tester.pumpAndSettle();
+      expect(total(tester), 'Noch zu kaufen: ca. 6,00 €');
+      expect(find.byKey(const Key('shopping-estimate-missing')), findsNothing);
+    });
+
+    testWidgets('der neueste Kauf gibt den Preis, egal in welcher Reihenfolge die Positionen kommen', (tester) async {
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1')],
+        products: [product('p1')],
+        receipts: [receipt('neu', DateTime.utc(2026, 9, 20)), receipt('alt', DateTime.utc(2026, 8, 1))],
+        receiptItems: [bought('a', 'neu', 'p1', 250), bought('b', 'alt', 'p1', 999)],
+      ));
+      await tester.pumpAndSettle();
+      expect(total(tester), 'Noch zu kaufen: ca. 2,50 €');
+    });
+
+    testWidgets('Eintraege ohne Preis (neues Produkt, Freitext) werden genannt, nicht eingerechnet', (tester) async {
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1'), item('i2', productId: 'p2'), item('i3', freeText: 'Klopapier')],
+        products: [product('p1'), product('p2')],
+        receipts: [receipt('r1', DateTime.utc(2026, 9, 1))],
+        receiptItems: [bought('a', 'r1', 'p1', 300)],
+      ));
+      await tester.pumpAndSettle();
+      expect(total(tester), 'Noch zu kaufen: ca. 3,00 €');
+      expect(tester.widget<Text>(find.byKey(const Key('shopping-estimate-missing'))).data, '2 Artikel ohne bekannten Preis sind nicht eingerechnet.');
+    });
+
+    testWidgets('ein Eintrag ohne Preis: Einzahl', (tester) async {
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1'), item('i3', freeText: 'Klopapier')],
+        products: [product('p1')],
+        receipts: [receipt('r1', DateTime.utc(2026, 9, 1))],
+        receiptItems: [bought('a', 'r1', 'p1', 300)],
+      ));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('shopping-estimate-missing'))).data, '1 Artikel ohne bekannten Preis ist nicht eingerechnet.');
+    });
+
+    testWidgets('abgehakte Eintraege und Vorschlaege zaehlen nicht ("noch zu kaufen")', (tester) async {
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1'), item('i2', productId: 'p2', checked: true), item('i3', productId: 'p3', suggestion: true)],
+        products: [product('p1'), product('p2'), product('p3')],
+        receipts: [receipt('r1', DateTime.utc(2026, 9, 1))],
+        receiptItems: [bought('a', 'r1', 'p1', 100), bought('b', 'r1', 'p2', 5000), bought('c', 'r1', 'p3', 7000)],
+      ));
+      await tester.pumpAndSettle();
+      expect(total(tester), 'Noch zu kaufen: ca. 1,00 €');
+    });
+
+    testWidgets('sind alle Eintraege abgehakt, verschwindet die Karte', (tester) async {
+      await tester.pumpWidget(app(
+        items: [item('i1', productId: 'p1', checked: true)],
+        products: [product('p1')],
+        receipts: [receipt('r1', DateTime.utc(2026, 9, 1))],
+        receiptItems: [bought('a', 'r1', 'p1', 100)],
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shopping-estimate')), findsNothing);
+    });
   });
 }

@@ -1,5 +1,6 @@
 import '../domain/nutrition/nutrition_targets.dart';
 import '../domain/receipt/vienna_time.dart';
+import '../domain/shopping_list/list_price_estimate.dart';
 
 /// Geldbetrag in Euro mit Komma und Tausenderpunkt, z.B. 123456 -> "1.234,56 €", -86 -> "-0,86 €".
 String formatEuro(int cents) {
@@ -58,6 +59,17 @@ String formatTarget(NutrientKey key, NutrientTarget target) {
   if (target.min != null && target.max != null) return '${n(target.min!)}–${n(target.max!)} $unit';
   if (target.min != null) return 'mindestens ${n(target.min!)} $unit';
   return 'höchstens ${n(target.max!)} $unit';
+}
+
+/// Schaetzung gegen tatsaechlich bezahlt: "geschätzt 24,30 € · bezahlt 26,10 € (1,80 € teurer als geschätzt)".
+String formatEstimateVsActual(EstimateVsActual c) {
+  final diff = c.differenceCents;
+  final note = diff == 0
+      ? 'genau wie geschätzt'
+      : diff > 0
+          ? '${formatEuro(diff)} teurer als geschätzt'
+          : '${formatEuro(-diff)} günstiger als geschätzt';
+  return 'geschätzt ${formatEuro(c.estimatedCents)} · bezahlt ${formatEuro(c.actualCents)} ($note)';
 }
 
 const _weekdayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
