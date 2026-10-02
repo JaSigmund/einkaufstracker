@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
+import '../../domain/nutrition/frequent_meals.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'balance_card.dart';
@@ -113,6 +114,7 @@ class DiaryPage extends ConsumerWidget {
       if (currentWeek != null)
         _weekCard(t, currentWeek, targets, partial: days.any((d) => !d.day.isBefore(currentWeek.weekStart) && d.dataQuality < 1)),
       BalanceCard(now: now),
+      _frequentChips(context, t, meals),
       for (final day in dayKeys) ...[
         _dayHeader(t, day, today, dayInfo[day], targets),
         for (final m in (byDay[day]!..sort((a, b) => b.eatenAt.compareTo(a.eatenAt))))
@@ -133,9 +135,62 @@ class DiaryPage extends ConsumerWidget {
             ].join(' · ')),
             trailing: (ingredientsByMeal[m.id] ?? const []).any((i) => i.kcal != null) ? Text(formatKcal(perMeal[m.id]!.kcal)) : null,
             onTap: () => context.push('/meal-form', extra: MealFormArgs(existing: m)),
+            onLongPress: () => _showMealActions(context, m),
           ),
       ],
     ]);
+  }
+
+  /// "Nochmal essen": die haeufigsten Mahlzeiten der letzten 60 Tage, ein Tipp oeffnet eine Kopie (Doku 15 §3.3).
+  Widget _frequentChips(BuildContext context, ThemeData t, List<Meal> meals) {
+    final since = (now ?? DateTime.now().toUtc()).subtract(const Duration(days: 60));
+    final frequent = frequentMeals(
+      [for (final m in meals) (id: m.id, title: m.title, eatenAtUtc: m.eatenAt)],
+      since: since,
+    );
+    if (frequent.isEmpty) return const SizedBox.shrink();
+    final byId = {for (final m in meals) m.id: m};
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Nochmal essen', style: t.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          for (var i = 0; i < frequent.length; i++)
+            ActionChip(
+              key: Key('frequent-meal-$i'),
+              avatar: Icon(mealTypeIcon(byId[frequent[i].latestId]?.mealType ?? ''), size: 18),
+              label: Text(frequent[i].title),
+              onPressed: () {
+                final template = byId[frequent[i].latestId];
+                if (template != null) context.push('/meal-form', extra: MealFormArgs(template: template));
+              },
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  /// Aktionen zu einer Mahlzeit per langem Druck: Kopie als neue Mahlzeit oder als Rest ohne Abzug (Doku 15 §3.2).
+  Future<void> _showMealActions(BuildContext context, Meal m) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(key: const Key('meal-action-repeat'), leading: const Icon(Icons.replay), title: const Text('Nochmal erfassen'), subtitle: const Text('Kopie mit denselben Zutaten, Bestand wird wieder abgezogen'), onTap: () => Navigator.pop(ctx, 'repeat')),
+          ListTile(key: const Key('meal-action-leftover'), leading: const Icon(Icons.takeout_dining_outlined), title: const Text('Als Rest erfassen'), subtitle: const Text('Gleiche Nährwerte, ohne erneuten Abzug vom Bestand'), onTap: () => Navigator.pop(ctx, 'leftover')),
+          ListTile(key: const Key('meal-action-edit'), leading: const Icon(Icons.edit_outlined), title: const Text('Bearbeiten'), onTap: () => Navigator.pop(ctx, 'edit')),
+        ]),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    final args = switch (action) {
+      'repeat' => MealFormArgs(template: m),
+      'leftover' => MealFormArgs(template: m, leftover: true),
+      _ => MealFormArgs(existing: m),
+    };
+    context.push('/meal-form', extra: args);
   }
 
   String _countText(int n) => n == 1 ? '1 Zutat' : '$n Zutaten';

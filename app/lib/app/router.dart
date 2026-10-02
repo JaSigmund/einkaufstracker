@@ -115,7 +115,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/meal-form',
-        builder: (_, state) => MealFormPage(existing: (state.extra as MealFormArgs?)?.existing),
+        builder: (_, state) {
+          final args = state.extra as MealFormArgs?;
+          return MealFormPage(existing: args?.existing, template: args?.template, leftover: args?.leftover ?? false);
+        },
       ),
       GoRoute(path: '/nutrition-targets', builder: (_, _) => const TargetsPage()),
       GoRoute(path: '/balance', builder: (_, _) => const BalancePage()),

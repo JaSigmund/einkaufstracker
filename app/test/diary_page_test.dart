@@ -47,7 +47,13 @@ void main() {
               path: '/meal-form',
               builder: (_, s) {
                 final a = s.extra as MealFormArgs;
-                return Scaffold(body: Text(a.existing == null ? 'NEU' : 'BEARBEITEN ${a.existing!.title}'));
+                return Scaffold(
+                  body: Text(a.existing != null
+                      ? 'BEARBEITEN ${a.existing!.title}'
+                      : a.template != null
+                          ? '${a.leftover ? 'REST' : 'KOPIE'} ${a.template!.title}'
+                          : 'NEU'),
+                );
               },
             ),
           ]),
@@ -79,7 +85,7 @@ void main() {
 
     expect(find.text('Heute'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('day-totals-2026-10-2'))).data, startsWith('625 kcal · 11 g Eiweiß'));
-    expect(find.text('Reispfanne'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.text('Reispfanne')), findsOneWidget);
     expect(find.text('12:30 · Mittagessen · 2 Zutaten'), findsOneWidget);
     expect(find.text('625 kcal'), findsOneWidget);
     expect(find.byKey(const Key('day-quality-2026-10-2')), findsNothing, reason: 'alle Zutaten haben Naehrwerte');
@@ -108,6 +114,10 @@ void main() {
   });
 
   testWidgets('mehrere Tage: neuester zuerst, Gestern und Wochentag-Ueberschriften; Tage ohne Eintrag fehlen', (tester) async {
+    // hoher Bildschirm: die Liste baut ihre Abschnitte sonst lazy, und der unterste liegt ausserhalb des Sichtbereichs
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(host(
       [_meal('a', DateTime.utc(2026, 10, 2, 10), title: 'Heute-Essen'), _meal('b', DateTime.utc(2026, 10, 1, 10), title: 'Gestern-Essen'), _meal('c', DateTime.utc(2026, 9, 28, 10), title: 'Montag-Essen')],
       [_ing('i1', 'a', kcal: 100), _ing('i2', 'b', kcal: 100), _ing('i3', 'c', kcal: 100)],
@@ -117,8 +127,9 @@ void main() {
     expect(find.text('Gestern'), findsOneWidget);
     expect(find.text('Montag, 28. September'), findsOneWidget);
     expect(find.text('Donnerstag, 1. Oktober'), findsNothing);
-    final heute = tester.getTopLeft(find.text('Heute-Essen')).dy;
-    final gestern = tester.getTopLeft(find.text('Gestern-Essen')).dy;
+    // in der Liste (nicht in den Chips "Nochmal essen", wo dieselben Titel stehen)
+    final heute = tester.getTopLeft(find.descendant(of: find.byKey(const Key('meal-a')), matching: find.text('Heute-Essen'))).dy;
+    final gestern = tester.getTopLeft(find.descendant(of: find.byKey(const Key('meal-b')), matching: find.text('Gestern-Essen'))).dy;
     expect(heute, lessThan(gestern), reason: 'neuester Tag oben');
   });
 
@@ -233,5 +244,67 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.byIcon(Icons.lunch_dining_outlined)), findsOneWidget);
     });
+  });
+
+  group('Nochmal essen (Doku 15 §3.2/§3.3)', () {
+    final recent = DateTime.utc(2026, 9, 28, 8);
+
+    List<Meal> repeated() => [
+          _meal('a1', DateTime.utc(2026, 9, 29, 8), title: 'Müsli', type: 'breakfast'),
+          _meal('a2', DateTime.utc(2026, 9, 30, 8), title: 'Müsli', type: 'breakfast'),
+          _meal('a3', DateTime.utc(2026, 10, 1, 8), title: 'Müsli', type: 'breakfast'),
+          _meal('b1', recent, title: 'Pizza', type: 'dinner'),
+          _meal('b2', DateTime.utc(2026, 9, 27, 18), title: 'Pizza', type: 'dinner'),
+        ];
+
+    testWidgets('haeufigste Mahlzeiten stehen als Chips, haeufigste zuerst', (tester) async {
+      await tester.pumpWidget(host(repeated(), [_ing('i1', 'a1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      expect(find.text('Nochmal essen'), findsOneWidget);
+      expect(tester.widget<ActionChip>(find.byKey(const Key('frequent-meal-0'))).label, isA<Text>());
+      expect(find.descendant(of: find.byKey(const Key('frequent-meal-0')), matching: find.text('Müsli')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('frequent-meal-1')), matching: find.text('Pizza')), findsOneWidget);
+    });
+
+    testWidgets('Tippen auf einen Chip oeffnet eine Kopie der juengsten Mahlzeit', (tester) async {
+      await tester.pumpWidget(host(repeated(), [_ing('i1', 'a1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('frequent-meal-0')));
+      await tester.pumpAndSettle();
+      expect(find.text('KOPIE Müsli'), findsOneWidget);
+    });
+
+    testWidgets('Mahlzeiten aelter als 60 Tage zaehlen nicht, ohne Treffer gibt es keinen Bereich', (tester) async {
+      await tester.pumpWidget(host([_meal('x', DateTime.utc(2026, 5, 1, 8), title: 'Uralt')], [_ing('i1', 'x', kcal: 100)]));
+      await tester.pumpAndSettle();
+      expect(find.text('Nochmal essen'), findsNothing);
+      expect(find.byKey(const Key('frequent-meal-0')), findsNothing);
+    });
+
+    testWidgets('langer Druck zeigt Nochmal erfassen, Als Rest erfassen und Bearbeiten', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10), title: 'Reispfanne')], [_ing('i1', 'm1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const Key('meal-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('meal-action-repeat')), findsOneWidget);
+      expect(find.byKey(const Key('meal-action-leftover')), findsOneWidget);
+      expect(find.byKey(const Key('meal-action-edit')), findsOneWidget);
+    });
+
+    for (final (key, expected) in [
+      ('meal-action-repeat', 'KOPIE Reispfanne'),
+      ('meal-action-leftover', 'REST Reispfanne'),
+      ('meal-action-edit', 'BEARBEITEN Reispfanne'),
+    ]) {
+      testWidgets('Aktion $key oeffnet das Formular im passenden Modus', (tester) async {
+        await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10), title: 'Reispfanne')], [_ing('i1', 'm1', kcal: 100)]));
+        await tester.pumpAndSettle();
+        await tester.longPress(find.byKey(const Key('meal-m1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+        expect(find.text(expected), findsOneWidget);
+      });
+    }
   });
 }
