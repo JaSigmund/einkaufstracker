@@ -42,7 +42,7 @@ void main() {
   });
   tearDown(() => db.close());
 
-  Widget host({Meal? existing, FakeMealPhotoService? photos}) => ProviderScope(
+  Widget host({Meal? existing, FakeMealPhotoService? photos, bool photosAvailable = true}) => ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
           mealRepositoryProvider.overrideWithValue(meals),
@@ -59,7 +59,7 @@ void main() {
         child: MaterialApp.router(
           routerConfig: GoRouter(routes: [
             GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('START'))),
-            GoRoute(path: '/form', builder: (_, _) => MealFormPage(existing: existing)),
+            GoRoute(path: '/form', builder: (_, _) => MealFormPage(existing: existing, photosAvailable: photosAvailable)),
           ]),
         ),
       );
@@ -77,6 +77,18 @@ void main() {
     service.attached.clear();
     return (await meals.get(m.id))!;
   }
+
+  testWidgets('Web-Version (kein lokaler Dateispeicher): kein Foto-Bereich, keine Foto-Analyse, Mahlzeit laesst sich speichern', (tester) async {
+    await open(tester, host(photosAvailable: false));
+    expect(find.byKey(const Key('meal-photo-camera')), findsNothing);
+    expect(find.byKey(const Key('meal-photo-gallery')), findsNothing);
+    expect(find.byKey(const Key('meal-analyze')), findsNothing);
+    await tester.enterText(find.byKey(const Key('meal-title')), 'Suppe');
+    await tester.tap(find.byKey(const Key('meal-save')));
+    await tester.pumpAndSettle();
+    expect((await db.select(db.meals).get()).single.title, 'Suppe');
+    expect(service.attached, isEmpty);
+  });
 
   testWidgets('ohne Foto: Knoepfe zum Aufnehmen und aus der Galerie, keine Vorschau', (tester) async {
     await open(tester, host());
