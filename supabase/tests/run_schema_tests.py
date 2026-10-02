@@ -316,6 +316,38 @@ def main():
     check("Bewegung darf auf Mahlzeit zeigen (FK)",
           not raises("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, meal_id) "
                      "values (%s,%s,'meal',-0.6,'kg',%s)", (ha, pid, meal)))
+    # --- Bilanz und Gegenbuchungen (0016): eigenes Produkt, damit die Zeilen oben unberuehrt bleiben ---
+    db("insert into products (household_id, name, base_unit) values (%s,'Reis','kg')", (ha,))
+    rice = one("select id from products where name='Reis'")
+    cooked = one("insert into meals (household_id, eaten_at, title) values (%s,'2026-10-07 12:00+02','Reispfanne') returning id", (ha,))
+    kept = one("insert into meals (household_id, eaten_at, title) values (%s,'2026-10-08 12:00+02','Reisbeilage') returning id", (ha,))
+    ins_flow = ("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, occurred_at, meal_id) "
+                "values (%s,%s,%s,%s,'kg',%s,%s)")
+    db(ins_flow, (ha, rice, "purchase", 3, "2026-10-06 10:00+02", None))
+    db(ins_flow, (ha, rice, "meal", -0.5, "2026-10-07 12:00+02", cooked))
+    db(ins_flow, (ha, rice, "meal", -0.2, "2026-10-08 12:00+02", kept))
+    db(ins_flow, (ha, rice, "consumed", -0.3, "2026-10-09 12:00+02", None))
+    db(ins_flow, (ha, rice, "adjustment", -0.1, "2026-10-09 18:00+02", None))
+    flow_sql = "select eaten, consumed_manual, adjusted, net_change from v_weekly_stock_flow where product_id=%s order by week"
+    row = db(flow_sql, (rice,))[0][0]
+    check("Bilanz-View: Mahlzeiten 0,7, aufgebraucht 0,3, Korrektur -0,1, netto +1,9",
+          [float(x) for x in row] == [0.7, 0.3, -0.1, 1.9], str(row))
+    # Mahlzeit 'cooked' wird zwei Wochen spaeter geloescht: Gegenbuchung nimmt den Abzug zurueck
+    db(ins_flow, (ha, rice, "adjustment", 0.5, "2026-10-20 09:00+02", cooked))
+    rows = db(flow_sql, (rice,))[0]
+    check("Bilanz-View: Gegenbuchung bleibt in der Woche ihrer Mahlzeit (eine Woche, keine negative Folgewoche)",
+          len(rows) == 1, str(rows))
+    eaten, consumed, adjusted, net = (float(x) for x in rows[0])
+    check("Bilanz-View: Gegenbuchung mindert gegessen auf 0,2 und zaehlt nicht als Korrektur (adjusted bleibt -0,1)",
+          [eaten, adjusted] == [0.2, -0.1], str(rows[0]))
+    check("Bilanz-View: Summe ueber alle Wochen entspricht dem Ledger (3 - 0,5 - 0,2 - 0,3 - 0,1 + 0,5 = 2,4)",
+          abs(sum(float(r[3]) for r in rows) - 2.4) < 1e-9, str(rows))
+    db(ins_flow, (ha, rice, "meal", -0.4, "2026-10-21 12:00+02", kept))
+    rows = db(flow_sql, (rice,))[0]
+    check("Bilanz-View: neue Mahlzeit der Folgewoche erscheint in der Folgewoche",
+          len(rows) == 2 and abs(float(rows[1][0]) - 0.4) < 1e-9, str(rows))
+    check("RLS: B sieht die Bilanz-Zeilen von A nicht", one("select count(*) from v_weekly_stock_flow where product_id=%s", (rice,), user=B) == 0)
+
     check("Storage: Bucket meals ist geschuetzt",
           raises("insert into storage.objects (bucket_id, name) values ('meals', %s)", (f"{hb}/x.jpg",), user=A))
 
