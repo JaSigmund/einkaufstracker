@@ -290,7 +290,39 @@ def main():
     check("Produkt: Naehrwerte mit Basis werden akzeptiert",
           not raises("update products set nutrients_per_100 = '{\"kcal\": 30}', nutrients_basis='g' where id=%s", (pid,)))
 
-    # --- Geplante Migrationen (Phase 7) muessen sauber einspielbar sein ------------------------
+    # --- Essenstagebuch (0014_meal_diary.sql, Phase 7a) ------------------------------------------
+    # Kam bis Phase 7a aus planned/meal_diary_draft.sql und lief nur, wenn der Entwurf fehlerfrei
+    # einspielbar war -- jetzt Teil der regulaeren Migrationen (oben in MIGRATIONS), also keine
+    # Bedingung mehr noetig.
+    meal = one("insert into meals (household_id, eaten_at, title, servings_made, servings_eaten) "
+               "values (%s,'2026-09-22 19:00+02','Gemuesepfanne',4,1) returning id", (ha,))
+    db("insert into meal_ingredients (household_id, meal_id, product_id, quantity, unit, amount_g, source, kcal, protein_g, fat_g, carbs_g, fiber_g, salt_g) "
+       "values (%s,%s,%s,0.6,'kg',600,'inventory',800,20,40,60,12,2.0)", (ha, meal, pid))
+    row = db("select kcal, protein_g, salt_g, meals from v_daily_nutrition")[0][0]
+    check("Tages-Naehrwerte: 800 kcal bei 1 von 4 Portionen = 200 kcal",
+          [float(x) for x in row] == [200.0, 5.0, 0.5, 1.0], str(row))
+    check("Wochen-Naehrwerte liefern Tagesdurchschnitt", one("select avg_kcal_per_day from v_weekly_nutrition") == 200)
+    check("RLS: B sieht keine Mahlzeiten von A", one("select count(*) from meals", user=B) == 0)
+    check("RLS: B sieht keine Tages-Naehrwerte von A", one("select count(*) from v_daily_nutrition", user=B) == 0)
+    check("Bewegung darf auf Mahlzeit zeigen (FK)",
+          not raises("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, meal_id) "
+                     "values (%s,%s,'meal',-0.6,'kg',%s)", (ha, pid, meal)))
+    check("Storage: Bucket meals ist geschuetzt",
+          raises("insert into storage.objects (bucket_id, name) values ('meals', %s)", (f"{hb}/x.jpg",), user=A))
+
+    # --- bls_foods (0014_meal_diary.sql, Phase 7a): globale Referenztabelle, nur lesbar ----------
+    db("insert into bls_foods (bls_code, name_de, kcal, protein_g) values ('TEST01', 'Test-Apfel', 52, 0.3)")
+    check("bls_foods: authentifizierter Nutzer kann lesen",
+          one("select count(*) from bls_foods where bls_code='TEST01'", user=A) == 1)
+    check("bls_foods: authentifizierter Nutzer darf nicht einfuegen (nur lesbar, gleiches Muster wie default_categories)",
+          raises("insert into bls_foods (bls_code, name_de) values ('TEST02', 'x')", user=A))
+    # Ohne UPDATE-Policy filtert RLS die Zeile aus der WHERE-Klausel heraus (0 betroffene Zeilen),
+    # statt einen Fehler zu werfen -- anders als beim INSERT oben, wo keine Policy ueberhaupt zutrifft.
+    _, updated_rowcount = db("update bls_foods set kcal=0 where bls_code='TEST01'", user=A)
+    check("bls_foods: authentifizierter Nutzer darf nicht aendern (RLS filtert die Zeile, 0 betroffen)",
+          updated_rowcount == 0)
+
+    # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
     planned_ok = True
     try:
         for m in PLANNED:
@@ -300,22 +332,6 @@ def main():
         print("  Fehler in geplanter Migration:", e)
     check("Geplante Migrationen (planned/) lassen sich einspielen", planned_ok)
     db(GRANTS)  # in echtem Supabase per Default-Privileges, hier nachziehen
-    if planned_ok:
-        meal = one("insert into meals (household_id, eaten_at, title, servings_made, servings_eaten) "
-                   "values (%s,'2026-09-22 19:00+02','Gemuesepfanne',4,1) returning id", (ha,))
-        db("insert into meal_ingredients (household_id, meal_id, product_id, quantity, unit, amount_g, source, kcal, protein_g, fat_g, carbs_g, fiber_g, salt_g) "
-           "values (%s,%s,%s,0.6,'kg',600,'inventory',800,20,40,60,12,2.0)", (ha, meal, pid))
-        row = db("select kcal, protein_g, salt_g, meals from v_daily_nutrition")[0][0]
-        check("Tages-Naehrwerte: 800 kcal bei 1 von 4 Portionen = 200 kcal",
-              [float(x) for x in row] == [200.0, 5.0, 0.5, 1.0], str(row))
-        check("Wochen-Naehrwerte liefern Tagesdurchschnitt", one("select avg_kcal_per_day from v_weekly_nutrition") == 200)
-        check("RLS: B sieht keine Mahlzeiten von A", one("select count(*) from meals", user=B) == 0)
-        check("RLS: B sieht keine Tages-Naehrwerte von A", one("select count(*) from v_daily_nutrition", user=B) == 0)
-        check("Bewegung darf auf Mahlzeit zeigen (FK)",
-              not raises("insert into inventory_movements (household_id, product_id, type, quantity_delta, unit, meal_id) "
-                         "values (%s,%s,'meal',-0.6,'kg',%s)", (ha, pid, meal)))
-        check("Storage: Bucket meals ist geschuetzt",
-              raises("insert into storage.objects (bucket_id, name) values ('meals', %s)", (f"{hb}/x.jpg",), user=A))
 
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} Tests bestanden")
