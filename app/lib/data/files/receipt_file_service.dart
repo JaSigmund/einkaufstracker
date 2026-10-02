@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/async_lock.dart';
 import '../local/database.dart';
 import '../repositories/receipt_repository.dart';
 
@@ -15,20 +16,7 @@ import '../repositories/receipt_repository.dart';
 /// Datei-Upload in den privaten Bucket noch nicht).
 const _networkTimeout = Duration(seconds: 20);
 
-/// Serialisiert asynchrone Aktionen, die sich sonst beim Lesen-Aendern-Schreiben eines gemeinsamen Werts
-/// ueberholen koennten (Codereview-Fund 2026-10-01, siehe `ReceiptFileService._pendingLock`). Eine fehlgeschlagene
-/// Aktion blockiert die Warteschlange nicht fuer die naechste.
-class _AsyncLock {
-  Future<void> _tail = Future.value();
-
-  Future<T> run<T>(Future<T> Function() action) {
-    final result = _tail.then((_) => action());
-    _tail = result.then((_) {}, onError: (_) {});
-    return result;
-  }
-}
-
-/// Ort der Originaldateien auf dem Server (privater Bucket "receipts").
+/// Ort der Originaldateien auf dem Server (privater Bucket, Standard "receipts", fuer Essensfotos "meals").
 abstract class RemoteFileStore {
   Future<void> upload(String path, Uint8List bytes, String contentType);
   Future<Uint8List> download(String path);
@@ -36,10 +24,11 @@ abstract class RemoteFileStore {
 }
 
 class SupabaseFileStore implements RemoteFileStore {
-  SupabaseFileStore(this._client);
+  SupabaseFileStore(this._client, {String bucket = 'receipts'}) : _bucketName = bucket;
   final SupabaseClient _client;
+  final String _bucketName;
 
-  StorageFileApi get _bucket => _client.storage.from('receipts');
+  StorageFileApi get _bucket => _client.storage.from(_bucketName);
 
   @override
   Future<void> upload(String path, Uint8List bytes, String contentType) => _bucket
@@ -92,7 +81,7 @@ class ReceiptFileService {
   /// schreibende Aufruf eine vom anderen inzwischen hinzugefuegte oder entfernte ID stillschweigend wieder
   /// ueberschreiben (Lost Update). Bewusst NICHT der eigentliche Netz-Upload mit darin eingeschlossen, sonst
   /// wuerde das Speichern eines neuen Bons auf einen laufenden, ggf. langsamen Upload warten muessen.
-  final _pendingLock = _AsyncLock();
+  final _pendingLock = AsyncLock();
 
   static String _ext(String kind) => kind == 'pdf' ? 'pdf' : 'jpg';
   static String contentType(String kind) => kind == 'pdf' ? 'application/pdf' : 'image/jpeg';

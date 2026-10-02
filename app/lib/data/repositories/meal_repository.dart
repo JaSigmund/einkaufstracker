@@ -191,6 +191,16 @@ class MealRepository {
     onChanged?.call();
   }
 
+  /// Setzt oder entfernt den Storage-Pfad des Fotos (`{household_id}/{meal_id}.jpg`). Eigene Methode statt ueber
+  /// [update], weil ein Foto auch nachtraeglich dazukommt oder wegfaellt, ohne dass Zutaten neu gerechnet oder
+  /// Bestaende zurueck- und neu gebucht werden duerfen.
+  Future<void> setPhotoPath(String mealId, String? path) async {
+    final existing = await get(mealId);
+    if (existing == null || existing.deletedAt != null || existing.photoPath == path) return;
+    await _putMeal(existing.copyWith(photoPath: Value(path), updatedAt: DateTime.now().toUtc()));
+    onChanged?.call();
+  }
+
   Future<void> _writeIngredients(Meal meal, List<IngredientDraft> drafts) async {
     final hid = meal.householdId;
     for (final d in drafts) {

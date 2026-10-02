@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +14,7 @@ import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'ingredient_picker.dart';
 import 'meal_labels.dart';
+import 'meal_photo.dart';
 
 /// Argumente fuer `/meal-form`: ohne [existing] wird eine neue Mahlzeit angelegt, sonst diese bearbeitet.
 class MealFormArgs {
@@ -83,6 +86,12 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   late DateTime _eatenAt;
   var _estimate = false;
   final _rows = <_Row>[];
+
+  /// Neu aufgenommenes oder gewaehltes Foto (bereits verkleinert), noch nicht gespeichert.
+  Uint8List? _newPhoto;
+
+  /// Das vorhandene Foto soll beim Speichern entfernt werden.
+  var _photoRemoved = false;
   var _saving = false;
   String? _error;
 
@@ -160,6 +169,45 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
+  }
+
+  bool get _hasPhoto => _newPhoto != null || (_isEdit && widget.existing!.photoPath != null && !_photoRemoved);
+
+  Future<void> _pickPhoto({required bool camera}) async {
+    try {
+      final raw = await ref.read(mealPhotoPickerProvider)(camera: camera);
+      if (raw == null || !mounted) return;
+      // Gleich verkleinern: ein unlesbares Bild (z.B. HEIC aus der Galerie) soll jetzt auffallen, nicht erst nach dem
+      // Speichern der Mahlzeit.
+      final prepared = await ref.read(mealPhotoServiceProvider).prepare(raw);
+      if (mounted) {
+        setState(() {
+          _newPhoto = prepared;
+          _photoRemoved = false;
+          _error = null;
+        });
+      }
+    } on FormatException {
+      if (mounted) setState(() => _error = 'Das Foto konnte nicht gelesen werden. Bitte ein JPEG oder PNG wählen.');
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Foto nicht verfügbar: $e');
+    }
+  }
+
+  /// Wendet die Foto-Entscheidung auf die gespeicherte Mahlzeit an. Ein Fehler hier macht die Mahlzeit nicht
+  /// rueckgaengig (sie ist gespeichert), wird aber gemeldet.
+  Future<String?> _applyPhoto(Meal saved) async {
+    try {
+      final service = ref.read(mealPhotoServiceProvider);
+      if (_newPhoto != null) {
+        await service.attach(saved, _newPhoto!, prepared: true);
+      } else if (_photoRemoved && widget.existing?.photoPath != null) {
+        await service.purge(widget.existing!, clearPath: true);
+      }
+      return null;
+    } catch (e) {
+      return 'Die Mahlzeit ist gespeichert, das Foto konnte nicht abgelegt werden: $e';
+    }
   }
 
   Future<void> _pickDateTime() async {
@@ -254,12 +302,11 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     );
     try {
       final repo = ref.read(mealRepositoryProvider);
-      if (_isEdit) {
-        await repo.update(widget.existing!.id, draft);
-      } else {
-        await repo.create(draft);
-      }
-      if (mounted) context.pop(true);
+      final saved = _isEdit ? await repo.update(widget.existing!.id, draft) : await repo.create(draft);
+      final photoProblem = await _applyPhoto(saved);
+      if (!mounted) return;
+      if (photoProblem != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(photoProblem)));
+      context.pop(true);
     } catch (e) {
       if (mounted) setState(() => _error = 'Speichern nicht möglich: $e');
     } finally {
@@ -281,6 +328,13 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     );
     if (ok != true) return;
     await ref.read(mealRepositoryProvider).delete(widget.existing!.id);
+    if (widget.existing!.photoPath != null) {
+      try {
+        await ref.read(mealPhotoServiceProvider).purge(widget.existing!);
+      } catch (_) {
+        // das Foto ohne Mahlzeit ist nicht mehr abrufbar (kein Verweis), ein Aufraeumfehler soll das Loeschen nicht kippen
+      }
+    }
     if (mounted) context.pop(true);
   }
 
@@ -322,6 +376,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         // Ganz oben, damit eine Fehlermeldung beim Speichern nicht unterhalb des sichtbaren Bereichs verschwindet.
         if (_error != null)
           Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, key: const Key('meal-error'), style: TextStyle(color: t.colorScheme.error))),
+        _photoSection(t),
         TextField(
           key: const Key('meal-title'),
           controller: _title,
@@ -390,6 +445,51 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           onChanged: (v) => setState(() => _estimate = v),
         ),
         TextField(key: const Key('meal-note'), controller: _note, decoration: const InputDecoration(labelText: 'Notiz (optional)'), maxLines: 2),
+      ]),
+    );
+  }
+
+  Widget _photoSection(ThemeData t) {
+    final Widget preview;
+    if (_newPhoto != null) {
+      preview = Image.memory(_newPhoto!, key: const Key('meal-photo-preview'), fit: BoxFit.cover, gaplessPlayback: true);
+    } else if (_hasPhoto) {
+      preview = MealPhoto(meal: widget.existing!, placeholder: const Icon(Icons.image_outlined, size: 40), fit: BoxFit.cover);
+    } else {
+      preview = const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (_hasPhoto)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(width: double.infinity, height: 180, child: preview),
+          ),
+        Wrap(spacing: 8, children: [
+          OutlinedButton.icon(
+            key: const Key('meal-photo-camera'),
+            onPressed: () => _pickPhoto(camera: true),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: Text(_hasPhoto ? 'Neues Foto' : 'Foto aufnehmen'),
+          ),
+          TextButton.icon(
+            key: const Key('meal-photo-gallery'),
+            onPressed: () => _pickPhoto(camera: false),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Aus Galerie'),
+          ),
+          if (_hasPhoto)
+            TextButton.icon(
+              key: const Key('meal-photo-remove'),
+              onPressed: () => setState(() {
+                _newPhoto = null;
+                _photoRemoved = true;
+              }),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Foto entfernen'),
+            ),
+        ]),
       ]),
     );
   }

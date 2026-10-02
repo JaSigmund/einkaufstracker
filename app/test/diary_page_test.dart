@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/features/diary/diary_page.dart';
@@ -7,6 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
+
+import 'support/fakes.dart';
 
 /// Tagebuch-Tab (Doku 15 §3.5, Phase 7b/7d): Tage, Tageswerte, Wochendurchschnitt, Datenqualitaet.
 Meal _meal(String id, DateTime utc, {String title = 'Mahlzeit', String type = 'lunch', double eaten = 1, double made = 1, bool estimate = false}) => Meal(
@@ -23,8 +29,11 @@ void main() {
   // Freitag, 2. Oktober 2026, 12:00 UTC; die Woche beginnt am Montag, 28. September
   final now = DateTime.utc(2026, 10, 2, 12);
 
-  Widget host(List<Meal> meals, List<MealIngredient> ingredients, {NutritionTargets targets = const NutritionTargets()}) => ProviderScope(
+  Widget host(List<Meal> meals, List<MealIngredient> ingredients,
+          {NutritionTargets targets = const NutritionTargets(), FakeMealPhotoService? photos}) =>
+      ProviderScope(
         overrides: [
+          if (photos != null) mealPhotoServiceProvider.overrideWithValue(photos),
           nutritionTargetsProvider.overrideWith((ref) => Stream.value(targets)),
           balanceMovementsProvider.overrideWith((ref) => Stream.value(const <InventoryMovement>[])),
           productsStreamProvider.overrideWith((ref) => Stream.value(const <Product>[])),
@@ -188,6 +197,41 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('target-row-week-kcal')), matching: find.byType(Text))).data,
           'Energie 1.500 kcal · 1.800–2.200 kcal (darunter)');
+    });
+  });
+
+  group('Foto (Phase 7b)', () {
+    Uint8List png() {
+      final image = img.Image(width: 8, height: 8);
+      return Uint8List.fromList(img.encodePng(image));
+    }
+
+    Meal withPhoto(String id) => _meal(id, DateTime.utc(2026, 10, 2, 10), title: 'Reispfanne').copyWith(photoPath: Value('h1/$id.jpg'));
+
+    testWidgets('Mahlzeit mit Foto zeigt das Bild als Vorschau statt des Typ-Symbols', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final service = FakeMealPhotoService(db, mealRepo(db))..photos['m1'] = png();
+      await tester.pumpWidget(host([withPhoto('m1')], [_ing('i1', 'm1', kcal: 100)], photos: service));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.byKey(const Key('meal-photo-image'))), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.byIcon(Icons.lunch_dining_outlined)), findsNothing);
+    });
+
+    testWidgets('Foto nicht abrufbar (anderes Geraet, kein Netz): Typ-Symbol bleibt, kein Fehler', (tester) async {
+      final db = memoryDb();
+      addTearDown(db.close);
+      final service = FakeMealPhotoService(db, mealRepo(db));
+      await tester.pumpWidget(host([withPhoto('m1')], [_ing('i1', 'm1', kcal: 100)], photos: service));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('meal-photo-image')), findsNothing);
+      expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.byIcon(Icons.lunch_dining_outlined)), findsOneWidget);
+    });
+
+    testWidgets('Mahlzeit ohne Foto braucht den Foto-Dienst gar nicht', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('meal-m1')), matching: find.byIcon(Icons.lunch_dining_outlined)), findsOneWidget);
     });
   });
 }

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
+import 'package:einkaufstracker/data/files/meal_photo_service.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
@@ -243,6 +244,59 @@ ReceiptFileService fileService(AppDatabase db, FakeRemoteFileStore remote, Direc
       baseDir: () async => dir,
       keepFiles: () async => keep,
     );
+
+/// Essensfotos mit Temp-Ordner; [prepare] ist standardmaessig die Identitaet (kein Isolate, kein JPEG noetig).
+MealPhotoService mealPhotoService(AppDatabase db, FakeRemoteFileStore remote, Directory dir,
+        {String household = 'h1', MealRepository? meals, Future<Uint8List> Function(Uint8List)? prepare}) =>
+    MealPhotoService(
+      db: db,
+      meals: meals ?? mealRepo(db, household: household),
+      remote: remote,
+      baseDir: () async => dir,
+      prepare: prepare ?? (b) async => b,
+    );
+
+/// Foto-Dienst im Speicher fuer Widget-Tests: dart:io laeuft unter `testWidgets` nicht in der simulierten Zeit. Das
+/// Dateiverhalten selbst ist in `meal_photo_service_test.dart` mit echten Dateien abgedeckt.
+class FakeMealPhotoService extends MealPhotoService {
+  FakeMealPhotoService(AppDatabase db, MealRepository meals, {Future<Uint8List> Function(Uint8List)? prepare})
+      : super(
+          db: db,
+          meals: meals,
+          remote: FakeRemoteFileStore(),
+          baseDir: () async => throw UnimplementedError('Datei-Zugriff im Widget-Test'),
+          prepare: prepare ?? (b) async => b,
+        );
+
+  /// Mahlzeit-ID -> Foto
+  final photos = <String, Uint8List>{};
+  final attached = <({String mealId, Uint8List bytes, bool prepared})>[];
+  final purged = <({String mealId, bool clearPath})>[];
+
+  /// Wenn gesetzt, wirft [attach] diesen Fehler.
+  Object? attachError;
+
+  @override
+  Future<void> attach(Meal meal, Uint8List photo, {bool prepared = false}) async {
+    if (attachError != null) throw attachError!;
+    photos[meal.id] = photo;
+    attached.add((mealId: meal.id, bytes: photo, prepared: prepared));
+    await meals.setPhotoPath(meal.id, MealPhotoService.storagePathOf(meal.householdId, meal.id));
+  }
+
+  @override
+  Future<Uint8List?> bytes(Meal meal) async => meal.photoPath == null ? null : photos[meal.id];
+
+  @override
+  Future<void> purge(Meal meal, {bool clearPath = false}) async {
+    photos.remove(meal.id);
+    purged.add((mealId: meal.id, clearPath: clearPath));
+    if (clearPath) await meals.setPhotoPath(meal.id, null);
+  }
+
+  @override
+  Future<int> uploadPending() async => 0;
+}
 
 ProductRepository productRepo(AppDatabase db, {String household = 'h1', OffClient? off, void Function()? onChanged}) =>
     ProductRepository(db, householdId: () async => household, off: off, onChanged: onChanged);
