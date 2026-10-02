@@ -16,8 +16,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-async function purgeReceiptFiles(admin: ReturnType<typeof createClient>, householdId: string) {
-  const bucket = admin.storage.from("receipts");
+// Nur der Storage-Bucket wird gebraucht -- als Parameter statt des ganzen Clients, weil der Typ des Clients von den
+// Datenbank-Generics abhaengt und `deno check` den Client aus createClient() sonst nicht als Parameter akzeptiert.
+type ReceiptBucket = ReturnType<ReturnType<typeof createClient>["storage"]["from"]>;
+
+async function purgeReceiptFiles(bucket: ReceiptBucket, householdId: string) {
   const { data: receiptFolders, error } = await bucket.list(householdId, { limit: 1000 });
   if (error || !receiptFolders) return;
   const paths: string[] = [];
@@ -54,7 +57,7 @@ Deno.serve(async (req) => {
       .eq("household_id", household_id);
 
     if ((count ?? 0) <= 1) {
-      await purgeReceiptFiles(admin, household_id);
+      await purgeReceiptFiles(admin.storage.from("receipts"), household_id);
       await admin.from("households").delete().eq("id", household_id); // cascade: alle Fachdaten
     } else {
       await admin.from("household_members").delete().eq("household_id", household_id).eq("user_id", userId);

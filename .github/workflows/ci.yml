@@ -48,7 +48,10 @@ jobs:
           deno-version: v2.x
       # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert
       - run: |
-          mkdir /tmp/fncheck
-          cp supabase/functions/parse-receipt/index.ts /tmp/fncheck/index.ts
-          cd /tmp/fncheck
-          deno check index.ts
+          # alle Edge Functions, nicht nur eine: neue Funktionen sind damit automatisch abgedeckt
+          for dir in supabase/functions/*/; do
+            fn=$(basename "$dir")
+            mkdir -p "/tmp/fncheck/$fn"
+            cp "$dir/index.ts" "/tmp/fncheck/$fn/index.ts"
+            (cd "/tmp/fncheck/$fn" && deno check index.ts)
+          done
