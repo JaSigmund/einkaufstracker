@@ -6,20 +6,23 @@ Datenbank aus -- nach Pruefung der erzeugten Datei von Hand einspielen:
 
     npx supabase db query --linked --file tools/bls_foods_import.sql
 
-Quelle:  https://blsdb.de/assets/uploads/BLS_4_0_2025_DE.zip (entpacken nach tools/bls_source/, gitignored)
+Quelle:  https://blsdb.de/assets/uploads/BLS_4_0_2025_DE.zip (entpacken, z.B. nach tools/BLS_4_0_2025_DE/)
 Lizenz:  CC BY 4.0 -- Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 —
          Deutsche Nährstoffdatenbank. Die Namensnennung steht im Kopf der erzeugten SQL-Datei.
 
 Voraussetzungen: pip install pandas openpyxl
 Aufruf:
-    python tools/import_bls_foods.py --inspect      # nur Zuordnung zeigen (Codes, Spalten, Einheiten), nichts schreiben
-    python tools/import_bls_foods.py                # tools/bls_foods_import.sql erzeugen
+    python tools/import_bls_foods.py --source-dir tools/BLS_4_0_2025_DE --inspect   # nur Zuordnung zeigen
+    python tools/import_bls_foods.py --source-dir tools/BLS_4_0_2025_DE             # SQL-Datei erzeugen
 
 Vorgehen: Die 8 benoetigten Naehrwerte werden NICHT ueber Spaltenpositionen gefunden (418 Spalten waeren
-fragil), sondern erst ueber den BLS-Komponentencode, danach ueber den deutschen/englischen Namen in
-der Components-Tabelle. Ist eine Zuordnung nicht eindeutig, bricht das Skript mit einer Liste der
-Kandidaten ab, statt zu raten. Salz hat ein bekanntes Risiko: Falls keine direkte Salz-Spalte existiert,
-wird es aus Natrium abgeleitet (Natrium x 2,5), mit Warnung im Ergebnis.
+fragil), sondern ueber den BLS-Komponentencode (z.B. ENERCC, PROT625) in der Components-Tabelle, ersatzweise
+ueber den deutschen/englischen Namen. Ist eine Zuordnung nicht eindeutig, die Einheit unerwartet oder ein
+Naehrwert nicht auffindbar, bricht das Skript mit Diagnose ab, statt zu raten. Die Wertspalte je Code heisst in
+den Daten z.B. "ENERCC Energie (Kilokalorien) [kcal/100g]", daneben stehen "... Datenherkunft" und "... Referenz".
+
+Achtung Excel-Einlesen: pandas liest den Text "NA" (Komponentencode Natrium) standardmaessig als fehlenden Wert.
+Deshalb keep_default_na=False, leere Zellen kommen dann als "" an und werden von to_float zu None.
 """
 import argparse
 import re
@@ -27,7 +30,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SOURCE = ROOT / "tools" / "bls_source"
+DEFAULT_SOURCE = ROOT / "tools" / "BLS_4_0_2025_DE"
 DEFAULT_OUT = ROOT / "tools" / "bls_foods_import.sql"
 DATA_FILE = "BLS_4_0_Daten_2025_DE.xlsx"
 COMPONENTS_FILE = "BLS_4_0_Components_DE_EN.xlsx"
@@ -35,30 +38,27 @@ COMPONENTS_FILE = "BLS_4_0_Components_DE_EN.xlsx"
 ATTRIBUTION = ("Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — "
                "Deutsche Nährstoffdatenbank (CC BY 4.0)")
 
-SODIUM_TO_SALT = 2.5  # NaCl-Aequivalent: Salz (g) = Natrium (g) x 2,5
-
-# key -> Zuordnungsregeln. "required": ohne Treffer bricht das Skript ab; sonst nur Warnung und NULL.
-# codes werden zuerst probiert (exakter Treffer in der Code-Spalte), danach names (exakter, case-insensitiver
-# Treffer in einer Namensspalte). unit ist die erwartete Einheit je 100 g laut Components-Tabelle.
+# key (= Spalte in bls_foods) -> Zuordnungsregeln. codes werden zuerst probiert (exakter Treffer in der
+# Code-Spalte), danach names (exakter, case-insensitiver Treffer in einer Namensspalte). unit ist die erwartete
+# Einheit je 100 g laut Components-Tabelle. Alle 8 Naehrwerte sind Pflicht.
 NUTRIENTS = {
-    "kcal":      {"required": True,  "unit": "kcal", "codes": ["ENERCC"],
-                  "names": ["Energie (Kilokalorien)", "Energie (kcal)", "Energy (kilocalories)", "Energy (kcal)"]},
-    "protein_g": {"required": True,  "unit": "g", "codes": ["PROT625"],
-                  "names": ["Protein (Nx6,25)", "Protein (N x 6,25)", "Protein", "Protein (N x 6.25)"]},
-    "fat_g":     {"required": True,  "unit": "g", "codes": ["FAT"],
+    "kcal":      {"unit": "kcal", "codes": ["ENERCC"],
+                  "names": ["Energie (Kilokalorien)", "Energy (kilocalorie)"]},
+    "protein_g": {"unit": "g", "codes": ["PROT625"],
+                  "names": ["Protein (Nx6,25)", "Protein (Nx6.25)"]},
+    "fat_g":     {"unit": "g", "codes": ["FAT"],
                   "names": ["Fett", "Fat"]},
-    "sat_fat_g": {"required": False, "unit": "g", "codes": ["FASAT"],
-                  "names": ["Fettsäuren, gesättigt", "Fatty acids, saturated"]},
-    "carbs_g":   {"required": True,  "unit": "g", "codes": ["CHO", "CHOAVL"],
-                  "names": ["Kohlenhydrate, verfügbar", "Kohlenhydrate", "Carbohydrates, available"]},
-    "sugar_g":   {"required": False, "unit": "g", "codes": ["SUGAR", "MDSA", "MDS"],
-                  "names": ["Zucker", "Zucker (Summe)", "Mono- und Disaccharide", "Sugars, total", "Sugar"]},
-    "fiber_g":   {"required": True,  "unit": "g", "codes": ["FIBT"],
-                  "names": ["Ballaststoffe", "Ballaststoffe, gesamt", "Fibre, total", "Dietary fibre"]},
-    "salt_g":    {"required": False, "unit": "g", "codes": ["NACL"],
-                  "names": ["Salz (NaCl)", "Kochsalz", "Natriumchlorid", "Salt (NaCl)", "Salt"]},
+    "sat_fat_g": {"unit": "g", "codes": ["FASAT"],
+                  "names": ["Fettsäuren, gesättigt, gesamt", "Fatty acids, saturated, total"]},
+    "carbs_g":   {"unit": "g", "codes": ["CHO"],
+                  "names": ["Kohlenhydrate, verfügbar", "Carbohydrate, available"]},
+    "sugar_g":   {"unit": "g", "codes": ["SUGAR"],
+                  "names": ["Zucker (Mono- und Disaccharide), gesamt", "Sugars (mono- and disaccharides), total"]},
+    "fiber_g":   {"unit": "g", "codes": ["FIBT"],
+                  "names": ["Ballaststoffe, gesamt", "Fibre, dietary, total"]},
+    "salt_g":    {"unit": "g", "codes": ["NACL"],
+                  "names": ["Salz (Natriumchlorid)", "Salt (sodium chloride)"]},
 }
-SODIUM = {"unit": "mg", "codes": ["NA"], "names": ["Natrium", "Sodium"]}
 
 
 class MappingError(Exception):
@@ -78,10 +78,8 @@ def clean(value):
 
 
 def to_float(value):
-    """Zahl aus einer Excel-Zelle (auch '12,5' als Text); nicht lesbare Marker ('-', 'n.b.', 'Sp.') ergeben None."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
+    """Zahl aus einer Excel-Zelle (auch '12,5' als Text); nicht lesbare Marker ('-', 'n.b.', '') ergeben None."""
+    if value is None or isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
         return None if value != value else float(value)
@@ -108,15 +106,20 @@ def sql_num(value):
 
 
 def components_columns(components):
-    """Findet Code-, Einheit- und Namensspalten der Components-Tabelle anhand der Ueberschriften."""
+    """Findet Code-, Einheit- und Namensspalten der Components-Tabelle anhand der Ueberschriften.
+
+    Echte Ueberschriften: 'Index', 'Nährstoffcode / Component code', 'Nährstoffbezeichnung', 'Component name',
+    'Einheit / Unit', ... -- die Index-Spalte darf nicht als Code gelten.
+    """
     headers = {col: clean(col).casefold() for col in components.columns}
-    code_col = next((c for c, h in headers.items() if re.fullmatch(r"(bls[\s_-]*)?(code|komponente|component)", h)), None)
-    code_col = code_col if code_col is not None else components.columns[0]
+    code_col = next((c for c, h in headers.items() if "code" in h), None)
+    if code_col is None:
+        raise MappingError(f"Keine Code-Spalte in der Components-Tabelle gefunden, Ueberschriften: {list(headers.values())}")
     unit_col = next((c for c, h in headers.items() if re.search(r"einheit|unit", h)), None)
     name_cols = [c for c, h in headers.items()
-                 if c != code_col and c != unit_col and re.search(r"name|bezeichnung|deutsch|german|englisch|english", h)]
+                 if c != code_col and c != unit_col and re.search(r"name|bezeichnung", h)]
     if not name_cols:
-        name_cols = [c for c in components.columns if c != code_col and c != unit_col]
+        raise MappingError(f"Keine Namensspalten in der Components-Tabelle gefunden, Ueberschriften: {list(headers.values())}")
     return code_col, unit_col, name_cols
 
 
@@ -156,7 +159,8 @@ def keyword_candidates(components, rules, limit=10):
     for _, row in components.iterrows():
         cells = [clean(row[c]).casefold() for c in [code_col] + name_cols]
         if any(w and w in cell for w in words for cell in cells):
-            out.append((clean(row[code_col]), [clean(row[c]) for c in name_cols], clean(row[unit_col]) if unit_col is not None else ""))
+            out.append((clean(row[code_col]), [clean(row[c]) for c in name_cols],
+                        clean(row[unit_col]) if unit_col is not None else ""))
         if len(out) >= limit:
             break
     return out
@@ -188,41 +192,25 @@ def find_identity_columns(data_columns):
 
 
 def resolve_mapping(components, data_columns):
-    """Ordnet alle Naehrwerte Komponentencode, Einheit und Wertspalte zu. Gibt (mapping, warnings) zurueck."""
-    mapping, warnings = {}, []
+    """Ordnet alle Naehrwerte Komponentencode, Einheit und Wertspalte zu."""
+    mapping = {}
     for key, rules in NUTRIENTS.items():
         picked = pick_component(components, rules, key)
-        if picked is None and key == "salt_g":
-            sodium = pick_component(components, SODIUM, "natrium")
-            if sodium is None:
-                if rules["required"]:
-                    raise MappingError("salt_g: weder Salz noch Natrium gefunden")
-                warnings.append("salt_g: weder Salz- noch Natrium-Spalte gefunden, salt_g bleibt NULL")
-                continue
-            code, unit = sodium
-            mapping[key] = {"code": code, "unit": unit or SODIUM["unit"], "column": find_value_column(data_columns, code),
-                            "derived_from_sodium": True}
-            warnings.append(f"salt_g: aus Natrium ({code}) abgeleitet (x{SODIUM_TO_SALT}), kein direkter Salz-Wert in den Daten")
-            continue
         if picked is None:
-            if rules["required"]:
-                cands = keyword_candidates(components, rules)
-                raise MappingError(f"{key}: keine Zuordnung ueber Code {rules['codes']} oder Name {rules['names']}. "
-                                   f"Aehnliche Components-Zeilen (Code, Namen, Einheit): {cands}")
-            warnings.append(f"{key}: keine Zuordnung gefunden, bleibt NULL")
-            continue
+            cands = keyword_candidates(components, rules)
+            raise MappingError(f"{key}: keine Zuordnung ueber Code {rules['codes']} oder Name {rules['names']}. "
+                               f"Aehnliche Components-Zeilen (Code, Namen, Einheit): {cands}")
         code, unit = picked
         if unit and unit.casefold() != rules["unit"].casefold():
             raise MappingError(f"{key}: Einheit in Components ist '{unit}', erwartet '{rules['unit']}' (Code {code})")
-        mapping[key] = {"code": code, "unit": unit or rules["unit"], "column": find_value_column(data_columns, code),
-                        "derived_from_sodium": False}
-    return mapping, warnings
+        mapping[key] = {"code": code, "unit": unit or rules["unit"], "column": find_value_column(data_columns, code)}
+    return mapping
 
 
 def build_rows(components, data):
-    """Wandelt die Roh-Tabellen in Zeilen fuer bls_foods. Gibt (rows, mapping, warnings, stats) zurueck."""
+    """Wandelt die Roh-Tabellen in Zeilen fuer bls_foods. Gibt (rows, mapping, stats) zurueck."""
     ident = find_identity_columns(data.columns)
-    mapping, warnings = resolve_mapping(components, data.columns)
+    mapping = resolve_mapping(components, data.columns)
     rows, null_counts, implausible = [], {k: 0 for k in NUTRIENTS}, []
     for _, rec in data.iterrows():
         code = clean(rec[ident["code"]])
@@ -231,21 +219,15 @@ def build_rows(components, data):
             continue
         values = {}
         for key in NUTRIENTS:
-            m = mapping.get(key)
-            raw = to_float(rec[m["column"]]) if m else None
-            if raw is not None and m["derived_from_sodium"]:
-                # Natrium liegt in mg vor: mg -> g, dann x 2,5
-                raw = raw / 1000 * SODIUM_TO_SALT if m["unit"].casefold() == "mg" else raw * SODIUM_TO_SALT
-            values[key] = raw
-            if raw is None:
+            values[key] = to_float(rec[mapping[key]["column"]])
+            if values[key] is None:
                 null_counts[key] += 1
         macros = [values[k] for k in ("protein_g", "fat_g", "carbs_g") if values[k] is not None]
         if (values["kcal"] is not None and values["kcal"] > 950) or any(v > 100.5 for v in macros) \
                 or any(v is not None and v < 0 for v in values.values()):
             implausible.append((code, name_de, values["kcal"]))
         rows.append((code, name_de, clean(rec[ident["name_en"]]) if "name_en" in ident else "", values))
-    stats = {"rows": len(rows), "null_counts": null_counts, "implausible": implausible}
-    return rows, mapping, warnings, stats
+    return rows, mapping, {"rows": len(rows), "null_counts": null_counts, "implausible": implausible}
 
 
 def write_sql(rows, out_path, batch=500):
@@ -264,17 +246,11 @@ def write_sql(rows, out_path, batch=500):
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def print_mapping(mapping, warnings):
+def print_mapping(mapping):
     print("Zuordnung der Naehrwerte (je 100 g):")
     for key in NUTRIENTS:
-        m = mapping.get(key)
-        if m:
-            extra = "  [aus Natrium abgeleitet]" if m["derived_from_sodium"] else ""
-            print(f"  {key:10s} Code {m['code']:10s} Einheit {m['unit']:5s} Spalte '{clean(m['column'])}'{extra}")
-        else:
-            print(f"  {key:10s} (keine Zuordnung)")
-    for w in warnings:
-        print("  WARNUNG:", w)
+        m = mapping[key]
+        print(f"  {key:10s} Code {m['code']:10s} Einheit {m['unit']:5s} Spalte '{clean(m['column'])}'")
 
 
 def main():
@@ -294,17 +270,16 @@ def main():
             sys.exit(f"Datei fehlt: {p}\nBLS_4_0_2025_DE.zip von https://blsdb.de/assets/uploads/BLS_4_0_2025_DE.zip "
                      f"laden und nach {args.source_dir} entpacken.")
     print("Lese Excel-Dateien (kann bei 7140 Zeilen x 418 Spalten etwas dauern)...")
-    components = pd.read_excel(comp_path, dtype=object)
-    data = pd.read_excel(data_path, dtype=object)
-    print(f"Components: {len(components)} Zeilen, Spalten {[clean(c) for c in components.columns]}")
-    print(f"Daten: {len(data)} Zeilen, {len(data.columns)} Spalten")
+    components = pd.read_excel(comp_path, dtype=object, keep_default_na=False)
+    data = pd.read_excel(data_path, dtype=object, keep_default_na=False)
+    print(f"Components: {len(components)} Zeilen, Daten: {len(data)} Zeilen x {len(data.columns)} Spalten")
 
     try:
-        rows, mapping, warnings, stats = build_rows(components, data)
+        rows, mapping, stats = build_rows(components, data)
     except MappingError as e:
         sys.exit(f"ABBRUCH, Zuordnung nicht eindeutig: {e}\nMit --inspect die Struktur ansehen und NUTRIENTS im Skript anpassen.")
 
-    print_mapping(mapping, warnings)
+    print_mapping(mapping)
     print(f"\n{stats['rows']} Zeilen ausgewertet.")
     for key, n in stats["null_counts"].items():
         print(f"  {key:10s} ohne Wert: {n}")

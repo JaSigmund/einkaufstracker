@@ -1,7 +1,9 @@
-"""Tests fuer tools/import_bls_foods.py mit kuenstlichen, BLS-aehnlichen Tabellen (ohne die echten Excel-Dateien).
+"""Tests fuer tools/import_bls_foods.py mit kuenstlichen Tabellen im Format der echten BLS-4.0-Dateien.
 
 Aufruf: python tools/test_import_bls_foods.py     (benoetigt: pip install pandas openpyxl)
-Echte Daten werden damit NICHT geprueft -- dafuer gibt es die Stichprobenpruefung im Plan (Phase 7a).
+Die Ueberschriften entsprechen den echten Dateien (Components: 'Index', 'Nährstoffcode / Component code', ...;
+Daten: 'ENERCC Energie (Kilokalorien) [kcal/100g]' + '... Datenherkunft' + '... Referenz'). Die echten Werte
+werden hier nicht geprueft, dafuer gibt es den --inspect-Lauf und die Stichprobe gegen eine unabhaengige Quelle.
 """
 import sys
 import tempfile
@@ -20,104 +22,111 @@ def check(name, cond):
     print(("PASS " if cond else "FAIL ") + name)
 
 
-def components(extra=None, salt=True):
-    rows = [
-        ("ENERCC", "Energie (Kilokalorien)", "Energy (kilocalories)", "kcal"),
-        ("PROT625", "Protein (Nx6,25)", "Protein (N x 6.25)", "g"),
-        ("FAT", "Fett", "Fat", "g"),
-        ("FASAT", "Fettsäuren, gesättigt", "Fatty acids, saturated", "g"),
-        ("CHO", "Kohlenhydrate, verfügbar", "Carbohydrates, available", "g"),
-        ("MDSA", "Mono- und Disaccharide", "Mono- and disaccharides", "g"),
-        ("FIBT", "Ballaststoffe", "Fibre, total", "g"),
-        ("NA", "Natrium", "Sodium", "mg"),
-    ]
-    if salt:
-        rows.append(("NACL", "Salz (NaCl)", "Salt (NaCl)", "g"))
-    rows += extra or []
-    return pd.DataFrame(rows, columns=["Code", "Name DE", "Name EN", "Einheit"])
+COMPONENT_ROWS = [
+    ("ENERCC", "Energie (Kilokalorien)", "Energy (kilocalorie)", "kcal"),
+    ("PROT625", "Protein (Nx6,25)", "Protein (Nx6.25)", "g"),
+    ("FAT", "Fett", "Fat", "g"),
+    ("FASAT", "Fettsäuren, gesättigt, gesamt", "Fatty acids, saturated, total", "g"),
+    ("CHO", "Kohlenhydrate, verfügbar", "Carbohydrate, available", "g"),
+    ("SUGAR", "Zucker (Mono- und Disaccharide), gesamt", "Sugars (mono- and disaccharides), total", "g"),
+    ("FIBT", "Ballaststoffe, gesamt", "Fibre, dietary, total", "g"),
+    ("NACL", "Salz (Natriumchlorid)", "Salt (sodium chloride)", "g"),
+    ("NA", "Natrium", "Sodium", "mg"),  # Code "NA" darf nie als fehlender Wert gelesen werden
+]
+CODES = [c[0] for c in COMPONENT_ROWS]
+UNITS = {c[0]: c[3] for c in COMPONENT_ROWS}
+NAMES = {c[0]: c[1] for c in COMPONENT_ROWS}
+NUTRIENT_ORDER = ["ENERCC", "PROT625", "FAT", "FASAT", "CHO", "SUGAR", "FIBT", "NACL"]
+
+
+def components(extra=None, drop=None):
+    rows = [r for r in COMPONENT_ROWS if r[0] != drop] + (extra or [])
+    return pd.DataFrame([(i + 1, *r, "Makronährstoffe", "Proximate composition") for i, r in enumerate(rows)],
+                        columns=["Index", "Nährstoffcode / Component code", "Nährstoffbezeichnung", "Component name",
+                                 "Einheit / Unit", "Nährstoffgruppe", "Component group"])
 
 
 def data(rows):
     cols = ["BLS Code", "Lebensmittelbezeichnung", "Food name"]
-    for code in ["ENERCC", "PROT625", "FAT", "FASAT", "CHO", "MDSA", "FIBT", "NA", "NACL"]:
-        cols += [code, f"{code} Datenherkunft", f"{code} Referenz"]
+    for code in CODES:
+        cols += [f"{code} {NAMES[code]} [{UNITS[code]}/100g]", f"{code} Datenherkunft", f"{code} Referenz"]
     return pd.DataFrame(rows, columns=cols)
 
 
-def row(code, name_de, name_en, kcal, protein, fat, sat, carbs, sugar, fiber, na, nacl):
+def row(code, name_de, name_en, **v):
     r = [code, name_de, name_en]
-    for v in (kcal, protein, fat, sat, carbs, sugar, fiber, na, nacl):
-        r += [v, "Analyse", "Ref1"]
+    for c in CODES:
+        r += [v.get(c), "Analyse", "-"]
     return r
 
 
 # 1) Normalfall: Zuordnung ueber Codes, Werte uebernommen, Datenherkunft-/Referenz-Spalten ignoriert
-d = data([row("B100000", "Apfel roh", "Apple raw", 52, 0.3, 0.4, 0.1, 11.4, 10.4, 2.0, 1.0, 0.0025)])
-rows, mapping, warnings, stats = m.build_rows(components(), d)
+d = data([row("B100000", "Apfel roh", "Apple raw", ENERCC=52, PROT625=0.3, FAT=0.4, FASAT=0.1, CHO=11.4,
+              SUGAR=10.4, FIBT=2.0, NACL=0.0025, NA=1.0)])
+rows, mapping, stats = m.build_rows(components(), d)
 check("Zuordnung: kcal ueber Code ENERCC", mapping["kcal"]["code"] == "ENERCC")
-check("Zuordnung: Wertspalte ist die Zahlen-Spalte, nicht Datenherkunft", mapping["kcal"]["column"] == "ENERCC")
-check("Zeilen: Werte stimmen", rows[0][3]["kcal"] == 52 and rows[0][3]["carbs_g"] == 11.4)
-check("Salz: direkte Salz-Spalte hat Vorrang vor Natrium", mapping["salt_g"]["derived_from_sodium"] is False)
+check("Zuordnung: Code-Spalte ist 'Nährstoffcode / Component code', nicht die Index-Spalte",
+      m.components_columns(components())[0] == "Nährstoffcode / Component code")
+check("Zuordnung: Wertspalte ist die Zahlen-Spalte, nicht Datenherkunft/Referenz",
+      mapping["kcal"]["column"] == "ENERCC Energie (Kilokalorien) [kcal/100g]")
+check("Zeilen: Werte stimmen", rows[0][3]["kcal"] == 52 and rows[0][3]["carbs_g"] == 11.4 and rows[0][3]["salt_g"] == 0.0025)
+check("Alle 8 Naehrwerte zugeordnet", len(mapping) == 8)
 
-# 2) Natrium-Fallback: keine Salz-Zeile in Components -> aus Natrium (mg) x 2,5 abgeleitet
-d = data([row("B100001", "Brot", "Bread", 250, 8, 2, 0.5, 48, 3, 6, 400, None)])
-rows, mapping, warnings, stats = m.build_rows(components(salt=False), d)
-check("Natrium-Fallback: Salz aus Natrium abgeleitet", mapping["salt_g"]["derived_from_sodium"] is True)
-check("Natrium-Fallback: 400 mg Natrium = 1,0 g Salz", abs(rows[0][3]["salt_g"] - 1.0) < 1e-9)
-check("Natrium-Fallback: erzeugt eine Warnung", any("Natrium" in w for w in warnings))
-
-# 3) Dezimalkomma als Text und nicht lesbare Marker
-d = data([row("B100002", "Test", "Test", "12,5", "-", "n.b.", None, "3,25", "", "1,5", "5", None)])
+# 2) Dezimalkomma als Text, nicht lesbare Marker und leere Zellen (keep_default_na=False liefert '')
+d = data([row("B100002", "Test", "Test", ENERCC="12,5", PROT625="-", FAT="n.b.", FASAT="", CHO="3,25", SUGAR=None,
+              FIBT="1,5", NACL=0.1)])
 rows, *_ = m.build_rows(components(), d)
 v = rows[0][3]
 check("Dezimalkomma als Text wird gelesen", v["kcal"] == 12.5 and v["carbs_g"] == 3.25)
-check("Marker '-' und 'n.b.' und leere Zelle ergeben None statt 0", v["protein_g"] is None and v["fat_g"] is None and v["sugar_g"] is None)
+check("Marker '-', 'n.b.', leere Zelle und None ergeben None statt 0",
+      v["protein_g"] is None and v["fat_g"] is None and v["sat_fat_g"] is None and v["sugar_g"] is None)
 
-# 4) Mehrdeutigkeit: identische Zeile doppelt ist ein Treffer, zwei verschiedene Codes sind ein Abbruch
-dup = components(extra=[("ENERCC", "Energie (Kilokalorien)", "Energy (kilocalories)", "kcal")])
+# 3) Mehrdeutigkeit: identische Zeile doppelt ist ein Treffer, zwei verschiedene Codes sind ein Abbruch
+dup = components(extra=[("ENERCC", "Energie (Kilokalorien)", "Energy (kilocalorie)", "kcal")])
 check("Dieselbe Components-Zeile doppelt: wird zu einem Treffer zusammengefasst",
       m.pick_component(dup, m.NUTRIENTS["kcal"], "kcal") == ("ENERCC", "kcal"))
 
-two_codes = components()
-two_codes.loc[len(two_codes)] = ["CHOAVL", "Kohlenhydrate, verfügbar", "Carbohydrates, available", "g"]
+two_names = components(drop="CHO", extra=[("CHOX", "Kohlenhydrate, verfügbar", "x", "g"), ("CHOY", "Kohlenhydrate, verfügbar", "y", "g")])
 try:
-    m.pick_component(two_codes, m.NUTRIENTS["carbs_g"], "carbs_g")
+    m.pick_component(two_names, m.NUTRIENTS["carbs_g"], "carbs_g")
     raised = False
 except m.MappingError:
     raised = True
-check("Zwei verschiedene Codes (CHO und CHOAVL) in derselben Stufe: Abbruch statt Raten", raised)
+check("Zwei verschiedene Codes mit demselben Namen (Name-Stufe): Abbruch statt Raten", raised)
 
-# 5) Falsche Einheit bricht ab
+by_name = components(drop="FAT", extra=[("FATX", "Fett", "Fat", "g")])
+check("Fehlender Code, eindeutiger Name: Zuordnung ueber den Namen", m.pick_component(by_name, m.NUTRIENTS["fat_g"], "fat_g") == ("FATX", "g"))
+
+# 4) Falsche Einheit bricht ab
 bad_unit = components()
-bad_unit.loc[bad_unit["Code"] == "FAT", "Einheit"] = "mg"
+bad_unit.loc[bad_unit["Nährstoffcode / Component code"] == "FAT", "Einheit / Unit"] = "mg"
 try:
-    m.resolve_mapping(bad_unit, data([row("B1", "x", "x", 1, 1, 1, 1, 1, 1, 1, 1, 1)]).columns)
-    raised = False
-except m.MappingError:
-    raised = True
-check("Unerwartete Einheit (Fett in mg) bricht ab", raised)
-
-# 6) Fehlender Pflicht-Naehrwert bricht ab, fehlender optionaler wird nur gewarnt
-no_fiber = components()
-no_fiber = no_fiber[no_fiber["Code"] != "FIBT"]
-try:
-    m.resolve_mapping(no_fiber, data([]).columns)
+    m.resolve_mapping(bad_unit, data([]).columns)
     raised = False
 except m.MappingError as e:
-    raised = "fiber_g" in str(e)
-check("Fehlender Pflicht-Naehrwert (Ballaststoffe) bricht mit Hinweis ab", raised)
+    raised = "FAT" in str(e) or "fat_g" in str(e)
+check("Unerwartete Einheit (Fett in mg) bricht ab", raised)
 
-no_sugar = components()
-no_sugar = no_sugar[no_sugar["Code"] != "MDSA"]
-_, warnings = m.resolve_mapping(no_sugar, data([]).columns)
-check("Fehlender optionaler Naehrwert (Zucker) wird nur gewarnt", any("sugar_g" in w for w in warnings))
+# 5) Fehlender Naehrwert bricht mit Hinweis ab (alle 8 sind Pflicht)
+for drop, key in (("FIBT", "fiber_g"), ("NACL", "salt_g"), ("SUGAR", "sugar_g")):
+    try:
+        m.resolve_mapping(components(drop=drop), data([]).columns)
+        raised = False
+    except m.MappingError as e:
+        raised = key in str(e)
+    check(f"Fehlender Naehrwert {key} bricht mit Hinweis ab", raised)
 
-# 7) Wertspalte: Praefix darf keine laengeren Codes treffen (FAT vs FATRN) und Herkunftsspalten nicht
-cols = ["FAT", "FAT Datenherkunft", "FATRN", "FAT Referenz"]
-check("find_value_column: FAT trifft nicht FATRN und nicht die Herkunftsspalte", m.find_value_column(cols, "FAT") == "FAT")
+# 6) Wertspalte: Praefix darf keine laengeren Codes treffen (NA vs NACL) und keine Herkunftsspalten
+cols = ["NACL Salz (Natriumchlorid) [g/100g]", "NACL Datenherkunft", "NA Natrium [mg/100g]", "NA Referenz"]
+check("find_value_column: NA trifft nicht NACL und nicht die Referenzspalte",
+      m.find_value_column(cols, "NA") == "NA Natrium [mg/100g]")
+check("find_value_column: NACL trifft nicht NA", m.find_value_column(cols, "NACL") == "NACL Salz (Natriumchlorid) [g/100g]")
+check("find_value_column: Codes mit Sonderzeichen (F4:0) funktionieren",
+      m.find_value_column(["F4:0 Fettsäure C4:0 [g/100g]", "F4:0 Datenherkunft"], "F4:0") == "F4:0 Fettsäure C4:0 [g/100g]")
 
-# 8) SQL-Ausgabe: Quote-Escaping, NULL, Attribution, idempotentes on conflict
-d = data([row("B100003", "Kind's Müsli", "Kids' muesli", 380, 9, 6, 1, 70, 20, 8, 20, None)])
+# 7) SQL-Ausgabe: Quote-Escaping, NULL, Attribution, idempotentes on conflict
+d = data([row("B100003", "Kind's Müsli", "Kids' muesli", ENERCC=380, PROT625=9, FAT=6, FASAT=1, CHO=70, SUGAR=20,
+              FIBT=8, NACL=None)])
 rows, *_ = m.build_rows(components(), d)
 with tempfile.TemporaryDirectory() as tmp:
     out = Path(tmp) / "out.sql"
@@ -126,10 +135,11 @@ with tempfile.TemporaryDirectory() as tmp:
 check("SQL: einfaches Anfuehrungszeichen wird verdoppelt", "'Kind''s Müsli'" in sql)
 check("SQL: Attribution im Kopf", "Max Rubner-Institut (2025)" in sql and "CC BY 4.0" in sql)
 check("SQL: on conflict (bls_code) do update", "on conflict (bls_code) do update set" in sql)
-check("SQL: Umlaute bleiben erhalten (UTF-8)", "Müsli" in sql)
+check("SQL: NULL fuer fehlende Werte", ", null)" in sql)
 
-# 9) Batches: 1200 Zeilen -> 3 INSERT-Statements bei batch=500
-many = data([row(f"B{i:06d}", f"Lebensmittel {i}", f"Food {i}", 100, 1, 1, 0.5, 10, 5, 1, 10, None) for i in range(1200)])
+# 8) Batches: 1200 Zeilen -> 3 INSERT-Statements bei batch=500
+many = data([row(f"B{i:06d}", f"Lebensmittel {i}", f"Food {i}", ENERCC=100, PROT625=1, FAT=1, FASAT=0.5, CHO=10,
+                 SUGAR=5, FIBT=1, NACL=0.1) for i in range(1200)])
 rows, *_ = m.build_rows(components(), many)
 with tempfile.TemporaryDirectory() as tmp:
     out = Path(tmp) / "out.sql"
@@ -138,9 +148,9 @@ with tempfile.TemporaryDirectory() as tmp:
 check("Batches: 1200 Zeilen ergeben 3 INSERT-Statements", sql.count("insert into public.bls_foods") == 3)
 check("Batches: alle 1200 Zeilen enthalten", sql.count("('B0") == 1200)
 
-# 10) Auffaellige Zeilen werden gemeldet (kcal > 950)
-d = data([row("B9", "Unmoeglich", "Impossible", 1200, 1, 1, 1, 1, 1, 1, 1, None)])
-_, _, _, stats = m.build_rows(components(), d)
+# 9) Auffaellige Zeilen werden gemeldet (kcal > 950)
+d = data([row("B9", "Unmoeglich", "Impossible", ENERCC=1200, PROT625=1, FAT=1, FASAT=1, CHO=1, SUGAR=1, FIBT=1, NACL=1)])
+_, _, stats = m.build_rows(components(), d)
 check("Plausibilitaet: kcal > 950 wird als auffaellig gemeldet", len(stats["implausible"]) == 1)
 
 failed = results.count(False)
