@@ -42,6 +42,18 @@ void main() {
       expect(() => productRepo(db).create(name: '   '), throwsArgumentError);
     });
 
+    test('nutrientsPer100 ohne nutrientsSource wird abgelehnt (Phase 7a: Quelle muss explizit sein)', () {
+      expect(
+        () => productRepo(db).create(name: 'Paprika', nutrientsPer100: {'kcal': 30}),
+        throwsArgumentError,
+      );
+    });
+
+    test('nutrientsPer100 mit nutrientsSource wird uebernommen', () async {
+      final p = await productRepo(db).create(name: 'Paprika', nutrientsPer100: {'kcal': 30}, nutrientsBasis: 'g', nutrientsSource: 'bls');
+      expect(p.nutrientsSource, 'bls');
+    });
+
     test('Marke ist leer/whitespace: wird zu null', () async {
       final p = await productRepo(db).create(name: 'X', brand: '   ');
       expect(p.brand, isNull);

@@ -215,11 +215,19 @@ class ProductRepository {
     String? offCode,
     Map<String, double>? nutrientsPer100,
     String? nutrientsBasis,
+    // Codereview-Fund 2026-10-02 (Phase 7a): vorher wurde die Quelle immer stillschweigend als
+    // 'off' angenommen, sobald Naehrwerte vorhanden waren -- das stimmt nicht mehr, sobald eine
+    // zweite Quelle (BLS, Phase 7b) hinzukommt. Explizit statt geraten, Default haelt bestehende
+    // Aufrufer (OFF-Scan) unveraendert.
+    String? nutrientsSource,
     double? unitWeightG,
     String? ean,
   }) async {
     final n = name.trim();
     if (n.isEmpty) throw ArgumentError('Name darf nicht leer sein');
+    if (nutrientsPer100 != null && nutrientsSource == null) {
+      throw ArgumentError('nutrientsSource muss gesetzt sein, wenn nutrientsPer100 angegeben wird');
+    }
     final hid = await householdId();
     final now = DateTime.now().toUtc();
     final product = Product(
@@ -238,7 +246,7 @@ class ProductRepository {
       offCode: offCode,
       nutrientsPer100: nutrientsPer100 == null ? null : jsonEncode(nutrientsPer100),
       nutrientsBasis: nutrientsBasis,
-      nutrientsSource: nutrientsPer100 == null ? null : 'off',
+      nutrientsSource: nutrientsSource,
       unitWeightG: unitWeightG,
       updatedAt: now,
     );
