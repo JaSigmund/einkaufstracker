@@ -5,43 +5,51 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 **Die vollständige Dokumentation liegt im Obsidian-Vault:**
 `C:\Users\jakob\Documents\ClaudeBrain\02 Projekte\Einkaufstracker\` (Einstieg: `Einkaufstracker.md`, Anforderungen: `01 Lastenheft.md`)
 
-## Stand (Phase 5 abgeschlossen, Phase 7a Fundament läuft, 2026-10-02)
+## Stand (Phase 5 abgeschlossen, Phase 7 und 6 weitgehend umgesetzt, 2026-10-02)
 
 | Teil | Status |
 |---|---|
 | Doku (Lastenheft bis Roadmap) | Laufend nachgeführt, siehe Roadmap für den Phasenstand |
-| `supabase/migrations` | 0001 bis 0014 (Schema, Kategorien, Ledger, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege, Fehlerberichte + Bearbeitungsstatus/Changelog, Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle); Schema-/RLS-Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`, 78 Tests) **und** gegen das echte Supabase-Projekt (Frankfurt) eingespielt. `shopping_lists`/`shopping_list_items` lagen schon seit 0001 bereit, client-seitig erst seit Phase 3 angebunden |
-| `supabase/planned` | Leer. Entwürfe für kommende Phasen (z.B. Haushalts-Einladungen, Phase 6) liegen hier, werden nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
-| `supabase/functions/parse-receipt` | deployt, mit Deno typgeprüft, gegen echte Bons getestet (Sonnet 5 exakt, `tools/test_parse_receipt.py`); Standardmodell per Secret `RECEIPT_MODEL` |
+| `supabase/migrations` | 0001 bis 0017: Schema, Kategorien, Ledger, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege, Fehlerberichte + Bearbeitungsstatus/Changelog, Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle (0014), ausgeschlossene Bon-Positionen (0015), Bilanz-View mit Gegenbuchungen (0016), Haushalts-Einladungen (0017). Schema-/RLS-Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`, 125 Tests) **und** gegen das echte Supabase-Projekt (Frankfurt) eingespielt |
+| `supabase/planned` | Leer. Entwürfe für kommende Phasen liegen hier, werden nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
+| `supabase/functions` | Alle mit Deno typgeprüft, deployt: `parse-receipt` (Bon-Erkennung, gegen echte Bons getestet), `suggest-recipes` und `cooking-chat` (Rezeptvorschläge, Koch-Chat), `analyze-meal` (Foto-KI fürs Essenstagebuch), `accept-invite` (Einladung annehmen, ohne JWT), `delete-account`. Eingabeprüfung als eigenes Modul mit `deno test` (`analyze-meal`, `accept-invite`). Die KI-Funktionen teilen ein Tageslimit von 40 Aufrufen je Haushalt |
 | `spikes/spike_scanner` | Android-Spike auf dem Handy getestet, 17 Unit-Tests (inkl. 3 echte Billa-Bons als Regression, lokal) |
 | `tools/test_parse_receipt.py` | Vergleichstest der Cloud-Erkennung (Modelle x Varianten x Fotos), Soll-Werte in `testdata/receipts/truth/` |
 | `tools/metrics.py` | Kennzahlen aus dem Testkonzept (Bons je Quelle, Summenstimmigkeit, Fallback-Quote, Kosten, Kategorisierung) aus den Live-Daten, nur lesend: `python tools/metrics.py` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 2 bis 5 fertig (Phase 5: Abnahme nach Lastenheft §6 bestanden, siehe Roadmap), Phase 4 (Preisvergleich und Trends) komplett umgesetzt: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung mit Grundpreis/Produkt-Zuordnung je Artikel, Duplikate zusammenführen, Artikel-Detail (Preisverlauf, Händlervergleich), Trend über 6/12 Monate, Monatsbudget, CSV-Export, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (Menge/Inhalt, Vorschläge aus „Leer“/„Ablauf“, hakt sich bei Bon-Zuordnung selbst ab), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 673 Tests, signierter Release-Build (aktuell v1.7.15) läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
-| CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
+| Flutter-App (`app/`) | Phase 2 bis 5 fertig (Abnahme nach Lastenheft §6 bestanden), dazu Phase 7 (Essenstagebuch: Mahlzeiten mit FEFO-Bestandsabzug und Rückbuchung, BLS-Suche, Foto und Foto-KI, Richtwerte, Verbrauchsbilanz, Schnelleinträge) und Phase 6 (Haushalts-Einladungen, kürzerer Sync-Takt, Konflikt-Hinweis). Außerdem Bon-Import (PDF, Teilen, Foto + Cloud-Fallback), Monatsauswertung mit Grundpreis, Trend, Barcode-Inventar mit Haltbarkeit, Einkaufsliste, Rezeptvorschläge, Web-Version (PWA). 1138 Tests. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| CI | GitHub Actions: App (analyze, test inkl. Migrationstest der lokalen Datenbank), Datenbank (Schema- und RLS-Tests), Edge Functions (deno check und deno test), alle auf Linux grün |
 
 ## Struktur
 
 ```
 Einkaufstracker/
   supabase/
-    migrations/        0001 bis 0014 (Schema inkl. Einkaufsliste, Kategorien, Ledger, Bon-Import, Kategorie-Aliase,
+    migrations/        0001 bis 0017 (Schema inkl. Einkaufsliste, Kategorien, Ledger, Bon-Import, Kategorie-Aliase,
                         Bon-Rabatte, Originalbelege, Fehlerberichte, Bearbeitungsstatus/Changelog,
-                        Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle)
-    planned/           leer (Entwürfe für kommende Phasen, z.B. Haushalts-Einladungen)
+                        Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle,
+                        ausgeschlossene Bon-Positionen, Bilanz-View, Haushalts-Einladungen)
+    planned/           leer (Entwürfe für kommende Phasen)
     tests/             run_schema_tests.py (Schema + RLS ohne Docker)
     functions/
       parse-receipt/   Edge Function (Claude Vision)
+      suggest-recipes/, cooking-chat/, analyze-meal/, accept-invite/, delete-account/
   tools/               Prototypen und einmalige SQL-Skripte (parse_digital_billa.py, changelog_*.sql, bugstatus_*.sql)
   spikes/spike_scanner Phase-0-Messapp (Scanner, OCR, Barcode, Open Food Facts)
-  app/                 Flutter-App (Phase 2 bis 4)
+  app/                 Flutter-App (Phase 2 bis 7, Phase 6 teilweise)
   testdata/receipts/   Golden Set (Bon-Fotos, OCR-Rohdaten, digital/*.pdf, NICHT einchecken, siehe .gitignore)
 ```
 
 ## Nächste Schritte
 
-Phase 0 bis 4 sind aus Code-Sicht abgeschlossen (siehe [[11 Roadmap und Meilensteine]] im Vault). **Offen aus Phase 3:** Ausloeser „Wiederkehrend“ für Listen-Vorschläge, die Haltbarkeits-Startwerte selbst sind noch nicht gegen Herstellerangaben/AGES verifiziert (Doku 06 §3.2), und M3 (zwei Wochen Praxistest mit den Ablauf-Erinnerungen im Alltag). **Offen aus Phase 4:** M4 selbst (Praxistest mit echten Daten; aktuell nur 7 Bons über ~3 Monate, Händlervergleich damit noch nicht aussagekräftig, zeigt aber korrekt „zu wenig Daten“), `share_plus` (CSV-Export) noch nicht auf dem Handy geprüft. **Weiterhin offen aus Phase 2, läuft parallel:** Hofer-Bons, weitere jö-PDFs fürs Golden Set, Diagnose der lokalen Foto-Erkennung. **Als Nächstes:** Phase 5 (Härtung und Abnahme) oder die offenen Phase-3/4-Punkte zuerst schliessen.
+Phase 0 bis 5 sind abgeschlossen, Phase 7 (Essenstagebuch) und große Teile von Phase 6 (Mehrpersonen-Haushalt) sind umgesetzt, den genauen Stand und die Entscheidungen führt der Vault: [[11 Roadmap und Meilensteine]] und [[12 Entscheidungen (ADR)]].
+
+**Offen:**
+- Prüfung auf dem Gerät und im Alltag für alles aus Phase 6 und 7 (Meilensteine M6 und M7), insbesondere Foto-KI (Qualität der Mengenschätzung, Kosten je Foto) und eine echte Einladung zwischen zwei Personen
+- Phase 7e (Journal-Design: Tagesseite, Monats-Mosaik, Wochenrückblick, PDF) und 7f (Rezept zu Mahlzeit, Skalieren)
+- Serverseitige Push-Erinnerungen (FCM) für mehrere Geräte, braucht ein Firebase-Projekt
+- Online-Preisquellen (ADR-019) und die offenen Fragen dazu
 
 **Migrationen anwenden:** `npx supabase db push --dry-run`, dann `npx supabase db push --yes` (gegen das Live-Projekt, verknüpft per `supabase link`). Neue Migrationen müssen live sein, **bevor** die App-Version mit dem neuen Schema installiert wird.
 
