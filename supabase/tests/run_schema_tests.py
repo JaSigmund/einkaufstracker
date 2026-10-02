@@ -369,6 +369,93 @@ def main():
     check("bls_foods: authentifizierter Nutzer darf nicht aendern (RLS filtert die Zeile, 0 betroffen)",
           updated_rowcount == 0)
 
+    # --- Online-Preise (0018, ADR-019): Preis-Snapshots, Feed-Status, Verknuepfung, Suche -------------------------
+    ins_price = ("insert into online_prices (store, external_id, name, price_cents, quantity, unit, base_unit, unit_price_norm_cents, seen_at) "
+                 "values (%s,%s,%s,%s,%s,%s,%s,%s, now())")
+    for row in [
+        ("billa", "00-1", "Ja! Natuerlich Bio-Vollmilch 3,5% 1l", 189, 1, "l", "l", 189),
+        ("billa", "00-2", "Clever Vollmilch 1l", 129, 1, "l", "l", 129),
+        ("billa", "00-3", "Cola Zero 1,5l", 159, 1.5, "l", "l", 106),
+        ("billa", "00-4", "Ariel Waschmittelpods", 849, 19, "wg", None, None),
+        ("billa", "00-5", "BILLA Vollmilchglasur", 199, 150, "g", "kg", 1327),
+        ("billa", "00-6", "Pasabahce Krug 1L", 499, 1, "l", "l", 499),
+        ("billa", "00-7", "Schogetten Vollmilch", 199, 100, "g", "kg", 1990),
+        ("spar", "2020", "A-zwei Vollmilch laenger frisch 1l", 208, 1, "l", "l", 208),
+        ("spar", "2021", "Vollkornbrot Roggen 500g", 249, 500, "g", "kg", 498),
+        ("sparSi", "9", "Mleko polnomastno 1l", 99, 1, "l", "l", 99),
+    ]:
+        db(ins_price, row)
+    check("online_prices: authentifizierter Nutzer kann lesen", one("select count(*) from online_prices", user=A) == 10)
+    check("online_prices: Nutzer darf nicht einfuegen (nur lesbar)", raises(ins_price, ("billa", "x", "x", 1, 1, "stk", "stk", 1), user=A))
+    check("online_prices: Nutzer darf nicht aendern (RLS filtert, 0 betroffen)",
+          db("update online_prices set price_cents = 1 where store='billa'", user=A)[1] == 0)
+    check("online_prices: Nutzer darf nicht loeschen (RLS filtert, 0 betroffen)",
+          db("delete from online_prices where store='billa'", user=A)[1] == 0)
+    check("online_prices: unbekannte Basiseinheit wird vom Check abgelehnt",
+          raises(ins_price, ("billa", "bad", "x", 1, 1, "stk", "dozen", 1)))
+    check("online_prices: Preis darf nicht negativ sein", raises(ins_price, ("billa", "neg", "x", -1, 1, "stk", "stk", 1)))
+
+    db("insert into online_feed_status (source, feed_last_modified, last_success_at, row_counts) values ('heisse_preise', now(), now(), '{\"billa\": 4}')")
+    check("online_feed_status: Nutzer kann lesen", one("select count(*) from online_feed_status", user=A) == 1)
+    check("online_feed_status: Nutzer darf nicht aendern (RLS filtert, 0 betroffen)",
+          db("update online_feed_status set last_error='x'", user=A)[1] == 0)
+    check("online_feed_status: Nutzer darf nicht einfuegen", raises("insert into online_feed_status (source) values ('x')", user=A))
+
+    def search(q, **kw):
+        stores = kw.get("stores", ["billa", "spar"])
+        n = kw.get("n", 8)
+        return db("select store, external_id, name from search_online_prices(%s, %s, %s, %s)", (q, stores, n, kw.get("prefer")), user=A)[0]
+
+    vm = search("Vollmilch")
+    check("Suche: findet Vollmilch bei Billa und Spar, nicht Cola, Waschmittel oder Krug",
+          {r[1] for r in vm} == {"00-1", "00-2", "00-5", "00-7", "2020"}, str(vm))
+    check("Suche: kuerzerer Name steht bei gleichem Treffer zuerst", [r[1] for r in vm if r[0] == "billa"][0] == "00-2", str(vm))
+    check("Suche: ganzes Wort vor Wortanfang (Vollmilch vor Vollmilchglasur)", [r[1] for r in vm if r[0] == "billa"][-1] == "00-5", str(vm))
+    check("Suche: ein Wort mehrfach im Namen (Bindestrich-Wort) zaehlt nicht mehr",
+          [r[1] for r in search("Vollmilch", stores=["billa"])][0] == "00-2", str(search("Vollmilch", stores=["billa"])))
+    both = [r[1] for r in search("Vollmilch Bio", stores=["billa"])]
+    check("Suche: alle Woerter der Anfrage zu treffen schlaegt eines", both[0] == "00-1", str(both))
+    plain = [r[1] for r in search("Vollmilch", stores=["billa"])]
+    pref_l = [r[1] for r in search("Vollmilch", stores=["billa"], prefer="l")]
+    pref_kg = [r[1] for r in search("Vollmilch", stores=["billa"], prefer="kg")]
+    check("Suche: ohne Vorliebe entscheidet bei gleicher Wertung der kuerzere Name", plain[:3] == ["00-2", "00-7", "00-1"], str(plain))
+    check("Suche: Basiseinheit l bevorzugt (Milch vor Schokolade)", pref_l[:3] == ["00-2", "00-1", "00-7"], str(pref_l))
+    check("Suche: Basiseinheit kg bevorzugt", pref_kg[:3] == ["00-7", "00-2", "00-1"], str(pref_kg))
+    check("Suche: Basiseinheit schlaegt nur bei gleicher Wertung (Wortanfang-Treffer bleibt hinten)",
+          pref_kg[-1] == "00-5" and set(pref_kg) == set(plain))
+    check("Suche: Mengen in der Anfrage (1l, 500g) werden ignoriert",
+          search("Vollmilch 1l") == vm and search("1l") == [] and search("500g") == [])
+    check("Suche: nur die gewuenschten Haendler (sparSi kommt nie vor)", {r[0] for r in search("mleko polnomastno")} == set())
+    check("Suche: Haendlerauswahl wird beachtet", {r[0] for r in search("Vollmilch", stores=["spar"])} == {"spar"})
+    check("Suche: Begrenzung je Haendler", len([r for r in search("Vollmilch", n=1) if r[0] == "billa"]) == 1)
+    check("Suche: Wortanfang genuegt (Vollk -> Vollkornbrot)", [r[1] for r in search("Vollk")] == ["2021"])
+    check("Suche: leere Anfrage ergibt nichts, ohne Fehler", search("") == [] and search("  ") == [] and search("a") == [])
+    check("Suche: Sonderzeichen der Anfrage brechen die Suche nicht",
+          not raises("select * from search_online_prices(%s)", ("vollmilch & | ! ( ) :* ' --",), user=A))
+
+    db("insert into products (household_id, name, base_unit) values (%s,'Milch 1l','l')", (ha,))
+    milk = one("select id from products where household_id=%s and name='Milch 1l'", (ha,))
+    ins_link = ("insert into product_online_links (household_id, product_id, store, external_id, linked_name) "
+                "values (%s,%s,%s,%s,%s)")
+    check("Online-Verknuepfung: A kann den eigenen Haushalt verknuepfen", not raises(ins_link, (ha, milk, "billa", "00-2", "Clever Vollmilch 1l"), user=A))
+    check("Online-Verknuepfung: B sieht sie nicht", one("select count(*) from product_online_links", user=B) == 0)
+    check("Online-Verknuepfung: B kann nicht in Haushalt A verknuepfen",
+          raises(ins_link, (ha, milk, "spar", "2020", "x"), user=B))
+    check("Online-Verknuepfung: je Produkt und Haendler nur eine aktive Zeile",
+          raises(ins_link, (ha, milk, "billa", "00-1", "anderer Artikel"), user=A))
+    check("Online-Verknuepfung: anderer Haendler fuer dasselbe Produkt geht", not raises(ins_link, (ha, milk, "spar", "2020", "A-zwei Vollmilch"), user=A))
+    db("update product_online_links set deleted_at = now() where product_id=%s and store='billa'", (milk,))
+    check("Online-Verknuepfung: nach dem Loeschen (Soft-Delete) ist eine neue Verknuepfung moeglich",
+          not raises(ins_link, (ha, milk, "billa", "00-1", "Ja! Natuerlich Bio-Vollmilch"), user=A))
+    before_touch = one("select updated_at from product_online_links where store='spar'")
+    db("update product_online_links set linked_name='A-zwei Vollmilch 1l' where store='spar'")
+    check("Online-Verknuepfung: updated_at wird beim Aendern gesetzt",
+          one("select updated_at > %s from product_online_links where store='spar'", (before_touch,)))
+    db("delete from products where id=%s", (milk,))
+    check("Online-Verknuepfung: faellt mit dem Produkt weg", one("select count(*) from product_online_links where product_id=%s", (milk,)) == 0)
+    db("delete from online_prices")
+    db("delete from online_feed_status")
+
     # --- Haushalts-Einladungen (0017, Phase 6, ADR-017 Option A) -----------------------------------------------
     import re
     codes = [one("select new_invite_code()") for _ in range(300)]
