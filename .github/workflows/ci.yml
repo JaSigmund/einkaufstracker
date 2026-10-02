@@ -52,6 +52,11 @@ jobs:
           for dir in supabase/functions/*/; do
             fn=$(basename "$dir")
             mkdir -p "/tmp/fncheck/$fn"
-            cp "$dir/index.ts" "/tmp/fncheck/$fn/index.ts"
+            # ganzer Ordner: eine Function darf aus mehreren Dateien bestehen (z.B. sanitize.ts neben index.ts)
+            cp "$dir"*.ts "/tmp/fncheck/$fn/"
             (cd "/tmp/fncheck/$fn" && deno check index.ts)
+            # vorhandene Deno-Tests (*_test.ts) mit ausfuehren
+            if ls "/tmp/fncheck/$fn"/*_test.ts >/dev/null 2>&1; then
+              (cd "/tmp/fncheck/$fn" && deno test)
+            fi
           done

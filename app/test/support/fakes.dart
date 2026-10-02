@@ -6,11 +6,13 @@ import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/cloud/cooking_cloud.dart';
+import 'package:einkaufstracker/data/cloud/meal_analysis_cloud.dart';
 import 'package:einkaufstracker/data/files/meal_photo_service.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
+import 'package:einkaufstracker/domain/nutrition/meal_analysis.dart';
 import 'package:einkaufstracker/domain/recipes/recipe_suggestion.dart';
 import 'package:einkaufstracker/features/recipes/cooking_chat_panel.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
@@ -420,5 +422,26 @@ class FakeCookingCloud implements CookingCloud {
     lastContext = context;
     if (error != null) throw error!;
     return chatReply;
+  }
+}
+
+/// Cloud-Attrappe fuer die Foto-Analyse einer Mahlzeit (Phase 7c).
+class FakeMealAnalysisCloud implements MealAnalysisCloud {
+  FakeMealAnalysisCloud({this.analysis = const MealAnalysis(), this.error});
+
+  MealAnalysis analysis;
+  Object? error;
+
+  int calls = 0;
+  Uint8List? lastPhoto;
+  List<AnalysisProduct>? lastProducts;
+
+  @override
+  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products) async {
+    calls++;
+    lastPhoto = photo;
+    lastProducts = products;
+    if (error != null) throw error!;
+    return analysis;
   }
 }
