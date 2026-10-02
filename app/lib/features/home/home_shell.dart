@@ -67,6 +67,12 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: Text(tab.label),
         actions: [
+          if (_index == 1)
+            IconButton(
+              tooltip: 'Rezeptvorschläge',
+              icon: const Icon(Icons.restaurant_menu_outlined),
+              onPressed: () => context.push('/recipe-suggestions'),
+            ),
           if (_index == 4)
             IconButton(
               tooltip: 'Trend über Monate',
