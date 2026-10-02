@@ -16,13 +16,20 @@ import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'ingredient_picker.dart';
+import 'manual_nutrients_dialog.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
 
 /// Argumente fuer `/meal-form`: ohne [existing] wird eine neue Mahlzeit angelegt, sonst diese bearbeitet.
+///
+/// Mit [template] entsteht eine NEUE Mahlzeit als Kopie einer frueheren ("Nochmal essen", Doku 15 §3.2): Titel,
+/// Portionen und Zutaten werden uebernommen, Zeitpunkt ist jetzt. Mit [leftover] ist es ein Rest vom Vortag: gleiche
+/// Naehrwerte, aber ohne erneuten Abzug vom Bestand.
 class MealFormArgs {
-  const MealFormArgs({this.existing});
+  const MealFormArgs({this.existing, this.template, this.leftover = false});
   final Meal? existing;
+  final Meal? template;
+  final bool leftover;
 }
 
 /// Eine Zutat im Formular, noch nicht gespeichert.
@@ -76,9 +83,11 @@ class _Row {
 /// dem Inventar, aus der Lebensmitteldatenbank oder als Freitext. Beim Speichern wird der Bestand FEFO abgezogen,
 /// beim Bearbeiten der alte Abzug per Gegenbuchung zurueckgenommen und neu gerechnet.
 class MealFormPage extends ConsumerStatefulWidget {
-  const MealFormPage({super.key, this.existing});
+  const MealFormPage({super.key, this.existing, this.template, this.leftover = false});
 
   final Meal? existing;
+  final Meal? template;
+  final bool leftover;
 
   @override
   ConsumerState<MealFormPage> createState() => _MealFormPageState();
@@ -107,7 +116,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   String? _analysisNotes;
 
   /// `manual` | `photo_ai` | `recipe`: woher die Mahlzeit stammt. Nach einem angewendeten KI-Vorschlag `photo_ai`.
-  late String _source = widget.existing?.source ?? 'manual';
+  late String _source = widget.existing?.source ?? widget.template?.source ?? 'manual';
   String? _error;
 
   bool get _isEdit => widget.existing != null;
@@ -126,6 +135,16 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       _estimate = m.isEstimate;
       _loadExistingIngredients(m);
     }
+    final tpl = widget.template;
+    if (tpl != null) {
+      // Kopie einer frueheren Mahlzeit: Zeitpunkt ist jetzt, der Typ richtet sich nach der Uhrzeit (ein Muesli von
+      // gestern Abend ist heute frueh ein Fruehstueck). Foto und Notiz werden nicht uebernommen.
+      _title.text = tpl.title;
+      _eaten.text = formatQuantity(tpl.servingsEaten);
+      _made.text = formatQuantity(tpl.servingsMade);
+      _estimate = tpl.isEstimate;
+      _loadExistingIngredients(tpl, noDeduction: widget.leftover);
+    }
   }
 
   @override
@@ -137,7 +156,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     super.dispose();
   }
 
-  Future<void> _loadExistingIngredients(Meal m) async {
+  Future<void> _loadExistingIngredients(Meal m, {bool noDeduction = false}) async {
     final ingredients = await ref.read(mealRepositoryProvider).ingredientsOf(m.id);
     final products = {for (final p in await ref.read(productRepositoryProvider).allSnapshot()) p.id: p};
     final rows = <_Row>[];
@@ -179,7 +198,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         per100: per100,
         per100Basis: per100 == null ? null : 'g',
         manual: manual,
-        deduct: i.source == 'inventory' || i.inventoryItemId != null,
+        deduct: !noDeduction && (i.source == 'inventory' || i.inventoryItemId != null),
         source: i.source,
         confidence: i.confidence,
       ));
@@ -395,7 +414,32 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         )));
   }
 
+  /// Zeile ohne Produkt und ohne Naehrwertprofil, deren absolute Werte von Hand eingetragen sind.
+  bool _isManual(_Row r) => r.manual != null && r.product == null && r.per100 == null;
+
+  Future<void> _addManual() async {
+    final entry = await askManualNutrients(context, initialName: _title.text.trim());
+    if (entry == null || !mounted) return;
+    setState(() {
+      _rows.add(_Row(freeText: entry.name, quantity: 1, unit: EntryUnit.piece, manual: entry.nutrients, source: 'estimate'));
+      // Von Hand eingetragene Werte (Speisekarte, Schaetzung) sind keine Messwerte: erkennbar halten (FR-17). Wer sie genau
+      // kennt, schaltet "Nur geschaetzt" wieder aus.
+      _estimate = true;
+    });
+  }
+
+  Future<void> _editManual(int index) async {
+    final row = _rows[index];
+    final entry = await askManualNutrients(context, initialName: row.label, initial: row.manual);
+    if (entry == null || !mounted) return;
+    setState(() {
+      row.freeText = entry.name;
+      row.manual = entry.nutrients;
+    });
+  }
+
   Future<void> _editIngredient(int index) async {
+    if (_isManual(_rows[index])) return _editManual(index);
     final row = _rows[index];
     final q = await askIngredientQuantity(
       context,
@@ -511,7 +555,13 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     final totals = _totals();
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Mahlzeit bearbeiten' : 'Neue Mahlzeit'),
+        title: Text(_isEdit
+            ? 'Mahlzeit bearbeiten'
+            : widget.leftover
+                ? 'Rest erfassen'
+                : widget.template != null
+                    ? 'Nochmal erfassen'
+                    : 'Neue Mahlzeit'),
         actions: [
           if (_isEdit) IconButton(key: const Key('meal-delete'), tooltip: 'Löschen', icon: const Icon(Icons.delete_outline), onPressed: _delete),
           // In der App-Leiste statt am Listenende: das Formular ist lang, Speichern soll immer erreichbar sein.
@@ -579,7 +629,10 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         for (var i = 0; i < _rows.length; i++) _ingredientTile(i, t),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(key: const Key('meal-add-ingredient'), onPressed: _addIngredient, icon: const Icon(Icons.add), label: const Text('Zutat hinzufügen')),
+          child: Wrap(spacing: 8, children: [
+            TextButton.icon(key: const Key('meal-add-ingredient'), onPressed: _addIngredient, icon: const Icon(Icons.add), label: const Text('Zutat hinzufügen')),
+            TextButton.icon(key: const Key('meal-add-manual'), onPressed: _addManual, icon: const Icon(Icons.edit_note), label: const Text('Nährwerte eintragen')),
+          ]),
         ),
         if (_rows.isNotEmpty) _totalsCard(t, totals),
         SwitchListTile(
@@ -668,7 +721,11 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   Widget _ingredientTile(int i, ThemeData t) {
     final r = _rows[i];
     final n = r.nutrients;
-    final amount = r.quantity <= 0 ? 'Menge eintragen' : '${formatQuantity(r.quantity)} ${r.unit.label}';
+    final amount = _isManual(r)
+        ? 'Handeingabe'
+        : r.quantity <= 0
+            ? 'Menge eintragen'
+            : '${formatQuantity(r.quantity)} ${r.unit.label}';
     final parts = <String>[
       amount,
       if (n?.kcal != null) formatKcal(n!.kcal!) else 'Nährwerte unbekannt',
@@ -679,7 +736,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       key: Key('ingredient-row-$i'),
       contentPadding: EdgeInsets.zero,
       dense: true,
-      leading: Icon(r.product != null ? Icons.kitchen_outlined : Icons.eco_outlined, size: 20),
+      leading: Icon(r.product != null ? Icons.kitchen_outlined : (_isManual(r) ? Icons.edit_note : Icons.eco_outlined), size: 20),
       title: Text(r.label),
       subtitle: Text(parts.join(' · ')),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
