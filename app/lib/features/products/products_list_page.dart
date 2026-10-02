@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../data/local/database.dart';
+import '../../domain/categorization/name_similarity.dart';
+import '../../domain/categorization/normalize_name.dart';
 import 'product_form_page.dart';
 
 /// Alle Produkte des Haushalts, durchsuchbar, zum Bearbeiten (Fehlerbericht "Alias ändern", 2026-09-27):
@@ -89,20 +91,33 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
       }),
     );
     if (target == null || !mounted) return;
+    await _confirmAndMerge(keep: source, drop: target);
+  }
 
+  /// Letzter Schritt beider Zusammenfuehren-Wege (manuell gesucht oder als Duplikat-Vorschlag
+  /// angetippt): [drop] verschwindet aus der Liste, seine Historie wandert zu [keep].
+  Future<void> _confirmAndMerge({required Product keep, required Product drop}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Produkte zusammenführen?'),
         content: Text(
-            '„${target.name}“ wird in „${source.name}“ zusammengeführt. Bons, Inventar und Einkaufsliste von „${target.name}“ gehören danach zu „${source.name}“; „${target.name}“ verschwindet aus der Liste.'),
+            '„${drop.name}“ wird in „${keep.name}“ zusammengeführt. Bons, Inventar und Einkaufsliste von „${drop.name}“ gehören danach zu „${keep.name}“; „${drop.name}“ verschwindet aus der Liste.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Zusammenführen')),
         ],
       ),
     );
-    if (confirmed == true) await ref.read(productRepositoryProvider).mergeInto(target.id, source.id);
+    if (confirmed == true) await ref.read(productRepositoryProvider).mergeInto(drop.id, keep.id);
+  }
+
+  /// Paare, deren normalisierte Namen knapp ausserhalb der automatischen Bon-Zuordnungs-Toleranz liegen
+  /// (ADR-023) -- zu unsicher fuer eine stille Automatik, aber nah genug fuer einen Hinweis hier. Wird bei
+  /// jedem Aufbau neu berechnet statt gespeichert, damit nichts veraltet nachhaengt.
+  List<(Product, Product)> _likelyDuplicates(List<Product> products) {
+    final keys = products.map((p) => normalizeItemName(p.name)).toList();
+    return [for (final (i, j) in likelyDuplicatePairs(keys)) (products[i], products[j])];
   }
 
   @override
@@ -111,6 +126,7 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
     final query = _search.text.trim().toLowerCase();
     final filtered = (query.isEmpty ? products : products.where((p) => p.name.toLowerCase().contains(query))).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final duplicates = _likelyDuplicates(products);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Meine Produkte')),
@@ -124,6 +140,30 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
             onChanged: (_) => setState(() {}),
           ),
         ),
+        if (duplicates.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Card(
+              key: const Key('duplicate-suggestions'),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text('Mögliche Duplikate', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                for (final (a, b) in duplicates)
+                  ListTile(
+                    key: Key('duplicate-${a.id}-${b.id}'),
+                    dense: true,
+                    title: Text('„${a.name}“ ≈ „${b.name}“'),
+                    trailing: TextButton(
+                      key: Key('duplicate-merge-${a.id}-${b.id}'),
+                      onPressed: () => _confirmAndMerge(keep: a, drop: b),
+                      child: const Text('Zusammenführen'),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
         Expanded(
           child: filtered.isEmpty
               ? const Center(child: Text('Keine Produkte gefunden'))

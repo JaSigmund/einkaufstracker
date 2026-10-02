@@ -188,6 +188,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           offCode: null,
           nutrientsPer100: widget.suggestion?.nutrientsPer100,
           nutrientsBasis: widget.suggestion?.nutrientsBasis,
+          nutrientsSource: widget.suggestion?.nutrientsPer100 == null ? null : 'off',
           unitWeightG: widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!),
           ean: widget.ean,
         );

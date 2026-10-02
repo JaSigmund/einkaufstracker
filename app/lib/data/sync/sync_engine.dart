@@ -102,15 +102,20 @@ class SyncEngine {
         final rows = await _remote.fetchChanges(def.remoteName, since: since);
         if (rows.isEmpty) break;
 
-        // Zeilen mit ausstehender lokaler Aenderung nicht ueberschreiben
         final ids = rows.map(def.idOf).toList();
-        final pending = (await (_db.select(_db.outbox)
-                  ..where((t) => t.remoteTable.equals(def.remoteName) & t.rowId.isIn(ids)))
-                .get())
-            .map((e) => e.rowId)
-            .toSet();
-
+        // Codereview-Fund 2026-10-01: die Pruefung auf ausstehende lokale Aenderungen muss in DERSELBEN
+        // Transaktion wie das Anwenden stehen, sonst koennte zwischen beiden Schritten ein neuer, lokaler
+        // Schreibvorgang auf genau dieser Zeile landen (Outbox-Eintrag entsteht nach der Pruefung, aber vor
+        // dem Anwenden) -- der aeltere Server-Stand wuerde die frische lokale Aenderung dann kurzzeitig
+        // ueberschreiben, bis der naechste Sync sie erneut hochlaedt. In einer Transaktion serialisiert
+        // drift/SQLite alle Operationen auf der Verbindung, ein paralleler Schreibzugriff muss warten.
         await _db.transaction(() async {
+          // Zeilen mit ausstehender lokaler Aenderung nicht ueberschreiben
+          final pending = (await (_db.select(_db.outbox)
+                    ..where((t) => t.remoteTable.equals(def.remoteName) & t.rowId.isIn(ids)))
+                  .get())
+              .map((e) => e.rowId)
+              .toSet();
           for (final r in rows) {
             if (pending.contains(def.idOf(r))) continue;
             await def.applyRemote(_db, r);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../common/app_update_banner.dart';
 import '../inventory/inventory_page.dart';
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
@@ -78,44 +79,51 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: _index == 0
-          ? const ReceiptsOverview()
-          : _index == 1
-          ? const InventoryPage()
-          : _index == 2
-          ? const ScanPage()
-          : _index == 3
-          ? const ShoppingListPage()
-          : _index == 4
-          ? const ReportPage()
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      tab.selected,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.outline,
+      body: Column(
+        children: [
+          const AppUpdateBanner(),
+          Expanded(
+            child: _index == 0
+                ? const ReceiptsOverview()
+                : _index == 1
+                ? const InventoryPage()
+                : _index == 2
+                ? const ScanPage()
+                : _index == 3
+                ? const ShoppingListPage()
+                : _index == 4
+                ? const ReportPage()
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            tab.selected,
+                            size: 48,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Noch nicht gebaut',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(tab.hint, textAlign: TextAlign.center),
+                          const SizedBox(height: 24),
+                          OutlinedButton.icon(
+                            onPressed: () => context.push('/categories'),
+                            icon: const Icon(Icons.category_outlined),
+                            label: const Text('Kategorien verwalten'),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Noch nicht gebaut',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(tab.hint, textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: () => context.push('/categories'),
-                      icon: const Icon(Icons.category_outlined),
-                      label: const Text('Kategorien verwalten'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

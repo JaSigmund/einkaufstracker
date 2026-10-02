@@ -114,6 +114,65 @@ void main() {
 
       expect(find.textContaining('Keine Verbindung'), findsOneWidget);
     });
+
+    testWidgets('Codereview-Fund 2026-10-01: signOut() scheitert nach erfolgreicher Loeschung -- wipe() laeuft trotzdem, kein Absturz', (tester) async {
+      useTallViewport(tester);
+      final auth = FakeAuth(failSignOutWith: 'Netzwerkfehler');
+      final db = memoryDb();
+      addTearDown(db.close);
+      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: DateTime.now().toUtc()));
+
+      await tester.pumpWidget(deleteHost(auth, db: db));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings-delete-account')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'LÖSCHEN');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Endgültig löschen'));
+      await tester.pumpAndSettle();
+
+      expect(auth.deleteAccountCalls, 1);
+      expect(auth.signOutCalls, 1); // wird trotz Fehler versucht
+      final remaining = await db.select(db.products).get();
+      expect(remaining, isEmpty); // wipe() lief trotzdem
+    });
+  });
+
+  group('Abmelden', () {
+    Widget signOutHost(FakeAuth auth, {required AppDatabase db}) => ProviderScope(
+          overrides: [
+            householdIdProvider.overrideWith((r) async => 'h1'),
+            settingsRepositoryProvider.overrideWithValue(FakeSettingsRepository(_settings)),
+            authRepositoryProvider.overrideWithValue(auth),
+            databaseProvider.overrideWithValue(db),
+            pendingChangesProvider.overrideWith((ref) => Stream.value(0)),
+          ],
+          child: MaterialApp.router(routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SettingsPage())])),
+        );
+
+    testWidgets('loescht die lokalen Daten und meldet ab', (tester) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final auth = FakeAuth();
+      final db = memoryDb();
+      addTearDown(db.close);
+      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: DateTime.now().toUtc()));
+
+      await tester.pumpWidget(signOutHost(auth, db: db));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings-sign-out')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Abmelden'));
+      await tester.pumpAndSettle();
+
+      expect(auth.signOutCalls, 1);
+      final remaining = await db.select(db.products).get();
+      expect(remaining, isEmpty);
+    });
   });
 
   testWidgets('kein Budget gesetzt: Hinweistext', (tester) async {
@@ -183,4 +242,13 @@ void main() {
     // Fehlermeldung zurueck statt abzustuerzen.
     expect(find.text('Export nicht möglich.'), findsOneWidget);
   });
+
+  // Hinweis zum Fix "Erinnerungszeit aendern wirkt nicht sofort" (Codereview-Fund 2026-10-01,
+  // SettingsPage._update): kein Widget-Test dafuer -- der Material-TimePicker-Dialog, der sich dabei
+  // oeffnet, haelt in diesem Projekt (gleiche Grenze wie bei ReceiptEditPage's Datum/Uhrzeit-Picker)
+  // eine laufende Animation, auf die pumpAndSettle() nie "settelt" (beobachtet: 10 Minuten bis zum
+  // Timeout, auch mit einzelnen pump()-Aufrufen statt pumpAndSettle() weiterhin ein haengender Timer
+  // beim Dispose). Die eigentliche Logik (`rescheduleExpiryReminders`) ist bereits in
+  // expiry_reminder_scheduling_test.dart abgedeckt; der Fix selbst ist eine einzelne, bedingte
+  // Zeile in `_update`.
 }

@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/cloud/cloud_receipt.dart';
+import '../../data/ocr/image_prep.dart';
 import '../../data/repositories/receipt_repository.dart';
+import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/ocr/ocr_text.dart';
 import '../../domain/ocr/row_cluster.dart';
 import '../../domain/receipt/parsed_receipt.dart';
@@ -85,11 +87,16 @@ class PhotoReceiptService {
               'Zahlungsblock nicht abschneiden. Bitte den Bon neu fotografieren, mit der Zeile "Summe" gut lesbar.';
         } else {
           onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
-          remote = await cloud.read(images);
+          // Codereview-Fund 2026-10-01: war fest auf 'Billa' verdrahtet, auch fuer Hofer-Bons -- dieselbe
+          // einfache Kopfzeilen-Heuristik wie parseReceiptText, da der volle Parser hier ja gerade
+          // gescheitert ist.
+          remote = await cloud.read(images, storeHint: detectChainHint(_joinText(pages)));
         }
       }
     } on CloudNotAllowed {
       note = 'Die Cloud-Erkennung ist in den Einstellungen ausgeschaltet.';
+    } on AppUpdateRequiredException {
+      note = 'Ein Update ist erforderlich, bevor die Cloud-Erkennung wieder verfügbar ist. Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } on CloudUnavailable catch (e) {
       note = 'Die Cloud ist nicht erreichbar (${e.message}). Das Ergebnis stammt nur aus der lokalen Erkennung.';
     } catch (e) {
@@ -127,6 +134,71 @@ class PhotoReceiptService {
   Future<ImportPreview> _preview(ParsedReceipt r, String source, {String? note, List<AttachmentSource> attachments = const []}) async {
     final existing = await repo.findDuplicate(r);
     return ImportPreview(receipt: r, source: source, note: note, duplicateOfReceiptId: existing?.id, attachments: attachments);
+  }
+
+  /// Foto-Scan im Browser (Doku 14 iOS-Strategie, Option D): ML Kit (Dokumentenscanner und lokale
+  /// Texterkennung) hat keine Web-Implementierung, ein im Browser aufgenommenes Foto geht deshalb
+  /// immer direkt an die Cloud -- ADR-003 ("lokal zuerst") gilt nur dort, wo lokale Erkennung
+  /// ueberhaupt moeglich ist.
+  ///
+  /// [cutY] (Codereview-Fund 2026-10-01, Go/No-Go B4 "Zahlungsdaten verlassen nie das Geraet"): die
+  /// automatische Zeilen-Geometrie aus der On-Device-Texterkennung gibt es im Browser nicht, deshalb
+  /// markiert hier ein Mensch von Hand den Schnittpunkt (`WebPhotoCropPage`). Erforderlich, nicht
+  /// optional -- ohne diesen Schritt darf kein Foto die Cloud erreichen, genau wie nativ ein fehlender
+  /// Schnittpunkt den Upload verhindert (siehe `_cloudImages`).
+  Future<ImportPreview> readSinglePhotoViaCloud(Uint8List jpeg, {required double cutY, void Function(String status)? onStatus}) async {
+    final bool allowed;
+    try {
+      allowed = await cloudAllowed();
+    } on CloudUnavailable catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Keine Verbindung.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Die Einwilligung zur Cloud-Erkennung konnte nicht geprueft werden (${e.message}).',
+      );
+    }
+    if (!allowed) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Cloud-Erkennung ist ausgeschaltet.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Im Browser ist die Cloud-Erkennung der einzige Weg, ein Foto zu lesen (lokale Erkennung '
+            'gibt es hier nicht). Bitte in den Einstellungen aktivieren, oder die Positionen von Hand eingeben.',
+      );
+    }
+    onStatus?.call('Die Cloud liest den Bon mit, das dauert etwa 10 Sekunden …');
+    final Uint8List cropped;
+    try {
+      cropped = prepareForCloudBytes(jpeg, cutY: cutY);
+    } catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Das Foto konnte nicht zugeschnitten werden.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Das Foto konnte nicht verarbeitet werden ($e). Bitte erneut versuchen.',
+      );
+    }
+    try {
+      final remote = await cloud.read([cropped]);
+      if (!remote.isParsed) {
+        return ImportPreview(
+          receipt: remote,
+          source: ReceiptSources.photoCloud,
+          error: 'Der Bon konnte nicht gelesen werden. Du kannst es erneut versuchen oder die Positionen von Hand eingeben.',
+        );
+      }
+      return await _preview(remote, ReceiptSources.photoCloud, note: remote.isTrustworthy ? null : 'Die Summe passte nicht genau, bitte prüfen.');
+    } on CloudUnavailable catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Cloud nicht erreichbar.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Die Cloud ist nicht erreichbar (${e.message}).',
+      );
+    } catch (e) {
+      return ImportPreview(
+        receipt: const ParsedReceipt.failed(['Der Bon konnte nicht gelesen werden.']),
+        source: ReceiptSources.photoCloud,
+        error: 'Der Bon konnte nicht gelesen werden ($e).',
+      );
+    }
   }
 
   /// Fotos zum Ablegen: alle Seiten bis zur Seite mit "Summe" bzw. den Zahlungsdaten, diese abgeschnitten, spaetere

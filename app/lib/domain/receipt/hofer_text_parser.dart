@@ -32,7 +32,6 @@ class HoferTextParser {
   static final _kassenId = RegExp(r'Kassenidentifikationsnummer:\s*(\d+)/(\d+)');
   static final _fiskal = RegExp(r'Fiskalsequenz-Nummer:\s*(\d+)');
   static final _deposit = RegExp(r'PFAND|LEERGUT|FLASCHENKASSEN', caseSensitive: false);
-  static final _discountName = RegExp(r'AKTION|RABATT', caseSensitive: false);
 
   static int _cents(String s) {
     final t = s.replaceAll(',', '.');
@@ -95,7 +94,10 @@ class HoferTextParser {
         final name = mi.group(1)!.trim();
         final cents = _cents(mi.group(2)!);
         var kind = ReceiptItemKind.article;
-        if (cents < 0 || _discountName.hasMatch(name)) kind = ReceiptItemKind.discount;
+        // Codereview-Fund 2026-10-01, siehe billa_text_parser.dart: ein echter Rabatt ist immer negativ
+        // bepreist, der Name-Abgleich erzeugte sonst Fehlklassifikationen bei positiv bepreisten
+        // Aktionsartikeln.
+        if (cents < 0) kind = ReceiptItemKind.discount;
         if (_deposit.hasMatch(name)) kind = ReceiptItemKind.deposit;
         items.add(ParsedItem(rawText: name, kind: kind, lineTotalCents: cents, taxCode: mi.group(3)));
       }

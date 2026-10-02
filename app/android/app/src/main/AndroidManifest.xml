@@ -52,6 +52,17 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Lokale Ablauf-Erinnerungen (ADR-007, Doku 06 Paragraph 5): vom Plugin zwingend verlangt
+             (README, "Android Setup", "Scheduled notifications"), sonst kann der beim Planen
+             (zonedSchedule) registrierte Alarm beim Ausloesen nicht zugestellt werden: die
+             Zielkomponente ist nirgends deklariert, Android verwirft den Broadcast auf System-Ebene,
+             noch bevor App-Code laeuft (kein Fehler im App-Prozess sichtbar). Fehlerbericht
+             "Ablauf-Erinnerung kommt nicht an", 2026-10-02. Bewusst OHNE
+             ScheduledNotificationBootReceiver: ein Geraete-Neustart loescht die Alarme ohnehin (kein
+             RECEIVE_BOOT_COMPLETED, siehe ADR-007), App-Neustart holt das nach. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- Fuer die Aktionsbuttons "Auf Liste setzen"/"Ignorieren" an der Erinnerung. -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

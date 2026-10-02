@@ -7,6 +7,7 @@ import 'app/app.dart';
 import 'app/providers.dart';
 import 'core/config.dart';
 import 'data/local/database.dart';
+import 'data/local/storage_persistence.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ Future<void> main() async {
   }
 
   await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabasePublishableKey);
+  // Codereview-Fund 2026-10-01 (iOS/Safari-Strategie Option D): auf nativen Plattformen ein No-op, im
+  // Browser eine Bitte an Safari & Co, die lokale DB/Outbox nicht bei Speicherdruck zu raeumen.
+  await requestPersistentStorage();
 
   runApp(ProviderScope(
     overrides: [databaseProvider.overrideWithValue(AppDatabase.persistent())],

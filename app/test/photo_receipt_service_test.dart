@@ -5,13 +5,19 @@ import 'dart:ui' show Rect;
 
 import 'package:einkaufstracker/data/cloud/cloud_receipt.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/domain/app_update/app_update_gate.dart';
 import 'package:einkaufstracker/domain/ocr/row_cluster.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:einkaufstracker/features/receipt_import/photo_receipt_service.dart';
 import 'package:einkaufstracker/features/receipt_import/receipt_import_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 import 'support/fakes.dart';
+
+/// Echtes, dekodierbares JPEG (Codereview-Fund 2026-10-01: readSinglePhotoViaCloud dekodiert das Bild
+/// jetzt tatsaechlich zum Zuschneiden, ein paar Platzhalter-Bytes reichen nicht mehr).
+Uint8List _realJpeg({int w = 400, int h = 600}) => Uint8List.fromList(img.encodeJpg(img.Image(width: w, height: h)));
 
 List<ScannedPage> _pages(String fixture) {
   final json = jsonDecode(File('test/fixtures/ocr/$fixture.json').readAsStringSync()) as Map<String, dynamic>;
@@ -43,11 +49,13 @@ class _FakeCloud implements CloudReceiptReader {
   Object answer; // ParsedReceipt oder Exception
   int calls = 0;
   List<Uint8List> lastImages = const [];
+  String? lastStoreHint;
 
   @override
-  Future<ParsedReceipt> read(List<Uint8List> jpegs) async {
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'}) async {
     calls++;
     lastImages = jpegs;
+    lastStoreHint = storeHint;
     final a = answer;
     if (a is Exception) throw a;
     return a as ParsedReceipt;
@@ -78,6 +86,73 @@ void main() {
   });
   tearDown(() => db.close());
 
+  group('readSinglePhotoViaCloud (Foto-Scan im Browser, Doku 14 iOS-Strategie Option D)', () {
+    final jpeg = _realJpeg();
+
+    test('Cloud erlaubt und Ergebnis vertrauenswuerdig: Vorschau mit Quelle photoCloud', () async {
+      final p = await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.source, ReceiptSources.photoCloud);
+      expect(p.receipt.isTrustworthy, isTrue);
+      expect(p.canImport, isTrue);
+      expect(p.note, isNull);
+      expect(cloud.calls, 1);
+    });
+
+    test('Codereview-Fund 2026-10-01: das hochgeladene Bild ist unterhalb von cutY zugeschnitten, nicht das Originalfoto', () async {
+      await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(cloud.lastImages, isNot([jpeg])); // nicht mehr das unveraenderte Originalfoto
+      final uploaded = img.decodeJpg(cloud.lastImages.single)!;
+      expect(uploaded.height, 300);
+    });
+
+    test('Cloud ausgeschaltet: Fehlermeldung erklaert, dass es im Browser keine lokale Erkennung gibt', () async {
+      allowed = false;
+      final p = await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.canImport, isFalse);
+      expect(p.error, contains('Browser'));
+      expect(cloud.calls, 0);
+    });
+
+    test('Ergebnis nicht vertrauenswuerdig (Summe passt nicht): trotzdem uebernehmbar, mit Hinweis', () async {
+      cloud = _FakeCloud(parsedReceiptFromCloud(_cloudJson(2319, [1000])));
+      final p = await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.receipt.isTrustworthy, isFalse);
+      expect(p.canImport, isTrue);
+      expect(p.note, contains('Summe'));
+    });
+
+    test('Cloud liefert kein Ergebnis (nicht gelesen): Fehler statt Absturz', () async {
+      cloud = _FakeCloud(const ParsedReceipt.failed(['keine Summe']));
+      final p = await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.canImport, isFalse);
+      expect(p.receipt.isParsed, isFalse);
+    });
+
+    test('Cloud nicht erreichbar: Fehlermeldung statt Absturz', () async {
+      cloud = _FakeCloud(Exception('offline'));
+      final p = await service().readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.canImport, isFalse);
+      expect(p.error, isNotNull);
+    });
+
+    test('Einwilligung nicht abrufbar (kein Netz): Fehlermeldung statt Absturz', () async {
+      final p = await PhotoReceiptService(
+        repo: receiptRepo(db),
+        cloud: cloud,
+        cloudAllowed: () async => throw const CloudUnavailable('kein Netz'),
+        prepare: (path, {cutY}) async => Uint8List.fromList([1, 2, 3]),
+      ).readSinglePhotoViaCloud(jpeg, cutY: 300);
+      expect(p.canImport, isFalse);
+      expect(cloud.calls, 0);
+    });
+
+    test('Codereview-Fund 2026-10-01: ein nicht dekodierbares Foto fuehrt zu einer Fehlermeldung statt eines Absturzes oder eines ungeprueften Uploads', () async {
+      final p = await service().readSinglePhotoViaCloud(Uint8List.fromList([1, 2, 3]), cutY: 100);
+      expect(p.canImport, isFalse);
+      expect(cloud.calls, 0); // auf keinen Fall hochladen, wenn der Zuschnitt nicht garantiert werden konnte
+    });
+  });
+
   test('Sauberer Scan besteht das Pruef-Tor lokal: keine Cloud, nichts wird hochgeladen', () async {
     final p = await service().read(_pages('billa_paper_02'));
     expect(p.source, ReceiptSources.photoLocal);
@@ -104,6 +179,9 @@ void main() {
     expect(p.receipt.isTrustworthy, isTrue);
     expect(p.receipt.totalCents, 2319);
     expect(cloud.calls, 1);
+    // Codereview-Fund 2026-10-01: war fest auf 'Billa' verdrahtet -- hier stimmt das zufaellig, siehe den
+    // eigenen detectChainHint-Test fuer einen echten Hofer-Fall.
+    expect(cloud.lastStoreHint, 'Billa');
 
     final (path, cutY) = prepared.single;
     expect(path, 'page0.jpg');
@@ -152,6 +230,21 @@ void main() {
     cloud.answer = const CloudNotAllowed();
     final p = await service().read(_pages('billa_paper_01_scan3'));
     expect(p.note, contains('ausgeschaltet'));
+  });
+
+  test('Update erforderlich (ADR-022): Hinweis statt Absturz, Cloud wird gar nicht erst gerufen', () async {
+    final service = PhotoReceiptService(
+      repo: receiptRepo(db),
+      cloud: cloud,
+      cloudAllowed: () async => throw const AppUpdateRequiredException(),
+      prepare: (path, {cutY}) async {
+        prepared.add((path, cutY));
+        return Uint8List.fromList([1, 2, 3]);
+      },
+    );
+    final p = await service.read(_pages('billa_paper_01_scan3'));
+    expect(p.note, contains('Update'));
+    expect(cloud.calls, 0);
   });
 
   test('Ohne erkennbare Summenzeile wird NICHTS hochgeladen (B4)', () async {

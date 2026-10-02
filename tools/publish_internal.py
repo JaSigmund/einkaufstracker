@@ -35,6 +35,12 @@ SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 DEFAULT_KEY_PATH = r"C:\Users\jakob\keys\einkaufstracker-release-510121-4f068f5a5735.json"
 DEFAULT_AAB_PATH = Path(__file__).resolve().parent.parent / "app" / "build" / "app" / "outputs" / "bundle" / "release" / "app-release.aab"
 
+# Das ~100-MB-Bundle in einem einzigen Request hochzuladen scheiterte regelmaessig mit
+# "TimeoutError: The read operation timed out" (mehrfach beobachtet 2026-10-02). Resumable Upload in
+# Chunks mit Wiederholung je Chunk macht einen kurzen Netzaussetzer unkritisch.
+UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
+RETRIES = 5
+
 
 def publish(aab_path: Path, key_path: Path, notes: str) -> None:
     assert TRACK == "internal", "Sicherheitsregel: automatisierte Releases gehen NUR auf internal"
@@ -47,13 +53,20 @@ def publish(aab_path: Path, key_path: Path, notes: str) -> None:
     service = build("androidpublisher", "v3", credentials=creds)
     edits = service.edits()
 
-    edit = edits.insert(body={}, packageName=PACKAGE_NAME).execute()
+    edit = edits.insert(body={}, packageName=PACKAGE_NAME).execute(num_retries=RETRIES)
     edit_id = edit["id"]
     print(f"Edit angelegt: {edit_id}")
 
     try:
-        media = MediaFileUpload(str(aab_path), mimetype="application/octet-stream")
-        upload = edits.bundles().upload(editId=edit_id, packageName=PACKAGE_NAME, media_body=media).execute()
+        media = MediaFileUpload(
+            str(aab_path), mimetype="application/octet-stream", resumable=True, chunksize=UPLOAD_CHUNK_BYTES
+        )
+        request = edits.bundles().upload(editId=edit_id, packageName=PACKAGE_NAME, media_body=media)
+        upload = None
+        while upload is None:
+            status, upload = request.next_chunk(num_retries=RETRIES)
+            if status:
+                print(f"  Upload {int(status.progress() * 100)} %")
         version_code = upload["versionCode"]
         print(f"Bundle hochgeladen, versionCode {version_code}")
 
@@ -66,10 +79,10 @@ def publish(aab_path: Path, key_path: Path, notes: str) -> None:
             track=TRACK,
             packageName=PACKAGE_NAME,
             body={"track": TRACK, "releases": [release]},
-        ).execute()
+        ).execute(num_retries=RETRIES)
         print(f"Track '{TRACK}' aktualisiert")
 
-        edits.commit(editId=edit_id, packageName=PACKAGE_NAME).execute()
+        edits.commit(editId=edit_id, packageName=PACKAGE_NAME).execute(num_retries=RETRIES)
         print(f"Release {version_code} auf '{TRACK}' veroeffentlicht.")
     except Exception:
         edits.delete(editId=edit_id, packageName=PACKAGE_NAME).execute()

@@ -40,7 +40,7 @@ class _SlowScanner implements ReceiptScanner {
 
 class _NoCloud implements CloudReceiptReader {
   @override
-  Future<ParsedReceipt> read(List<Uint8List> jpegs) => throw const CloudUnavailable('kein Netz');
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'}) => throw const CloudUnavailable('kein Netz');
 }
 
 List<ScannedPage> _pages(String fixture) {

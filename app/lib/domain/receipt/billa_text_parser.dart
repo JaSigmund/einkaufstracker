@@ -30,7 +30,6 @@ class BillaTextParser {
   );
   static final _reNr = RegExp(r'Re-Nr:\s*(\d{4})-(\d{8})-(\d{2})-(\d+)');
   static final _deposit = RegExp(r'PFAND|LEERGUT|FLASCHENKASSEN', caseSensitive: false);
-  static final _discountName = RegExp(r'AKTION|RABATT|NIMM\s+MEHR', caseSensitive: false);
 
   static int _cents(String s) {
     final t = s.replaceAll(',', '.');
@@ -105,7 +104,11 @@ class BillaTextParser {
         final name = mi.group(1)!.trim();
         final cents = _cents(mi.group(3)!);
         var kind = ReceiptItemKind.article;
-        if (cents < 0 || _discountName.hasMatch(name)) kind = ReceiptItemKind.discount;
+        // Codereview-Fund 2026-10-01: nicht zusaetzlich nach "AKTION"/"RABATT"/"NIMM MEHR" im Namen suchen --
+        // ein normaler, positiv bepreister Aktionsartikel (reale Bon-Zeile, kein Rabatt) hiess damit
+        // faelschlich "discount" und floss in month_report.dart in den vorherigen Artikel ein, statt als
+        // eigene Position gezaehlt zu werden. Ein echter Rabatt ist immer negativ bepreist, das reicht.
+        if (cents < 0) kind = ReceiptItemKind.discount;
         if (_deposit.hasMatch(name)) kind = ReceiptItemKind.deposit;
         items.add(ParsedItem(
           rawText: name,

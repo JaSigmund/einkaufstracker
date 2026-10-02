@@ -212,6 +212,36 @@ void main() {
       expect(row.receiptItemId, 'ri1');
     });
 
+    // Fehlerbericht "kein passender Bon bei Inventarartikel gefunden" (2026-10-01): "Bergbauern Milch" war
+    // schon gescannt, der Bon kam danach als Vorschlag dazu -- die Liste zeigte trotzdem "keine passende
+    // Bon-Position", weil der Vorschlag die Position fuer "schon zugeordnet" hielt.
+    testWidgets('Bon liegt bereits als Vorschlag vor: er ist waehlbar und wird beim Zuordnen aufgenommen', (tester) async {
+      await makeReceiptItem('ri1', 'BERGBAUERN MILCH');
+      final repo = inventoryRepo(db);
+      final scanned = await repo.recordFromScan(productId: product.id, ean: '1', now: DateTime.utc(2026, 9, 10));
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: product.id, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      await tester.pumpWidget(app(scanned));
+      await tester.pumpAndSettle();
+      GoRouter.of(tester.element(find.text('START'))).push('/item');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('receipt-link-add')));
+      await tester.pumpAndSettle();
+      expect(find.text('Keine passenden Bon-Positionen gefunden.'), findsNothing);
+      expect(find.byKey(const Key('receipt-link-candidate-ri1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('receipt-link-candidate-ri1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-link')), findsOneWidget);
+      final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(scanned.id))).getSingle();
+      expect(row.receiptItemId, 'ri1');
+      final absorbed = await (db.select(db.inventoryItems)..where((i) => i.id.equals(suggestion.id))).getSingle();
+      expect(absorbed.deletedAt, isNotNull);
+    });
+
     testWidgets('bereits zugeordnet: loesen macht den Eintrag zum reinen Scan', (tester) async {
       await makeReceiptItem('ri1', 'H-VOLLMILCH 1L');
       final repo = inventoryRepo(db);

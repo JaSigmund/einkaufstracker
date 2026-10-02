@@ -94,8 +94,13 @@ class FakeRemoteStore implements RemoteStore {
 }
 
 class FakeAuth implements AuthRepository {
-  FakeAuth({this.failWith});
+  FakeAuth({this.failWith, this.failSignOutWith});
   final String? failWith;
+
+  /// Laesst nur `signOut()` scheitern (unabhaengig von [failWith], das signIn/deleteAccount betrifft) --
+  /// fuer Tests, die pruefen, dass eine bereits erfolgreiche Konto-Loeschung trotzdem versucht, lokal
+  /// aufzuraeumen (Codereview-Fund 2026-10-01).
+  final String? failSignOutWith;
   final signIns = <(String, String)>[];
 
   @override
@@ -107,8 +112,13 @@ class FakeAuth implements AuthRepository {
     if (failWith != null) throw SignInFailure(failWith!);
   }
 
+  var signOutCalls = 0;
+
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async {
+    signOutCalls++;
+    if (failSignOutWith != null) throw SignInFailure(failSignOutWith!);
+  }
 
   var deleteAccountCalls = 0;
 
@@ -184,9 +194,15 @@ class FakeRemoteFileStore implements RemoteFileStore {
   bool offline = false;
   int uploads = 0;
 
+  /// Laesst `upload()` warten, bis dieser Future abgeschlossen ist -- simuliert einen langsamen Netz-Upload,
+  /// um die Race Condition zwischen `uploadPending()` und einem parallelen `attach()` testbar zu machen
+  /// (Codereview-Fund 2026-10-01).
+  Future<void>? uploadGate;
+
   @override
   Future<void> upload(String path, Uint8List bytes, String contentType) async {
     if (offline) throw const SocketException('offline');
+    if (uploadGate != null) await uploadGate;
     uploads++;
     files[path] = bytes;
     contentTypes[path] = contentType;
