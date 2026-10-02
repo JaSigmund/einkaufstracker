@@ -12,6 +12,9 @@ import 'package:einkaufstracker/data/household/household_invites.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
+import 'package:einkaufstracker/data/online_prices/online_price_remote.dart';
+import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
+import 'package:einkaufstracker/domain/online_prices/online_price.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
 import 'package:einkaufstracker/domain/nutrition/meal_analysis.dart';
 import 'package:einkaufstracker/domain/recipes/recipe_suggestion.dart';
@@ -424,6 +427,72 @@ class FakeBlsFoodSearch implements BlsFoodSearch {
     return rankBlsFoods(foods.where((f) => f.nameDe.toLowerCase().contains(query.trim().toLowerCase())), query);
   }
 }
+
+/// Attrappe fuer die Online-Preise (Tabelle `online_prices`, ADR-019): ein Sortiment im Speicher, durchsucht nach
+/// Namensbestandteilen, mit Netzfehler zum Einschalten.
+class FakeOnlinePriceRemote implements OnlinePriceRemote {
+  FakeOnlinePriceRemote({List<OnlineArticle> articles = const [], this.feedLastModified}) : articles = [...articles];
+
+  /// Das Online-Sortiment. Ein Artikel, der hier fehlt, gilt beim Abruf als aus dem Feed verschwunden.
+  List<OnlineArticle> articles;
+
+  /// Stand des Feeds, `null` = der Server war noch nie erfolgreich.
+  DateTime? feedLastModified;
+
+  /// true = Suche und Abruf melden [OnlinePricesUnavailable]
+  bool fail = false;
+
+  final searches = <({String query, List<String> stores, int perStore, String? preferBase})>[];
+  var fetchCalls = 0;
+
+  @override
+  Future<List<OnlineArticle>> search(String query, {List<String> stores = const ['billa', 'spar'], int perStore = 8, String? preferBase}) async {
+    searches.add((query: query, stores: stores, perStore: perStore, preferBase: preferBase));
+    if (fail) throw const OnlinePricesUnavailable();
+    final words = query.toLowerCase().split(RegExp(r'[^a-zäöüß]+')).where((w) => w.length >= 2).toList();
+    return [
+      for (final a in articles)
+        if (stores.contains(a.store) && words.any((w) => a.name.toLowerCase().contains(w))) a,
+    ];
+  }
+
+  @override
+  Future<OnlineFetchResult> fetch(List<({String store, String externalId})> links) async {
+    fetchCalls++;
+    if (fail) throw const OnlinePricesUnavailable();
+    final wanted = {for (final l in links) onlineKey(l.store, l.externalId)};
+    return OnlineFetchResult(
+      found: {for (final a in articles) if (wanted.contains(onlineKey(a.store, a.externalId))) onlineKey(a.store, a.externalId): a},
+      feedLastModified: feedLastModified,
+    );
+  }
+}
+
+/// Ein Online-Artikel fuer Tests, Vollmilch bei Billa als Standard.
+OnlineArticle onlineArticle({
+  String store = 'billa',
+  String externalId = '00-1',
+  String name = 'Clever Vollmilch',
+  int priceCents = 132,
+  double? quantity = 1,
+  String? unit = 'l',
+  String? baseUnit = 'l',
+  int? unitPriceNormCents = 132,
+}) =>
+    OnlineArticle(
+      store: store,
+      externalId: externalId,
+      name: name,
+      priceCents: priceCents,
+      quantity: quantity,
+      unit: unit,
+      baseUnit: baseUnit,
+      unitPriceNormCents: unitPriceNormCents,
+    );
+
+OnlinePriceRepository onlinePriceRepo(AppDatabase db, OnlinePriceRemote remote,
+        {String household = 'h1', void Function()? onChanged, DateTime Function()? now}) =>
+    OnlinePriceRepository(db, remote, householdId: () async => household, onChanged: onChanged, now: now);
 
 /// Cloud-Attrappe fuer Rezeptvorschlaege/Koch-Chat (ADR-021).
 class FakeCookingCloud implements CookingCloud {

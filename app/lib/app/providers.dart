@@ -24,6 +24,8 @@ import '../data/photos/photo_picker.dart';
 import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
 import '../data/nutrition/bls_food_search.dart';
+import '../data/online_prices/online_price_remote.dart';
+import '../data/repositories/online_price_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
@@ -258,6 +260,27 @@ final productRepositoryProvider = Provider<ProductRepository>((ref) {
 });
 
 final productsStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAll());
+
+/// Online-Preise von Billa und Spar zu eigenen Produkten (ADR-019): Verknuepfungen und lokaler Preis-Zwischenspeicher.
+final onlinePriceRemoteProvider = Provider<OnlinePriceRemote>((ref) => SupabaseOnlinePriceRemote(ref.watch(supabaseClientProvider)));
+
+final onlinePriceRepositoryProvider = Provider<OnlinePriceRepository>((ref) {
+  return OnlinePriceRepository(
+    ref.watch(databaseProvider),
+    ref.watch(onlinePriceRemoteProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final onlineLinksStreamProvider =
+    StreamProvider.family<List<ProductOnlineLink>, String>((ref, String productId) => ref.watch(onlinePriceRepositoryProvider).watchLinksFor(productId));
+
+final onlinePriceCacheStreamProvider = StreamProvider<List<OnlinePriceCacheRow>>((ref) => ref.watch(onlinePriceRepositoryProvider).watchCache());
 
 final barcodeScannerProvider = Provider<BarcodeScanner>((ref) => MobileBarcodeScanner());
 

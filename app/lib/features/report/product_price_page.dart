@@ -5,6 +5,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/receipt/price_history.dart';
+import 'online_price_section.dart';
 
 const _baseUnitLabels = {'piece': 'Stk', 'kg': 'kg', 'l': 'l'};
 
@@ -74,6 +75,8 @@ class ProductPricePage extends ConsumerWidget {
                   ),
               ]),
             ),
+          const SizedBox(height: 24),
+          OnlinePriceSection(product: product),
           const SizedBox(height: 24),
           Text('Preisverlauf', style: t.textTheme.titleMedium),
           const SizedBox(height: 8),

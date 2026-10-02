@@ -459,6 +459,57 @@ class SyncStates extends Table {
   Set<Column> get primaryKey => {remoteTable};
 }
 
+/// Zuordnung "dieses Produkt entspricht diesem Online-Artikel" (Spiegel von public.product_online_links, ADR-019).
+/// Je Produkt und Haendler hoechstens eine aktive Zeile (der Server erzwingt es ueber einen Unique-Index). Der Nutzer
+/// bestaetigt jede Zuordnung selbst, der Feed hat keine EAN, ein automatisches Matching waere unzuverlaessig.
+@DataClassName('ProductOnlineLink')
+class ProductOnlineLinks extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get productId => text()();
+
+  /// 'billa' | 'spar' (Schluessel im Feed)
+  TextColumn get store => text()();
+  TextColumn get externalId => text()();
+
+  /// Name des Online-Artikels bei der Bestaetigung, fuer die Anzeige, falls der Artikel aus dem Feed verschwindet.
+  TextColumn get linkedName => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Zuletzt bekannter Preis eines verknuepften Online-Artikels, nur lokal (kein Sync, jedes Geraet holt ihn selbst aus
+/// `online_prices`). So bleibt der Preis offline sichtbar, und ein aus dem Feed verschwundener Artikel zeigt seinen
+/// letzten bekannten Preis als "zuletzt bekannt" (ADR-019: die Anzeige faellt sauber aus, statt zu verschwinden).
+@DataClassName('OnlinePriceCacheRow')
+class OnlinePriceCache extends Table {
+  TextColumn get store => text()();
+  TextColumn get externalId => text()();
+  TextColumn get name => text()();
+
+  /// null, wenn der Artikel nie mit Preis geholt werden konnte.
+  IntColumn get priceCents => integer().nullable()();
+  RealColumn get quantity => real().nullable()();
+  TextColumn get unit => text().nullable()();
+
+  /// 'kg' | 'l' | 'stk', null bei unbekannter Einheit.
+  TextColumn get baseUnit => text().nullable()();
+  IntColumn get unitPriceNormCents => integer().nullable()();
+
+  /// Beim letzten Abruf noch im Online-Sortiment (im Feed verfuegbar).
+  BoolColumn get available => boolean().withDefault(const Constant(true))();
+
+  /// Stand des Feeds selbst (Last-Modified) beim Abruf; Basis von "Stand vom ..." und "zuletzt bekannt".
+  DateTimeColumn get feedUpdatedAt => dateTime().nullable()();
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {store, externalId};
+}
+
 /// Kleine Schluessel-Wert-Ablage (z.B. zuletzt bekannte Haushalts-ID fuer den Offline-Start).
 @DataClassName('KeyValueEntry')
 class KeyValues extends Table {
@@ -472,7 +523,7 @@ class KeyValues extends Table {
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
   ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
-  ShoppingLists, ShoppingListItems, Outbox, SyncStates, KeyValues,
+  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -491,7 +542,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -573,6 +624,11 @@ class AppDatabase extends _$AppDatabase {
           // 14 -> 15: Richtwerte fuer die Naehrwerte (Phase 7d)
           if (from < 15) {
             await m.createTable(nutritionTargetRows);
+          }
+          // 15 -> 16: Online-Preise (ADR-019): Verknuepfung Produkt <-> Online-Artikel und lokaler Preis-Zwischenspeicher
+          if (from < 16) {
+            await m.createTable(productOnlineLinks);
+            await m.createTable(onlinePriceCache);
           }
         },
       );

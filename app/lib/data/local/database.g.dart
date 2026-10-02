@@ -11789,6 +11789,1219 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
   }
 }
 
+class $ProductOnlineLinksTable extends ProductOnlineLinks
+    with TableInfo<$ProductOnlineLinksTable, ProductOnlineLink> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductOnlineLinksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _storeMeta = const VerificationMeta('store');
+  @override
+  late final GeneratedColumn<String> store = GeneratedColumn<String>(
+    'store',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalIdMeta = const VerificationMeta(
+    'externalId',
+  );
+  @override
+  late final GeneratedColumn<String> externalId = GeneratedColumn<String>(
+    'external_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _linkedNameMeta = const VerificationMeta(
+    'linkedName',
+  );
+  @override
+  late final GeneratedColumn<String> linkedName = GeneratedColumn<String>(
+    'linked_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    productId,
+    store,
+    externalId,
+    linkedName,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_online_links';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProductOnlineLink> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('store')) {
+      context.handle(
+        _storeMeta,
+        store.isAcceptableOrUnknown(data['store']!, _storeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_storeMeta);
+    }
+    if (data.containsKey('external_id')) {
+      context.handle(
+        _externalIdMeta,
+        externalId.isAcceptableOrUnknown(data['external_id']!, _externalIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_externalIdMeta);
+    }
+    if (data.containsKey('linked_name')) {
+      context.handle(
+        _linkedNameMeta,
+        linkedName.isAcceptableOrUnknown(data['linked_name']!, _linkedNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_linkedNameMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProductOnlineLink map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductOnlineLink(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      store: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store'],
+      )!,
+      externalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_id'],
+      )!,
+      linkedName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}linked_name'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $ProductOnlineLinksTable createAlias(String alias) {
+    return $ProductOnlineLinksTable(attachedDatabase, alias);
+  }
+}
+
+class ProductOnlineLink extends DataClass
+    implements Insertable<ProductOnlineLink> {
+  final String id;
+  final String householdId;
+  final String productId;
+
+  /// 'billa' | 'spar' (Schluessel im Feed)
+  final String store;
+  final String externalId;
+
+  /// Name des Online-Artikels bei der Bestaetigung, fuer die Anzeige, falls der Artikel aus dem Feed verschwindet.
+  final String linkedName;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const ProductOnlineLink({
+    required this.id,
+    required this.householdId,
+    required this.productId,
+    required this.store,
+    required this.externalId,
+    required this.linkedName,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['product_id'] = Variable<String>(productId);
+    map['store'] = Variable<String>(store);
+    map['external_id'] = Variable<String>(externalId);
+    map['linked_name'] = Variable<String>(linkedName);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  ProductOnlineLinksCompanion toCompanion(bool nullToAbsent) {
+    return ProductOnlineLinksCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      productId: Value(productId),
+      store: Value(store),
+      externalId: Value(externalId),
+      linkedName: Value(linkedName),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory ProductOnlineLink.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductOnlineLink(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      store: serializer.fromJson<String>(json['store']),
+      externalId: serializer.fromJson<String>(json['externalId']),
+      linkedName: serializer.fromJson<String>(json['linkedName']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'productId': serializer.toJson<String>(productId),
+      'store': serializer.toJson<String>(store),
+      'externalId': serializer.toJson<String>(externalId),
+      'linkedName': serializer.toJson<String>(linkedName),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  ProductOnlineLink copyWith({
+    String? id,
+    String? householdId,
+    String? productId,
+    String? store,
+    String? externalId,
+    String? linkedName,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => ProductOnlineLink(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    productId: productId ?? this.productId,
+    store: store ?? this.store,
+    externalId: externalId ?? this.externalId,
+    linkedName: linkedName ?? this.linkedName,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  ProductOnlineLink copyWithCompanion(ProductOnlineLinksCompanion data) {
+    return ProductOnlineLink(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      store: data.store.present ? data.store.value : this.store,
+      externalId: data.externalId.present
+          ? data.externalId.value
+          : this.externalId,
+      linkedName: data.linkedName.present
+          ? data.linkedName.value
+          : this.linkedName,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductOnlineLink(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('productId: $productId, ')
+          ..write('store: $store, ')
+          ..write('externalId: $externalId, ')
+          ..write('linkedName: $linkedName, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    productId,
+    store,
+    externalId,
+    linkedName,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductOnlineLink &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.productId == this.productId &&
+          other.store == this.store &&
+          other.externalId == this.externalId &&
+          other.linkedName == this.linkedName &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class ProductOnlineLinksCompanion extends UpdateCompanion<ProductOnlineLink> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> productId;
+  final Value<String> store;
+  final Value<String> externalId;
+  final Value<String> linkedName;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const ProductOnlineLinksCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.store = const Value.absent(),
+    this.externalId = const Value.absent(),
+    this.linkedName = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductOnlineLinksCompanion.insert({
+    required String id,
+    required String householdId,
+    required String productId,
+    required String store,
+    required String externalId,
+    required String linkedName,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       productId = Value(productId),
+       store = Value(store),
+       externalId = Value(externalId),
+       linkedName = Value(linkedName),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProductOnlineLink> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? productId,
+    Expression<String>? store,
+    Expression<String>? externalId,
+    Expression<String>? linkedName,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (productId != null) 'product_id': productId,
+      if (store != null) 'store': store,
+      if (externalId != null) 'external_id': externalId,
+      if (linkedName != null) 'linked_name': linkedName,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductOnlineLinksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? productId,
+    Value<String>? store,
+    Value<String>? externalId,
+    Value<String>? linkedName,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return ProductOnlineLinksCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      productId: productId ?? this.productId,
+      store: store ?? this.store,
+      externalId: externalId ?? this.externalId,
+      linkedName: linkedName ?? this.linkedName,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (store.present) {
+      map['store'] = Variable<String>(store.value);
+    }
+    if (externalId.present) {
+      map['external_id'] = Variable<String>(externalId.value);
+    }
+    if (linkedName.present) {
+      map['linked_name'] = Variable<String>(linkedName.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductOnlineLinksCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('productId: $productId, ')
+          ..write('store: $store, ')
+          ..write('externalId: $externalId, ')
+          ..write('linkedName: $linkedName, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $OnlinePriceCacheTable extends OnlinePriceCache
+    with TableInfo<$OnlinePriceCacheTable, OnlinePriceCacheRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OnlinePriceCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _storeMeta = const VerificationMeta('store');
+  @override
+  late final GeneratedColumn<String> store = GeneratedColumn<String>(
+    'store',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _externalIdMeta = const VerificationMeta(
+    'externalId',
+  );
+  @override
+  late final GeneratedColumn<String> externalId = GeneratedColumn<String>(
+    'external_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _priceCentsMeta = const VerificationMeta(
+    'priceCents',
+  );
+  @override
+  late final GeneratedColumn<int> priceCents = GeneratedColumn<int>(
+    'price_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _baseUnitMeta = const VerificationMeta(
+    'baseUnit',
+  );
+  @override
+  late final GeneratedColumn<String> baseUnit = GeneratedColumn<String>(
+    'base_unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitPriceNormCentsMeta =
+      const VerificationMeta('unitPriceNormCents');
+  @override
+  late final GeneratedColumn<int> unitPriceNormCents = GeneratedColumn<int>(
+    'unit_price_norm_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _availableMeta = const VerificationMeta(
+    'available',
+  );
+  @override
+  late final GeneratedColumn<bool> available = GeneratedColumn<bool>(
+    'available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _feedUpdatedAtMeta = const VerificationMeta(
+    'feedUpdatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> feedUpdatedAt =
+      GeneratedColumn<DateTime>(
+        'feed_updated_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _fetchedAtMeta = const VerificationMeta(
+    'fetchedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> fetchedAt = GeneratedColumn<DateTime>(
+    'fetched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    store,
+    externalId,
+    name,
+    priceCents,
+    quantity,
+    unit,
+    baseUnit,
+    unitPriceNormCents,
+    available,
+    feedUpdatedAt,
+    fetchedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'online_price_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OnlinePriceCacheRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('store')) {
+      context.handle(
+        _storeMeta,
+        store.isAcceptableOrUnknown(data['store']!, _storeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_storeMeta);
+    }
+    if (data.containsKey('external_id')) {
+      context.handle(
+        _externalIdMeta,
+        externalId.isAcceptableOrUnknown(data['external_id']!, _externalIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_externalIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('price_cents')) {
+      context.handle(
+        _priceCentsMeta,
+        priceCents.isAcceptableOrUnknown(data['price_cents']!, _priceCentsMeta),
+      );
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('base_unit')) {
+      context.handle(
+        _baseUnitMeta,
+        baseUnit.isAcceptableOrUnknown(data['base_unit']!, _baseUnitMeta),
+      );
+    }
+    if (data.containsKey('unit_price_norm_cents')) {
+      context.handle(
+        _unitPriceNormCentsMeta,
+        unitPriceNormCents.isAcceptableOrUnknown(
+          data['unit_price_norm_cents']!,
+          _unitPriceNormCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('available')) {
+      context.handle(
+        _availableMeta,
+        available.isAcceptableOrUnknown(data['available']!, _availableMeta),
+      );
+    }
+    if (data.containsKey('feed_updated_at')) {
+      context.handle(
+        _feedUpdatedAtMeta,
+        feedUpdatedAt.isAcceptableOrUnknown(
+          data['feed_updated_at']!,
+          _feedUpdatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('fetched_at')) {
+      context.handle(
+        _fetchedAtMeta,
+        fetchedAt.isAcceptableOrUnknown(data['fetched_at']!, _fetchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fetchedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {store, externalId};
+  @override
+  OnlinePriceCacheRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OnlinePriceCacheRow(
+      store: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store'],
+      )!,
+      externalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      priceCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}price_cents'],
+      ),
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      baseUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}base_unit'],
+      ),
+      unitPriceNormCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_price_norm_cents'],
+      ),
+      available: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}available'],
+      )!,
+      feedUpdatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}feed_updated_at'],
+      ),
+      fetchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}fetched_at'],
+      )!,
+    );
+  }
+
+  @override
+  $OnlinePriceCacheTable createAlias(String alias) {
+    return $OnlinePriceCacheTable(attachedDatabase, alias);
+  }
+}
+
+class OnlinePriceCacheRow extends DataClass
+    implements Insertable<OnlinePriceCacheRow> {
+  final String store;
+  final String externalId;
+  final String name;
+
+  /// null, wenn der Artikel nie mit Preis geholt werden konnte.
+  final int? priceCents;
+  final double? quantity;
+  final String? unit;
+
+  /// 'kg' | 'l' | 'stk', null bei unbekannter Einheit.
+  final String? baseUnit;
+  final int? unitPriceNormCents;
+
+  /// Beim letzten Abruf noch im Online-Sortiment (im Feed verfuegbar).
+  final bool available;
+
+  /// Stand des Feeds selbst (Last-Modified) beim Abruf; Basis von "Stand vom ..." und "zuletzt bekannt".
+  final DateTime? feedUpdatedAt;
+  final DateTime fetchedAt;
+  const OnlinePriceCacheRow({
+    required this.store,
+    required this.externalId,
+    required this.name,
+    this.priceCents,
+    this.quantity,
+    this.unit,
+    this.baseUnit,
+    this.unitPriceNormCents,
+    required this.available,
+    this.feedUpdatedAt,
+    required this.fetchedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['store'] = Variable<String>(store);
+    map['external_id'] = Variable<String>(externalId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || priceCents != null) {
+      map['price_cents'] = Variable<int>(priceCents);
+    }
+    if (!nullToAbsent || quantity != null) {
+      map['quantity'] = Variable<double>(quantity);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || baseUnit != null) {
+      map['base_unit'] = Variable<String>(baseUnit);
+    }
+    if (!nullToAbsent || unitPriceNormCents != null) {
+      map['unit_price_norm_cents'] = Variable<int>(unitPriceNormCents);
+    }
+    map['available'] = Variable<bool>(available);
+    if (!nullToAbsent || feedUpdatedAt != null) {
+      map['feed_updated_at'] = Variable<DateTime>(feedUpdatedAt);
+    }
+    map['fetched_at'] = Variable<DateTime>(fetchedAt);
+    return map;
+  }
+
+  OnlinePriceCacheCompanion toCompanion(bool nullToAbsent) {
+    return OnlinePriceCacheCompanion(
+      store: Value(store),
+      externalId: Value(externalId),
+      name: Value(name),
+      priceCents: priceCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priceCents),
+      quantity: quantity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quantity),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      baseUnit: baseUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUnit),
+      unitPriceNormCents: unitPriceNormCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitPriceNormCents),
+      available: Value(available),
+      feedUpdatedAt: feedUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(feedUpdatedAt),
+      fetchedAt: Value(fetchedAt),
+    );
+  }
+
+  factory OnlinePriceCacheRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OnlinePriceCacheRow(
+      store: serializer.fromJson<String>(json['store']),
+      externalId: serializer.fromJson<String>(json['externalId']),
+      name: serializer.fromJson<String>(json['name']),
+      priceCents: serializer.fromJson<int?>(json['priceCents']),
+      quantity: serializer.fromJson<double?>(json['quantity']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      baseUnit: serializer.fromJson<String?>(json['baseUnit']),
+      unitPriceNormCents: serializer.fromJson<int?>(json['unitPriceNormCents']),
+      available: serializer.fromJson<bool>(json['available']),
+      feedUpdatedAt: serializer.fromJson<DateTime?>(json['feedUpdatedAt']),
+      fetchedAt: serializer.fromJson<DateTime>(json['fetchedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'store': serializer.toJson<String>(store),
+      'externalId': serializer.toJson<String>(externalId),
+      'name': serializer.toJson<String>(name),
+      'priceCents': serializer.toJson<int?>(priceCents),
+      'quantity': serializer.toJson<double?>(quantity),
+      'unit': serializer.toJson<String?>(unit),
+      'baseUnit': serializer.toJson<String?>(baseUnit),
+      'unitPriceNormCents': serializer.toJson<int?>(unitPriceNormCents),
+      'available': serializer.toJson<bool>(available),
+      'feedUpdatedAt': serializer.toJson<DateTime?>(feedUpdatedAt),
+      'fetchedAt': serializer.toJson<DateTime>(fetchedAt),
+    };
+  }
+
+  OnlinePriceCacheRow copyWith({
+    String? store,
+    String? externalId,
+    String? name,
+    Value<int?> priceCents = const Value.absent(),
+    Value<double?> quantity = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<String?> baseUnit = const Value.absent(),
+    Value<int?> unitPriceNormCents = const Value.absent(),
+    bool? available,
+    Value<DateTime?> feedUpdatedAt = const Value.absent(),
+    DateTime? fetchedAt,
+  }) => OnlinePriceCacheRow(
+    store: store ?? this.store,
+    externalId: externalId ?? this.externalId,
+    name: name ?? this.name,
+    priceCents: priceCents.present ? priceCents.value : this.priceCents,
+    quantity: quantity.present ? quantity.value : this.quantity,
+    unit: unit.present ? unit.value : this.unit,
+    baseUnit: baseUnit.present ? baseUnit.value : this.baseUnit,
+    unitPriceNormCents: unitPriceNormCents.present
+        ? unitPriceNormCents.value
+        : this.unitPriceNormCents,
+    available: available ?? this.available,
+    feedUpdatedAt: feedUpdatedAt.present
+        ? feedUpdatedAt.value
+        : this.feedUpdatedAt,
+    fetchedAt: fetchedAt ?? this.fetchedAt,
+  );
+  OnlinePriceCacheRow copyWithCompanion(OnlinePriceCacheCompanion data) {
+    return OnlinePriceCacheRow(
+      store: data.store.present ? data.store.value : this.store,
+      externalId: data.externalId.present
+          ? data.externalId.value
+          : this.externalId,
+      name: data.name.present ? data.name.value : this.name,
+      priceCents: data.priceCents.present
+          ? data.priceCents.value
+          : this.priceCents,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      baseUnit: data.baseUnit.present ? data.baseUnit.value : this.baseUnit,
+      unitPriceNormCents: data.unitPriceNormCents.present
+          ? data.unitPriceNormCents.value
+          : this.unitPriceNormCents,
+      available: data.available.present ? data.available.value : this.available,
+      feedUpdatedAt: data.feedUpdatedAt.present
+          ? data.feedUpdatedAt.value
+          : this.feedUpdatedAt,
+      fetchedAt: data.fetchedAt.present ? data.fetchedAt.value : this.fetchedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePriceCacheRow(')
+          ..write('store: $store, ')
+          ..write('externalId: $externalId, ')
+          ..write('name: $name, ')
+          ..write('priceCents: $priceCents, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('baseUnit: $baseUnit, ')
+          ..write('unitPriceNormCents: $unitPriceNormCents, ')
+          ..write('available: $available, ')
+          ..write('feedUpdatedAt: $feedUpdatedAt, ')
+          ..write('fetchedAt: $fetchedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    store,
+    externalId,
+    name,
+    priceCents,
+    quantity,
+    unit,
+    baseUnit,
+    unitPriceNormCents,
+    available,
+    feedUpdatedAt,
+    fetchedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OnlinePriceCacheRow &&
+          other.store == this.store &&
+          other.externalId == this.externalId &&
+          other.name == this.name &&
+          other.priceCents == this.priceCents &&
+          other.quantity == this.quantity &&
+          other.unit == this.unit &&
+          other.baseUnit == this.baseUnit &&
+          other.unitPriceNormCents == this.unitPriceNormCents &&
+          other.available == this.available &&
+          other.feedUpdatedAt == this.feedUpdatedAt &&
+          other.fetchedAt == this.fetchedAt);
+}
+
+class OnlinePriceCacheCompanion extends UpdateCompanion<OnlinePriceCacheRow> {
+  final Value<String> store;
+  final Value<String> externalId;
+  final Value<String> name;
+  final Value<int?> priceCents;
+  final Value<double?> quantity;
+  final Value<String?> unit;
+  final Value<String?> baseUnit;
+  final Value<int?> unitPriceNormCents;
+  final Value<bool> available;
+  final Value<DateTime?> feedUpdatedAt;
+  final Value<DateTime> fetchedAt;
+  final Value<int> rowid;
+  const OnlinePriceCacheCompanion({
+    this.store = const Value.absent(),
+    this.externalId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.priceCents = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.baseUnit = const Value.absent(),
+    this.unitPriceNormCents = const Value.absent(),
+    this.available = const Value.absent(),
+    this.feedUpdatedAt = const Value.absent(),
+    this.fetchedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OnlinePriceCacheCompanion.insert({
+    required String store,
+    required String externalId,
+    required String name,
+    this.priceCents = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.baseUnit = const Value.absent(),
+    this.unitPriceNormCents = const Value.absent(),
+    this.available = const Value.absent(),
+    this.feedUpdatedAt = const Value.absent(),
+    required DateTime fetchedAt,
+    this.rowid = const Value.absent(),
+  }) : store = Value(store),
+       externalId = Value(externalId),
+       name = Value(name),
+       fetchedAt = Value(fetchedAt);
+  static Insertable<OnlinePriceCacheRow> custom({
+    Expression<String>? store,
+    Expression<String>? externalId,
+    Expression<String>? name,
+    Expression<int>? priceCents,
+    Expression<double>? quantity,
+    Expression<String>? unit,
+    Expression<String>? baseUnit,
+    Expression<int>? unitPriceNormCents,
+    Expression<bool>? available,
+    Expression<DateTime>? feedUpdatedAt,
+    Expression<DateTime>? fetchedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (store != null) 'store': store,
+      if (externalId != null) 'external_id': externalId,
+      if (name != null) 'name': name,
+      if (priceCents != null) 'price_cents': priceCents,
+      if (quantity != null) 'quantity': quantity,
+      if (unit != null) 'unit': unit,
+      if (baseUnit != null) 'base_unit': baseUnit,
+      if (unitPriceNormCents != null)
+        'unit_price_norm_cents': unitPriceNormCents,
+      if (available != null) 'available': available,
+      if (feedUpdatedAt != null) 'feed_updated_at': feedUpdatedAt,
+      if (fetchedAt != null) 'fetched_at': fetchedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OnlinePriceCacheCompanion copyWith({
+    Value<String>? store,
+    Value<String>? externalId,
+    Value<String>? name,
+    Value<int?>? priceCents,
+    Value<double?>? quantity,
+    Value<String?>? unit,
+    Value<String?>? baseUnit,
+    Value<int?>? unitPriceNormCents,
+    Value<bool>? available,
+    Value<DateTime?>? feedUpdatedAt,
+    Value<DateTime>? fetchedAt,
+    Value<int>? rowid,
+  }) {
+    return OnlinePriceCacheCompanion(
+      store: store ?? this.store,
+      externalId: externalId ?? this.externalId,
+      name: name ?? this.name,
+      priceCents: priceCents ?? this.priceCents,
+      quantity: quantity ?? this.quantity,
+      unit: unit ?? this.unit,
+      baseUnit: baseUnit ?? this.baseUnit,
+      unitPriceNormCents: unitPriceNormCents ?? this.unitPriceNormCents,
+      available: available ?? this.available,
+      feedUpdatedAt: feedUpdatedAt ?? this.feedUpdatedAt,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (store.present) {
+      map['store'] = Variable<String>(store.value);
+    }
+    if (externalId.present) {
+      map['external_id'] = Variable<String>(externalId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (priceCents.present) {
+      map['price_cents'] = Variable<int>(priceCents.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (baseUnit.present) {
+      map['base_unit'] = Variable<String>(baseUnit.value);
+    }
+    if (unitPriceNormCents.present) {
+      map['unit_price_norm_cents'] = Variable<int>(unitPriceNormCents.value);
+    }
+    if (available.present) {
+      map['available'] = Variable<bool>(available.value);
+    }
+    if (feedUpdatedAt.present) {
+      map['feed_updated_at'] = Variable<DateTime>(feedUpdatedAt.value);
+    }
+    if (fetchedAt.present) {
+      map['fetched_at'] = Variable<DateTime>(fetchedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OnlinePriceCacheCompanion(')
+          ..write('store: $store, ')
+          ..write('externalId: $externalId, ')
+          ..write('name: $name, ')
+          ..write('priceCents: $priceCents, ')
+          ..write('quantity: $quantity, ')
+          ..write('unit: $unit, ')
+          ..write('baseUnit: $baseUnit, ')
+          ..write('unitPriceNormCents: $unitPriceNormCents, ')
+          ..write('available: $available, ')
+          ..write('feedUpdatedAt: $feedUpdatedAt, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -12716,6 +13929,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ShoppingListsTable shoppingLists = $ShoppingListsTable(this);
   late final $ShoppingListItemsTable shoppingListItems =
       $ShoppingListItemsTable(this);
+  late final $ProductOnlineLinksTable productOnlineLinks =
+      $ProductOnlineLinksTable(this);
+  late final $OnlinePriceCacheTable onlinePriceCache = $OnlinePriceCacheTable(
+    this,
+  );
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -12741,6 +13959,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     bugReports,
     shoppingLists,
     shoppingListItems,
+    productOnlineLinks,
+    onlinePriceCache,
     outbox,
     syncStates,
     keyValues,
@@ -18510,6 +19730,636 @@ typedef $$ShoppingListItemsTableProcessedTableManager =
       ShoppingListItem,
       PrefetchHooks Function()
     >;
+typedef $$ProductOnlineLinksTableCreateCompanionBuilder =
+    ProductOnlineLinksCompanion Function({
+      required String id,
+      required String householdId,
+      required String productId,
+      required String store,
+      required String externalId,
+      required String linkedName,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$ProductOnlineLinksTableUpdateCompanionBuilder =
+    ProductOnlineLinksCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> productId,
+      Value<String> store,
+      Value<String> externalId,
+      Value<String> linkedName,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$ProductOnlineLinksTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductOnlineLinksTable> {
+  $$ProductOnlineLinksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get store => $composableBuilder(
+    column: $table.store,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get linkedName => $composableBuilder(
+    column: $table.linkedName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ProductOnlineLinksTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductOnlineLinksTable> {
+  $$ProductOnlineLinksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get store => $composableBuilder(
+    column: $table.store,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get linkedName => $composableBuilder(
+    column: $table.linkedName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProductOnlineLinksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductOnlineLinksTable> {
+  $$ProductOnlineLinksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get store =>
+      $composableBuilder(column: $table.store, builder: (column) => column);
+
+  GeneratedColumn<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get linkedName => $composableBuilder(
+    column: $table.linkedName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$ProductOnlineLinksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductOnlineLinksTable,
+          ProductOnlineLink,
+          $$ProductOnlineLinksTableFilterComposer,
+          $$ProductOnlineLinksTableOrderingComposer,
+          $$ProductOnlineLinksTableAnnotationComposer,
+          $$ProductOnlineLinksTableCreateCompanionBuilder,
+          $$ProductOnlineLinksTableUpdateCompanionBuilder,
+          (
+            ProductOnlineLink,
+            BaseReferences<
+              _$AppDatabase,
+              $ProductOnlineLinksTable,
+              ProductOnlineLink
+            >,
+          ),
+          ProductOnlineLink,
+          PrefetchHooks Function()
+        > {
+  $$ProductOnlineLinksTableTableManager(
+    _$AppDatabase db,
+    $ProductOnlineLinksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductOnlineLinksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductOnlineLinksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductOnlineLinksTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String> store = const Value.absent(),
+                Value<String> externalId = const Value.absent(),
+                Value<String> linkedName = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductOnlineLinksCompanion(
+                id: id,
+                householdId: householdId,
+                productId: productId,
+                store: store,
+                externalId: externalId,
+                linkedName: linkedName,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String productId,
+                required String store,
+                required String externalId,
+                required String linkedName,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductOnlineLinksCompanion.insert(
+                id: id,
+                householdId: householdId,
+                productId: productId,
+                store: store,
+                externalId: externalId,
+                linkedName: linkedName,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ProductOnlineLinksTable, ProductOnlineLink>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ProductOnlineLinksTable,
+                    ProductOnlineLink
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProductOnlineLinksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductOnlineLinksTable,
+      ProductOnlineLink,
+      $$ProductOnlineLinksTableFilterComposer,
+      $$ProductOnlineLinksTableOrderingComposer,
+      $$ProductOnlineLinksTableAnnotationComposer,
+      $$ProductOnlineLinksTableCreateCompanionBuilder,
+      $$ProductOnlineLinksTableUpdateCompanionBuilder,
+      (
+        ProductOnlineLink,
+        BaseReferences<
+          _$AppDatabase,
+          $ProductOnlineLinksTable,
+          ProductOnlineLink
+        >,
+      ),
+      ProductOnlineLink,
+      PrefetchHooks Function()
+    >;
+typedef $$OnlinePriceCacheTableCreateCompanionBuilder =
+    OnlinePriceCacheCompanion Function({
+      required String store,
+      required String externalId,
+      required String name,
+      Value<int?> priceCents,
+      Value<double?> quantity,
+      Value<String?> unit,
+      Value<String?> baseUnit,
+      Value<int?> unitPriceNormCents,
+      Value<bool> available,
+      Value<DateTime?> feedUpdatedAt,
+      required DateTime fetchedAt,
+      Value<int> rowid,
+    });
+typedef $$OnlinePriceCacheTableUpdateCompanionBuilder =
+    OnlinePriceCacheCompanion Function({
+      Value<String> store,
+      Value<String> externalId,
+      Value<String> name,
+      Value<int?> priceCents,
+      Value<double?> quantity,
+      Value<String?> unit,
+      Value<String?> baseUnit,
+      Value<int?> unitPriceNormCents,
+      Value<bool> available,
+      Value<DateTime?> feedUpdatedAt,
+      Value<DateTime> fetchedAt,
+      Value<int> rowid,
+    });
+
+class $$OnlinePriceCacheTableFilterComposer
+    extends Composer<_$AppDatabase, $OnlinePriceCacheTable> {
+  $$OnlinePriceCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get store => $composableBuilder(
+    column: $table.store,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priceCents => $composableBuilder(
+    column: $table.priceCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get baseUnit => $composableBuilder(
+    column: $table.baseUnit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get available => $composableBuilder(
+    column: $table.available,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get feedUpdatedAt => $composableBuilder(
+    column: $table.feedUpdatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$OnlinePriceCacheTableOrderingComposer
+    extends Composer<_$AppDatabase, $OnlinePriceCacheTable> {
+  $$OnlinePriceCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get store => $composableBuilder(
+    column: $table.store,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priceCents => $composableBuilder(
+    column: $table.priceCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get baseUnit => $composableBuilder(
+    column: $table.baseUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get available => $composableBuilder(
+    column: $table.available,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get feedUpdatedAt => $composableBuilder(
+    column: $table.feedUpdatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$OnlinePriceCacheTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OnlinePriceCacheTable> {
+  $$OnlinePriceCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get store =>
+      $composableBuilder(column: $table.store, builder: (column) => column);
+
+  GeneratedColumn<String> get externalId => $composableBuilder(
+    column: $table.externalId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get priceCents => $composableBuilder(
+    column: $table.priceCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get baseUnit =>
+      $composableBuilder(column: $table.baseUnit, builder: (column) => column);
+
+  GeneratedColumn<int> get unitPriceNormCents => $composableBuilder(
+    column: $table.unitPriceNormCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get available =>
+      $composableBuilder(column: $table.available, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get feedUpdatedAt => $composableBuilder(
+    column: $table.feedUpdatedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get fetchedAt =>
+      $composableBuilder(column: $table.fetchedAt, builder: (column) => column);
+}
+
+class $$OnlinePriceCacheTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OnlinePriceCacheTable,
+          OnlinePriceCacheRow,
+          $$OnlinePriceCacheTableFilterComposer,
+          $$OnlinePriceCacheTableOrderingComposer,
+          $$OnlinePriceCacheTableAnnotationComposer,
+          $$OnlinePriceCacheTableCreateCompanionBuilder,
+          $$OnlinePriceCacheTableUpdateCompanionBuilder,
+          (
+            OnlinePriceCacheRow,
+            BaseReferences<
+              _$AppDatabase,
+              $OnlinePriceCacheTable,
+              OnlinePriceCacheRow
+            >,
+          ),
+          OnlinePriceCacheRow,
+          PrefetchHooks Function()
+        > {
+  $$OnlinePriceCacheTableTableManager(
+    _$AppDatabase db,
+    $OnlinePriceCacheTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OnlinePriceCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OnlinePriceCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OnlinePriceCacheTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> store = const Value.absent(),
+                Value<String> externalId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int?> priceCents = const Value.absent(),
+                Value<double?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> baseUnit = const Value.absent(),
+                Value<int?> unitPriceNormCents = const Value.absent(),
+                Value<bool> available = const Value.absent(),
+                Value<DateTime?> feedUpdatedAt = const Value.absent(),
+                Value<DateTime> fetchedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OnlinePriceCacheCompanion(
+                store: store,
+                externalId: externalId,
+                name: name,
+                priceCents: priceCents,
+                quantity: quantity,
+                unit: unit,
+                baseUnit: baseUnit,
+                unitPriceNormCents: unitPriceNormCents,
+                available: available,
+                feedUpdatedAt: feedUpdatedAt,
+                fetchedAt: fetchedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String store,
+                required String externalId,
+                required String name,
+                Value<int?> priceCents = const Value.absent(),
+                Value<double?> quantity = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<String?> baseUnit = const Value.absent(),
+                Value<int?> unitPriceNormCents = const Value.absent(),
+                Value<bool> available = const Value.absent(),
+                Value<DateTime?> feedUpdatedAt = const Value.absent(),
+                required DateTime fetchedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => OnlinePriceCacheCompanion.insert(
+                store: store,
+                externalId: externalId,
+                name: name,
+                priceCents: priceCents,
+                quantity: quantity,
+                unit: unit,
+                baseUnit: baseUnit,
+                unitPriceNormCents: unitPriceNormCents,
+                available: available,
+                feedUpdatedAt: feedUpdatedAt,
+                fetchedAt: fetchedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$OnlinePriceCacheTable, OnlinePriceCacheRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $OnlinePriceCacheTable,
+                    OnlinePriceCacheRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OnlinePriceCacheTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OnlinePriceCacheTable,
+      OnlinePriceCacheRow,
+      $$OnlinePriceCacheTableFilterComposer,
+      $$OnlinePriceCacheTableOrderingComposer,
+      $$OnlinePriceCacheTableAnnotationComposer,
+      $$OnlinePriceCacheTableCreateCompanionBuilder,
+      $$OnlinePriceCacheTableUpdateCompanionBuilder,
+      (
+        OnlinePriceCacheRow,
+        BaseReferences<
+          _$AppDatabase,
+          $OnlinePriceCacheTable,
+          OnlinePriceCacheRow
+        >,
+      ),
+      OnlinePriceCacheRow,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -19080,6 +20930,10 @@ class $AppDatabaseManager {
       $$ShoppingListsTableTableManager(_db, _db.shoppingLists);
   $$ShoppingListItemsTableTableManager get shoppingListItems =>
       $$ShoppingListItemsTableTableManager(_db, _db.shoppingListItems);
+  $$ProductOnlineLinksTableTableManager get productOnlineLinks =>
+      $$ProductOnlineLinksTableTableManager(_db, _db.productOnlineLinks);
+  $$OnlinePriceCacheTableTableManager get onlinePriceCache =>
+      $$OnlinePriceCacheTableTableManager(_db, _db.onlinePriceCache);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

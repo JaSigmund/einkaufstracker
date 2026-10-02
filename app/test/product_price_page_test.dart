@@ -35,18 +35,25 @@ void main() {
                 _item('r3', 'i3', 150),
                 _item('r4', 'i4', 160),
               ])),
+          onlineLinksStreamProvider.overrideWith((ref, productId) => Stream.value(const <ProductOnlineLink>[])),
+          onlinePriceCacheStreamProvider.overrideWith((ref) => Stream.value(const <OnlinePriceCacheRow>[])),
         ],
         child: MaterialApp(home: ProductPricePage(product: _product())),
       );
 
   testWidgets('zeigt Haendlervergleich und Preisverlauf', (tester) async {
+    // hoher Bildschirm: die Liste baut ihre Zeilen lazy, und der Online-Abschnitt schiebt den Preisverlauf nach unten
+    tester.view.physicalSize = const Size(900, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
 
     expect(find.text('Vollmilch'), findsOneWidget);
     expect(find.byKey(const Key('comparison-card')), findsOneWidget);
-    expect(find.text('Hofer'), findsOneWidget);
-    expect(find.text('Billa'), findsOneWidget);
+    final card = find.byKey(const Key('comparison-card'));
+    expect(find.descendant(of: card, matching: find.text('Hofer')), findsOneWidget);
+    expect(find.descendant(of: card, matching: find.text('Billa')), findsOneWidget);
     expect(find.textContaining('spart'), findsOneWidget);
 
     // Preisverlauf: neuester Kauf zuerst
@@ -62,6 +69,8 @@ void main() {
         receiptsStreamProvider.overrideWith((ref) => Stream.value([_receipt('r1', 's-billa', DateTime.utc(2026, 9, 1))])),
         storesStreamProvider.overrideWith((ref) => Stream.value([_store('s-billa', 'Billa')])),
         allItemsStreamProvider.overrideWith((ref) => Stream.value([_item('r1', 'i1', 200)])),
+        onlineLinksStreamProvider.overrideWith((ref, productId) => Stream.value(const <ProductOnlineLink>[])),
+        onlinePriceCacheStreamProvider.overrideWith((ref) => Stream.value(const <OnlinePriceCacheRow>[])),
       ],
       child: MaterialApp(home: ProductPricePage(product: _product())),
     );
@@ -70,5 +79,17 @@ void main() {
 
     expect(find.byKey(const Key('comparison-insufficient')), findsOneWidget);
     expect(find.byKey(const Key('comparison-card')), findsNothing);
+  });
+
+  testWidgets('Online-Preise stehen getrennt unter dem Haendlervergleich und fliessen nicht in ihn ein', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('online-section')), findsOneWidget);
+    // der Haendlervergleich kennt nur Billa und Hofer aus eigenen Kaeufen; Spar kommt nur im Online-Abschnitt vor
+    final comparison = find.byKey(const Key('comparison-card'));
+    expect(find.descendant(of: comparison, matching: find.text('Spar')), findsNothing);
+    expect(find.descendant(of: find.byKey(const Key('online-section')), matching: find.text('Spar')), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const Key('online-section'))).dy, greaterThan(tester.getTopLeft(comparison).dy));
   });
 }
