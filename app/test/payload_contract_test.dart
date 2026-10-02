@@ -87,7 +87,7 @@ Future<List<Map<String, dynamic>>> _collect() async {
       .withTarget(NutrientKey.kcal, const NutrientTarget(min: 1800, max: 2200))
       .withTarget(NutrientKey.saltG, const NutrientTarget(max: 6)));
 
-  // Online-Preise (ADR-019): zuordnen, auf einen anderen Artikel umstellen, bei einem anderen Haendler zuordnen, loesen
+  // Online-Preise (ADR-019): zwei Artikel beim selben Haendler (Bio und normal), einer bei einem anderen, einer wieder geloest
   final online = OnlinePriceRepository(db, FakeOnlinePriceRemote(), householdId: () async => 'h1');
   await online.link(reis.id, onlineArticle(externalId: '00-1', name: 'Clever Vollmilch'));
   await online.link(reis.id, onlineArticle(externalId: '00-2', name: 'Ja! Natürlich Vollmilch', priceCents: 189));
@@ -146,5 +146,10 @@ void main() {
     expect(rows('meal_ingredients').any((i) => i['product_id'] == null && i['free_text'] != null), isTrue);
     expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
     expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
+    expect(
+      rows('product_online_links').where((l) => l['store'] == 'billa' && l['deleted_at'] == null).map((l) => l['external_id']).toSet(),
+      {'00-1', '00-2'},
+      reason: 'zwei aktive Artikel beim selben Haendler',
+    );
   });
 }

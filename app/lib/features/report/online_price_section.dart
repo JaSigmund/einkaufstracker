@@ -10,8 +10,10 @@ import '../../domain/online_prices/online_price.dart';
 import 'online_article_search.dart';
 
 /// Online-Preise zu einem Produkt (ADR-019): getrennt von der Kaufhistorie, nie in Grundpreis-Statistik oder
-/// Haendlervergleich gemischt. Zeigt je Haendler den zugeordneten Artikel mit Preis, Grundpreis und "Stand vom ...",
-/// oder "zuletzt bekannt", wenn der Feed nicht mehr gepflegt wird. Faellt der Abruf aus, bleibt der letzte Preis stehen.
+/// Haendlervergleich gemischt. Je Haendler lassen sich mehrere Artikel zuordnen (Bio-Paprika und normale Paprika sind bei Billa
+/// zwei Artikel, fuer den Einkauf aber dasselbe Produkt). Jeder zeigt Preis, Grundpreis und "Stand vom ...", oder "zuletzt
+/// bekannt", wenn der Feed nicht mehr gepflegt wird. Der guenstigste Artikel nach Grundpreis ist markiert. Faellt der Abruf
+/// aus, bleibt der letzte Preis stehen.
 class OnlinePriceSection extends ConsumerStatefulWidget {
   const OnlinePriceSection({super.key, required this.product, this.now});
 
@@ -40,15 +42,16 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
     }
   }
 
-  Future<void> _pick(String store) async {
-    final article = await showOnlineArticleSearch(
+  Future<void> _add(String store, List<ProductOnlineLink> links) async {
+    final articles = await showOnlineArticleSearch(
       context,
       store: store,
       initialQuery: widget.product.name,
       productBaseUnit: widget.product.baseUnit,
+      alreadyLinked: {for (final l in links.where((l) => l.store == store)) l.externalId},
     );
-    if (article == null || !mounted) return;
-    await ref.read(onlinePriceRepositoryProvider).link(widget.product.id, article);
+    if (articles == null || articles.isEmpty || !mounted) return;
+    await ref.read(onlinePriceRepositoryProvider).linkAll(widget.product.id, articles);
     unawaited(_refresh(force: true));
   }
 
@@ -61,6 +64,12 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
     final cache = ref.watch(onlinePriceCacheStreamProvider).value ?? const <OnlinePriceCacheRow>[];
     final now = (widget.now ?? DateTime.now)().toUtc();
 
+    // Preise aller zugeordneten Artikel, fuer die Markierung des guenstigsten
+    final priced = [
+      for (final l in links) _pricedOf(l, cache, now),
+    ];
+    final cheapest = priced.length >= 2 ? cheapestOnlinePrice(priced, widget.product.baseUnit) : null;
+
     return Column(
       key: const Key('online-section'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,37 +77,73 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
         Text('Online-Preise', style: t.textTheme.titleMedium),
         const SizedBox(height: 4),
         Text(
-          'Regalpreise aus dem Webshop (heisse-preise.io), getrennt von deinen Käufen.',
+          'Regalpreise aus dem Webshop (heisse-preise.io), getrennt von deinen Käufen. Ordne alle Artikel zu, die für dich dasselbe Produkt sind.',
           style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
         ),
         const SizedBox(height: 8),
         Card(
           child: Column(children: [
-            for (final store in onlineStores.keys)
-              _storeRow(
-                t,
-                store,
-                links.where((l) => l.store == store).firstOrNull,
-                cache,
-                now,
-              ),
+            for (final store in onlineStores.keys) _storeBlock(t, store, links, cache, now, cheapest),
           ]),
         ),
+        if (cheapest != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Günstigster Online-Preis: ${cheapest.name} (${onlineStoreLabel(cheapest.store)}), '
+            '${formatEuro(cheapest.unitPriceNormCents!)}/${onlineBaseUnitLabel(cheapest.baseUnit!)}',
+            key: const Key('online-cheapest'),
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.primary),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _storeRow(ThemeData t, String store, ProductOnlineLink? link, List<OnlinePriceCacheRow> cache, DateTime now) {
-    final label = onlineStoreLabel(store);
-    if (link == null) {
-      return ListTile(
-        key: Key('online-row-$store'),
-        title: Text(label),
-        subtitle: const Text('Noch kein Artikel zugeordnet'),
-        trailing: TextButton(key: Key('online-link-$store'), onPressed: () => _pick(store), child: const Text('Zuordnen')),
-      );
-    }
+  LinkedOnlinePrice _pricedOf(ProductOnlineLink link, List<OnlinePriceCacheRow> cache, DateTime now) {
+    final c = cache.where((c) => c.store == link.store && c.externalId == link.externalId).firstOrNull;
+    return LinkedOnlinePrice(
+      store: link.store,
+      externalId: link.externalId,
+      name: c?.name ?? link.linkedName,
+      priceCents: c?.priceCents,
+      baseUnit: c?.baseUnit,
+      unitPriceNormCents: c?.unitPriceNormCents,
+      freshness: c == null ? OnlinePriceFreshness.stale : onlinePriceFreshness(available: c.available, feedUpdatedAt: c.feedUpdatedAt?.toUtc(), now: now),
+    );
+  }
 
+  Widget _storeBlock(ThemeData t, String store, List<ProductOnlineLink> allLinks, List<OnlinePriceCacheRow> cache, DateTime now, LinkedOnlinePrice? cheapest) {
+    final label = onlineStoreLabel(store);
+    final links = allLinks.where((l) => l.store == store).toList();
+    return Column(
+      key: Key('online-store-$store'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          child: Row(children: [
+            Expanded(child: Text(label, style: t.textTheme.titleSmall)),
+            TextButton.icon(
+              key: Key('online-link-$store'),
+              onPressed: () => _add(store, allLinks),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(links.isEmpty ? 'Zuordnen' : 'Artikel hinzufügen'),
+            ),
+          ]),
+        ),
+        if (links.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text('Noch kein Artikel zugeordnet', key: Key('online-empty-$store'), style: t.textTheme.bodyMedium),
+          )
+        else
+          for (final link in links) _articleTile(t, link, cache, now, cheapest),
+      ],
+    );
+  }
+
+  Widget _articleTile(ThemeData t, ProductOnlineLink link, List<OnlinePriceCacheRow> cache, DateTime now, LinkedOnlinePrice? cheapest) {
+    final k = '${link.store}-${link.externalId}';
     final cached = cache.where((c) => c.store == link.store && c.externalId == link.externalId).firstOrNull;
     final freshness = cached == null
         ? OnlinePriceFreshness.stale
@@ -106,6 +151,7 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
     final dim = freshness != OnlinePriceFreshness.fresh;
     final muted = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline);
     final name = cached?.name ?? link.linkedName;
+    final isCheapest = cheapest != null && cheapest.store == link.store && cheapest.externalId == link.externalId;
 
     final detail = cached == null
         ? ''
@@ -130,27 +176,26 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
         : null;
 
     return ListTile(
-      key: Key('online-row-$store'),
+      key: Key('online-row-$k'),
+      dense: true,
       isThreeLine: true,
-      title: Text('$label · $name'),
+      leading: isCheapest ? Icon(Icons.star, key: Key('online-star-$k'), color: t.colorScheme.primary) : const SizedBox(width: 24),
+      title: Text(name),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (detail.isNotEmpty) Text(detail, key: Key('online-detail-$store')),
-        Text(status, key: Key('online-status-$store'), style: dim ? muted : t.textTheme.bodySmall),
-        if (mismatch != null) Text(mismatch, key: Key('online-mismatch-$store'), style: muted),
+        if (detail.isNotEmpty) Text(detail, key: Key('online-detail-$k')),
+        Text(status, key: Key('online-status-$k'), style: dim ? muted : t.textTheme.bodySmall),
+        if (mismatch != null) Text(mismatch, key: Key('online-mismatch-$k'), style: muted),
       ]),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
         Text(
           cached?.priceCents == null ? '–' : formatEuro(cached!.priceCents!),
-          key: Key('online-price-$store'),
+          key: Key('online-price-$k'),
           style: t.textTheme.titleSmall?.copyWith(color: dim ? t.colorScheme.outline : null),
         ),
         PopupMenuButton<String>(
-          key: Key('online-menu-$store'),
-          onSelected: (v) => v == 'change' ? _pick(store) : _unlink(link),
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'change', child: Text('Anderen Artikel wählen')),
-            PopupMenuItem(value: 'unlink', child: Text('Zuordnung lösen')),
-          ],
+          key: Key('online-menu-$k'),
+          onSelected: (_) => _unlink(link),
+          itemBuilder: (_) => const [PopupMenuItem(value: 'unlink', child: Text('Zuordnung lösen'))],
         ),
       ]),
     );

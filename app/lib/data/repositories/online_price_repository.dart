@@ -40,18 +40,25 @@ class OnlinePriceRepository {
   Future<List<OnlineArticle>> search(String query, {List<String> stores = const ['billa', 'spar'], String? productBaseUnit}) =>
       _remote.search(query, stores: stores, preferBase: productBaseUnit == null ? null : onlineBaseUnitOf(productBaseUnit));
 
-  /// Verknuepft [productId] mit [article]. Hat das Produkt bei diesem Haendler schon eine Verknuepfung, wird sie auf den neuen
-  /// Artikel umgestellt (der Server erlaubt je Produkt und Haendler nur eine aktive Zeile). Der Preis des Artikels wird gleich
+  /// Verknuepft [productId] mit [article]. Ein Produkt kann beliebig viele Online-Artikel haben, auch mehrere beim selben
+  /// Haendler (Bio-Paprika und normale Paprika sind bei Billa zwei Artikel, fuer den Einkauf aber dasselbe Produkt). Derselbe
+  /// Artikel wird nur einmal je Produkt gefuehrt: ein zweites Verknuepfen aendert nichts. Der Preis des Artikels wird gleich
   /// zwischengespeichert, damit er sofort sichtbar ist.
-  Future<void> link(String productId, OnlineArticle article) async {
+  Future<void> link(String productId, OnlineArticle article) => linkAll(productId, [article]);
+
+  /// Wie [link] fuer mehrere Artikel auf einmal (eine Transaktion, ein Sync-Anstoss).
+  Future<void> linkAll(String productId, Iterable<OnlineArticle> articles) async {
     final hid = await householdId();
     final now = _now().toUtc();
-    final existing = await (_db.select(_db.productOnlineLinks)
-          ..where((l) => l.productId.equals(productId) & l.store.equals(article.store) & l.deletedAt.isNull()))
-        .getSingleOrNull();
-    final row = existing != null
-        ? existing.copyWith(externalId: article.externalId, linkedName: article.name, updatedAt: now)
-        : ProductOnlineLink(
+    var changed = false;
+    await _db.transaction(() async {
+      for (final article in articles) {
+        final existing = await (_db.select(_db.productOnlineLinks)
+              ..where((l) =>
+                  l.productId.equals(productId) & l.store.equals(article.store) & l.externalId.equals(article.externalId) & l.deletedAt.isNull()))
+            .getSingleOrNull();
+        if (existing == null) {
+          final row = ProductOnlineLink(
             id: _uuid.v4(),
             householdId: hid,
             productId: productId,
@@ -61,14 +68,16 @@ class OnlinePriceRepository {
             updatedAt: now,
             deletedAt: null,
           );
-    await _db.transaction(() async {
-      await _db.into(_db.productOnlineLinks).insertOnConflictUpdate(row.toCompanion(false));
-      await _enqueue(row);
-      await _db.into(_db.onlinePriceCache).insertOnConflictUpdate(
-            _cacheRow(article, available: true, feedUpdatedAt: null, fetchedAt: now),
-          );
+          await _db.into(_db.productOnlineLinks).insertOnConflictUpdate(row.toCompanion(false));
+          await _enqueue(row);
+          await _db.into(_db.onlinePriceCache).insertOnConflictUpdate(
+                _cacheRow(article, available: true, feedUpdatedAt: null, fetchedAt: now),
+              );
+          changed = true;
+        }
+      }
     });
-    onChanged?.call();
+    if (changed) onChanged?.call();
   }
 
   /// Loest die Verknuepfung (Soft-Delete, damit der Sync sie auf andere Geraete bringt).

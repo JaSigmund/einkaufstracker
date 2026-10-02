@@ -441,12 +441,20 @@ def main():
     check("Online-Verknuepfung: B sieht sie nicht", one("select count(*) from product_online_links", user=B) == 0)
     check("Online-Verknuepfung: B kann nicht in Haushalt A verknuepfen",
           raises(ins_link, (ha, milk, "spar", "2020", "x"), user=B))
-    check("Online-Verknuepfung: je Produkt und Haendler nur eine aktive Zeile",
-          raises(ins_link, (ha, milk, "billa", "00-1", "anderer Artikel"), user=A))
-    check("Online-Verknuepfung: anderer Haendler fuer dasselbe Produkt geht", not raises(ins_link, (ha, milk, "spar", "2020", "A-zwei Vollmilch"), user=A))
-    db("update product_online_links set deleted_at = now() where product_id=%s and store='billa'", (milk,))
-    check("Online-Verknuepfung: nach dem Loeschen (Soft-Delete) ist eine neue Verknuepfung moeglich",
+    check("Online-Verknuepfung: derselbe Artikel nur einmal je Produkt",
+          raises(ins_link, (ha, milk, "billa", "00-2", "Clever Vollmilch noch einmal"), user=A))
+    check("Online-Verknuepfung: mehrere Artikel desselben Haendlers fuer ein Produkt (Bio und normal)",
           not raises(ins_link, (ha, milk, "billa", "00-1", "Ja! Natuerlich Bio-Vollmilch"), user=A))
+    check("Online-Verknuepfung: anderer Haendler fuer dasselbe Produkt geht", not raises(ins_link, (ha, milk, "spar", "2020", "A-zwei Vollmilch"), user=A))
+    db("insert into products (household_id, name, base_unit) values (%s,'Milch fettarm','l')", (ha,))
+    low_fat = one("select id from products where name='Milch fettarm'")
+    check("Online-Verknuepfung: derselbe Artikel darf bei einem anderen Produkt vorkommen",
+          not raises(ins_link, (ha, low_fat, "billa", "00-2", "Clever Vollmilch"), user=A))
+    check("Online-Verknuepfung: ein Produkt hat jetzt zwei aktive Billa-Artikel",
+          one("select count(*) from product_online_links where product_id=%s and store='billa' and deleted_at is null", (milk,)) == 2)
+    db("update product_online_links set deleted_at = now() where product_id=%s and store='billa' and external_id='00-2'", (milk,))
+    check("Online-Verknuepfung: nach dem Loeschen (Soft-Delete) ist derselbe Artikel wieder verknuepfbar",
+          not raises(ins_link, (ha, milk, "billa", "00-2", "Clever Vollmilch"), user=A))
     before_touch = one("select updated_at from product_online_links where store='spar'")
     db("update product_online_links set linked_name='A-zwei Vollmilch 1l' where store='spar'")
     check("Online-Verknuepfung: updated_at wird beim Aendern gesetzt",

@@ -75,6 +75,42 @@ void main() {
     expect(onlineStores.keys, ['billa', 'spar']);
   });
 
+  group('cheapestOnlinePrice', () {
+    LinkedOnlinePrice item(String id, {int? unit = 200, int? price = 200, String? base = 'kg', OnlinePriceFreshness f = OnlinePriceFreshness.fresh, String store = 'billa'}) =>
+        LinkedOnlinePrice(store: store, externalId: id, name: 'Artikel $id', priceCents: price, baseUnit: base, unitPriceNormCents: unit, freshness: f);
+
+    test('der niedrigste Grundpreis gewinnt, auch ueber Haendler hinweg', () {
+      final best = cheapestOnlinePrice([item('a', unit: 398), item('b', unit: 249, store: 'spar'), item('c', unit: 299)], 'kg');
+      expect(best?.externalId, 'b');
+      expect(best?.store, 'spar');
+    });
+
+    test('bei gleichem Grundpreis gewinnt der niedrigere Preis, dann der erste', () {
+      expect(cheapestOnlinePrice([item('a', unit: 300, price: 300), item('b', unit: 300, price: 150)], 'kg')?.externalId, 'b');
+      expect(cheapestOnlinePrice([item('a', unit: 300), item('b', unit: 300)], 'kg')?.externalId, 'a');
+    });
+
+    test('nur vergleichbare Artikel: gleiche Basiseinheit wie das Produkt', () {
+      final items = [item('a', unit: 100, base: 'l'), item('b', unit: 500, base: 'kg')];
+      expect(cheapestOnlinePrice(items, 'kg')?.externalId, 'b');
+      expect(cheapestOnlinePrice(items, 'l')?.externalId, 'a');
+      expect(cheapestOnlinePrice(items, 'piece'), isNull);
+    });
+
+    test('ohne Grundpreis oder aus dem Sortiment verschwunden zaehlt nicht', () {
+      expect(cheapestOnlinePrice([item('a', unit: null), item('b', f: OnlinePriceFreshness.discontinued, unit: 50)], 'kg'), isNull);
+      expect(cheapestOnlinePrice([item('a', unit: null), item('b', unit: 400)], 'kg')?.externalId, 'b');
+    });
+
+    test('ein zuletzt bekannter Preis (alter Feed) zaehlt weiter mit', () {
+      expect(cheapestOnlinePrice([item('a', unit: 100, f: OnlinePriceFreshness.stale), item('b', unit: 400)], 'kg')?.externalId, 'a');
+    });
+
+    test('leere Liste ergibt null', () {
+      expect(cheapestOnlinePrice(const [], 'kg'), isNull);
+    });
+  });
+
   group('onlinePriceFreshness', () {
     final now = DateTime.utc(2026, 10, 10, 12);
 
