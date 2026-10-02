@@ -5,7 +5,8 @@
 //
 // Ablauf: JWT pruefen -> Haushalte des Nutzers ermitteln -> ist er das einzige Mitglied eines
 // Haushalts, wird der ganze Haushalt geloescht (cascade loescht Bons, Inventar, Kategorien etc.,
-// siehe Migration 0001) und dessen Bon-Dateien im Storage-Bucket "receipts" entfernt; ist er nicht
+// siehe Migration 0001) und dessen Dateien in den Storage-Buckets "receipts" (Bon-Fotos, PDFs) und
+// "meals" (Essensfotos, Phase 7) entfernt; ist er nicht
 // alleiniges Mitglied, wird nur seine Mitgliedschaft entfernt, die Haushaltsdaten bleiben fuer die
 // anderen Mitglieder bestehen. Zuletzt wird der Auth-Nutzer selbst geloescht.
 //
@@ -18,17 +19,40 @@ const json = (body: unknown, status = 200) =>
 
 // Nur der Storage-Bucket wird gebraucht -- als Parameter statt des ganzen Clients, weil der Typ des Clients von den
 // Datenbank-Generics abhaengt und `deno check` den Client aus createClient() sonst nicht als Parameter akzeptiert.
-type ReceiptBucket = ReturnType<ReturnType<typeof createClient>["storage"]["from"]>;
+type StorageBucket = ReturnType<ReturnType<typeof createClient>["storage"]["from"]>;
 
-async function purgeReceiptFiles(bucket: ReceiptBucket, householdId: string) {
-  const { data: receiptFolders, error } = await bucket.list(householdId, { limit: 1000 });
-  if (error || !receiptFolders) return;
-  const paths: string[] = [];
-  for (const folder of receiptFolders) {
-    const { data: files } = await bucket.list(`${householdId}/${folder.name}`, { limit: 1000 });
-    for (const f of files ?? []) paths.push(`${householdId}/${folder.name}/${f.name}`);
+// Eine Seite der Storage-Auflistung. Mehr als diese Anzahl Eintraege je Ordner kommen nur ueber weitere Seiten.
+const PAGE = 1000;
+
+/// Alle Eintraege eines Ordners, seitenweise (die Auflistung liefert hoechstens PAGE je Aufruf).
+async function listAll(bucket: StorageBucket, folder: string): Promise<{ name: string }[]> {
+  const all: { name: string }[] = [];
+  for (let offset = 0;; offset += PAGE) {
+    const { data, error } = await bucket.list(folder, { limit: PAGE, offset });
+    if (error || !data) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
   }
-  if (paths.length > 0) await bucket.remove(paths);
+  return all;
+}
+
+async function removeInChunks(bucket: StorageBucket, paths: string[]) {
+  for (let i = 0; i < paths.length; i += PAGE) await bucket.remove(paths.slice(i, i + PAGE));
+}
+
+/// Bon-Dateien liegen als {haushalt}/{bon}/{datei}, also eine Ordnerebene tiefer.
+async function purgeReceiptFiles(bucket: StorageBucket, householdId: string) {
+  const paths: string[] = [];
+  for (const folder of await listAll(bucket, householdId)) {
+    for (const f of await listAll(bucket, `${householdId}/${folder.name}`)) paths.push(`${householdId}/${folder.name}/${f.name}`);
+  }
+  await removeInChunks(bucket, paths);
+}
+
+/// Essensfotos liegen flach als {haushalt}/{mahlzeit}.jpg (Phase 7b, MealPhotoService).
+async function purgeMealPhotos(bucket: StorageBucket, householdId: string) {
+  const files = await listAll(bucket, householdId);
+  await removeInChunks(bucket, files.map((f) => `${householdId}/${f.name}`));
 }
 
 Deno.serve(async (req) => {
@@ -58,6 +82,7 @@ Deno.serve(async (req) => {
 
     if ((count ?? 0) <= 1) {
       await purgeReceiptFiles(admin.storage.from("receipts"), household_id);
+      await purgeMealPhotos(admin.storage.from("meals"), household_id);
       await admin.from("households").delete().eq("id", household_id); // cascade: alle Fachdaten
     } else {
       await admin.from("household_members").delete().eq("household_id", household_id).eq("user_id", userId);
