@@ -1,0 +1,384 @@
+name,expected,mode
+Reis,C352000,auto
+200 g Reis,C352000,auto
+Basmati Reis,C352000,auto
+gekochter Reis,C352032,auto
+gekochte Nudeln,E401032,auto
+Spaghetti,E401000,auto
+gekochte Spaghetti,E401032,auto
+Vollkorn Nudeln,E510000,auto
+Penne Rigate,E401000,auto
+Hartweizennudeln,E401000,top
+Couscous,C119200,auto
+Bulgur,C119100,auto
+Quinoa,C118000|C118100,top
+Haferflocken,C133000,auto
+zarte Haferflocken,C133000,auto
+Müsli,C512600,auto
+Cornflakes,C515000,auto
+Brot,B271000,auto
+Vollkornbrot,B101000,auto
+Roggenbrot,B271000,auto
+Weißbrot,B311000,auto
+Toastbrot,B311000,auto
+Brötchen,B511000,auto
+Semmel,B511000,auto
+Croissant,D771600,auto
+Knäckebrot,B6A2000,auto
+Mehl,C214100,auto
+Weizenmehl,C214100,auto
+Zucker,S111000,auto
+Kartoffeln,K110100,auto
+gekochte Kartoffeln,K110132,auto
+Pommes frites,K130492,auto
+Süßkartoffel,K420100,auto
+Gnocchi,K270000,auto
+Apfel,F110100,auto
+Äpfel,F110100,auto
+Birne,F130100,auto
+Banane,F503100,auto
+Bananen,F503100,auto
+Orange,F603100,auto
+Mandarine,F606100,auto
+Zitrone,F601100,auto
+Erdbeeren,F301100,auto
+Himbeeren,F302100,auto
+Heidelbeeren,F304100,auto
+Blaubeeren,F304100,auto
+Kirschen,F211100,auto
+Weintrauben,F310100,auto
+Trauben,F310100,auto
+Ananas,F501100,auto
+Mango,F516100,auto
+Kiwi,F514100,auto
+Wassermelone,F535100,auto
+Avocado,F502100,auto
+Pfirsich,F203100,auto
+Zwetschken,F223100,auto
+Marillen,F201100,auto
+Rosinen,F840100,auto
+Datteln,F504100,auto
+Tomate,G561100,auto
+Tomaten,G561100,auto
+frische Tomaten,G561100,auto
+Cherrytomaten,G561100,auto
+Gurke,G520100,auto
+Salatgurke,G520100,auto
+Paprika,G543100,auto
+rote Paprika,G543100,auto
+gelbe Paprika,G542100,auto
+Zwiebel,G480100,auto
+Zwiebeln,G480100,auto
+rote Zwiebel,G480100,auto
+Frühlingszwiebel,G482100,auto
+Knoblauch,G490100,auto
+Karotte,G620100,auto
+Karotten,G620100,auto
+Möhren,G620100,auto
+gedünstete Karotten,G620152,auto
+Brokkoli,G312100,auto
+gedünsteter Brokkoli,G312152,auto
+Blumenkohl,G311100,auto
+Spinat,G211100,auto
+Salat,G105100,auto
+Eisbergsalat,G103100,auto
+Rucola,G130100,auto
+Feldsalat,G104100,auto
+Zucchini,G582100,auto
+Aubergine,G510100,auto
+Kürbis,G581000,auto
+Mais,G570902,auto
+Erbsen,G760100,auto
+grüne Bohnen,G710100,auto
+Kohlrabi,G331100,auto
+Lauch,G470100,auto
+Sellerie,G660100,auto
+Spargel,G450100,auto
+Champignons,K701100,auto
+Pilze,K701100,auto
+Rote Bete,G613100,auto
+Radieschen,G691100,auto
+Weißkohl,G342100,auto
+Rotkohl,G341100,auto
+Oliven,H510802,auto
+Ingwer,R211200,auto
+Petersilie,G250100,auto
+Milch,M111300,auto
+Vollmilch,M111300,auto
+fettarme Milch,M111200,auto
+Haferdrink,C660000,auto
+Joghurt,M141300,auto
+Naturjoghurt,M141300,auto
+Skyr,M710100,auto
+Quark,M713300,auto
+Magerquark,M713100,auto
+Frischkäse,M820600,auto
+Hüttenkäse,M711300,auto
+Sahne,M173900,auto
+Schlagobers,M173900,auto
+Butter,Q611000,auto
+Käse,M400600,auto
+geriebener Käse,M400600,auto
+Gouda,M402600,auto
+Emmentaler,M304600,auto
+Mozzarella,M032100,auto
+Parmesan,M306400,auto
+Feta,M012200,auto
+Ei,E111100,auto
+Eier,E111100,auto
+gekochtes Ei,E111132,auto
+Spiegelei,Y710142,auto
+Rührei,Y720143,auto
+Eigelb,E112100,auto
+Rindfleisch,U202000,auto
+Hackfleisch,U050100,auto
+Rinderhackfleisch,U010100,auto
+Schweinefleisch,U602100,auto
+Schnitzel,U541100,auto
+Hähnchen,V413000,auto
+Hähnchenbrust,V416100,auto
+Hähnchenbrustfilet,V416100,auto
+gebratene Hähnchenbrust,V416182,auto
+gegrillte Hähnchenbrust,V416172,auto
+Hähnchenschenkel,V4A5100,auto
+Putenbrust,V486100,auto
+Speck,W410400,auto
+Schinken,W424000,auto
+Kochschinken,W424000,auto
+Salami,W140000,auto
+Leberkäse,W256100,auto
+Bratwurst,W222100,auto
+Würstchen,W211200,auto
+Lachs,T410100,auto
+Lachsfilet,T410100,auto
+Thunfisch,T121100,auto
+Forelle,T422100,auto
+Garnelen,T753100,auto
+Fischstäbchen,T930100,auto
+Hering,T102100,auto
+Tofu,H861000,auto
+Olivenöl,Q120000,auto
+Rapsöl,Q180000,auto
+Sonnenblumenöl,Q320000,auto
+Margarine,Q400000,auto
+Mayonnaise,Q991000,auto
+Ketchup,R141100,auto
+Senf,R132000,auto
+Sojasauce,R143000,auto
+Honig,S120000,auto
+Marmelade,S132000,auto
+Nutella,S145000,auto
+Erdnussbutter,H880200,auto
+Pesto,X372012,auto
+Tomatenmark,R160000,auto
+Mandeln,H210100,auto
+Walnüsse,H120100,auto
+Haselnüsse,H130100,auto
+Cashewkerne,H170100,auto
+Erdnüsse,H110600,auto
+Sonnenblumenkerne,H430100,auto
+Leinsamen,H410100,auto
+Chiasamen,H480100,auto
+Linsen,H725100,auto
+Kichererbsen,G770400,auto
+Kidneybohnen,H742100,auto
+Wasser,N110000,auto
+Mineralwasser,N120000,auto
+Cola,N330000,auto
+Limonade,N310400,auto
+Orangensaft,F603600,auto
+Apfelsaft,F110600,auto
+Kaffee,N410100,auto
+Cappuccino,N414000,auto
+Tee,N630000,auto
+Bier,P163000,auto
+Rotwein,P2A3000,auto
+Weißwein,P210000,auto
+Sekt,P2A6000,auto
+Schokolade,S500000,auto
+Gummibärchen,S361000,auto
+Kekse,D630400,auto
+Kartoffelchips,K280100,auto
+Popcorn,C518000,auto
+Eis,S241000,auto
+Müsliriegel,S830000,auto
+Pizza Margherita,X912033,top
+Lasagne,X730033,top
+Döner,Y921062|Y921162|V422072,top
+Currywurst,Y943032|Y944062,top
+Pfannkuchen,,none
+Kaiserschmarrn,Y890512|Y890342,top
+Gemüsepfanne,,none
+Energy Drink,,none
+Dill,,none
+Koriander,,none
+Rosmarin,,none
+Thymian,,none
+Minze,,none
+Palatschinken,,none
+Kuchen,,none
+Pudding,,none
+Burger,,none
+Tomatensuppe,,none
+Hühnersuppe,,none
+Schweinebraten,,none
+Mixed Pickles,G880602,auto
+Sushi,,none
+Bowl,,none
+Smoothie,,none
+Protein Shake,,none
+Chia Pudding,,none
+Rührei mit Speck und Schnittlauch,,none
+Lieblingsmüsli von Seitenbacher,,none
+Hähnchenbrustfilet gebraten,V416182,auto
+Hähnchenbrust gekocht,V416132,auto
+Hühnerbrust gebraten,V416182,auto
+Lachsfilet gegrillt,T410100|T410172,top
+Rinderhack,U010100,auto
+Schweinehack,U020100,auto
+Paprikaschoten,G543100,auto
+Paprikastreifen,G543100,top
+Salatblätter,G105100,top
+Tomatenscheiben,G561100,top
+Gurkenscheiben,G520100,top
+Zwiebelringe,G480100,top
+Kartoffelspalten,K110100|K120100,top
+Süßkartoffeln,K420100,auto
+Naturreis gekocht,C351032,auto
+Reis gekocht,C352032,auto
+Vollkornreis,C351000,auto
+Brauner Reis,C351000,auto
+Jasminreis,C352000,auto
+Schnittlauch,G081100,auto
+Petersilie gehackt,G250100,auto
+Parmesan gerieben,M306400,auto
+Mozzarella Kugeln,M032100,top
+Cheddar Scheiben,M303700,top
+"Joghurt 3,5% Fett",M141300,auto
+Griechischer Joghurt,M141300,auto
+Sauerrahm,M172500,auto
+"Milch 1,5%",M111200,top
+Hafermilch,C660000,auto
+Sojamilch,H841100,auto
+Mandelmilch,H800000,auto
+Frischkäse natur,M820600,auto
+Cottage Cheese,M711300,top
+Crème fraîche,M176800,auto
+Schmand,M172700,auto
+Rührei mit Speck,Y720643,top
+Spiegelei mit Speck,,none
+Bacon,W415000,auto
+Rohschinken,U681700,auto
+Putenaufschnitt,W561000,auto
+Hühnerleber,V634100|Y5A3000,auto
+Räucherlachs,T411700,top
+Thunfisch aus der Dose,T121902,auto
+Garnelen gekocht,T753132,auto
+Kabeljaufilet,T204100,auto
+Fischfilet,T213100,auto
+Sardinen in Öl,T105702,auto
+Rapsöl zum Braten,Q180000,auto
+Olivenöl extra vergine,Q120000,auto
+Butterschmalz,Q683000,auto
+Kokosöl,Q550000,auto
+Mayo,Q991000,auto
+Tomatenketchup,R141100,auto
+Balsamico,R125000,auto
+Apfelessig,R123100,top
+Salz,R114000,auto
+Pfeffer,R258100,auto
+Brauner Zucker,S112000,auto
+Puderzucker,S111100,auto
+Ahornsirup,S151100,auto
+Nuss-Nougat-Creme,S145000,auto
+Konfitüre,S132000,auto
+Erdnussmus,H110800,auto
+Studentenfutter,H810000,auto
+Sesamsamen,H420100,top
+Kürbiskerne,H310100,auto
+Pistazien,H250100,auto
+Rote Linsen,H730000,auto
+Kichererbsen aus der Dose,G770400|H720902,top
+Kidneybohnen,H742100,auto
+Weiße Bohnen,H739400,auto
+Edamame,G750100,auto
+Kohlrabi,G331100,auto
+Stangensellerie,G220100,auto
+Fenchel,G431100,auto
+Rosenkohl,G332100,auto
+Weißkraut,G342100,top
+Sauerkraut,G345100,auto
+Rote Rüben,G613100,auto
+Meerrettich,G630100,auto
+Eierschwammerl,K713100,auto
+Steinpilze,K718100,auto
+Pfifferlinge,K713100,auto
+Süßkartoffelpommes,,none
+Kartoffelpüree,X634012,auto
+Bratkartoffeln,X651063,auto
+Kroketten,K282200,auto
+Gemüsebrühe,X416243,auto
+Cola Zero,N331000,auto
+Fanta,N310300,auto
+Sprite,N310400,auto
+Eistee,N019000,auto
+Espresso,N411100,auto
+Latte Macchiato,N418000,auto
+Schwarztee,N630000,auto
+Grüntee,N610100,auto
+Pfefferminztee,N721000,auto
+Radler,P192000,auto
+Weizenbier,P151100,auto
+Prosecco,P2A6000,auto
+Vollmilchschokolade,S539900,auto
+Zartbitterschokolade,S560000,auto
+Butterkekse,D630400,auto
+Chips,K280100,auto
+Vanilleeis,S241000,auto
+Studentenfutter Mischung,H810000,auto
+Nudelsalat,,none
+Kartoffelsalat,,none
+Orangen,F603100,auto
+Pfirsiche,F203100,auto
+Erdbeere,F301100,auto
+Himbeere,F302100,auto
+Kiwis,F514100,auto
+Clementinen,F607100,auto
+Nektarinen,F202100,auto
+Avocados,F502100,auto
+Feige,F505100,auto
+Johannisbeeren,F321100,auto
+Stachelbeeren,F305100,auto
+Zucchinis,G582100,auto
+Auberginen,G510100,auto
+Spargel grün,,none
+Frühlingszwiebeln,G482100,auto
+Schalotten,G485100,auto
+Ingwerwurzel,R211200,auto
+Dinkelmehl,C234000,auto
+Magermilch,M111100,auto
+Rinderfilet,U211100,auto
+Schweinefilet,U611100,auto
+Putenschnitzel,V486100,auto
+Kalbsschnitzel,U342100,auto
+Entenbrust,V463000,auto
+Wiener Würstchen,W211200,auto
+Frankfurter Würstchen,W213000,auto
+Mineralwasser still,N128000,top
+Mineralwasser mit Kohlensäure,N127000,top
+Apfelsaft naturtrüb,F110600,auto
+Orangensaft frisch gepresst,F603600,auto
+Honig flüssig,S120000,auto
+Basilikum frisch,G061000,auto
+Bohnen grün,G710100,auto
+Rote Linsen gekocht,H730032,auto
+Spinat gekocht,G210132|G211100,auto
+Eier hartgekocht,E111132,auto
+Hühnerei,E111100,auto
+Tofu natur,H861000,auto
+Seitan,C558000,auto
+Hüttenkäse körnig,M711300|M711100,top
+Joghurt Natur,M141300,auto
+Schnittlauch frisch,G081100,auto
+Champignon,K701100,auto
+Pfifferling,K713100,auto
