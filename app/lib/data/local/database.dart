@@ -252,6 +252,76 @@ class InventoryMovements extends Table {
   /// 'piece' | 'kg' | 'l'
   TextColumn get unit => text()();
   TextColumn get note => text().nullable()();
+
+  /// Mahlzeit, die diese Bewegung ausgeloest hat (Abzug oder Gegenbuchung, Doku 15 §3.4, FR-12).
+  TextColumn get mealId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Mahlzeit im Essenstagebuch (Spiegel von public.meals, Doku 15 Essenstagebuch und Naehrwerte).
+class Meals extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  DateTimeColumn get eatenAt => dateTime()();
+
+  /// 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'drink'
+  TextColumn get mealType => text().withDefault(const Constant('lunch'))();
+  TextColumn get title => text()();
+  TextColumn get note => text().nullable()();
+
+  /// Storage-Pfad im Bucket `meals` (`{household_id}/{meal_id}.jpg`), sobald das Foto hochgeladen ist.
+  TextColumn get photoPath => text().nullable()();
+  TextColumn get recipeId => text().nullable()();
+
+  /// Anteil, der von der Person selbst gegessen wurde, und insgesamt zubereitete Portionen (FR-13).
+  RealColumn get servingsEaten => real().withDefault(const Constant(1))();
+  RealColumn get servingsMade => real().withDefault(const Constant(1))();
+
+  /// 'manual' | 'photo_ai' | 'recipe'
+  TextColumn get source => text().withDefault(const Constant('manual'))();
+
+  /// Zutaten nur geschaetzt (z.B. Restaurant), in allen Auswertungen erkennbar (FR-17).
+  BoolColumn get isEstimate => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Zutat einer Mahlzeit (Spiegel von public.meal_ingredients). Die Naehrwerte sind ein Snapshot zum
+/// Erfassungszeitpunkt (Doku 15 §5.4): spaetere Korrekturen am Produkt aendern alte Eintraege nicht.
+class MealIngredients extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get mealId => text()();
+  TextColumn get productId => text().nullable()();
+
+  /// Erster Inventar-Posten, aus dem abgezogen wurde (die Aufteilung auf mehrere Posten steht im Ledger).
+  TextColumn get inventoryItemId => text().nullable()();
+  TextColumn get freeText => text().nullable()();
+
+  /// Erfasste Menge in einer der Datenbank-Einheiten `kg` | `l` | `piece`.
+  RealColumn get quantity => real()();
+  TextColumn get unit => text()();
+
+  /// Menge in g bzw. ml, Basis der Naehrwertrechnung; `null`, wenn nicht bestimmbar.
+  RealColumn get amountG => real().nullable()();
+
+  /// 'inventory' | 'photo_ai' | 'recipe' | 'manual' | 'estimate'
+  TextColumn get source => text().withDefault(const Constant('manual'))();
+  RealColumn get confidence => real().nullable()();
+  RealColumn get kcal => real().nullable()();
+  RealColumn get proteinG => real().nullable()();
+  RealColumn get fatG => real().nullable()();
+  RealColumn get carbsG => real().nullable()();
+  RealColumn get sugarG => real().nullable()();
+  RealColumn get fiberG => real().nullable()();
+  RealColumn get saltG => real().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
@@ -389,8 +459,8 @@ class KeyValues extends Table {
 
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
-  ReceiptFiles, InventoryItems, InventoryMovements, BugReports, ShoppingLists, ShoppingListItems, Outbox,
-  SyncStates, KeyValues,
+  ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, BugReports, ShoppingLists,
+  ShoppingListItems, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -409,7 +479,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -481,6 +551,12 @@ class AppDatabase extends _$AppDatabase {
           // 12 -> 13: ausgeschlossene Bon-Positionen (ADR-020)
           if (from < 13) {
             await m.addColumn(receiptItems, receiptItems.excluded);
+          }
+          // 13 -> 14: Essenstagebuch (Phase 7), Bewegungen kennen ihre Mahlzeit
+          if (from < 14) {
+            await m.createTable(meals);
+            await m.createTable(mealIngredients);
+            await m.addColumn(inventoryMovements, inventoryMovements.mealId);
           }
         },
       );

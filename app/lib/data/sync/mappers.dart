@@ -281,6 +281,7 @@ Map<String, dynamic> inventoryMovementToRemote(InventoryMovement m) => {
       'quantity_delta': m.quantityDelta,
       'unit': m.unit,
       'note': m.note,
+      'meal_id': m.mealId,
       'updated_at': m.updatedAt.toUtc().toIso8601String(),
       'deleted_at': m.deletedAt?.toUtc().toIso8601String(),
     };
@@ -295,9 +296,93 @@ InventoryMovementsCompanion inventoryMovementFromRemote(Map<String, dynamic> j) 
       quantityDelta: Value((j['quantity_delta'] as num).toDouble()),
       unit: Value(j['unit'] as String),
       note: Value(j['note'] as String?),
+      mealId: Value(j['meal_id'] as String?),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );
+
+Map<String, dynamic> mealToRemote(Meal m) => {
+      'id': m.id,
+      'household_id': m.householdId,
+      'eaten_at': m.eatenAt.toUtc().toIso8601String(),
+      'meal_type': m.mealType,
+      'title': m.title,
+      'note': m.note,
+      'photo_path': m.photoPath,
+      'recipe_id': m.recipeId,
+      'servings_eaten': m.servingsEaten,
+      'servings_made': m.servingsMade,
+      'source': m.source,
+      'is_estimate': m.isEstimate,
+      'updated_at': m.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': m.deletedAt?.toUtc().toIso8601String(),
+    };
+
+MealsCompanion mealFromRemote(Map<String, dynamic> j) => MealsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      eatenAt: Value(_dt(j['eaten_at'])!),
+      mealType: Value(j['meal_type'] as String? ?? 'lunch'),
+      title: Value(j['title'] as String),
+      note: Value(j['note'] as String?),
+      photoPath: Value(j['photo_path'] as String?),
+      recipeId: Value(j['recipe_id'] as String?),
+      servingsEaten: Value((j['servings_eaten'] as num?)?.toDouble() ?? 1),
+      servingsMade: Value((j['servings_made'] as num?)?.toDouble() ?? 1),
+      source: Value(j['source'] as String? ?? 'manual'),
+      isEstimate: Value(j['is_estimate'] as bool? ?? false),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> mealIngredientToRemote(MealIngredient i) => {
+      'id': i.id,
+      'household_id': i.householdId,
+      'meal_id': i.mealId,
+      'product_id': i.productId,
+      'inventory_item_id': i.inventoryItemId,
+      'free_text': i.freeText,
+      'quantity': i.quantity,
+      'unit': i.unit,
+      'amount_g': i.amountG,
+      'source': i.source,
+      'confidence': i.confidence,
+      'kcal': i.kcal,
+      'protein_g': i.proteinG,
+      'fat_g': i.fatG,
+      'carbs_g': i.carbsG,
+      'sugar_g': i.sugarG,
+      'fiber_g': i.fiberG,
+      'salt_g': i.saltG,
+      'updated_at': i.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+    };
+
+MealIngredientsCompanion mealIngredientFromRemote(Map<String, dynamic> j) {
+  double? n(String key) => (j[key] as num?)?.toDouble();
+  return MealIngredientsCompanion(
+    id: Value(j['id'] as String),
+    householdId: Value(j['household_id'] as String),
+    mealId: Value(j['meal_id'] as String),
+    productId: Value(j['product_id'] as String?),
+    inventoryItemId: Value(j['inventory_item_id'] as String?),
+    freeText: Value(j['free_text'] as String?),
+    quantity: Value((j['quantity'] as num).toDouble()),
+    unit: Value(j['unit'] as String),
+    amountG: Value(n('amount_g')),
+    source: Value(j['source'] as String? ?? 'manual'),
+    confidence: Value(n('confidence')),
+    kcal: Value(n('kcal')),
+    proteinG: Value(n('protein_g')),
+    fatG: Value(n('fat_g')),
+    carbsG: Value(n('carbs_g')),
+    sugarG: Value(n('sugar_g')),
+    fiberG: Value(n('fiber_g')),
+    saltG: Value(n('salt_g')),
+    updatedAt: Value(_dt(j['updated_at'])!),
+    deletedAt: Value(_dt(j['deleted_at'])),
+  );
+}
 
 Map<String, dynamic> productAliasToRemote(ProductAlias a) => {
       'id': a.id,
