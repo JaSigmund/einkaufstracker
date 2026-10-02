@@ -1,10 +1,9 @@
 /// FEFO-Abzug (First Expired, First Out) fuers Essenstagebuch (Doku 15 Essenstagebuch und
 /// Naehrwerte, §3.4, FR-10/FR-11).
 ///
-/// Vorbereitung fuer Phase 7 (noch nicht verdrahtet). Reine Funktion ohne Datenbankzugriff, damit
-/// sie unabhaengig von drift/Repository getestet werden kann -- der Aufrufer liefert bereits die
-/// aktiven Bestaende (Status `sealed`/`opened`) eines Produkts, sortiert ist hier egal, die
-/// Funktion sortiert selbst nach Ablaufdatum.
+/// Reine Funktion ohne Datenbankzugriff, damit sie unabhaengig von drift/Repository getestet werden kann. Der
+/// Aufrufer liefert die aktiven Bestaende (Status `sealed`/`opened`) eines Produkts, die Reihenfolge ist egal,
+/// die Funktion sortiert selbst nach Ablaufdatum.
 library;
 
 /// Ein verfuegbarer Inventar-Posten eines Produkts, aus dem abgezogen werden kann.

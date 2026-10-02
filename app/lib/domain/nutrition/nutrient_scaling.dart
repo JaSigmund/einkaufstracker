@@ -1,9 +1,9 @@
 /// Skaliert Naehrwerte je 100 g/ml auf eine tatsaechlich verzehrte Menge (Doku 15 Essenstagebuch
-/// und Naehrwerte, §5.1/§5.4). Vorbereitung fuer Phase 7 (noch nicht verdrahtet).
+/// und Naehrwerte, §5.1/§5.4).
 library;
 
 /// Naehrwertprofil je 100 g bzw. 100 ml -- dieselben 8 Schluessel wie `products.nutrients_per_100`
-/// und die geplante Tabelle `bls_foods`, damit ein Wert beide Quellen gleich behandeln kann.
+/// und die Tabelle `bls_foods`, damit ein Wert beide Quellen gleich behandeln kann.
 class NutrientsPer100 {
   const NutrientsPer100({
     this.kcal,
@@ -16,6 +16,26 @@ class NutrientsPer100 {
     this.saltG,
   });
 
+  /// Liest die Schluessel von `products.nutrients_per_100` (`kcal`, `protein_g`, `fat_g`, `sat_fat_g`,
+  /// `carbs_g`, `sugar_g`, `fiber_g`, `salt_g`). Unbekannte oder nicht numerische Eintraege werden zu `null`,
+  /// eine leere Map ergibt `null` (kein Naehrwertprofil) statt eines Profils aus lauter `null`.
+  static NutrientsPer100? fromMap(Map<String, dynamic>? map) {
+    if (map == null || map.isEmpty) return null;
+    double? v(String key) => (map[key] is num) ? (map[key] as num).toDouble() : null;
+    final p = NutrientsPer100(
+      kcal: v('kcal'),
+      proteinG: v('protein_g'),
+      fatG: v('fat_g'),
+      satFatG: v('sat_fat_g'),
+      carbsG: v('carbs_g'),
+      sugarG: v('sugar_g'),
+      fiberG: v('fiber_g'),
+      saltG: v('salt_g'),
+    );
+    final hasAny = [p.kcal, p.proteinG, p.fatG, p.satFatG, p.carbsG, p.sugarG, p.fiberG, p.saltG].any((x) => x != null);
+    return hasAny ? p : null;
+  }
+
   final double? kcal;
   final double? proteinG;
   final double? fatG;
@@ -27,7 +47,7 @@ class NutrientsPer100 {
 }
 
 /// Absolute Naehrwerte einer Zutatenmenge -- passend zu den Snapshot-Spalten in `meal_ingredients`
-/// (die bewusst kein `sat_fat_g` hat, siehe `supabase/planned/meal_diary_draft.sql`).
+/// (die bewusst kein `sat_fat_g` hat, siehe Migration `0014_meal_diary.sql`).
 class NutrientAmounts {
   const NutrientAmounts({this.kcal, this.proteinG, this.fatG, this.carbsG, this.sugarG, this.fiberG, this.saltG});
 

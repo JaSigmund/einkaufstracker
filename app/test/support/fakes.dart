@@ -7,6 +7,7 @@ import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
 import 'package:einkaufstracker/data/remote/remote_store.dart';
 import 'package:einkaufstracker/data/repositories/auth_repository.dart';
@@ -15,6 +16,7 @@ import 'package:einkaufstracker/data/barcode/barcode_scanner.dart';
 import 'package:einkaufstracker/data/products/off_client.dart';
 import 'package:einkaufstracker/data/repositories/bug_report_repository.dart';
 import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
+import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/product_repository.dart';
 import 'package:einkaufstracker/data/repositories/receipt_repository.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
@@ -240,6 +242,9 @@ InventoryRepository inventoryRepo(AppDatabase db,
         {String household = 'h1', void Function()? onChanged, Future<void> Function(String productId)? onDepleted}) =>
     InventoryRepository(db, householdId: () async => household, onChanged: onChanged, onDepleted: onDepleted);
 
+MealRepository mealRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged, InventoryRepository? inventory}) =>
+    MealRepository(db, householdId: () async => household, inventory: inventory ?? inventoryRepo(db, household: household), onChanged: onChanged);
+
 ShoppingListRepository shoppingListRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     ShoppingListRepository(db, householdId: () async => household, onChanged: onChanged);
 
@@ -301,3 +306,21 @@ class FakeOffClient implements OffClient {
 
 BugReportRepository bugReportRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     BugReportRepository(db, householdId: () async => household, onChanged: onChanged);
+
+/// Attrappe fuer die Online-Suche in der Lebensmitteldatenbank (BLS, ADR-024).
+class FakeBlsFoodSearch implements BlsFoodSearch {
+  FakeBlsFoodSearch({this.foods = const [], this.fail = false});
+
+  List<BlsFood> foods;
+
+  /// true = Suche meldet [BlsSearchUnavailable]
+  bool fail;
+  final queries = <String>[];
+
+  @override
+  Future<List<BlsFood>> search(String query) async {
+    queries.add(query);
+    if (fail) throw const BlsSearchUnavailable();
+    return rankBlsFoods(foods.where((f) => f.nameDe.toLowerCase().contains(query.trim().toLowerCase())), query);
+  }
+}

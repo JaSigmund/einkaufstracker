@@ -4,12 +4,24 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../domain/inventory/expiry.dart';
+import '../../domain/nutrition/fefo_deduction.dart';
 import '../local/database.dart';
 import '../../domain/receipt/vienna_time.dart';
 import '../sync/mappers.dart';
 
 /// Kein aktiver Bestand mehr fuer dieses Produkt (fuer die Einkaufsliste-Vorschlaege in einer spaeteren PR).
 class NoActiveStockException implements Exception {}
+
+/// Ergebnis von [InventoryRepository.deductForMeal]: aus welchen Posten wie viel abgezogen wurde und was der
+/// Bestand nicht decken konnte (`shortfall`, gilt als "nicht im Bestand", FR-11).
+class MealDeduction {
+  const MealDeduction({required this.allocations, required this.shortfall});
+  final List<FefoAllocation> allocations;
+  final double shortfall;
+
+  /// Erster Posten, aus dem abgezogen wurde (fuer `meal_ingredients.inventory_item_id`), sonst `null`.
+  String? get firstItemId => allocations.isEmpty ? null : allocations.first.inventoryItemId;
+}
 
 /// Der Bon, dem ein Inventar-Eintrag zugeordnet ist (siehe [InventoryRepository.receiptLinkFor]).
 class ReceiptLink {
@@ -500,6 +512,129 @@ class InventoryRepository {
     }
   }
 
+  /// Zieht [quantity] (in [unit], der Einheit des Produkts: `kg`, `l` oder `piece`) fuer eine Mahlzeit vom Bestand
+  /// ab, aeltestes Ablaufdatum zuerst (FEFO, Doku 15 §3.4, FR-10). Jeder Abzug ist eine `meal`-Bewegung im Ledger
+  /// mit Verweis auf die Mahlzeit (FR-12). Der Bestand wird nie negativ (FR-11): was nicht gedeckt ist, steht in
+  /// [MealDeduction.shortfall] und wird nicht abgezogen.
+  ///
+  /// Wird ein Posten dabei nur angebrochen, gilt er als geoeffnet und bekommt die Haltbarkeit nach dem Oeffnen
+  /// (FR-14, [openedShelfLifeDays] ist die Produktvorgabe); ein leerer Posten wird abgeschlossen. War es der letzte
+  /// Bestand des Produkts, loest das wie bei "Aufgebraucht" [onDepleted] aus.
+  ///
+  /// Gehoert in die Transaktion des Aufrufers ([MealRepository]), schreibt aber selbst keine.
+  Future<MealDeduction> deductForMeal({
+    required String mealId,
+    required String productId,
+    required double quantity,
+    required String unit,
+    required DateTime eatenAt,
+    int? openedShelfLifeDays,
+  }) async {
+    if (quantity <= 0) return const MealDeduction(allocations: [], shortfall: 0);
+    final hid = await householdId();
+    final active = await (_db.select(_db.inventoryItems)
+          ..where((i) =>
+              i.householdId.equals(hid) &
+              i.productId.equals(productId) &
+              i.deletedAt.isNull() &
+              i.isSuggestion.equals(false) &
+              i.status.isIn(['sealed', 'opened']) &
+              i.unit.equals(unit)))
+        .get();
+    final byId = {for (final i in active) i.id: i};
+    final result = allocateFefo(
+      [for (final i in active) FefoCandidate(inventoryItemId: i.id, availableQuantity: i.quantity, expiresOn: i.expiresOn)],
+      quantity,
+    );
+
+    final nowUtc = DateTime.now().toUtc();
+    for (final a in result.allocations) {
+      final item = byId[a.inventoryItemId]!;
+      final remaining = _round3(item.quantity - a.quantity);
+      if (remaining <= 0) {
+        await _putItem(item.copyWith(quantity: 0, status: 'consumed', closedAt: Value(nowUtc), updatedAt: nowUtc));
+      } else {
+        await _putItem(item.copyWith(quantity: remaining, updatedAt: nowUtc));
+        if (item.status == 'sealed') {
+          await open(item.id, productDefaultOpenShelfLifeDays: openedShelfLifeDays, now: eatenAt);
+        }
+      }
+      await _addMovement(
+        inventoryItemId: item.id,
+        productId: productId,
+        type: 'meal',
+        delta: -a.quantity,
+        unit: unit,
+        now: eatenAt,
+        mealId: mealId,
+      );
+    }
+
+    if (result.allocations.isNotEmpty && onDepleted != null) {
+      final left = await (_db.select(_db.inventoryItems)
+            ..where((i) =>
+                i.productId.equals(productId) & i.deletedAt.isNull() & i.isSuggestion.equals(false) & i.status.isIn(['sealed', 'opened'])))
+          .get();
+      if (left.isEmpty) await onDepleted!(productId);
+    }
+    onChanged?.call();
+    return MealDeduction(allocations: result.allocations, shortfall: _round3(result.shortfall));
+  }
+
+  /// Bucht den Abzug einer Mahlzeit per Gegenbuchung zurueck (Doku 15 §3.4, FR-12, LH-MEAL-04): fuer jeden Posten
+  /// wird genau die noch offene Menge zurueckgebucht, als `adjustment` mit Verweis auf die Mahlzeit. Das Ledger
+  /// bleibt dadurch append-only. Wiederholtes Aufrufen ist ungefaehrlich, denn zurueckgebucht wird nur, was
+  /// netto noch abgezogen ist.
+  ///
+  /// Ein inzwischen geloeschter Posten kann nicht wiederhergestellt werden und wird uebersprungen. Ein durch den
+  /// Abzug geleerter Posten ist danach wieder aktiv (`opened`, falls er je geoeffnet wurde, sonst `sealed`).
+  /// Rueckgabe: Anzahl der zurueckgebuchten Posten.
+  Future<int> restoreForMeal(String mealId, {DateTime? now}) async {
+    final movements = await (_db.select(_db.inventoryMovements)
+          ..where((m) => m.mealId.equals(mealId) & m.deletedAt.isNull() & m.inventoryItemId.isNotNull()))
+        .get();
+    final outstanding = <String, double>{};
+    final sample = <String, InventoryMovement>{};
+    for (final m in movements) {
+      outstanding.update(m.inventoryItemId!, (v) => v - m.quantityDelta, ifAbsent: () => -m.quantityDelta);
+      sample[m.inventoryItemId!] = m;
+    }
+
+    final nowUtc = now ?? DateTime.now().toUtc();
+    var restored = 0;
+    for (final entry in outstanding.entries) {
+      final amount = _round3(entry.value);
+      if (amount <= 0) continue;
+      final item = await (_db.select(_db.inventoryItems)..where((i) => i.id.equals(entry.key))).getSingleOrNull();
+      if (item == null || item.deletedAt != null) continue;
+      final wasEmptied = item.status == 'consumed';
+      final status = wasEmptied ? (item.openedOn != null ? 'opened' : 'sealed') : item.status;
+      await _putItem(item.copyWith(
+        quantity: _round3(item.quantity + amount),
+        status: status,
+        closedAt: wasEmptied ? const Value(null) : Value(item.closedAt),
+        updatedAt: DateTime.now().toUtc(),
+      ));
+      await _addMovement(
+        inventoryItemId: item.id,
+        productId: item.productId,
+        type: 'adjustment',
+        delta: amount,
+        unit: sample[entry.key]!.unit,
+        now: nowUtc,
+        mealId: mealId,
+        note: 'Gegenbuchung zur Mahlzeit',
+      );
+      restored++;
+    }
+    if (restored > 0) onChanged?.call();
+    return restored;
+  }
+
+  /// Rundet auf drei Nachkommastellen, wie `quantity_delta` in der Datenbank (numeric(10,3)): ohne das bliebe nach
+  /// 1,0 - 0,15 - 0,85 ein Rest von 1e-17 stehen und der Posten wuerde nie als leer gelten.
+  double _round3(double v) => (v * 1000).round() / 1000;
+
   Future<InventoryItem> _get(String id) => (_db.select(_db.inventoryItems)..where((i) => i.id.equals(id))).getSingle();
 
   Future<void> _putItem(InventoryItem item) =>
@@ -512,6 +647,8 @@ class InventoryRepository {
     required double delta,
     required String unit,
     DateTime? now,
+    String? mealId,
+    String? note,
   }) async {
     final hid = await householdId();
     final m = InventoryMovement(
@@ -523,6 +660,8 @@ class InventoryRepository {
       type: type,
       quantityDelta: delta,
       unit: unit,
+      note: note,
+      mealId: mealId,
       updatedAt: DateTime.now().toUtc(),
     );
     await _put('inventory_movements', m.id, inventoryMovementToRemote(m),
