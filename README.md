@@ -90,6 +90,7 @@ Ein Projekt mit einer Person, aber mit den Regeln eines Teams, damit der Verlauf
 - **Commits** nach Conventional Commits: `feat(app): ...`, `fix(db): ...`, `docs: ...`, `chore: ...`, `ci: ...`, `test: ...`. Betreff im Imperativ, ein Gedanke pro Commit, im Rumpf das *Warum*.
 - **Pull Requests** werden erst gemergt, wenn die CI gruen ist (App: analyze und test, Datenbank: Schema- und RLS-Tests, Edge Function: Typpruefung). Merge per **Squash**, damit `main` eine lineare, lesbare Historie hat.
 - **Datenbank:** Migrationen in `supabase/migrations/` sind nach dem Einspielen unveraenderlich. Aenderungen kommen als neue, hoeher nummerierte Datei. Entwuerfe liegen in `supabase/planned/`.
+- **Lokale Datenbank (Drift):** Wer `schemaVersion` in `app/lib/data/local/database.dart` erhoeht, ergaenzt den Zweig in `onUpgrade`, fuehrt `dart run build_runner build --delete-conflicting-outputs` aus und erzeugt danach das neue Schema fuer den Migrationstest: `dart run drift_dev schema dump lib/data/local/database.dart drift_schemas/` und `dart run drift_dev schema generate drift_schemas/ test/generated_migrations/`. `test/db_migration_test.dart` prueft, dass sich jeder installierte Stand auf das aktuelle Schema hochziehen laesst (die neue Version dort in der Liste der Vorgaengerstaende ergaenzen, sobald sie in einem Release war).
 - **Geheimnisse** (Passwoerter, Keystore, API-Keys, Bon-Fotos) gehoeren nie ins Repo. Sie stehen in `.gitignore`. Vor jedem Commit ist der Diff darauf zu pruefen.
 - **Meilensteine** werden als Tag markiert (z.B. `m1-phase1`).
 
