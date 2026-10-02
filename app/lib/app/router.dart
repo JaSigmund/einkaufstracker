@@ -10,6 +10,8 @@ import '../features/diary/balance_page.dart';
 import '../features/diary/meal_form_page.dart';
 import '../features/diary/targets_page.dart';
 import '../features/home/home_shell.dart';
+import '../features/household/accept_invite_page.dart';
+import '../features/household/household_page.dart';
 import '../features/receipt_import/import_review_page.dart';
 import '../features/receipt_import/receipt_edit_page.dart';
 import '../features/receipt_import/receipt_import_service.dart';
@@ -57,12 +59,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loggedIn = auth.currentSession != null;
       final atLogin = state.matchedLocation == '/login';
-      if (!loggedIn) return atLogin ? null : '/login';
-      if (atLogin) return '/';
+      // Wer eingeladen wurde, hat noch kein Konto: die Seite zum Annehmen ist ohne Anmeldung erreichbar
+      final atAccept = state.matchedLocation == '/accept-invite';
+      if (!loggedIn) return (atLogin || atAccept) ? null : '/login';
+      if (atLogin || atAccept) return '/';
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/accept-invite', builder: (_, _) => const AcceptInvitePage()),
+      GoRoute(path: '/household', builder: (_, _) => const HouseholdPage()),
       GoRoute(path: '/', builder: (_, _) => const HomeShell()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/categories', builder: (_, _) => const CategoriesPage()),

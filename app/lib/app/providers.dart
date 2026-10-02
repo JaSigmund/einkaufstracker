@@ -3,11 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_config/app_config_repository.dart';
 import '../data/files/meal_photo_service.dart';
+import '../data/household/household_invites.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
@@ -531,6 +533,28 @@ final cookingCloudProvider = Provider<CookingCloud>(
     return id;
   }),
 );
+
+/// Einladungen in den Haushalt (Phase 6, ADR-017 Option A): offene Einladungen, anlegen, zurueckziehen.
+final householdInviteRepositoryProvider = Provider<HouseholdInviteRepository>(
+  (ref) => SupabaseHouseholdInviteRepository(ref.watch(supabaseClientProvider), () async {
+    final id = await ref.read(householdIdProvider.future);
+    if (id == null) throw const InviteFailure('Kein Haushalt gefunden.');
+    return id;
+  }),
+);
+
+/// Offene Einladungen des Haushalts. Nach dem Anlegen oder Zurueckziehen mit `ref.invalidate` neu laden.
+final householdInvitesProvider = FutureProvider.autoDispose((ref) => ref.watch(householdInviteRepositoryProvider).pending());
+
+final householdMemberCountProvider = FutureProvider.autoDispose((ref) => ref.watch(householdInviteRepositoryProvider).memberCount());
+
+/// Einladung annehmen (Edge Function `accept-invite`, ohne Anmeldung).
+final acceptInviteApiProvider = Provider<AcceptInviteApi>((ref) => SupabaseAcceptInviteApi(ref.watch(supabaseClientProvider)));
+
+/// Einen Text ueber das Teilen-Menue des Geraets weitergeben (in Tests ersetzbar).
+typedef ShareText = Future<void> Function(String text);
+
+final shareTextProvider = Provider<ShareText>((ref) => (text) => SharePlus.instance.share(ShareParams(text: text)));
 
 /// Foto-Analyse einer Mahlzeit (Phase 7c). Einwilligung und Tageslimit prueft der Server, die Update-Sperre
 /// (ADR-022) wie bei den Rezeptvorschlaegen schon vor dem Netzzugriff.

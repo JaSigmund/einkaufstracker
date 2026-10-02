@@ -413,3 +413,8 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# Einladungen annehmen: der Eingeladene hat noch kein Konto und damit kein JWT (Phase 6, ADR-017). Geschuetzt ist die
+# Function durch den Einladungscode, siehe accept-invite/index.ts. Beim Deploy zusaetzlich --no-verify-jwt angeben.
+[functions.accept-invite]
+verify_jwt = false

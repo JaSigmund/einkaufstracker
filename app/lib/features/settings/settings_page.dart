@@ -140,7 +140,9 @@ class SettingsPage extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Dein Konto und alle Daten (Bons, Inventar, Einkaufsliste, Kategorien) werden unwiderruflich gelöscht. '
+              const Text('Bist du das einzige Mitglied deines Haushalts, werden dein Konto und alle Daten (Bons, Inventar, '
+                  'Einkaufsliste, Kategorien, Essenstagebuch samt Fotos) unwiderruflich gelöscht. Gibt es weitere Mitglieder, '
+                  'verlierst nur du den Zugang, die Daten bleiben für die anderen erhalten. '
                   'Das kann nicht rückgängig gemacht werden.'),
               const SizedBox(height: 16),
               Text('Tippe "LÖSCHEN" ein, um zu bestätigen:', style: Theme.of(ctx).textTheme.bodySmall),
@@ -199,6 +201,14 @@ class SettingsPage extends ConsumerWidget {
           const SyncStatusBanner(),
           const Divider(height: 1),
           ListTile(leading: const Icon(Icons.person_outline), title: const Text('Konto'), subtitle: Text(email ?? '–')),
+          ListTile(
+            key: const Key('settings-household'),
+            leading: const Icon(Icons.group_outlined),
+            title: const Text('Haushalt'),
+            subtitle: const Text('Personen einladen, Einladungen verwalten'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/household'),
+          ),
           ListTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Kategorien verwalten'),
