@@ -102,11 +102,19 @@ class InventoryRepository {
   /// Bon-Positionen desselben Produkts, die noch keinem Inventar-Eintrag zugeordnet sind: Kandidaten, um
   /// eine Bonzuordnung nachtraeglich zu setzen oder zu korrigieren (Fehlerbericht "Bonzuordnung anzeigen",
   /// erweitert 2026-09-28 um die Moeglichkeit, die Zuordnung auch wieder zu aendern).
+  ///
+  /// Als "schon zugeordnet" gelten nur **bestaetigte** Eintraege. Ein unbestaetigter Bon-Vorschlag traegt zwar
+  /// ebenfalls eine `receiptItemId`, ist aber genau die Bon-Position, die der Nutzer einem bereits vorhandenen
+  /// Bestand zuordnen will (Fehlerbericht "kein passender Bon bei Inventarartikel gefunden", 2026-10-01) -- sie
+  /// auszublenden hiess, dass die Liste leer blieb, obwohl der passende Bon als Vorschlag direkt daneben lag.
+  /// [setReceiptLink] nimmt den Vorschlag dann auf.
   Future<List<ReceiptLink>> candidateReceiptLinksFor(String productId, {int limit = 10}) async {
     final hid = await householdId();
     final linked = _db.selectOnly(_db.inventoryItems)
       ..addColumns([_db.inventoryItems.receiptItemId])
-      ..where(_db.inventoryItems.receiptItemId.isNotNull() & _db.inventoryItems.deletedAt.isNull());
+      ..where(_db.inventoryItems.receiptItemId.isNotNull() &
+          _db.inventoryItems.deletedAt.isNull() &
+          _db.inventoryItems.isSuggestion.equals(false));
     final linkedIds = (await linked.map((r) => r.read(_db.inventoryItems.receiptItemId)!).get()).toSet();
 
     final query = _db.select(_db.receiptItems).join([
@@ -138,11 +146,40 @@ class InventoryRepository {
 
   /// Setzt oder loest die Bonzuordnung eines Inventar-Eintrags nachtraeglich (Fehlerbericht "Bonzuordnung
   /// anzeigen"): `null` macht den Eintrag zu einem reinen Scan ohne Bon-Herkunft.
+  ///
+  /// Wird eine Bon-Position zugeordnet, auf die noch ein unbestaetigter Vorschlag zeigt, nimmt dieser Aufruf den
+  /// Vorschlag auf: er und seine Kaufbuchung werden geloescht. Beides beschreibt denselben Einkauf wie der
+  /// bestaetigte Eintrag (Vorschlag: Beleg per Bon, Eintrag: Beleg per Scan) -- bliebe der Vorschlag stehen,
+  /// stuende die Ware doppelt im Bestand und im Ledger. Vorschlaege anderer Bon-Positionen bleiben unberuehrt.
   Future<void> setReceiptLink(String inventoryItemId, String? receiptItemId) async {
     final item = await _get(inventoryItemId);
-    final updated = item.copyWith(receiptItemId: Value(receiptItemId), updatedAt: DateTime.now().toUtc());
-    await _putItem(updated);
+    final now = DateTime.now().toUtc();
+    if (receiptItemId != null) {
+      final absorbed = await (_db.select(_db.inventoryItems)
+            ..where((i) =>
+                i.receiptItemId.equals(receiptItemId) &
+                i.isSuggestion.equals(true) &
+                i.deletedAt.isNull() &
+                i.id.equals(inventoryItemId).not()))
+          .get();
+      for (final suggestion in absorbed) {
+        await _putItem(suggestion.copyWith(deletedAt: Value(now), updatedAt: now));
+        await _deleteMovementsOf(suggestion.id, now);
+      }
+    }
+    await _putItem(item.copyWith(receiptItemId: Value(receiptItemId), updatedAt: now));
     onChanged?.call();
+  }
+
+  Future<void> _deleteMovementsOf(String inventoryItemId, DateTime now) async {
+    final movements = await (_db.select(_db.inventoryMovements)
+          ..where((m) => m.inventoryItemId.equals(inventoryItemId) & m.deletedAt.isNull()))
+        .get();
+    for (final m in movements) {
+      final deleted = m.copyWith(deletedAt: Value(now), updatedAt: now);
+      await _put('inventory_movements', m.id, inventoryMovementToRemote(deleted),
+          () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(deleted.toCompanion(false)));
+    }
   }
 
   /// Legt einen Bon-Vorschlag an (Doku 06 §2 Punkt 1, §9 "Bon bestaetigt"): kein MHD, sondern hoechstens
@@ -412,14 +449,7 @@ class InventoryRepository {
     }
     final updated = item.copyWith(deletedAt: Value(now), updatedAt: now);
     await _putItem(updated);
-    final movements = await (_db.select(_db.inventoryMovements)
-          ..where((m) => m.inventoryItemId.equals(id) & m.deletedAt.isNull()))
-        .get();
-    for (final m in movements) {
-      final deleted = m.copyWith(deletedAt: Value(now), updatedAt: now);
-      await _put('inventory_movements', m.id, inventoryMovementToRemote(deleted),
-          () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(deleted.toCompanion(false)));
-    }
+    await _deleteMovementsOf(id, now);
     onChanged?.call();
   }
 

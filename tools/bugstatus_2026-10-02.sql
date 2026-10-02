@@ -1,0 +1,3 @@
+update bug_reports set status='fixed', severity='medium', fixed_in_version='1.7.16', status_updated_at=now(),
+  resolution='candidateReceiptLinksFor hielt jede Bon-Position fuer "schon zugeordnet", auf die irgendein Inventar-Eintrag zeigt -- auch ein unbestaetigter Bon-Vorschlag, der ja selbst eine receiptItemId traegt. Dadurch war die Kandidatenliste leer, obwohl genau dieser Vorschlag der Anlass war, den Bon zuzuordnen. Jetzt zaehlen nur bestaetigte Eintraege als zugeordnet. setReceiptLink nimmt den Vorschlag beim Zuordnen auf (Vorschlag und seine Kaufbuchung werden geloescht), damit die Ware nicht doppelt im Bestand und im Ledger steht.'
+  where id='cc2a1173-c716-4209-86ee-f71162dc139a';
