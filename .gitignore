@@ -38,3 +38,10 @@ app/dart_defines.local.json
 # Python-Bytecode
 __pycache__/
 *.pyc
+
+# Datenbank-Backups (tools/backup.sh) enthalten alle Nutzerdaten, nie committen
+backups/
+
+# BLS-Rohdaten (tools/import_bls_foods.py): grosse Fremddateien, jederzeit neu von blsdb.de ladbar --
+# eingecheckt wird nur das erzeugte tools/bls_foods_import.sql
+tools/BLS_4_0_*/

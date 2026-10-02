@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/app_config/app_config_repository.dart';
 import '../data/files/receipt_file_service.dart';
 import '../data/local/database.dart';
 import '../data/cloud/cloud_receipt.dart';
@@ -27,6 +29,7 @@ import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
 import '../data/repositories/shopping_list_repository.dart';
 import '../data/notifications/notification_scheduler.dart';
+import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
@@ -95,10 +98,14 @@ final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(r
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.running = false});
+  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false});
   final DateTime? lastSync;
   final String? error;
   final bool running;
+
+  /// Die installierte Version ist zu alt fuer den aktuellen Server-Stand (ADR-022) -- Synchronisierung
+  /// bleibt bewusst aus, bis aktualisiert wurde, statt mit moeglicherweise inkompatiblen Daten weiterzumachen.
+  final bool updateRequired;
 }
 
 class SyncController extends Notifier<SyncStatus> {
@@ -111,9 +118,17 @@ class SyncController extends Notifier<SyncStatus> {
   }
 
   Future<void> sync() async {
+    // Codereview-Fund 2026-10-01: waehrend Abmelden/Konto-Loeschen laeuft, darf kein parallel ausgeloester
+    // Sync (2-Minuten-Timer, Connectivity-Wechsel, Tipp auf den Sync-Banner) mit der noch kurz gueltigen
+    // alten Session Daten in die gerade geleerte lokale DB zurueckschreiben -- siehe settings_page.dart.
+    if (ref.read(authTransitionInProgressProvider)) return;
     final engine = ref.read(syncEngineProvider);
     if (engine.isRunning) return;
     if (ref.read(sessionProvider).value == null) return;
+    if (ref.read(appUpdateRequiredProvider)) {
+      state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true);
+      return;
+    }
     state = SyncStatus(lastSync: state.lastSync, running: true);
     try {
       await engine.sync();
@@ -220,11 +235,15 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
 /// Erinnerung unveraendert bestehen, statt abzubrechen.
 Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final hid = await ref.read(householdIdProvider.future);
-  if (hid == null) return;
+  if (hid == null) {
+    debugPrint('[expiry-reminders] kein Haushalt bekannt, nichts geplant');
+    return;
+  }
   final HouseholdSettings settings;
   try {
     settings = await ref.read(settingsRepositoryProvider).load(hid);
-  } catch (_) {
+  } catch (e) {
+    debugPrint('[expiry-reminders] Einstellungen nicht ladbar, alter Plan bleibt bestehen: $e');
     return;
   }
   final inventoryRepo = ref.read(inventoryRepositoryProvider);
@@ -239,6 +258,15 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
+  );
+  // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): sichtbar machen, WAS
+  // ueberhaupt berechnet wurde, bevor es an den Plugin-Scheduler geht -- ohne das war nicht zu
+  // unterscheiden, ob gar nichts geplant wurde (Domain-Logik/Daten) oder der Plan die Oberflaeche/den
+  // Nutzer nie erreicht hat (Betriebssystem-Ebene: Berechtigung, Kanal, Akku-Optimierung).
+  debugPrint(
+    '[expiry-reminders] ${items.length} aktive Posten/Vorschlaege, ${reminders.length} Erinnerungstag(e) '
+    'geplant (notifyTime=${settings.notifyTime}, leadDays=${settings.notifyLeadDays})'
+    '${reminders.isEmpty ? '' : ': ${reminders.map((r) => '${r.date.toIso8601String().substring(0, 10)}=${r.productNames}').join(', ')}'}',
   );
   await ref.read(notificationSchedulerProvider).scheduleExpiryReminders(reminders, notifyTime: settings.notifyTime, leadDays: settings.notifyLeadDays);
 }
@@ -267,6 +295,54 @@ final appVersionProvider = FutureProvider<String>((ref) async {
   final info = await PackageInfo.fromPlatform();
   return '${info.version} (${info.buildNumber})';
 });
+
+/// `null`, wenn [PackageInfo.buildNumber] nicht als Zahl lesbar ist -- Codereview-Fund 2026-10-01: ein
+/// Fallback-Wert wie `0` waere technisch "bekannt" (nicht `null`) und wuerde `appUpdateRequiredProvider`
+/// faelschlich ausloesen (jede echte Mindestversion ist `>= 1`), obwohl die eigene Version in Wahrheit nur
+/// nicht auswertbar war -- genau das Fail-closed-Verhalten, das diese Sperre laut ihrer eigenen Dokumentation
+/// nie haben sollte (auf Android bisher folgenlos, `versionCode` ist immer numerisch; relevant sobald
+/// iOS/PWA dazukommt).
+final currentBuildNumberProvider = FutureProvider<int?>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return int.tryParse(info.buildNumber);
+});
+
+final appConfigRepositoryProvider = Provider<AppConfigRepository>((ref) => AppConfigRepository(ref.watch(supabaseClientProvider)));
+
+/// `null` bei Fehler (kein Netz, Server nicht erreichbar) statt eines Absturzes -- siehe
+/// [appUpdateRequiredProvider], das bei fehlenden Daten bewusst NICHT sperrt (fail-open).
+final appConfigProvider = FutureProvider<AppConfig?>((ref) async {
+  try {
+    return await ref.watch(appConfigRepositoryProvider).load();
+  } catch (_) {
+    return null;
+  }
+});
+
+/// True nur, wenn sowohl die eigene Build-Nummer als auch die Server-Mindestversion bekannt sind UND
+/// die eigene Version zu alt ist. Fail-open bei fehlenden Daten: ein Netzfehler beim Abrufen der
+/// Konfiguration selbst darf nicht faelschlich alle Online-Funktionen sperren, das widerspraeche dem
+/// Offline-first-Ansatz der App (ADR-004).
+final appUpdateRequiredProvider = Provider<bool>((ref) {
+  final config = ref.watch(appConfigProvider).value;
+  final build = ref.watch(currentBuildNumberProvider).value;
+  if (config == null || build == null) return false;
+  return isAppUpdateRequired(currentBuildNumber: build, minSupportedBuildNumber: config.minSupportedBuildNumber);
+});
+
+/// True waehrend Abmelden/Konto-Loeschen laeuft (Codereview-Fund 2026-10-01, siehe `SyncController.sync()`
+/// und `SettingsPage`). Lebt im selben langlebigen `ProviderScope` wie die ganze App (kein Neustart beim
+/// An-/Abmelden), muss also nach jeder Abmeldung/Loeschung wieder auf `false` zurueckgesetzt werden --
+/// sonst bliebe Sync fuer den Rest der App-Laufzeit blockiert, auch nach einer neuen Anmeldung.
+class AuthTransitionNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void start() => state = true;
+  void finish() => state = false;
+}
+
+final authTransitionInProgressProvider = NotifierProvider<AuthTransitionNotifier, bool>(AuthTransitionNotifier.new);
 
 final inventoryMovementsStreamProvider =
     StreamProvider.family((ref, String productId) => ref.watch(inventoryRepositoryProvider).watchMovements(productId));
@@ -359,6 +435,9 @@ final photoReceiptServiceProvider = Provider<PhotoReceiptService>(
     cloud: ref.watch(cloudReceiptReaderProvider),
     // Einwilligung liegt beim Server (household_settings)
     cloudAllowed: () async {
+      // Zuerst pruefen, nicht erst nach einem Netzfehler verstecken (ADR-022): eine zu alte Version
+      // soll gar nicht erst versuchen, mit dem Server zu sprechen.
+      if (ref.read(appUpdateRequiredProvider)) throw const AppUpdateRequiredException();
       try {
         final id = await ref.read(householdIdProvider.future);
         if (id == null) return false;

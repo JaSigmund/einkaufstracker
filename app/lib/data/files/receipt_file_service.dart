@@ -15,6 +15,19 @@ import '../repositories/receipt_repository.dart';
 /// Datei-Upload in den privaten Bucket noch nicht).
 const _networkTimeout = Duration(seconds: 20);
 
+/// Serialisiert asynchrone Aktionen, die sich sonst beim Lesen-Aendern-Schreiben eines gemeinsamen Werts
+/// ueberholen koennten (Codereview-Fund 2026-10-01, siehe `ReceiptFileService._pendingLock`). Eine fehlgeschlagene
+/// Aktion blockiert die Warteschlange nicht fuer die naechste.
+class _AsyncLock {
+  Future<void> _tail = Future.value();
+
+  Future<T> run<T>(Future<T> Function() action) {
+    final result = _tail.then((_) => action());
+    _tail = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+}
+
 /// Ort der Originaldateien auf dem Server (privater Bucket "receipts").
 abstract class RemoteFileStore {
   Future<void> upload(String path, Uint8List bytes, String contentType);
@@ -73,6 +86,14 @@ class ReceiptFileService {
 
   static const _pendingKey = 'pending_file_uploads';
 
+  /// Serialisiert nur das Lesen+Schreiben der Warteschlange selbst (Codereview-Fund 2026-10-01): `attach()`
+  /// (direkt nach dem Speichern eines Bons) und `uploadPending()` (Timer/Connectivity/manueller Sync) lesen
+  /// und schreiben denselben KV-Eintrag unabhaengig voneinander -- ohne das koennte der jeweils zuletzt
+  /// schreibende Aufruf eine vom anderen inzwischen hinzugefuegte oder entfernte ID stillschweigend wieder
+  /// ueberschreiben (Lost Update). Bewusst NICHT der eigentliche Netz-Upload mit darin eingeschlossen, sonst
+  /// wuerde das Speichern eines neuen Bons auf einen laufenden, ggf. langsamen Upload warten muessen.
+  final _pendingLock = _AsyncLock();
+
   static String _ext(String kind) => kind == 'pdf' ? 'pdf' : 'jpg';
   static String contentType(String kind) => kind == 'pdf' ? 'application/pdf' : 'image/jpeg';
 
@@ -95,7 +116,7 @@ class ReceiptFileService {
     if (attachments.isEmpty || !await keepFiles()) return 0;
     final hid = await repo.householdId();
     final now = DateTime.now().toUtc();
-    final pending = await _pending();
+    final newIds = <String>[];
     var n = 0;
     for (final a in attachments) {
       // deterministisch: derselbe Bon zweimal abgelegt ergibt dieselbe Datei
@@ -112,10 +133,15 @@ class ReceiptFileService {
       );
       await (await _localFile(f)).writeAsBytes(a.bytes, flush: true);
       await repo.putFile(f);
-      if (!pending.contains(id)) pending.add(id);
+      newIds.add(id);
       n++;
     }
-    await _setPending(pending);
+    // Nur dieser letzte Schritt (lesen+schreiben der gemeinsamen Warteschlange) ist gesperrt, siehe
+    // _pendingLock -- die Datei-/DB-Schreibvorgaenge oben sind rein lokal und brauchen das nicht.
+    await _pendingLock.run(() async {
+      final current = await _pending();
+      await _setPending({...current, ...newIds}.toList());
+    });
     return n;
   }
 
@@ -123,21 +149,38 @@ class ReceiptFileService {
   Future<int> uploadPending() async {
     final pending = await _pending();
     if (pending.isEmpty) return 0;
-    final left = <String>[];
+    // Nur die IDs merken, die definitiv erledigt sind (hochgeladen, oder der Bon/die Datei ist weg) --
+    // beim Schreiben wird das gegen die dann AKTUELLE Warteschlange abgezogen, nicht gegen diese Kopie von
+    // vorhin ueberschrieben (Codereview-Fund 2026-10-01: sonst ginge ein waehrend des -- je nach
+    // Netzgeschwindigkeit potenziell lang laufenden -- Uploads per attach() neu hinzugekommener Eintrag
+    // verloren, weil diese Methode von seiner Existenz noch gar nichts wissen konnte).
+    final settled = <String>[];
     var done = 0;
     for (final id in pending) {
       final f = await (db.select(db.receiptFiles)..where((x) => x.id.equals(id))).getSingleOrNull();
-      if (f == null || f.deletedAt != null) continue; // Bon wurde inzwischen geloescht
+      if (f == null || f.deletedAt != null) {
+        settled.add(id); // Bon wurde inzwischen geloescht
+        continue;
+      }
       final file = await _localFile(f);
-      if (!await file.exists()) continue;
+      if (!await file.exists()) {
+        settled.add(id); // Datei verschwunden, nicht wiederherstellbar -- weiter warten haette keinen Sinn
+        continue;
+      }
       try {
         await remote.upload(f.storagePath, await file.readAsBytes(), contentType(f.kind));
+        settled.add(id);
         done++;
       } catch (_) {
-        left.add(id);
+        // bleibt in der Warteschlange, naechster Versuch beim naechsten Sync
       }
     }
-    await _setPending(left);
+    if (settled.isNotEmpty) {
+      await _pendingLock.run(() async {
+        final current = await _pending();
+        await _setPending(current.where((id) => !settled.contains(id)).toList());
+      });
+    }
     return done;
   }
 
@@ -161,8 +204,10 @@ class ReceiptFileService {
       final file = await _localFile(f);
       if (await file.exists()) await file.delete();
     }
-    final pending = await _pending();
-    await _setPending(pending.where((id) => !files.any((f) => f.id == id)).toList());
+    await _pendingLock.run(() async {
+      final pending = await _pending();
+      await _setPending(pending.where((id) => !files.any((f) => f.id == id)).toList());
+    });
     try {
       await remote.remove([for (final f in files) f.storagePath]);
     } catch (_) {

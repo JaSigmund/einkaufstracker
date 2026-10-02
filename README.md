@@ -5,20 +5,20 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 **Die vollständige Dokumentation liegt im Obsidian-Vault:**
 `C:\Users\jakob\Documents\ClaudeBrain\02 Projekte\Einkaufstracker\` (Einstieg: `Einkaufstracker.md`, Anforderungen: `01 Lastenheft.md`)
 
-## Stand (Phase 4 komplett, 2026-09-28)
+## Stand (Phase 5 abgeschlossen, Phase 7a Fundament läuft, 2026-10-02)
 
 | Teil | Status |
 |---|---|
 | Doku (Lastenheft bis Roadmap) | Laufend nachgeführt, siehe Roadmap für den Phasenstand |
-| `supabase/migrations` | 0001 bis 0011 (Schema, Kategorien, Ledger, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege, Fehlerberichte + Bearbeitungsstatus/Changelog); Schema-/RLS-Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`, 75 Tests) **und** gegen das echte Supabase-Projekt (Frankfurt) eingespielt. `shopping_lists`/`shopping_list_items` lagen schon seit 0001 bereit, client-seitig erst seit Phase 3 angebunden |
-| `supabase/planned` | Entwurf Essenstagebuch (Phase 7), wird nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
+| `supabase/migrations` | 0001 bis 0014 (Schema, Kategorien, Ledger, Bon-Import, Kategorie-Aliase, Bon-Rabatte, Originalbelege, Fehlerberichte + Bearbeitungsstatus/Changelog, Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle); Schema-/RLS-Tests gegen eingebettetes Postgres (`supabase/tests/run_schema_tests.py`, 78 Tests) **und** gegen das echte Supabase-Projekt (Frankfurt) eingespielt. `shopping_lists`/`shopping_list_items` lagen schon seit 0001 bereit, client-seitig erst seit Phase 3 angebunden |
+| `supabase/planned` | Leer. Entwürfe für kommende Phasen (z.B. Haushalts-Einladungen, Phase 6) liegen hier, werden nicht eingespielt, aber von den Tests auf Einspielbarkeit geprüft |
 | `supabase/functions/parse-receipt` | deployt, mit Deno typgeprüft, gegen echte Bons getestet (Sonnet 5 exakt, `tools/test_parse_receipt.py`); Standardmodell per Secret `RECEIPT_MODEL` |
 | `spikes/spike_scanner` | Android-Spike auf dem Handy getestet, 17 Unit-Tests (inkl. 3 echte Billa-Bons als Regression, lokal) |
 | `tools/test_parse_receipt.py` | Vergleichstest der Cloud-Erkennung (Modelle x Varianten x Fotos), Soll-Werte in `testdata/receipts/truth/` |
 | `tools/metrics.py` | Kennzahlen aus dem Testkonzept (Bons je Quelle, Summenstimmigkeit, Fallback-Quote, Kosten, Kategorisierung) aus den Live-Daten, nur lesend: `python tools/metrics.py` |
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
-| Flutter-App (`app/`) | Phase 2 und 3 fertig, Phase 4 (Preisvergleich und Trends) komplett umgesetzt: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung mit Grundpreis/Produkt-Zuordnung je Artikel, Duplikate zusammenführen, Artikel-Detail (Preisverlauf, Händlervergleich), Trend über 6/12 Monate, Monatsbudget, CSV-Export, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (Menge/Inhalt, Vorschläge aus „Leer“/„Ablauf“, hakt sich bei Bon-Zuordnung selbst ab), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 549 Tests, signierter Release-Build (aktuell v1.7.0) läuft auf dem Handy — **Phase 4 selbst noch nicht auf dem Handy gegen echte Daten geprüft** (Stand direkt nach dem Merge). Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
+| Flutter-App (`app/`) | Phase 2 bis 5 fertig (Phase 5: Abnahme nach Lastenheft §6 bestanden, siehe Roadmap), Phase 4 (Preisvergleich und Trends) komplett umgesetzt: Anmeldung, Offline-Sync, Kategorien, Einstellungen, Bon-Import (PDF, Teilen, Foto+Cloud-Fallback), Kategorisierung, Monatsauswertung mit Grundpreis/Produkt-Zuordnung je Artikel, Duplikate zusammenführen, Artikel-Detail (Preisverlauf, Händlervergleich), Trend über 6/12 Monate, Monatsbudget, CSV-Export, Barcode-Inventar mit Haltbarkeit und Ampel, Haltbarkeits-Vorbelegung nach Produkttyp, Einkaufsliste (Menge/Inhalt, Vorschläge aus „Leer“/„Ablauf“, hakt sich bei Bon-Zuordnung selbst ab), lokale Ablauf-Benachrichtigungen mit Aktionen, Stückgewicht aus Open Food Facts. 673 Tests, signierter Release-Build (aktuell v1.7.15) läuft auf dem Handy. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
 | CI | GitHub Actions: App (analyze, test), Datenbank (Schema- und RLS-Tests), Edge Function (deno check), alle auf Linux grün |
 
 ## Struktur
@@ -26,9 +26,10 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 ```
 Einkaufstracker/
   supabase/
-    migrations/        0001 bis 0011 (Schema inkl. Einkaufsliste, Kategorien, Ledger, Bon-Import, Kategorie-Aliase,
-                        Bon-Rabatte, Originalbelege, Fehlerberichte, Bearbeitungsstatus/Changelog)
-    planned/           meal_diary_draft.sql (Phase 7, noch nicht produktiv)
+    migrations/        0001 bis 0014 (Schema inkl. Einkaufsliste, Kategorien, Ledger, Bon-Import, Kategorie-Aliase,
+                        Bon-Rabatte, Originalbelege, Fehlerberichte, Bearbeitungsstatus/Changelog,
+                        Feature-Requests, App-Konfiguration, Essenstagebuch + BLS-Referenztabelle)
+    planned/           leer (Entwürfe für kommende Phasen, z.B. Haushalts-Einladungen)
     tests/             run_schema_tests.py (Schema + RLS ohne Docker)
     functions/
       parse-receipt/   Edge Function (Claude Vision)
@@ -78,7 +79,7 @@ npx supabase db push                        # einspielen
 npx supabase db query --linked "select 1"   # Abfrage gegen das Projekt
 ```
 
-Regel: bereits eingespielte Migrationen (0001 bis 0003) werden nie mehr geaendert, Aenderungen kommen als neue Migration. Datenbankpasswort, Access Tokens und API-Keys gehoeren nie in den Chat oder ins Repo.
+Regel: bereits eingespielte Migrationen (alle bis einschliesslich 0014) werden nie mehr geaendert, Aenderungen kommen als neue Migration. Datenbankpasswort, Access Tokens und API-Keys gehoeren nie in den Chat oder ins Repo.
 
 ## Entwicklungs-Workflow
 

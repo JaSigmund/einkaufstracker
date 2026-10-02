@@ -45,23 +45,29 @@ void main() {
         products: [_product('p1', 'Vollmilch 3,5%', categoryId: 'c1')],
         categories: [_cat('c1', 'Milch & Milchprodukte')],
       );
-      final lines = csv.trim().split('\n');
+      // Codereview-Fund 2026-10-01: ';' statt ',' als Trennzeichen (das Dezimalkomma waere sonst
+      // doppeldeutig, und Excel auf einem deutschsprachigen System erwartet beim Doppelklick-Oeffnen
+      // ohnehin ';'), dazu ein UTF-8-BOM am Anfang der Datei.
+      expect(csv, startsWith('﻿'));
+      final lines = csv.substring(1).trim().split('\n');
       expect(lines, hasLength(3)); // Kopfzeile + 2 Positionen
-      expect(lines[0], 'Datum,Händler,Bon-ID,Name,Produkt,Kategorie,Menge,Einheit,Preis,Grundpreis');
+      expect(lines[0], 'Datum;Händler;Bon-ID;Name;Produkt;Kategorie;Menge;Einheit;Preis;Grundpreis');
       // aeltere Position (r2, 5.9.) steht vor der juengeren (r1, 10.9.)
       final rIndex1 = lines.indexWhere((l) => l.contains('r1'));
       final rIndex2 = lines.indexWhere((l) => l.contains('r2'));
       expect(rIndex2, lessThan(rIndex1));
 
       expect(lines[rIndex1], contains('Billa 0643'));
-      expect(lines[rIndex1], contains('"Vollmilch 3,5%"')); // Produktname mit Komma wird gequotet
+      // Ein Komma (Dezimaltrennzeichen oder Teil des Produktnamens) macht kein Quoting mehr noetig, das
+      // Trennzeichen ist jetzt ';'.
+      expect(lines[rIndex1], contains('Vollmilch 3,5%'));
       expect(lines[rIndex1], contains('Milch & Milchprodukte'));
-      expect(lines[rIndex1], contains('"1,29"')); // Preis und Grundpreis, gequotet wegen Dezimalkomma
+      expect(lines[rIndex1], contains('1,29'));
 
       expect(lines[rIndex2], contains('Paprika'));
       expect(lines[rIndex2], contains('0,62'));
       expect(lines[rIndex2], contains('kg'));
-      expect(lines[rIndex2], contains('"2,49"'));
+      expect(lines[rIndex2], contains('2,49'));
     });
 
     test('Position ohne Produkt-/Kategorie-Zuordnung und ohne Grundpreis: leere Felder statt Absturz', () {
@@ -72,11 +78,23 @@ void main() {
         products: const [],
         categories: const [],
       );
-      final line = csv.trim().split('\n')[1];
+      final line = csv.substring(1).trim().split('\n')[1];
       expect(line, contains('r1'));
       expect(line, contains('Unbekannt'));
-      expect(line, contains('"0,99"'));
-      expect(line, endsWith(','), reason: 'kein Grundpreis: letztes Feld leer');
+      expect(line, contains('0,99'));
+      expect(line, endsWith(';'), reason: 'kein Grundpreis: letztes Feld leer');
+    });
+
+    test('Codereview-Fund 2026-10-01: ein Name mit dem Trennzeichen (";") oder Anfuehrungszeichen wird weiterhin korrekt gequotet', () {
+      final csv = buildReceiptItemsCsv(
+        receipts: [_receipt('r1', null, DateTime.utc(2026, 9, 10))],
+        items: [_item('r1', 'i1', 1, 'Wurst; Extra "scharf"', 99)],
+        stores: const [],
+        products: const [],
+        categories: const [],
+      );
+      final line = csv.substring(1).trim().split('\n')[1];
+      expect(line, contains('"Wurst; Extra ""scharf"""'));
     });
 
     test('Kategorie fehlt am Bon-Item, wird vom Produkt uebernommen', () {

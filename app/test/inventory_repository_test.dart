@@ -243,6 +243,22 @@ void main() {
       expect(await repo.watchSuggestions().first, hasLength(1));
       expect(await db.select(db.inventoryMovements).get(), hasLength(1)); // die Kaufbewegung des Bons bleibt
     });
+
+    test('Codereview-Fund 2026-10-01: ein bereits geoeffneter Eintrag bekommt beim Zurueck-zum-Vorschlag wieder das volle (nicht das verkuerzte) Ablaufdatum', () async {
+      final repo = inventoryRepo(db);
+      await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: DateTime.utc(2026, 9, 20),
+      );
+      final refined = await repo.recordFromScan(productId: productId, ean: '1', bestBefore: DateTime.utc(2026, 11, 1), now: DateTime.utc(2026, 9, 21));
+      await repo.open(refined.id, productDefaultOpenShelfLifeDays: 3, now: DateTime.utc(2026, 10, 1));
+      final opened = await (db.select(db.inventoryItems)..where((i) => i.id.equals(refined.id))).getSingle();
+      expect(opened.expiresOn, DateTime.utc(2026, 10, 4)); // verkuerzt durch die 3 Tage nach Oeffnen
+
+      await repo.deleteItem(refined.id);
+      final reverted = await (db.select(db.inventoryItems)..where((i) => i.id.equals(refined.id))).getSingle();
+      expect(reverted.openedOn, isNull);
+      expect(reverted.expiresOn, DateTime.utc(2026, 11, 1)); // wieder das volle MHD, nicht mehr der 2026-10-04-Wert
+    });
   });
 
   group('receiptLinkFor (Fehlerbericht "Bonzuordnung anzeigen")', () {
@@ -364,6 +380,72 @@ void main() {
       await repo.setReceiptLink(item.id, null);
       row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
       expect(row.receiptItemId, isNull);
+    });
+
+    // Fehlerbericht "kein passender Bon bei Inventarartikel gefunden" (2026-10-01): ein Bon-Vorschlag IST
+    // ein Inventar-Eintrag mit receiptItemId. Er hielt seine Bon-Position bisher fuer "schon verlinkt" und
+    // blendete sie als Kandidat aus -- obwohl genau dieser Vorschlag der Grund war, den Bon zuordnen zu wollen.
+    test('Kandidat trotz Vorschlag: bestehender, bestaetigter Eintrag ohne Bon sieht die Position des Vorschlags', () async {
+      await makeReceiptItem('ri1', 'r1');
+      final repo = inventoryRepo(db);
+      // Bestaetigter Bestand ohne Bon (aelterer Scan), dann kommt ein Bon dazu und erzeugt einen Vorschlag.
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 10));
+      await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      final candidates = await repo.candidateReceiptLinksFor(productId);
+      expect(candidates.map((c) => c.receiptItemId), ['ri1']);
+      expect(confirmed.receiptItemId, isNull);
+    });
+
+    test('Zuordnen nimmt den Vorschlag auf: er verschwindet samt Kaufbuchung, nichts wird doppelt gezaehlt', () async {
+      await makeReceiptItem('ri1', 'r1');
+      final repo = inventoryRepo(db);
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 10));
+      final suggestion = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri1', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      await repo.setReceiptLink(confirmed.id, 'ri1');
+
+      final items = await (db.select(db.inventoryItems)..where((i) => i.deletedAt.isNull())).get();
+      expect(items.map((i) => i.id), [confirmed.id], reason: 'nur der bestaetigte Eintrag bleibt aktiv');
+      expect(items.single.receiptItemId, 'ri1');
+      final suggestionRow = await (db.select(db.inventoryItems)..where((i) => i.id.equals(suggestion.id))).getSingle();
+      expect(suggestionRow.deletedAt, isNotNull, reason: 'der Vorschlag ist aufgenommen (soft-deleted), nicht doppelt vorhanden');
+
+      final activeMovements = await (db.select(db.inventoryMovements)..where((m) => m.deletedAt.isNull())).get();
+      expect(activeMovements.map((m) => m.inventoryItemId).toSet(), {confirmed.id},
+          reason: 'die Kaufbuchung des Vorschlags darf nicht zusaetzlich zum bestaetigten Eintrag zaehlen');
+    });
+
+    test('Zuordnen laesst Vorschlaege anderer Bon-Positionen unangetastet', () async {
+      await makeReceiptItem('ri1', 'r1');
+      await makeReceiptItem('ri2', 'r2');
+      final repo = inventoryRepo(db);
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 10));
+      final other = await repo.createSuggestionFromReceipt(
+        productId: productId, receiptItemId: 'ri2', quantity: 1, unit: 'piece', purchasedOn: _d(2026, 9, 20),
+      );
+
+      await repo.setReceiptLink(confirmed.id, 'ri1');
+
+      final otherRow = await (db.select(db.inventoryItems)..where((i) => i.id.equals(other.id))).getSingle();
+      expect(otherRow.deletedAt, isNull);
+      expect(otherRow.isSuggestion, isTrue);
+    });
+
+    test('Zuordnung loesen (null) rettet keinen alten Vorschlag zurueck und aendert nichts am Bestand', () async {
+      await makeReceiptItem('ri1', 'r1');
+      final repo = inventoryRepo(db);
+      final confirmed = await repo.recordFromScan(productId: productId, ean: '1', now: DateTime.utc(2026, 9, 10));
+      await repo.setReceiptLink(confirmed.id, 'ri1');
+      await repo.setReceiptLink(confirmed.id, null);
+
+      final items = await (db.select(db.inventoryItems)..where((i) => i.deletedAt.isNull())).get();
+      expect(items.map((i) => i.id), [confirmed.id]);
+      expect(items.single.receiptItemId, isNull);
     });
   });
 

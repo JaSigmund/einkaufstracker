@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/categorization/name_similarity.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
@@ -114,13 +115,25 @@ class ProductRepository {
   Future<Product> findOrCreateForReceiptItem(String rawText, {String? categoryId, String baseUnit = 'piece'}) async {
     final hid = await householdId();
     final key = normalizeItemName(rawText);
-    final alias = await (_db.select(_db.productAliases)
-          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull()))
-        .getSingleOrNull();
+    final alias = await _activeAliasFor(hid, key);
     if (alias != null) {
       final p = await byId(alias.productId);
       if (p != null && p.deletedAt == null) return p;
     }
+
+    // Kein exakter Treffer: ein einzelnes OCR-Leerzeichen oder ein Tippfehler darf trotzdem kein neues
+    // Duplikat anlegen (ADR-023, Fehlerbericht "Faschiertes"/"Faschi ertes", 2026-10-01). Konservative,
+    // laengenabhaengige Toleranz -- siehe name_similarity.dart.
+    final fuzzyMatch = closestWithinTolerance(key, await _activeAliasKeys(hid));
+    if (fuzzyMatch != null) {
+      final fuzzyAlias = await _activeAliasFor(hid, fuzzyMatch);
+      final p = fuzzyAlias == null ? null : await byId(fuzzyAlias.productId);
+      if (p != null && p.deletedAt == null) {
+        await _learnAlias(key, p.id, hid);
+        return p;
+      }
+    }
+
     // Waegware (Obst, Gemuese, Kaese am Stueck ...) steht im Bon in kg: das gleich als Grundeinheit setzen,
     // statt bei "Stueck" zu bleiben (Fehlerbericht "Bonartikel bearbeiten", 2026-09-27).
     // Haltbarkeit nach dem Oeffnen, Lagerort und Datumsart aus den Startwerten der Roadmap-Phase 3
@@ -161,6 +174,27 @@ class ProductRepository {
     return (m == null ? t : t.substring(m.end)).trim();
   }
 
+  /// Der aktive Alias zu [key] im Haushalt, falls vorhanden. `.get()` statt `.getSingleOrNull()`, damit ein
+  /// bereits bestehendes Duplikat (z.B. aus einer Alt-Installation vor dem Codereview-Fix 2026-10-01, siehe
+  /// `softDelete`) nicht den ganzen Bon-Import mit einem `StateError` abstuerzen laesst -- bei mehreren
+  /// Treffern gewinnt der zuletzt aktualisierte, der Rest wird beim naechsten `softDelete` des betroffenen
+  /// Produkts bereinigt.
+  Future<ProductAlias?> _activeAliasFor(String hid, String key) async {
+    final rows = await (_db.select(_db.productAliases)
+          ..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull())
+          ..orderBy([(a) => OrderingTerm.desc(a.updatedAt)]))
+        .get();
+    return rows.firstOrNull;
+  }
+
+  /// Alle aktiven, gelernten Alias-Schluessel des Haushalts (ADR-023: Vergleichsbasis fuer den
+  /// Fuzzy-Match, bevor ein neues Produkt angelegt wird).
+  Future<List<String>> _activeAliasKeys(String hid) => (_db.selectOnly(_db.productAliases)
+        ..addColumns([_db.productAliases.aliasText])
+        ..where(_db.productAliases.householdId.equals(hid) & _db.productAliases.deletedAt.isNull()))
+      .map((r) => r.read(_db.productAliases.aliasText)!)
+      .get();
+
   Future<void> _learnAlias(String key, String productId, String householdId) async {
     final a = ProductAlias(id: _uuid.v4(), householdId: householdId, aliasText: key, productId: productId, hits: 1, updatedAt: DateTime.now().toUtc());
     await _put('product_aliases', a.id, productAliasToRemote(a), () => _db.into(_db.productAliases).insertOnConflictUpdate(a.toCompanion(false)));
@@ -181,11 +215,19 @@ class ProductRepository {
     String? offCode,
     Map<String, double>? nutrientsPer100,
     String? nutrientsBasis,
+    // Codereview-Fund 2026-10-02 (Phase 7a): vorher wurde die Quelle immer stillschweigend als
+    // 'off' angenommen, sobald Naehrwerte vorhanden waren -- das stimmt nicht mehr, sobald eine
+    // zweite Quelle (BLS, Phase 7b) hinzukommt. Explizit statt geraten, Default haelt bestehende
+    // Aufrufer (OFF-Scan) unveraendert.
+    String? nutrientsSource,
     double? unitWeightG,
     String? ean,
   }) async {
     final n = name.trim();
     if (n.isEmpty) throw ArgumentError('Name darf nicht leer sein');
+    if (nutrientsPer100 != null && nutrientsSource == null) {
+      throw ArgumentError('nutrientsSource muss gesetzt sein, wenn nutrientsPer100 angegeben wird');
+    }
     final hid = await householdId();
     final now = DateTime.now().toUtc();
     final product = Product(
@@ -204,7 +246,7 @@ class ProductRepository {
       offCode: offCode,
       nutrientsPer100: nutrientsPer100 == null ? null : jsonEncode(nutrientsPer100),
       nutrientsBasis: nutrientsBasis,
-      nutrientsSource: nutrientsPer100 == null ? null : 'off',
+      nutrientsSource: nutrientsSource,
       unitWeightG: unitWeightG,
       updatedAt: now,
     );
@@ -223,11 +265,29 @@ class ProductRepository {
   /// Loescht ein Produkt aus "Meine Produkte" (Fehlerbericht "Produkt löschen", 2026-09-28). Bestehende
   /// Bons, Inventar-Eintraege und Einkaufslisten-Positionen behalten ihre `product_id` und zeigen den Namen
   /// weiter an; nur Suche, Autovervollstaendigung und Barcode-Zuordnung ignorieren das Produkt danach.
+  ///
+  /// Loescht auch die gelernten Aliase mit (Codereview-Fund 2026-10-01): sonst bleibt ein aktiver Alias auf
+  /// das geloeschte Produkt stehen, `findOrCreateForReceiptItem` legt beim naechsten Kauf desselben Artikels
+  /// ein zweites Produkt mit demselben Alias-Text an, und ein dritter Kauf laesst die Alias-Abfrage zwei
+  /// Treffer finden statt einem -- die lokale Tabelle hat (anders als die Server-Tabelle) keine Eindeutigkeits-
+  /// Pruefung auf den Alias-Text, der ganze Bon-Import stuerzt dann ab.
   Future<void> softDelete(String id) async {
     final product = await byId(id);
     if (product == null) return;
-    final updated = product.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
-    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    final now = DateTime.now().toUtc();
+    // Codereview-Fund 2026-10-01: in einer Transaktion, damit ein Abbruch mittendrin (z.B. App-Kill) nicht
+    // einen Teil der Aliase geloescht und den Rest (oder das Produkt selbst) aktiv zuruecklaesst.
+    await _db.transaction(() async {
+      final aliases = await (_db.select(_db.productAliases)
+            ..where((a) => a.productId.equals(id) & a.deletedAt.isNull()))
+          .get();
+      for (final alias in aliases) {
+        final deleted = alias.copyWith(deletedAt: Value(now), updatedAt: now);
+        await _put('product_aliases', deleted.id, productAliasToRemote(deleted), () => _db.into(_db.productAliases).insertOnConflictUpdate(deleted.toCompanion(false)));
+      }
+      final updated = product.copyWith(deletedAt: Value(now), updatedAt: now);
+      await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    });
     onChanged?.call();
   }
 
@@ -239,50 +299,56 @@ class ProductRepository {
     if (sourceId == targetId) return;
     final now = DateTime.now().toUtc();
 
-    final receiptItems = await (_db.select(_db.receiptItems)..where((i) => i.productId.equals(sourceId))).get();
-    for (final item in receiptItems) {
-      final updated = item.copyWith(productId: Value(targetId), updatedAt: now);
-      await _put('receipt_items', updated.id, receiptItemToRemote(updated), () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
-    }
-
-    final inventoryItems = await (_db.select(_db.inventoryItems)..where((i) => i.productId.equals(sourceId))).get();
-    for (final item in inventoryItems) {
-      final updated = item.copyWith(productId: targetId, updatedAt: now);
-      await _put('inventory_items', updated.id, inventoryItemToRemote(updated), () => _db.into(_db.inventoryItems).insertOnConflictUpdate(updated.toCompanion(false)));
-    }
-
-    final listItems = await (_db.select(_db.shoppingListItems)..where((i) => i.productId.equals(sourceId))).get();
-    for (final item in listItems) {
-      final updated = item.copyWith(productId: Value(targetId), updatedAt: now);
-      await _put('shopping_list_items', updated.id, shoppingListItemToRemote(updated), () => _db.into(_db.shoppingListItems).insertOnConflictUpdate(updated.toCompanion(false)));
-    }
-
-    final barcodes = await (_db.select(_db.productBarcodes)..where((b) => b.productId.equals(sourceId))).get();
-    for (final b in barcodes) {
-      final updated = b.copyWith(productId: targetId, updatedAt: now);
-      await _put('product_barcodes', '${updated.householdId}:${updated.ean}', productBarcodeToRemote(updated),
-          () => _db.into(_db.productBarcodes).insertOnConflictUpdate(updated.toCompanion(false)));
-    }
-
-    // Alias-Texte sind je Haushalt eindeutig gedacht (ADR-010): hat das Zielprodukt den Text schon, wird der
-    // doppelte Alias geloescht statt eine zweite aktive Zeile fuer denselben Bon-Text anzulegen (das wuerde
-    // findOrCreateForReceiptItem's getSingleOrNull() spaeter zum Absturz bringen).
-    final aliases = await (_db.select(_db.productAliases)..where((a) => a.productId.equals(sourceId) & a.deletedAt.isNull())).get();
-    for (final alias in aliases) {
-      final clash = await (_db.select(_db.productAliases)
-            ..where((a) =>
-                a.householdId.equals(alias.householdId) & a.aliasText.equals(alias.aliasText) & a.productId.equals(targetId) & a.deletedAt.isNull()))
-          .getSingleOrNull();
-      if (clash != null) {
-        final deleted = alias.copyWith(deletedAt: Value(now), updatedAt: now);
-        await _put('product_aliases', deleted.id, productAliasToRemote(deleted), () => _db.into(_db.productAliases).insertOnConflictUpdate(deleted.toCompanion(false)));
-      } else {
-        final updated = alias.copyWith(productId: targetId, updatedAt: now);
-        await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
+    // Codereview-Fund 2026-10-01: eine einzige Transaktion ueber alle umgehaengten Tabellen plus das
+    // abschliessende softDelete -- sonst koennte ein Abbruch mittendrin (z.B. App-Kill) manche Zeilen schon
+    // auf das Zielprodukt umgehaengt und andere noch auf dem (dann weiterhin aktiven) Quellprodukt stehen
+    // lassen, ein sichtbar inkonsistenter Zwischenzustand ohne einfachen Weg zurueck.
+    await _db.transaction(() async {
+      final receiptItems = await (_db.select(_db.receiptItems)..where((i) => i.productId.equals(sourceId))).get();
+      for (final item in receiptItems) {
+        final updated = item.copyWith(productId: Value(targetId), updatedAt: now);
+        await _put('receipt_items', updated.id, receiptItemToRemote(updated), () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
       }
-    }
 
-    await softDelete(sourceId);
+      final inventoryItems = await (_db.select(_db.inventoryItems)..where((i) => i.productId.equals(sourceId))).get();
+      for (final item in inventoryItems) {
+        final updated = item.copyWith(productId: targetId, updatedAt: now);
+        await _put('inventory_items', updated.id, inventoryItemToRemote(updated), () => _db.into(_db.inventoryItems).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+
+      final listItems = await (_db.select(_db.shoppingListItems)..where((i) => i.productId.equals(sourceId))).get();
+      for (final item in listItems) {
+        final updated = item.copyWith(productId: Value(targetId), updatedAt: now);
+        await _put('shopping_list_items', updated.id, shoppingListItemToRemote(updated), () => _db.into(_db.shoppingListItems).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+
+      final barcodes = await (_db.select(_db.productBarcodes)..where((b) => b.productId.equals(sourceId))).get();
+      for (final b in barcodes) {
+        final updated = b.copyWith(productId: targetId, updatedAt: now);
+        await _put('product_barcodes', '${updated.householdId}:${updated.ean}', productBarcodeToRemote(updated),
+            () => _db.into(_db.productBarcodes).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+
+      // Alias-Texte sind je Haushalt eindeutig gedacht (ADR-010): hat das Zielprodukt den Text schon, wird der
+      // doppelte Alias geloescht statt eine zweite aktive Zeile fuer denselben Bon-Text anzulegen (das wuerde
+      // findOrCreateForReceiptItem's getSingleOrNull() spaeter zum Absturz bringen).
+      final aliases = await (_db.select(_db.productAliases)..where((a) => a.productId.equals(sourceId) & a.deletedAt.isNull())).get();
+      for (final alias in aliases) {
+        final clash = await (_db.select(_db.productAliases)
+              ..where((a) =>
+                  a.householdId.equals(alias.householdId) & a.aliasText.equals(alias.aliasText) & a.productId.equals(targetId) & a.deletedAt.isNull()))
+            .getSingleOrNull();
+        if (clash != null) {
+          final deleted = alias.copyWith(deletedAt: Value(now), updatedAt: now);
+          await _put('product_aliases', deleted.id, productAliasToRemote(deleted), () => _db.into(_db.productAliases).insertOnConflictUpdate(deleted.toCompanion(false)));
+        } else {
+          final updated = alias.copyWith(productId: targetId, updatedAt: now);
+          await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
+        }
+      }
+
+      await softDelete(sourceId);
+    });
   }
 
   /// Verknuepft einen EAN dauerhaft mit einem Produkt (Doku 06 §4: "bleibt danach dauerhaft erhalten").

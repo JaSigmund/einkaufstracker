@@ -5,6 +5,7 @@ import 'dart:ui' show Rect;
 
 import 'package:einkaufstracker/data/cloud/cloud_receipt.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/domain/app_update/app_update_gate.dart';
 import 'package:einkaufstracker/domain/ocr/row_cluster.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:einkaufstracker/features/receipt_import/photo_receipt_service.dart';
@@ -43,11 +44,13 @@ class _FakeCloud implements CloudReceiptReader {
   Object answer; // ParsedReceipt oder Exception
   int calls = 0;
   List<Uint8List> lastImages = const [];
+  String? lastStoreHint;
 
   @override
-  Future<ParsedReceipt> read(List<Uint8List> jpegs) async {
+  Future<ParsedReceipt> read(List<Uint8List> jpegs, {String storeHint = 'Billa'}) async {
     calls++;
     lastImages = jpegs;
+    lastStoreHint = storeHint;
     final a = answer;
     if (a is Exception) throw a;
     return a as ParsedReceipt;
@@ -104,6 +107,9 @@ void main() {
     expect(p.receipt.isTrustworthy, isTrue);
     expect(p.receipt.totalCents, 2319);
     expect(cloud.calls, 1);
+    // Codereview-Fund 2026-10-01: war fest auf 'Billa' verdrahtet -- hier stimmt das zufaellig, siehe den
+    // eigenen detectChainHint-Test fuer einen echten Hofer-Fall.
+    expect(cloud.lastStoreHint, 'Billa');
 
     final (path, cutY) = prepared.single;
     expect(path, 'page0.jpg');
@@ -152,6 +158,21 @@ void main() {
     cloud.answer = const CloudNotAllowed();
     final p = await service().read(_pages('billa_paper_01_scan3'));
     expect(p.note, contains('ausgeschaltet'));
+  });
+
+  test('Update erforderlich (ADR-022): Hinweis statt Absturz, Cloud wird gar nicht erst gerufen', () async {
+    final service = PhotoReceiptService(
+      repo: receiptRepo(db),
+      cloud: cloud,
+      cloudAllowed: () async => throw const AppUpdateRequiredException(),
+      prepare: (path, {cutY}) async {
+        prepared.add((path, cutY));
+        return Uint8List.fromList([1, 2, 3]);
+      },
+    );
+    final p = await service.read(_pages('billa_paper_01_scan3'));
+    expect(p.note, contains('Update'));
+    expect(cloud.calls, 0);
   });
 
   test('Ohne erkennbare Summenzeile wird NICHTS hochgeladen (B4)', () async {
