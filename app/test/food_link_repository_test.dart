@@ -248,4 +248,140 @@ void main() {
       expect(profile.keys.toSet(), {'kcal', 'salt_g'});
     });
   });
+
+  group('Stueckgewicht (Phase N2)', () {
+    test('setUnitWeight legt die Zuordnung samt Gewicht an und stellt sie in die Outbox', () async {
+      var changed = 0;
+      final repo = foodLinkRepo(db, onChanged: () => changed++);
+      await repo.setUnitWeight('Banane', 'F503100', 135);
+
+      final link = (await repo.all()).single;
+      expect(link.nameNorm, 'Banane');
+      expect(link.blsCode, 'F503100');
+      expect(link.unitWeightG, 135);
+      final out = await queued();
+      expect(out.single['unit_weight_g'], 135);
+      expect(out.single['bls_code'], 'F503100');
+      expect(changed, 1);
+    });
+
+    test('unitWeightForCode: egal unter welchem Namen, das juengste Gewicht gilt, ohne Gewicht null', () async {
+      final repo = foodLinkRepo(db);
+      expect(await repo.unitWeightForCode('F503100'), isNull);
+      await repo.learn('Banane', 'F503100');
+      expect(await repo.unitWeightForCode('F503100'), isNull, reason: 'Zuordnung ohne Gewicht');
+      await repo.setUnitWeight('Banane', 'F503100', 120);
+      expect(await repo.unitWeightForCode('F503100'), 120);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await repo.setUnitWeight('Bananen klein', 'F503100', 95);
+      expect(await repo.unitWeightForCode('F503100'), 95, reason: 'das juengste gilt');
+      expect(await repo.unitWeightForCode('B311000'), isNull);
+    });
+
+    test('dasselbe Gewicht noch einmal: nichts in der Outbox; ein anderes aendert dieselbe Zeile', () async {
+      final repo = foodLinkRepo(db);
+      await repo.setUnitWeight('Banane', 'F503100', 135);
+      await repo.setUnitWeight('Banane', 'F503100', 135);
+      expect(await queued(), hasLength(1));
+      await repo.setUnitWeight('banane', 'F503100', 140);
+      expect(await repo.all(), hasLength(1));
+      expect((await repo.all()).single.unitWeightG, 140);
+      expect(await queued(), hasLength(2));
+    });
+
+    test('bestehende Zuordnung ohne Gewicht bekommt das Gewicht, der Code bleibt', () async {
+      final repo = foodLinkRepo(db);
+      await repo.learn('Quark', 'M713300');
+      await repo.setUnitWeight('Quark', 'M713300', 250);
+      final link = (await repo.all()).single;
+      expect([link.blsCode, link.unitWeightG], ['M713300', 250]);
+    });
+
+    test('learn mit demselben Code behaelt das Gewicht, mit anderem Code faellt es weg', () async {
+      final repo = foodLinkRepo(db);
+      await repo.setUnitWeight('Banane', 'F503100', 135);
+      await repo.learn('Banane', 'F503100');
+      expect((await repo.all()).single.unitWeightG, 135, reason: 'gleiche Zuordnung: nichts aendert sich');
+      await repo.learn('Banane', 'F504100');
+      final link = (await repo.all()).single;
+      expect(link.blsCode, 'F504100');
+      expect(link.unitWeightG, isNull, reason: 'das Gewicht galt dem alten Lebensmittel');
+    });
+
+    test('setUnitWeight mit anderem Code ersetzt Code und Gewicht', () async {
+      final repo = foodLinkRepo(db);
+      await repo.learn('Banane', 'F503100');
+      await repo.setUnitWeight('Banane', 'F504100', 20);
+      final link = (await repo.all()).single;
+      expect([link.blsCode, link.unitWeightG], ['F504100', 20]);
+    });
+
+    test('Unsinn wird ignoriert: leerer Name oder Code, Gewicht 0, negativ oder ueber 5 kg', () async {
+      final repo = foodLinkRepo(db);
+      await repo.setUnitWeight('  ', 'F503100', 100);
+      await repo.setUnitWeight('Banane', '', 100);
+      await repo.setUnitWeight('Banane', 'F503100', 0);
+      await repo.setUnitWeight('Banane', 'F503100', -5);
+      await repo.setUnitWeight('Banane', 'F503100', 5001);
+      expect(await repo.all(), isEmpty);
+      expect(await queued(), isEmpty);
+    });
+
+    test('ein vergessenes Gewicht zaehlt nicht mehr', () async {
+      final repo = foodLinkRepo(db);
+      await repo.setUnitWeight('Banane', 'F503100', 135);
+      await repo.forget((await repo.all()).single.id);
+      expect(await repo.unitWeightForCode('F503100'), isNull);
+    });
+
+    test('das Gewicht wandert mit dem Sync auf das andere Geraet', () async {
+      final remote = FakeRemoteStore();
+      final other = memoryDb();
+      addTearDown(other.close);
+      final repoA = foodLinkRepo(db);
+      await repoA.setUnitWeight('Banane', 'F503100', 135);
+      await SyncEngine(db, remote).sync();
+      expect(remote.table('household_food_links').values.single['unit_weight_g'], 135);
+
+      await SyncEngine(other, remote).sync();
+      expect(await foodLinkRepo(other).unitWeightForCode('F503100'), 135);
+    });
+  });
+
+  group('Produkt-Stueckgewicht (Phase N2)', () {
+    test('setUnitWeight speichert das Gewicht am Produkt und stellt es in die Outbox', () async {
+      var changed = 0;
+      final products = productRepo(db, onChanged: () => changed++);
+      final p = await products.create(name: 'Ei', baseUnit: 'piece');
+      final before = (await db.select(db.outbox).get()).length;
+
+      final updated = await products.setUnitWeight(p.id, 58);
+
+      expect(updated?.unitWeightG, 58);
+      expect((await products.byId(p.id))!.unitWeightG, 58);
+      expect((await db.select(db.outbox).get()).length, before + 1);
+      expect(changed, greaterThan(0));
+    });
+
+    test('dasselbe Gewicht noch einmal: nichts in der Outbox', () async {
+      final products = productRepo(db);
+      final p = await products.create(name: 'Ei', baseUnit: 'piece');
+      await products.setUnitWeight(p.id, 58);
+      final count = (await db.select(db.outbox).get()).length;
+      await products.setUnitWeight(p.id, 58);
+      expect((await db.select(db.outbox).get()).length, count);
+    });
+
+    test('unbekanntes oder geloeschtes Produkt und sinnlose Gewichte: null', () async {
+      final products = productRepo(db);
+      expect(await products.setUnitWeight('gibt-es-nicht', 58), isNull);
+      final p = await products.create(name: 'Ei', baseUnit: 'piece');
+      expect(await products.setUnitWeight(p.id, 0), isNull);
+      expect(await products.setUnitWeight(p.id, -1), isNull);
+      expect(await products.setUnitWeight(p.id, 5001), isNull);
+      expect((await products.byId(p.id))!.unitWeightG, isNull);
+      await products.softDelete(p.id);
+      expect(await products.setUnitWeight(p.id, 58), isNull);
+    });
+  });
 }

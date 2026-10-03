@@ -13212,6 +13212,17 @@ class $HouseholdFoodLinksTable extends HouseholdFoodLinks
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _unitWeightGMeta = const VerificationMeta(
+    'unitWeightG',
+  );
+  @override
+  late final GeneratedColumn<double> unitWeightG = GeneratedColumn<double>(
+    'unit_weight_g',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -13240,6 +13251,7 @@ class $HouseholdFoodLinksTable extends HouseholdFoodLinks
     householdId,
     nameNorm,
     blsCode,
+    unitWeightG,
     updatedAt,
     deletedAt,
   ];
@@ -13287,6 +13299,15 @@ class $HouseholdFoodLinksTable extends HouseholdFoodLinks
     } else if (isInserting) {
       context.missing(_blsCodeMeta);
     }
+    if (data.containsKey('unit_weight_g')) {
+      context.handle(
+        _unitWeightGMeta,
+        unitWeightG.isAcceptableOrUnknown(
+          data['unit_weight_g']!,
+          _unitWeightGMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -13326,6 +13347,10 @@ class $HouseholdFoodLinksTable extends HouseholdFoodLinks
         DriftSqlType.string,
         data['${effectivePrefix}bls_code'],
       )!,
+      unitWeightG: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}unit_weight_g'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -13349,6 +13374,10 @@ class HouseholdFoodLink extends DataClass
   final String householdId;
   final String nameNorm;
   final String blsCode;
+
+  /// Eigenes Gewicht von 1 Stueck in g (essbarer Anteil), wenn der Haushalt es einmal angegeben hat (Phase N2, ADR-033).
+  /// Es geht jedem Tabellenwert vor.
+  final double? unitWeightG;
   final DateTime updatedAt;
   final DateTime? deletedAt;
   const HouseholdFoodLink({
@@ -13356,6 +13385,7 @@ class HouseholdFoodLink extends DataClass
     required this.householdId,
     required this.nameNorm,
     required this.blsCode,
+    this.unitWeightG,
     required this.updatedAt,
     this.deletedAt,
   });
@@ -13366,6 +13396,9 @@ class HouseholdFoodLink extends DataClass
     map['household_id'] = Variable<String>(householdId);
     map['name_norm'] = Variable<String>(nameNorm);
     map['bls_code'] = Variable<String>(blsCode);
+    if (!nullToAbsent || unitWeightG != null) {
+      map['unit_weight_g'] = Variable<double>(unitWeightG);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -13379,6 +13412,9 @@ class HouseholdFoodLink extends DataClass
       householdId: Value(householdId),
       nameNorm: Value(nameNorm),
       blsCode: Value(blsCode),
+      unitWeightG: unitWeightG == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitWeightG),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -13396,6 +13432,7 @@ class HouseholdFoodLink extends DataClass
       householdId: serializer.fromJson<String>(json['householdId']),
       nameNorm: serializer.fromJson<String>(json['nameNorm']),
       blsCode: serializer.fromJson<String>(json['blsCode']),
+      unitWeightG: serializer.fromJson<double?>(json['unitWeightG']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
@@ -13408,6 +13445,7 @@ class HouseholdFoodLink extends DataClass
       'householdId': serializer.toJson<String>(householdId),
       'nameNorm': serializer.toJson<String>(nameNorm),
       'blsCode': serializer.toJson<String>(blsCode),
+      'unitWeightG': serializer.toJson<double?>(unitWeightG),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
@@ -13418,6 +13456,7 @@ class HouseholdFoodLink extends DataClass
     String? householdId,
     String? nameNorm,
     String? blsCode,
+    Value<double?> unitWeightG = const Value.absent(),
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
   }) => HouseholdFoodLink(
@@ -13425,6 +13464,7 @@ class HouseholdFoodLink extends DataClass
     householdId: householdId ?? this.householdId,
     nameNorm: nameNorm ?? this.nameNorm,
     blsCode: blsCode ?? this.blsCode,
+    unitWeightG: unitWeightG.present ? unitWeightG.value : this.unitWeightG,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
@@ -13436,6 +13476,9 @@ class HouseholdFoodLink extends DataClass
           : this.householdId,
       nameNorm: data.nameNorm.present ? data.nameNorm.value : this.nameNorm,
       blsCode: data.blsCode.present ? data.blsCode.value : this.blsCode,
+      unitWeightG: data.unitWeightG.present
+          ? data.unitWeightG.value
+          : this.unitWeightG,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
@@ -13448,6 +13491,7 @@ class HouseholdFoodLink extends DataClass
           ..write('householdId: $householdId, ')
           ..write('nameNorm: $nameNorm, ')
           ..write('blsCode: $blsCode, ')
+          ..write('unitWeightG: $unitWeightG, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
           ..write(')'))
@@ -13455,8 +13499,15 @@ class HouseholdFoodLink extends DataClass
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, householdId, nameNorm, blsCode, updatedAt, deletedAt);
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    nameNorm,
+    blsCode,
+    unitWeightG,
+    updatedAt,
+    deletedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -13465,6 +13516,7 @@ class HouseholdFoodLink extends DataClass
           other.householdId == this.householdId &&
           other.nameNorm == this.nameNorm &&
           other.blsCode == this.blsCode &&
+          other.unitWeightG == this.unitWeightG &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
 }
@@ -13474,6 +13526,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
   final Value<String> householdId;
   final Value<String> nameNorm;
   final Value<String> blsCode;
+  final Value<double?> unitWeightG;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> rowid;
@@ -13482,6 +13535,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
     this.householdId = const Value.absent(),
     this.nameNorm = const Value.absent(),
     this.blsCode = const Value.absent(),
+    this.unitWeightG = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -13491,6 +13545,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
     required String householdId,
     required String nameNorm,
     required String blsCode,
+    this.unitWeightG = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -13504,6 +13559,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
     Expression<String>? householdId,
     Expression<String>? nameNorm,
     Expression<String>? blsCode,
+    Expression<double>? unitWeightG,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
@@ -13513,6 +13569,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
       if (householdId != null) 'household_id': householdId,
       if (nameNorm != null) 'name_norm': nameNorm,
       if (blsCode != null) 'bls_code': blsCode,
+      if (unitWeightG != null) 'unit_weight_g': unitWeightG,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
@@ -13524,6 +13581,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
     Value<String>? householdId,
     Value<String>? nameNorm,
     Value<String>? blsCode,
+    Value<double?>? unitWeightG,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? rowid,
@@ -13533,6 +13591,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
       householdId: householdId ?? this.householdId,
       nameNorm: nameNorm ?? this.nameNorm,
       blsCode: blsCode ?? this.blsCode,
+      unitWeightG: unitWeightG ?? this.unitWeightG,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
@@ -13554,6 +13613,9 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
     if (blsCode.present) {
       map['bls_code'] = Variable<String>(blsCode.value);
     }
+    if (unitWeightG.present) {
+      map['unit_weight_g'] = Variable<double>(unitWeightG.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -13573,6 +13635,7 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
           ..write('householdId: $householdId, ')
           ..write('nameNorm: $nameNorm, ')
           ..write('blsCode: $blsCode, ')
+          ..write('unitWeightG: $unitWeightG, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
@@ -21007,6 +21070,7 @@ typedef $$HouseholdFoodLinksTableCreateCompanionBuilder =
       required String householdId,
       required String nameNorm,
       required String blsCode,
+      Value<double?> unitWeightG,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -21017,6 +21081,7 @@ typedef $$HouseholdFoodLinksTableUpdateCompanionBuilder =
       Value<String> householdId,
       Value<String> nameNorm,
       Value<String> blsCode,
+      Value<double?> unitWeightG,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -21048,6 +21113,11 @@ class $$HouseholdFoodLinksTableFilterComposer
 
   ColumnFilters<String> get blsCode => $composableBuilder(
     column: $table.blsCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21091,6 +21161,11 @@ class $$HouseholdFoodLinksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -21124,6 +21199,11 @@ class $$HouseholdFoodLinksTableAnnotationComposer
 
   GeneratedColumn<String> get blsCode =>
       $composableBuilder(column: $table.blsCode, builder: (column) => column);
+
+  GeneratedColumn<double> get unitWeightG => $composableBuilder(
+    column: $table.unitWeightG,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -21176,6 +21256,7 @@ class $$HouseholdFoodLinksTableTableManager
                 Value<String> householdId = const Value.absent(),
                 Value<String> nameNorm = const Value.absent(),
                 Value<String> blsCode = const Value.absent(),
+                Value<double?> unitWeightG = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -21184,6 +21265,7 @@ class $$HouseholdFoodLinksTableTableManager
                 householdId: householdId,
                 nameNorm: nameNorm,
                 blsCode: blsCode,
+                unitWeightG: unitWeightG,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,
@@ -21194,6 +21276,7 @@ class $$HouseholdFoodLinksTableTableManager
                 required String householdId,
                 required String nameNorm,
                 required String blsCode,
+                Value<double?> unitWeightG = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -21202,6 +21285,7 @@ class $$HouseholdFoodLinksTableTableManager
                 householdId: householdId,
                 nameNorm: nameNorm,
                 blsCode: blsCode,
+                unitWeightG: unitWeightG,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,

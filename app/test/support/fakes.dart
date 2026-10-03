@@ -12,6 +12,8 @@ import 'package:einkaufstracker/data/household/household_invites.dart';
 import 'package:einkaufstracker/data/files/receipt_file_service.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
+import 'package:einkaufstracker/data/nutrition/food_units_source.dart';
+import 'package:einkaufstracker/domain/nutrition/food_unit.dart';
 import 'package:einkaufstracker/data/online_prices/online_price_remote.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
 import 'package:einkaufstracker/domain/online_prices/online_price.dart';
@@ -449,6 +451,38 @@ class FakeBlsFoodSearch implements BlsFoodSearch {
     return (resolved[name.trim().toLowerCase()] ?? const <BlsFood>[]).take(limit).toList();
   }
 }
+
+/// Attrappe fuer die Haushaltsmasse (`food_units`, Phase N2): je BLS-Code vorgegebene Einheiten, sonst leer.
+class FakeFoodUnitsSource implements FoodUnitsSource {
+  FakeFoodUnitsSource([Map<String, List<FoodUnit>>? units]) : units = units ?? {};
+
+  Map<String, List<FoodUnit>> units;
+  final requested = <String>[];
+
+  /// true = Abfrage scheitert (kein Netz): wie in der echten Fassung bleibt die Liste dann leer
+  bool fail = false;
+
+  @override
+  Future<List<FoodUnit>> unitsFor(String blsCode) async {
+    requested.add(blsCode);
+    if (fail) return const [];
+    return units[blsCode] ?? const [];
+  }
+}
+
+/// Banane (F503100) mit Groessen und ein Brot (B311000) mit Scheibe, wie in der Tabelle `food_units`.
+Map<String, List<FoodUnit>> sampleFoodUnits() => {
+      'F503100': const [
+        FoodUnit(blsCode: 'F503100', key: FoodUnitKey.piece, size: UnitSize.small, gramsEdible: 101),
+        FoodUnit(blsCode: 'F503100', key: FoodUnitKey.piece, size: UnitSize.medium, gramsEdible: 118),
+        FoodUnit(blsCode: 'F503100', key: FoodUnitKey.piece, size: UnitSize.large, gramsEdible: 136),
+      ],
+      'B311000': const [FoodUnit(blsCode: 'B311000', key: FoodUnitKey.slice, gramsEdible: 28)],
+      'Q120000': const [
+        FoodUnit(blsCode: 'Q120000', key: FoodUnitKey.tbsp, gramsEdible: 13.5),
+        FoodUnit(blsCode: 'Q120000', key: FoodUnitKey.tsp, gramsEdible: 4.5),
+      ],
+    };
 
 /// Attrappe fuer die Online-Preise (Tabelle `online_prices`, ADR-019): ein Sortiment im Speicher, durchsucht nach
 /// Namensbestandteilen, mit Netzfehler zum Einschalten.

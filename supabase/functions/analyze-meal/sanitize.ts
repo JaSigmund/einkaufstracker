@@ -12,9 +12,11 @@ export const MAX_LABEL_CHARS = 200;
 export const MAX_IMAGE_BASE64_CHARS = 1_000_000;
 export const MAX_INGREDIENTS = 20;
 export const MAX_AMOUNT_G = 5000;
+export const MAX_COUNT = 50;
 export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack", "drink"] as const;
 export const KINDS = ["food", "drink"] as const;
 export const STATES = ["raw", "cooked", "ready_made"] as const;
+export const COUNT_UNITS = ["piece", "slice", "tbsp", "tsp", "clove", "head", "stalk"] as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Anfang jedes JPEG in Base64 (FF D8 FF): das Modell bekommt nur JPEG, so passt der media_type, den wir angeben.
@@ -30,6 +32,10 @@ export type Ingredient = {
   confidence: number;
   kind: "food" | "drink";
   state: "raw" | "cooked" | "ready_made" | null;
+  /// Anzahl bei Stueckware (2 Eier, 3 Scheiben Brot), in halben Schritten; null = nicht zaehlbar. Die Function rechnet damit in
+  /// Gramm um (units.ts), die KI schaetzt kein Stueckgewicht.
+  count: number | null;
+  count_unit: typeof COUNT_UNITS[number];
 };
 export type Analysis = {
   dish_title: string;
@@ -95,13 +101,20 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
         : null;
       const amount = number(i.est_amount_g);
       const confidence = number(i.confidence);
+      const kind = i.kind === "drink" ? "drink" : "food";
+      const counted = number(i.count);
+      const count = kind === "drink" || counted === null || counted <= 0 ? null : Math.min(MAX_COUNT, Math.round(counted * 2) / 2);
       ingredients.push({
         name,
         inventory_product_id: id,
         est_amount_g: amount === null || amount <= 0 ? null : Math.min(amount, MAX_AMOUNT_G),
         confidence: confidence === null ? 0 : Math.min(1, Math.max(0, confidence)),
-        kind: i.kind === "drink" ? "drink" : "food",
+        kind,
         state: typeof i.state === "string" && (STATES as readonly string[]).includes(i.state) ? i.state as Ingredient["state"] : null,
+        count: count === 0 ? null : count,
+        count_unit: typeof i.count_unit === "string" && (COUNT_UNITS as readonly string[]).includes(i.count_unit)
+          ? i.count_unit as Ingredient["count_unit"]
+          : "piece",
       });
     }
   }

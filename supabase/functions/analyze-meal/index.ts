@@ -14,7 +14,8 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { MEAL_TYPES, parseRequest, sanitizeAnalysis } from "./sanitize.ts";
+import { COUNT_UNITS, MEAL_TYPES, parseRequest, sanitizeAnalysis } from "./sanitize.ts";
+import { totalGrams, type UnitInfo, unitInfoFor, type UnitRow } from "./units.ts";
 import { resolveIngredients, type Usage } from "./analyze.ts";
 import { buildChoosePrompt, CHOOSE_SYSTEM, CHOOSE_TOOL, type ChooseItem, type FoodRow, parseFoodRow } from "./resolve.ts";
 
@@ -34,6 +35,7 @@ Regeln:
 - Nenne einen kurzen Gerichtsnamen (dish_title) und die erkennbaren Zutaten mit dem gaengigen deutschen Namen, ohne Zusaetze und ohne den Zustand im Namen (z.B. "Reis", "Haehnchenbrust", "Paprika rot", nicht "gekochter Reis").
 - state ist der Zustand, wie die Zutat auf dem Foto zu sehen ist: "raw" (roh, z.B. Salat, Obst, rohes Gemuese), "cooked" (gekocht, gebraten, gedaempft: Reis, Nudeln, Fleisch, gegartes Gemuese), "ready_made" (fertig Gekauftes oder Zubereitetes wie Pommes, Pizza, Burger, Cola, Wurst) oder "unknown".
 - kind ist "drink" fuer Getraenke (dann gilt die Menge in Millilitern), sonst "food".
+- count ist die Anzahl bei Stueckware, die man zaehlen kann (2 Eier, 1 Banane, 3 Scheiben Brot, 2 EL Oel), sonst 0; count_unit ist dann "piece" (Stueck), "slice" (Scheibe), "tbsp" (Essloeffel), "tsp" (Teeloeffel), "clove" (Zehe), "head" (Kopf) oder "stalk" (Stange). Bei Reis, Nudeln, Saucen, Fluessigem und allem, was du nicht zaehlen kannst, ist count 0. Auch bei Stueckware schaetzt du est_amount_g, die Anzahl geht vor.
 - est_amount_g ist die geschaetzte Menge der Zutat in Gramm (Getraenke in Millilitern) fuer das GANZE sichtbare Gericht, so wie sie auf dem Teller oder im Glas liegt, also gekochter Reis gekocht gewogen. Wenn du eine Menge gar nicht schaetzen kannst, gib 0 an. Raten ist erlaubt, aber trage dann eine niedrige confidence ein.
 - meal_type_guess ist "unknown", wenn die Tageszeit nicht erkennbar ist; servings_visible ist 0, wenn du die Portionen nicht zaehlen kannst.
 - confidence liegt zwischen 0 und 1 und beschreibt, wie sicher du dir bei dieser Zutat bist (Zutat erkannt UND Menge plausibel).
@@ -65,8 +67,10 @@ const TOOL = {
             confidence: { type: "number" },
             kind: { type: "string", enum: ["food", "drink"] },
             state: { type: "string", enum: ["raw", "cooked", "ready_made", "unknown"] },
+            count: { type: "number" },
+            count_unit: { type: "string", enum: [...COUNT_UNITS] },
           },
-          required: ["name", "inventory_product_id", "est_amount_g", "confidence", "kind", "state"],
+          required: ["name", "inventory_product_id", "est_amount_g", "confidence", "kind", "state", "count", "count_unit"],
         },
       },
       notes: { type: "string" },
@@ -232,8 +236,51 @@ Deno.serve(async (req) => {
   }
   console.log("resolved", resolution.stats);
 
+  // 7) Stueckzahlen in Gramm umrechnen (Phase N2, ADR-033): eigenes Gewicht des Haushalts, sonst Tabelle food_units
+  const counted = analysis.ingredients
+    .map((i, idx) => ({ i, idx, code: resolution.matches[idx]?.code ?? null }))
+    .filter((x) => x.i.count !== null && x.code !== null);
+  const codes = [...new Set(counted.map((x) => x.code as string))];
+  const unitRows = new Map<string, UnitRow[]>();
+  const householdWeights = new Map<string, number>();
+  if (codes.length > 0) {
+    try {
+      const [units, links] = await Promise.all([
+        admin.from("food_units").select("bls_code, unit_key, size, grams_edible, source").in("bls_code", codes),
+        admin.from("household_food_links").select("bls_code, unit_weight_g").eq("household_id", body.household_id).is("deleted_at", null)
+          .in("bls_code", codes).not("unit_weight_g", "is", null),
+      ]);
+      for (const r of (units.data ?? []) as UnitRow[]) {
+        unitRows.set(r.bls_code, [...(unitRows.get(r.bls_code) ?? []), { ...r, grams_edible: Number(r.grams_edible) }]);
+      }
+      for (const r of (links.data ?? []) as { bls_code: string; unit_weight_g: number | string }[]) {
+        const g = Number(r.unit_weight_g);
+        if (Number.isFinite(g) && g > 0) householdWeights.set(r.bls_code, g);
+      }
+    } catch (e) {
+      console.error("units_failed", e); // ohne Gewichte bleibt es bei der Gramm-Schaetzung der KI
+    }
+  }
+  const unitInfos = new Map<number, UnitInfo>();
+  for (const { i, idx, code } of counted) {
+    const info = unitInfoFor(i.count, i.count_unit, unitRows.get(code as string) ?? [], householdWeights.get(code as string) ?? null);
+    if (info) unitInfos.set(idx, info);
+  }
+
   return json({
-    analysis: { ...analysis, ingredients: analysis.ingredients.map((i, idx) => ({ ...i, match: resolution.matches[idx] })) },
+    analysis: {
+      ...analysis,
+      ingredients: analysis.ingredients.map((i, idx) => {
+        const info = unitInfos.get(idx);
+        return {
+          ...i,
+          // Mit bekanntem Stueckgewicht gilt die Zaehlung (2 Eier = 100 g), sonst die Gramm-Schaetzung der KI
+          est_amount_g: info ? totalGrams(info) : i.est_amount_g,
+          unit: info ?? null,
+          match: resolution.matches[idx],
+        };
+      }),
+    },
     model,
     usage: { input_tokens: total.input_tokens, output_tokens: total.output_tokens, cost_micro_usd: totalCost },
     duration_ms: Date.now() - started,

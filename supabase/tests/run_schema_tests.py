@@ -628,6 +628,56 @@ def main():
     db("delete from meals where id = %s", (meal_n1,))
     db("update products set bls_code = null")
 
+    # --- Stueckgewichte (0024, Phase N2, ADR-033) ------------------------------------------------------------------
+    db((repo_root / "tools" / "food_units_import.sql").read_text(encoding="utf-8"))
+    n_units = one("select count(*) from food_units")
+    check("Einheiten: Import eingespielt (mehr als 150 Zeilen)", n_units > 150, n_units)
+    check("Einheiten: jede Zeile gehoert zu einem BLS-Eintrag",
+          one("select count(*) from food_units u left join bls_foods b using (bls_code) where b.bls_code is null") == 0)
+    check("Einheiten: Banane, 1 Stueck mittel = 118 g (USDA)",
+          float(one("select grams_edible from food_units where bls_code = 'F503100' and unit_key = 'piece' and size = 'medium'")) == 118.0)
+    check("Einheiten: Olivenoel, 1 EL = 13,5 g",
+          float(one("select grams_edible from food_units where bls_code = 'Q120000' and unit_key = 'tbsp' and size = ''")) == 13.5)
+    check("Einheiten: Ei Groesse M = 50 g, L = 56 g (USDA large und extra large, auf EU-Groessen umbenannt)",
+          [float(r[0]) for r in db("select grams_edible from food_units where bls_code = 'E111100' and unit_key = 'piece' "
+                                   "and size in ('medium', 'large') order by size desc")[0]] == [50.0, 56.0])
+    check("Einheiten: Groessen gibt es nur bei Stueck, Kopf und Stange",
+          one("select count(*) from food_units where size <> '' and unit_key not in ('piece', 'head', 'stalk')") == 0)
+    check("Einheiten: Nutzer kann lesen", one("select count(*) from food_units", user=A) == n_units)
+    ins_unit = "insert into food_units (bls_code, unit_key, size, grams_edible, source) values (%s,%s,%s,%s,%s)"
+    check("Einheiten: Nutzer darf nicht einfuegen", raises(ins_unit, ("C352000", "tbsp", "", 15, "usda"), user=A))
+    check("Einheiten: Nutzer darf nicht aendern (RLS filtert, 0 betroffen)", db("update food_units set grams_edible = 1", user=A)[1] == 0)
+    check("Einheiten: Nutzer darf nicht loeschen (RLS filtert, 0 betroffen)", db("delete from food_units", user=A)[1] == 0)
+    check("Einheiten: Eintrag mit gueltigen Werten wird angenommen", not raises(ins_unit, ("C352000", "tbsp", "", 15, "curated")))
+    check("Einheiten: dieselbe Einheit und Groesse zweimal wird abgelehnt (Primaerschluessel)", raises(ins_unit, ("C352000", "tbsp", "", 16, "curated")))
+    check("Einheiten: Gewicht 0 wird abgelehnt", raises(ins_unit, ("C352000", "tsp", "", 0, "curated")))
+    check("Einheiten: negatives Gewicht wird abgelehnt", raises(ins_unit, ("C352000", "tsp", "", -3, "curated")))
+    check("Einheiten: Gewicht ueber 5 kg wird abgelehnt", raises(ins_unit, ("C352000", "tsp", "", 5001, "curated")))
+    check("Einheiten: unbekannte Einheit wird abgelehnt", raises(ins_unit, ("C352000", "handvoll", "", 20, "curated")))
+    check("Einheiten: unbekannte Groesse wird abgelehnt", raises(ins_unit, ("C352000", "piece", "riesig", 20, "curated")))
+    check("Einheiten: unbekannte Quelle wird abgelehnt", raises(ins_unit, ("C352000", "tsp", "", 5, "geraten")))
+    check("Einheiten: unbekannter BLS-Code wird abgelehnt", raises(ins_unit, ("NICHT00", "tsp", "", 5, "curated")))
+    for key in ("piece", "slice", "tbsp", "tsp", "clove", "head", "stalk"):
+        check(f"Einheiten: {key} erlaubt", not raises(ins_unit, ("C351000", key, "", 5, "llm_estimate")))
+    for size in ("small", "medium", "large"):
+        check(f"Einheiten: Groesse {size} erlaubt", not raises(ins_unit, ("C351000", "piece", size, 5, "off")))
+    db("delete from food_units where bls_code in ('C352000', 'C351000')")
+    db((repo_root / "tools" / "food_units_import.sql").read_text(encoding="utf-8"))
+    check("Einheiten: der Import laesst sich wiederholen (on conflict), keine Doppelten", one("select count(*) from food_units") == n_units)
+    db("insert into bls_foods (bls_code, name_de) values ('CASC01', 'Wegwerf')")
+    db(ins_unit, ("CASC01", "piece", "", 10, "curated"))
+    db("delete from bls_foods where bls_code = 'CASC01'")
+    check("Einheiten: fallen mit dem BLS-Eintrag weg (cascade)", one("select count(*) from food_units where bls_code = 'CASC01'") == 0)
+
+    # Eigenes Stueckgewicht im Gedaechtnis des Haushalts (0024)
+    check("Gedaechtnis: eigenes Stueckgewicht lässt sich speichern",
+          not raises("insert into household_food_links (household_id, name_norm, bls_code, unit_weight_g) values (%s,'banane','F503100',135)", (ha,), user=A))
+    check("Gedaechtnis: Stueckgewicht ist lesbar", float(one("select unit_weight_g from household_food_links where household_id = %s", (ha,))) == 135.0)
+    check("Gedaechtnis: Stueckgewicht 0 wird abgelehnt", raises("update household_food_links set unit_weight_g = 0 where household_id = %s", (ha,)))
+    check("Gedaechtnis: Stueckgewicht ueber 5 kg wird abgelehnt", raises("update household_food_links set unit_weight_g = 6000 where household_id = %s", (ha,)))
+    check("Gedaechtnis: ohne Stueckgewicht (null) bleibt moeglich", not raises("update household_food_links set unit_weight_g = null where household_id = %s", (ha,)))
+    db("delete from household_food_links")
+
     # --- Haushalts-Einladungen (0017, Phase 6, ADR-017 Option A) -----------------------------------------------
     import re
     codes = [one("select new_invite_code()") for _ in range(300)]

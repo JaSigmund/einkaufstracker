@@ -395,6 +395,7 @@ Map<String, dynamic> householdFoodLinkToRemote(HouseholdFoodLink l) => {
       'household_id': l.householdId,
       'name_norm': l.nameNorm,
       'bls_code': l.blsCode,
+      'unit_weight_g': l.unitWeightG,
       'updated_at': l.updatedAt.toUtc().toIso8601String(),
       'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
     };
@@ -404,6 +405,7 @@ HouseholdFoodLinksCompanion householdFoodLinkFromRemote(Map<String, dynamic> j) 
       householdId: Value(j['household_id'] as String),
       nameNorm: Value(j['name_norm'] as String),
       blsCode: Value(j['bls_code'] as String),
+      unitWeightG: Value((j['unit_weight_g'] as num?)?.toDouble()),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );

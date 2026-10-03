@@ -1,0 +1,177 @@
+bls_code,unit_key,size,grams_edible,source,note
+B311000,slice,,28.0,usda,Weizenbrot/Toast Scheibe (US-Scheibe)
+B511000,piece,,57.0,usda,Weizenbroetchen (hard roll)
+B6A2000,slice,,10.0,usda,Knaeckebrot Scheibe
+B6A2100,slice,,10.0,usda,Knaeckebrot Vollkorn Scheibe
+D771600,piece,large,67.0,usda,Croissant
+D771600,piece,medium,57.0,usda,Croissant
+D771600,piece,small,42.0,usda,Croissant
+E106100,piece,,9.0,usda,Wachtelei
+E111100,piece,large,56.0,usda,Huehnerei roh; USDA large entspricht etwa EU-Groesse M (50 g ohne Schale)
+E111100,piece,medium,50.0,usda,Huehnerei roh; USDA large entspricht etwa EU-Groesse M (50 g ohne Schale)
+E111100,piece,small,44.0,usda,Huehnerei roh; USDA large entspricht etwa EU-Groesse M (50 g ohne Schale)
+E111132,piece,,50.0,usda,Huehnerei gekocht ohne Schale
+E112100,piece,,17.0,usda,Eigelb
+E113100,piece,,33.0,usda,Eiklar
+F110100,piece,large,223.0,usda,Apfel roh; USDA Apples raw with skin
+F110100,piece,medium,182.0,usda,Apfel roh; USDA Apples raw with skin
+F110100,piece,small,149.0,usda,Apfel roh; USDA Apples raw with skin
+F130100,piece,large,230.0,usda,Birne roh; zweite Quelle Foundation Foods (Bartlett)
+F130100,piece,medium,178.0,usda,Birne roh; zweite Quelle Foundation Foods (Bartlett)
+F130100,piece,small,148.0,usda,Birne roh; zweite Quelle Foundation Foods (Bartlett)
+F201100,piece,,35.0,usda,Aprikose
+F202100,piece,large,156.0,usda,Nektarine
+F202100,piece,medium,142.0,usda,Nektarine
+F202100,piece,small,129.0,usda,Nektarine
+F203100,piece,large,175.0,usda,Pfirsich; zweite Quelle Foundation Foods
+F203100,piece,medium,150.0,usda,Pfirsich; zweite Quelle Foundation Foods
+F203100,piece,small,130.0,usda,Pfirsich; zweite Quelle Foundation Foods
+F211100,piece,,8.2,usda,Suesskirsche (ein Stueck ohne Stein)
+F220100,piece,,66.0,usda,Pflaume
+F223100,piece,,66.0,usda,Zwetschge wie Pflaume
+F301100,piece,large,18.0,usda,Erdbeere (S/M/L)
+F301100,piece,medium,12.0,usda,Erdbeere (S/M/L)
+F301100,piece,small,7.0,usda,Erdbeere (S/M/L)
+F310100,piece,,4.9,usda,Weintraube (eine Beere)
+F502100,piece,,136.0,usda,Avocado ohne Schale und Kern
+F503100,piece,large,136.0,usda,Banane ohne Schale
+F503100,piece,medium,118.0,usda,Banane ohne Schale
+F503100,piece,small,101.0,usda,Banane ohne Schale
+F505100,piece,large,64.0,usda,Feige
+F505100,piece,medium,50.0,usda,Feige
+F505100,piece,small,40.0,usda,Feige
+F514100,piece,,69.0,usda,Kiwi
+F516100,piece,,336.0,usda,Mango ohne Schale und Kern
+F601100,piece,,58.0,usda,Zitrone ohne Schale (kleine Frucht)
+F602100,piece,,67.0,usda,Limette
+F603100,piece,large,184.0,usda,Orange
+F603100,piece,medium,131.0,usda,Orange
+F603100,piece,small,96.0,usda,Orange
+F606100,piece,large,120.0,usda,Mandarine
+F606100,piece,medium,88.0,usda,Mandarine
+F606100,piece,small,76.0,usda,Mandarine
+F607100,piece,,74.0,usda,Clementine
+G061000,tbsp,,2.6,usda,Basilikum gehackt
+G081100,tbsp,,3.0,usda,Schnittlauch gehackt
+G103100,head,large,755.0,usda,Eisbergsalat Kopf
+G103100,head,medium,539.0,usda,Eisbergsalat Kopf
+G103100,head,small,324.0,usda,Eisbergsalat Kopf
+G105100,head,,163.0,usda,Kopfsalat
+G107100,head,,626.0,usda,Roemersalat Kopf
+G220100,stalk,large,64.0,usda,Bleichsellerie Stange
+G220100,stalk,medium,40.0,usda,Bleichsellerie Stange
+G220100,stalk,small,17.0,usda,Bleichsellerie Stange
+G250100,tbsp,,3.8,usda,Petersilie gehackt
+G311100,head,large,840.0,usda,Blumenkohl Kopf
+G311100,head,medium,588.0,usda,Blumenkohl Kopf
+G311100,head,small,265.0,usda,Blumenkohl Kopf
+G332100,piece,,19.0,usda,Rosenkohl Roeschen
+G341100,head,large,1134.0,usda,Rotkohl Kopf
+G341100,head,medium,839.0,usda,Rotkohl Kopf
+G341100,head,small,567.0,usda,Rotkohl Kopf
+G342100,head,large,1248.0,usda,Weisskohl Kopf (USDA Cabbage)
+G342100,head,medium,908.0,usda,Weisskohl Kopf (USDA Cabbage)
+G342100,head,small,714.0,usda,Weisskohl Kopf (USDA Cabbage)
+G431100,piece,,234.0,usda,Fenchelknolle
+G450100,stalk,large,20.0,usda,Spargelstange
+G450100,stalk,medium,16.0,usda,Spargelstange
+G450100,stalk,small,12.0,usda,Spargelstange
+G470100,piece,,89.0,usda,Lauch Stange
+G480100,piece,large,150.0,usda,Zwiebel (mittel und gross)
+G480100,piece,medium,110.0,usda,Zwiebel (mittel und gross)
+G480100,piece,small,70.0,usda,Zwiebel (mittel und gross)
+G482100,piece,large,25.0,usda,Fruehlingszwiebel
+G482100,piece,medium,15.0,usda,Fruehlingszwiebel
+G482100,piece,small,5.0,usda,Fruehlingszwiebel
+G490100,clove,,3.0,usda,Knoblauchzehe
+G520100,piece,,301.0,usda,Salatgurke mit Schale
+G541100,piece,large,164.0,usda,Paprika gruen
+G541100,piece,medium,119.0,usda,Paprika gruen
+G541100,piece,small,74.0,usda,Paprika gruen
+G542100,piece,large,186.0,usda,Paprika gelb (nur gross)
+G543100,piece,large,164.0,usda,Paprika rot
+G543100,piece,medium,119.0,usda,Paprika rot
+G543100,piece,small,74.0,usda,Paprika rot
+G553100,piece,,45.0,usda,Chili gruen
+G554100,piece,,45.0,usda,Chili rot
+G561100,piece,large,182.0,usda,Tomate (S/M/L); Cherrytomaten ausgenommen
+G561100,piece,medium,123.0,usda,Tomate (S/M/L); Cherrytomaten ausgenommen
+G561100,piece,small,91.0,usda,Tomate (S/M/L); Cherrytomaten ausgenommen
+G582100,piece,large,323.0,usda,Zucchini
+G582100,piece,medium,196.0,usda,Zucchini
+G582100,piece,small,118.0,usda,Zucchini
+G613100,piece,,82.0,usda,Rote Bete
+G620100,piece,large,72.0,usda,Karotte
+G620100,piece,medium,61.0,usda,Karotte
+G620100,piece,small,50.0,usda,Karotte
+G691100,piece,large,9.0,usda,Radieschen
+G691100,piece,medium,4.5,usda,Radieschen
+G691100,piece,small,2.0,usda,Radieschen
+H110800,tbsp,,16.0,usda,Erdnussmus
+H130100,piece,,1.4,usda,Haselnuss (ein Kern)
+H210100,piece,,1.2,usda,Mandel (ein Kern)
+H410100,tbsp,,10.3,usda,Leinsamen ganz
+H410100,tsp,,3.4,usda,Leinsamen ganz
+H420100,tbsp,,9.0,usda,Sesam
+H880200,tbsp,,16.0,usda,Erdnussbutter
+K110100,piece,large,313.6,curated,Kartoffel geschaelt roh; USDA wiegt mit Schale; Schaelverlust 15 % geschaetzt (Quelle curated)
+K110100,piece,medium,181.0,curated,Kartoffel geschaelt roh; USDA wiegt mit Schale; Schaelverlust 15 % geschaetzt (Quelle curated)
+K110100,piece,small,144.5,curated,Kartoffel geschaelt roh; USDA wiegt mit Schale; Schaelverlust 15 % geschaetzt (Quelle curated)
+K420100,piece,,130.0,usda,Suesskartoffel ungeschaelt
+K701100,piece,large,23.0,usda,Champignon
+K701100,piece,medium,18.0,usda,Champignon
+K701100,piece,small,10.0,usda,Champignon
+M032100,slice,,28.3,usda,Mozzarella Scheibe
+M172500,tbsp,,12.0,usda,Sauerrahm
+M172700,tbsp,,12.0,usda,Sauerrahm 20 %
+M173800,tbsp,,15.0,usda,Schlagsahne 30 %
+M173900,tbsp,,15.0,usda,Schlagsahne 36 %
+M303700,slice,,28.0,usda,Cheddar Scheibe
+M304600,slice,,28.0,usda,Emmentaler Scheibe (USDA Swiss)
+M306400,tbsp,,5.0,usda,Parmesan gerieben
+M710700,tbsp,,14.5,usda,Frischkaese
+M820600,tbsp,,14.5,usda,Frischkaese
+Q120000,tbsp,,13.5,usda,Olivenoel
+Q120000,tsp,,4.5,usda,Olivenoel
+Q180000,tbsp,,14.0,usda,Rapsoel
+Q180000,tsp,,4.5,usda,Rapsoel
+Q320000,tbsp,,13.6,usda,Sonnenblumenoel
+Q320000,tsp,,4.5,usda,Sonnenblumenoel
+Q400000,tbsp,,14.0,usda,Margarine
+Q400000,tsp,,4.7,usda,Margarine
+Q550000,tbsp,,13.6,usda,Kokosoel
+Q550000,tsp,,4.5,usda,Kokosoel
+Q611000,tbsp,,14.2,usda,Butter mild gesaeuert
+Q683000,tbsp,,12.8,usda,Butterschmalz
+Q6A4000,tbsp,,14.2,usda,Butter gesalzen
+Q991000,tbsp,,13.8,usda,Mayonnaise
+R114000,tbsp,,18.0,usda,Speisesalz Teeloeffel
+R114000,tsp,,6.0,usda,Speisesalz Teeloeffel
+R121000,tbsp,,14.9,usda,Weinessig
+R121000,tsp,,5.0,usda,Weinessig
+R123100,tbsp,,14.9,usda,Apfelessig
+R123100,tsp,,5.0,usda,Apfelessig
+R125000,tbsp,,16.0,usda,Balsamicoessig
+R125000,tsp,,5.3,usda,Balsamicoessig
+R132000,tsp,,5.0,usda,Senf
+R141100,tbsp,,17.0,usda,Ketchup
+R143000,tbsp,,16.0,usda,Sojasauce
+R143000,tsp,,5.3,usda,Sojasauce
+R160000,tbsp,,16.0,usda,Tomatenmark
+R258100,tbsp,,6.9,usda,Pfeffer gemahlen
+R258100,tsp,,2.3,usda,Pfeffer gemahlen
+R421100,tsp,,4.6,usda,Backpulver
+S111000,tsp,,4.2,usda,Zucker weiss Teeloeffel
+S111100,tbsp,,8.0,usda,Puderzucker
+S111100,tsp,,2.5,usda,Puderzucker
+S120000,tbsp,,21.0,usda,Honig
+S132000,tbsp,,20.0,usda,Konfituere
+S151100,tbsp,,20.0,usda,Ahornsirup
+T930100,piece,,28.0,usda,Fischstaebchen
+W140000,slice,,10.0,usda,Salami Scheibe
+W213000,piece,,49.0,usda,Frankfurter Wuerstchen
+W234000,slice,,25.5,usda,Fleischwurst Scheibe (Bologna)
+W327000,slice,,18.0,usda,Leberwurst Scheibe
+W424000,slice,,28.0,usda,Kochschinken Scheibe
+Y710142,piece,,46.0,usda,Spiegelei gebraten
+Y720143,piece,,61.0,usda,Ruehrei gebraten
