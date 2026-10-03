@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,9 +11,11 @@ import '../../data/local/database.dart';
 import '../../data/repositories/meal_repository.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/journal.dart';
+import '../../domain/nutrition/journal_report.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
 import '../../domain/nutrition/unrecorded_estimate.dart';
 import '../../domain/receipt/vienna_time.dart';
+import 'journal_pdf.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
@@ -67,6 +72,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   DateTime? _selected;
   var _initialSelectionDone = false;
   var _estimateOn = false;
+  var _exporting = false;
 
   DateTime get _today {
     final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
@@ -95,6 +101,62 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       await ref.read(databaseProvider).setKv(journalEstimateKey, on.toString());
     } catch (_) {
       // nur eine Komfortfunktion
+    }
+  }
+
+  /// Den angezeigten Monat als PDF teilen (Teilen-Menue, im Browser Download). Fotos kommen mit, soweit sie erreichbar sind.
+  Future<void> _exportPdf(List<Meal> meals, List<MealIngredient> ingredients) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final report = buildJournalReport(
+        year: _month.year,
+        month: _month.month,
+        meals: [
+          for (final m in meals)
+            (
+              id: m.id,
+              eatenAtUtc: m.eatenAt,
+              title: m.title,
+              mealType: m.mealType,
+              servingsEaten: m.servingsEaten,
+              servingsMade: m.servingsMade,
+              isEstimate: m.isEstimate,
+              hasPhoto: m.photoPath != null,
+            ),
+        ],
+        ingredients: [
+          for (final i in ingredients)
+            (mealId: i.mealId, kcal: i.kcal, proteinG: i.proteinG, fatG: i.fatG, carbsG: i.carbsG, sugarG: i.sugarG, fiberG: i.fiberG, saltG: i.saltG),
+        ],
+      );
+      if (report == null) {
+        messenger.showSnackBar(const SnackBar(content: Text('In diesem Monat wurde nichts erfasst.')));
+        return;
+      }
+      final byId = {for (final m in meals) m.id: m};
+      final photoService = ref.read(mealPhotoServiceProvider);
+      final photos = <String, Uint8List>{};
+      for (final d in report.days) {
+        final meal = d.photoMealId == null ? null : byId[d.photoMealId!];
+        if (meal == null) continue;
+        try {
+          // ein nicht erreichbares Foto (kein Netz, anderes Geraet) laesst nur dieses Foto weg, nicht den Export
+          final bytes = await photoService.bytes(meal).timeout(const Duration(seconds: 8));
+          final small = bytes == null ? null : shrinkPhotoForPdf(bytes);
+          if (small != null) photos[meal.id] = small;
+        } catch (_) {}
+      }
+      final regular = (await rootBundle.load('assets/fonts/Roboto-Regular.ttf')).buffer.asUint8List();
+      final bold = (await rootBundle.load('assets/fonts/Roboto-Bold.ttf')).buffer.asUint8List();
+      final pdf = await buildJournalPdf(report, regularFont: regular, boldFont: bold, createdAtUtc: widget.now ?? DateTime.now().toUtc(), photos: photos);
+      final name = 'Essenstagebuch ${_month.year}-${_month.month.toString().padLeft(2, '0')}.pdf';
+      await ref.read(shareFileProvider)(bytes: pdf, fileName: name, mimeType: 'application/pdf', text: 'Essenstagebuch ${formatMonthTitle(_month.year, _month.month)}');
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('PDF-Export nicht möglich.')));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -187,7 +249,19 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       _grid(t, days, byId, kcalRef, monthMaxKcal),
       const SizedBox(height: 4),
       Text('Leere Tage sind nicht erfasst, das ist nicht dasselbe wie 0 kcal.', key: const Key('journal-hint'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
-      const SizedBox(height: 16),
+      if (days.any((d) => d.logged))
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('journal-export-pdf'),
+            onPressed: _exporting ? null : () => _exportPdf(meals, ingredients),
+            icon: _exporting
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(_exporting ? 'PDF wird erstellt …' : 'Monat als PDF teilen'),
+          ),
+        ),
+      const SizedBox(height: 12),
       if (selectedDay != null)
         _dayCard(context, t, selectedDay, byId,
             targets: targets,
