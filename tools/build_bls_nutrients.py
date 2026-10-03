@@ -12,7 +12,7 @@ ohne die grossen BLS-Dateien).
 
 Regeln fuer die Werte (nie raten):
 - Datenherkunft ``-`` oder Wert ``-``/leer: der Schluessel fehlt (unbekannt, NICHT 0)
-- ``<LOD or <LOQ`` (unter der Bestimmungsgrenze) und der Wert ``0``: ``0``
+- ``<LOD``, ``<LOQ``, ``<LOD or <LOQ`` (unter der Bestimmungsgrenze), ``TR`` (Spuren) und der Wert ``0``: ``0``
 - Einheiten der BLS-Spalte muessen zur Registerangabe passen (``bls_unit``), sonst Abbruch; ``factor`` rechnet in die Registereinheit
   um (Vitamin B6, Kupfer, Mangan, Fluorid: ug -> mg)
 
@@ -41,7 +41,7 @@ DATA_FILE = "BLS_4_0_Daten_2025_DE.xlsx"
 COMPONENTS_FILE = "BLS_4_0_Components_DE_EN.xlsx"
 ATTRIBUTION = ("Max Rubner-Institut (2025): Bundeslebensmittelschlüssel (BLS), Version 4.0 — "
                "Deutsche Nährstoffdatenbank (CC BY 4.0)")
-BELOW_LIMIT = re.compile(r"^<\s*(lod|loq)", re.IGNORECASE)
+BELOW_LIMIT = re.compile(r"^(<\s*(lod|loq).*|tr)$", re.IGNORECASE)
 
 GROUPS_DART = {"vitamin": "NutrientGroup.vitamin", "mineral": "NutrientGroup.mineral", "fat": "NutrientGroup.fat", "other": "NutrientGroup.other"}
 
