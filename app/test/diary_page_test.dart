@@ -289,6 +289,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('meal-action-repeat')), findsOneWidget);
       expect(find.byKey(const Key('meal-action-leftover')), findsOneWidget);
+      expect(find.byKey(const Key('meal-action-shopping')), findsOneWidget);
+      expect(find.byKey(const Key('meal-action-micros')), findsOneWidget);
       expect(find.byKey(const Key('meal-action-edit')), findsOneWidget);
     });
 

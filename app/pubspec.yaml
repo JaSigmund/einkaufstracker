@@ -60,6 +60,7 @@ dependencies:
   image: ^4.10.1
   webview_flutter: ^4.14.1
   url_launcher: ^6.3.2
+  pdf: ^3.12.0
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +86,12 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Roboto (Apache License 2.0, aus dem Flutter-SDK) fuer den PDF-Export des Journals: die eingebauten PDF-Schriften kennen
+  # weder alle deutschen Sonderzeichen noch das Euro-Zeichen zuverlaessig.
+  assets:
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

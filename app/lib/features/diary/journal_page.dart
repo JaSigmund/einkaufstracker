@@ -5,11 +5,59 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/journal.dart';
+import '../../domain/nutrition/nutrition_targets.dart';
+import '../../domain/nutrition/unrecorded_estimate.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
+import 'target_rows.dart';
+
+/// KV-Schluessel: Schaetzung des Nicht-Erfassten im Journal (`true`/`false`, Standard aus).
+const journalEstimateKey = 'journal_estimate_unrecorded';
+
+/// Menge einer Zutat in g (oder ml), wie sie fuer die Schaetzung des Nicht-Erfassten gilt: der Snapshot, sonst bei kg und l die erfasste
+/// Menge. Stueckmengen ohne Gewicht haben keine bekannte Menge.
+double? ingredientGrams(MealIngredient i) {
+  if (i.amountG != null && i.amountG! > 0) return i.amountG;
+  return switch (i.unit) {
+    'kg' || 'l' => i.quantity > 0 ? i.quantity * 1000 : null,
+    _ => null,
+  };
+}
+
+/// Ring um einen Anteil (0 bis 1) in einer Farbe, ohne Bewertung (keine Ampel).
+class _RingPainter extends CustomPainter {
+  _RingPainter({required this.fraction, required this.color, required this.track, this.stroke = 3});
+
+  final double fraction;
+  final Color color;
+  final Color track;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final inner = rect.deflate(stroke / 2);
+    final base = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..color = track;
+    canvas.drawArc(inner, 0, 6.2831853, false, base);
+    if (fraction <= 0) return;
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    canvas.drawArc(inner, -1.5707963, 6.2831853 * fraction, false, arc);
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) => old.fraction != fraction || old.color != color || old.track != track || old.stroke != stroke;
+}
 
 /// Journal (Phase 7e, Doku 15 §3.6): Monats-Mosaik mit den Fotos der Tage, darunter der gewaehlte Tag und der
 /// Rueckblick auf seine Woche. Tage ohne Eintrag bleiben leer: "nicht erfasst", nicht "0 kcal" (FR-15).
@@ -27,6 +75,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   late DateTime _month; // erster Tag des angezeigten Monats
   DateTime? _selected;
   var _initialSelectionDone = false;
+  var _estimateOn = false;
 
   DateTime get _today {
     final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
@@ -37,6 +86,25 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   void initState() {
     super.initState();
     _month = DateTime(_today.year, _today.month);
+    _loadEstimateSetting();
+  }
+
+  Future<void> _loadEstimateSetting() async {
+    try {
+      final on = await ref.read(databaseProvider).getKv(journalEstimateKey) == 'true';
+      if (mounted && on != _estimateOn) setState(() => _estimateOn = on);
+    } catch (_) {
+      // ohne lesbare Ablage bleibt die Schaetzung aus
+    }
+  }
+
+  Future<void> _setEstimate(bool on) async {
+    setState(() => _estimateOn = on);
+    try {
+      await ref.read(databaseProvider).setKv(journalEstimateKey, on.toString());
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
   }
 
   bool get _isCurrentMonth => _month.year == _today.year && _month.month == _today.month;
@@ -57,6 +125,8 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   Widget build(BuildContext context) {
     final mealsAsync = ref.watch(mealsStreamProvider);
     final ingredientsAsync = ref.watch(mealIngredientsStreamProvider);
+    // Richtwerte sind optional: bis sie geladen sind (oder falls das Laden scheitert) zeigt die Seite sie einfach nicht
+    final targets = ref.watch(nutritionTargetsProvider).value ?? const NutritionTargets();
     final t = Theme.of(context);
 
     return Scaffold(
@@ -65,11 +135,11 @@ class _JournalPageState extends ConsumerState<JournalPage> {
           ? const Center(child: CircularProgressIndicator())
           : (mealsAsync.hasError || ingredientsAsync.hasError)
               ? Center(child: Text('Fehler: ${mealsAsync.error ?? ingredientsAsync.error}'))
-              : _content(context, t, mealsAsync.value!, ingredientsAsync.value!),
+              : _content(context, t, mealsAsync.value!, ingredientsAsync.value!, targets),
     );
   }
 
-  Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients) {
+  Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients, NutritionTargets targets) {
     final nutritionIngredients = [
       for (final i in ingredients)
         (
@@ -97,6 +167,18 @@ class _JournalPageState extends ConsumerState<JournalPage> {
     ];
     final byId = {for (final m in meals) m.id: m};
     final days = buildMonthJournal(year: _month.year, month: _month.month, meals: journalMeals, ingredients: nutritionIngredients);
+    // Tageswerte fuer die Tageskarte (Makros gegen Richtwerte) und die Energiedichte des Verlaufs fuer die Schaetzung
+    final nutritionByDay = {
+      for (final d in buildDailyNutrition(
+        [for (final m in meals) (id: m.id, eatenAtUtc: m.eatenAt, servingsEaten: m.servingsEaten, servingsMade: m.servingsMade, isEstimate: m.isEstimate)],
+        nutritionIngredients,
+      ))
+        d.day: d,
+    };
+    final unrecorded = [for (final i in ingredients) (mealId: i.mealId, grams: ingredientGrams(i), kcal: i.kcal)];
+    final historyDensity = kcalPerGram(unrecorded);
+    final kcalRef = targets[NutrientKey.kcal]?.reference;
+    final monthMaxKcal = days.fold<double>(0, (m, d) => (d.kcal ?? 0) > m ? d.kcal! : m);
     if (!_initialSelectionDone) {
       _selected = _defaultSelection(days);
       _initialSelectionDone = true;
@@ -111,11 +193,19 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       const SizedBox(height: 8),
       _weekdayRow(t),
       const SizedBox(height: 4),
-      _grid(t, days, byId),
+      _grid(t, days, byId, kcalRef, monthMaxKcal),
       const SizedBox(height: 4),
       Text('Leere Tage sind nicht erfasst, das ist nicht dasselbe wie 0 kcal.', key: const Key('journal-hint'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
       const SizedBox(height: 16),
-      if (selectedDay != null) _dayCard(context, t, selectedDay, byId),
+      if (selectedDay != null)
+        _dayCard(context, t, selectedDay, byId,
+            targets: targets,
+            totals: nutritionByDay[selectedDay.day],
+            estimate: estimateUnrecorded(
+              [for (final m in meals) if (selectedDay.mealIds.contains(m.id)) (id: m.id, eatenAtUtc: m.eatenAt, servingsEaten: m.servingsEaten, servingsMade: m.servingsMade, isEstimate: m.isEstimate)],
+              unrecorded,
+              historyKcalPerGram: historyDensity,
+            )),
       const SizedBox(height: 12),
       if (weekStart != null) _weekCard(t, weekStart, review, byId),
     ]);
@@ -137,7 +227,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
           Expanded(child: Center(child: Text(d, style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.outline)))),
       ]);
 
-  Widget _grid(ThemeData t, List<JournalDay> days, Map<String, Meal> byId) {
+  Widget _grid(ThemeData t, List<JournalDay> days, Map<String, Meal> byId, double? kcalRef, double monthMaxKcal) {
     final offset = DateTime(_month.year, _month.month, 1).weekday - 1;
     return GridView.count(
       shrinkWrap: true,
@@ -147,12 +237,12 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       crossAxisSpacing: 4,
       children: [
         for (var i = 0; i < offset; i++) const SizedBox.shrink(),
-        for (final d in days) _cell(t, d, byId),
+        for (final d in days) _cell(t, d, byId, kcalRef, monthMaxKcal),
       ],
     );
   }
 
-  Widget _cell(ThemeData t, JournalDay d, Map<String, Meal> byId) {
+  Widget _cell(ThemeData t, JournalDay d, Map<String, Meal> byId, double? kcalRef, double monthMaxKcal) {
     final isSelected = _selected != null && _selected!.year == d.day.year && _selected!.month == d.day.month && _selected!.day == d.day.day;
     final isToday = d.day == _today;
     final photoMeal = d.photoMealId == null ? null : byId[d.photoMealId!];
@@ -165,17 +255,54 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       ),
     );
 
+    // Ring (gegen den kcal-Richtwert) oder, ohne Richtwert, ein Balken relativ zum Tag mit den meisten kcal des Monats; nur bei
+    // bekannten kcal. Ein Tag ohne bekannte Werte bekommt weder Ring noch Balken (unbekannt ist nicht 0).
+    final ringFrac = ringFraction(d.kcal, kcalRef);
+    final barFrac = kcalRef == null ? ringFraction(d.kcal, monthMaxKcal > 0 ? monthMaxKcal : null) : null;
+    final Widget? marker = ringFrac != null
+        ? Positioned(
+            right: 3,
+            bottom: 3,
+            child: SizedBox(
+              key: Key('journal-ring-${d.day.day}'),
+              width: 16,
+              height: 16,
+              child: CustomPaint(painter: _RingPainter(fraction: ringFrac, color: t.colorScheme.primary, track: t.colorScheme.surface.withValues(alpha: 0.8), stroke: 3)),
+            ),
+          )
+        : barFrac != null
+            ? Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: FractionallySizedBox(
+                    key: Key('journal-bar-${d.day.day}'),
+                    widthFactor: barFrac,
+                    child: Container(height: 4, color: t.colorScheme.primary),
+                  ),
+                ),
+              )
+            : null;
+
     final Widget face = photoMeal != null
         ? Stack(fit: StackFit.expand, children: [
             MealPhoto(meal: photoMeal, placeholder: const Icon(Icons.restaurant, size: 18), fit: BoxFit.cover),
             Positioned(left: 4, top: 2, child: number),
+            ?marker,
           ])
         : Container(
             color: d.logged ? t.colorScheme.primaryContainer : null,
             alignment: Alignment.center,
-            child: d.logged
-                ? Column(mainAxisSize: MainAxisSize.min, children: [number, Icon(mealTypeIcon(byId[d.mealIds.first]?.mealType ?? ''), size: 14, color: t.colorScheme.onPrimaryContainer)])
-                : number,
+            child: Stack(fit: StackFit.expand, alignment: Alignment.center, children: [
+              Center(
+                child: d.logged
+                    ? Column(mainAxisSize: MainAxisSize.min, children: [number, Icon(mealTypeIcon(byId[d.mealIds.first]?.mealType ?? ''), size: 14, color: t.colorScheme.onPrimaryContainer)])
+                    : number,
+              ),
+              ?marker,
+            ]),
           );
 
     return InkWell(
@@ -193,8 +320,19 @@ class _JournalPageState extends ConsumerState<JournalPage> {
     );
   }
 
-  Widget _dayCard(BuildContext context, ThemeData t, JournalDay d, Map<String, Meal> byId) {
+  Widget _dayCard(
+    BuildContext context,
+    ThemeData t,
+    JournalDay d,
+    Map<String, Meal> byId, {
+    required NutritionTargets targets,
+    required DayNutrition? totals,
+    required UnrecordedEstimate? estimate,
+  }) {
     final kcal = d.kcal;
+    final kcalRef = targets[NutrientKey.kcal]?.reference;
+    final ringFrac = ringFraction(kcal, kcalRef);
+    final partial = totals != null && totals.dataQuality < 1;
     return Card(
       key: const Key('journal-day-card'),
       child: Padding(
@@ -204,11 +342,49 @@ class _JournalPageState extends ConsumerState<JournalPage> {
           if (!d.logged)
             Padding(padding: const EdgeInsets.only(top: 4), child: Text('Nichts erfasst.', key: const Key('journal-day-empty'), style: t.textTheme.bodyMedium))
           else ...[
-            Text(
-              [if (kcal != null) formatKcal(kcal) else 'Nährwerte unbekannt', if (d.hasEstimates) 'enthält Schätzwerte'].join(' · '),
-              key: const Key('journal-day-totals'),
-              style: t.textTheme.bodySmall,
-            ),
+            Row(children: [
+              if (ringFrac != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12, top: 4),
+                  child: SizedBox(
+                    key: const Key('journal-day-ring'),
+                    width: 44,
+                    height: 44,
+                    child: Stack(alignment: Alignment.center, children: [
+                      CustomPaint(
+                        size: const Size(44, 44),
+                        painter: _RingPainter(fraction: ringFrac, color: t.colorScheme.primary, track: t.colorScheme.surfaceContainerHighest, stroke: 5),
+                      ),
+                      Text('${(ringFrac * 100).round()} %', style: t.textTheme.labelSmall),
+                    ]),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  [if (kcal != null) formatKcal(kcal) else 'Nährwerte unbekannt', if (d.hasEstimates) 'enthält Schätzwerte'].join(' · '),
+                  key: const Key('journal-day-totals'),
+                  style: t.textTheme.bodySmall,
+                ),
+              ),
+            ]),
+            if (totals != null) TargetRows(totals: totals.totals, targets: targets, keyPrefix: 'journal-${d.day.year}-${d.day.month}-${d.day.day}', partial: partial),
+            if (estimate != null) ...[
+              SwitchListTile(
+                key: const Key('journal-estimate-toggle'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Nicht Erfasstes schätzen'),
+                subtitle: const Text('Zutaten ohne Nährwerte, aber mit Menge, grob dazurechnen (getrennt und als Schätzung)'),
+                value: _estimateOn,
+                onChanged: _setEstimate,
+              ),
+              if (_estimateOn)
+                Text(
+                  _estimateText(estimate),
+                  key: const Key('journal-estimate-text'),
+                  style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+                ),
+            ],
             for (final id in d.mealIds)
               if (byId[id] case final m?)
                 ListTile(
@@ -224,6 +400,22 @@ class _JournalPageState extends ConsumerState<JournalPage> {
         ]),
       ),
     );
+  }
+
+  String _estimateText(UnrecordedEstimate e) {
+    final basis = switch (e.basis) {
+      DensityBasis.day => 'nach dem Durchschnitt dieses Tages',
+      DensityBasis.history => 'nach dem Durchschnitt deiner erfassten Tage',
+      DensityBasis.fallback => 'nach einem Faustwert für ein durchschnittliches Essen',
+    };
+    final parts = <String>[
+      if (e.ingredients > 0)
+        'Dazu etwa ${formatKcal(e.kcal)} aus ${e.ingredients == 1 ? '1 Zutat' : '${e.ingredients} Zutaten'} ohne Nährwerte (${formatMassG(e.grams)}), geschätzt $basis.'
+      else
+        'Keine Zutat ohne Nährwerte hat eine bekannte Menge, deshalb gibt es nichts zu schätzen.',
+      if (e.withoutAmount > 0) '${e.withoutAmount == 1 ? '1 weitere Zutat' : '${e.withoutAmount} weitere Zutaten'} ohne Nährwerte und ohne Menge ${e.withoutAmount == 1 ? 'bleibt' : 'bleiben'} unberücksichtigt.',
+    ];
+    return parts.join(' ');
   }
 
   Widget _weekCard(ThemeData t, DateTime weekStart, WeekReview? r, Map<String, Meal> byId) {

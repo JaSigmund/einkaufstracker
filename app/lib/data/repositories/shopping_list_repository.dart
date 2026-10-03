@@ -59,6 +59,44 @@ class ShoppingListRepository {
     return item;
   }
 
+  /// Die unabgehakten Eintraege der Liste (Momentaufnahme), z.B. um Vorschlaege nicht doppelt anzulegen.
+  Future<List<ShoppingListItem>> openItems() =>
+      (_db.select(_db.shoppingListItems)..where((i) => i.deletedAt.isNull() & i.checked.equals(false))).get();
+
+  /// Setzt mehrere Eintraege auf einmal auf die Liste (z.B. die fehlenden Zutaten einer Mahlzeit): je Eintrag Menge 1, was schon
+  /// unabgehakt auf der Liste steht (gleiches Produkt, oder gleicher Freitext ohne Gross-/Kleinschreibung), wird nicht doppelt angelegt.
+  /// Gibt die Zahl der neu angelegten Eintraege zurueck und stoesst den Sync nur einmal an.
+  Future<int> addMany(Iterable<({String? productId, String? freeText, String unit})> entries) async {
+    final open = await (_db.select(_db.shoppingListItems)..where((i) => i.deletedAt.isNull() & i.checked.equals(false))).get();
+    final listedProducts = {for (final i in open) if (i.productId != null) i.productId!};
+    final listedTexts = {for (final i in open) if (i.freeText != null) i.freeText!.trim().toLowerCase()};
+    final hid = await householdId();
+    final listId = await _defaultListId();
+    var added = 0;
+    for (final e in entries) {
+      final id = e.productId;
+      final text = e.freeText?.trim();
+      if (id == null && (text == null || text.isEmpty)) continue;
+      if (id != null ? !listedProducts.add(id) : !listedTexts.add(text!.toLowerCase())) continue;
+      await _putItem(ShoppingListItem(
+        id: _uuid.v4(),
+        householdId: hid,
+        listId: listId,
+        productId: id,
+        freeText: id == null ? text : null,
+        quantity: 1,
+        unit: e.unit,
+        checked: false,
+        source: 'manual',
+        isSuggestion: false,
+        updatedAt: DateTime.now().toUtc(),
+      ));
+      added++;
+    }
+    if (added > 0) onChanged?.call();
+    return added;
+  }
+
   /// Abhaken/wieder aktivieren (LH-SHO-01).
   Future<void> setChecked(String id, bool checked) async {
     final item = await _get(id);
