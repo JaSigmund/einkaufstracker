@@ -8,6 +8,7 @@ import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
 import '../local/database.dart';
+import '../nutrition/bls_food_search.dart';
 import '../products/off_client.dart';
 import '../sync/mappers.dart';
 
@@ -260,6 +261,38 @@ class ProductRepository {
     final updated = product.copyWith(updatedAt: DateTime.now().toUtc());
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
+  }
+
+  /// Verknuepft das Produkt mit einem Eintrag der Lebensmitteldatenbank (Phase N1, ADR-031): `bls_code` und das Profil je
+  /// 100 g als Snapshot in `nutrients_per_100` (`nutrients_source = 'bls'`), damit die Mahlzeitenerfassung offline ohne Abfrage
+  /// rechnet. Ein vorhandenes Profil (z.B. von Open Food Facts, packungsgenau) bleibt, ausser mit [overwrite].
+  /// Liefert das geaenderte Produkt, `null` bei unbekanntem Produkt, vorhandenem Profil oder einem Eintrag ohne Naehrwerte.
+  Future<Product?> setBlsProfile(String productId, BlsFood food, {bool overwrite = false}) async {
+    final product = await byId(productId);
+    if (product == null || product.deletedAt != null) return null;
+    if (product.nutrientsPer100 != null && !overwrite) return null;
+    final p = food.per100;
+    final profile = <String, double>{
+      if (p.kcal != null) 'kcal': p.kcal!,
+      if (p.proteinG != null) 'protein_g': p.proteinG!,
+      if (p.fatG != null) 'fat_g': p.fatG!,
+      if (p.satFatG != null) 'sat_fat_g': p.satFatG!,
+      if (p.carbsG != null) 'carbs_g': p.carbsG!,
+      if (p.sugarG != null) 'sugar_g': p.sugarG!,
+      if (p.fiberG != null) 'fiber_g': p.fiberG!,
+      if (p.saltG != null) 'salt_g': p.saltG!,
+    };
+    if (profile.isEmpty) return null;
+    final updated = product.copyWith(
+      nutrientsPer100: Value(jsonEncode(profile)),
+      nutrientsBasis: const Value('g'),
+      nutrientsSource: const Value('bls'),
+      blsCode: Value(food.code),
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+    return updated;
   }
 
   /// Loescht ein Produkt aus "Meine Produkte" (Fehlerbericht "Produkt löschen", 2026-09-28). Bestehende

@@ -26,6 +26,7 @@ import '../data/remote/remote_store.dart';
 import '../data/nutrition/bls_food_search.dart';
 import '../data/online_prices/online_price_remote.dart';
 import '../data/repositories/online_price_repository.dart';
+import '../data/repositories/food_link_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
@@ -260,6 +261,19 @@ final productRepositoryProvider = Provider<ProductRepository>((ref) {
 });
 
 final productsStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAll());
+
+/// Gedaechtnis des Haushalts: Name -> BLS-Eintrag (Phase N1, ADR-031).
+final foodLinkRepositoryProvider = Provider<FoodLinkRepository>((ref) {
+  return FoodLinkRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
 
 /// Online-Preise von Billa und Spar zu eigenen Produkten (ADR-019): Verknuepfungen und lokaler Preis-Zwischenspeicher.
 final onlinePriceRemoteProvider = Provider<OnlinePriceRemote>((ref) => SupabaseOnlinePriceRemote(ref.watch(supabaseClientProvider)));

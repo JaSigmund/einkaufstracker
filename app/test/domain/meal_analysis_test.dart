@@ -1,3 +1,4 @@
+import 'package:einkaufstracker/domain/nutrition/food_match.dart';
 import 'package:einkaufstracker/domain/nutrition/meal_analysis.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -94,6 +95,83 @@ void main() {
     expect(parseMealAnalysis({'servings_visible': 0}).servingsVisible, isNull);
     expect(parseMealAnalysis({'servings_visible': -1}).servingsVisible, isNull);
     expect(parseMealAnalysis({'servings_visible': 'zwei'}).servingsVisible, isNull);
+  });
+
+  test('Art und Zustand: nur bekannte Werte, sonst Essen ohne Zustand', () {
+    final a = parseMealAnalysis({
+      'ingredients': [
+        {'name': 'Cola', 'kind': 'drink', 'state': 'ready_made'},
+        {'name': 'Reis', 'kind': 'food', 'state': 'cooked'},
+        {'name': 'Ei', 'kind': 'snack', 'state': 'roh'},
+        {'name': 'Brot'},
+      ],
+    });
+    expect(a.ingredients.map((i) => i.kind), ['drink', 'food', 'food', 'food']);
+    expect(a.ingredients.map((i) => i.state), ['ready_made', 'cooked', null, null]);
+    expect(a.ingredients.map((i) => i.isDrink), [true, false, false, false]);
+  });
+
+  group('Treffer der Lebensmitteldatenbank (Phase N1)', () {
+    Map<String, dynamic> match({Object? per100, Object? code = 'G543100', Object? name = 'Gemüsepaprika rot, roh', Object? method, Object? trust}) =>
+        {'code': code, 'name': name, 'per100': per100 ?? {'kcal': 31, 'protein_g': 1.0}, 'method': method, 'trust': trust};
+
+    test('wird gelesen: Code, Name, Werte, Herkunft und Sicherheit', () {
+      final a = parseMealAnalysis({
+        'ingredients': [
+          {'name': 'Paprika', 'match': match(method: 'synonym', trust: 'sure')},
+          {'name': 'Quark', 'match': match(code: 'M713300', name: 'Speisequark', method: 'llm')},
+        ],
+      });
+      final m = a.ingredients[0].match!;
+      expect(m.code, 'G543100');
+      expect(m.name, 'Gemüsepaprika rot, roh');
+      expect(m.per100.kcal, 31);
+      expect(m.per100.proteinG, 1.0);
+      expect(m.method, 'synonym');
+      expect(m.trust, MatchTrust.sure);
+      expect(m.alreadyKnown, isTrue);
+      final q = a.ingredients[1].match!;
+      expect(q.method, 'llm');
+      expect(q.trust, MatchTrust.auto, reason: 'ohne "sure" gilt: automatisch zugeordnet');
+      expect(q.alreadyKnown, isFalse);
+    });
+
+    test('unlesbare oder unvollstaendige Treffer werden zu "kein Treffer", die Zutat bleibt', () {
+      final a = parseMealAnalysis({
+        'ingredients': [
+          {'name': 'A', 'match': 'Paprika'},
+          {'name': 'B', 'match': match(code: '')},
+          {'name': 'C', 'match': match(name: 7)},
+          {'name': 'D', 'match': match(per100: <String, dynamic>{})},
+          {'name': 'E', 'match': match(per100: 'viel')},
+          {'name': 'F', 'match': null},
+          {'name': 'G'},
+        ],
+      });
+      expect(a.ingredients.map((i) => i.name), ['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+      expect(a.ingredients.map((i) => i.match), everyElement(isNull));
+    });
+
+    test('unbekannte Herkunft wird als Suche gelesen', () {
+      final m = parseFoodMatch(match(method: 'zauberei'))!;
+      expect(m.method, 'search');
+    });
+
+    test('confirmed() macht aus einem automatischen Treffer einen sicheren und behaelt alles andere', () {
+      final auto = parseFoodMatch(match(method: 'search'))!;
+      final sure = auto.confirmed();
+      expect(sure.trust, MatchTrust.sure);
+      expect(sure.code, auto.code);
+      expect(sure.name, auto.name);
+      expect(sure.method, 'search');
+      expect(sure.per100.kcal, 31);
+    });
+
+    test('Herkunft fuer die Speicherung: sicher bls_exact, automatisch bls_matched, unbekannt unknown', () {
+      expect(MatchTrust.sure.basis, 'bls_exact');
+      expect(MatchTrust.auto.basis, 'bls_matched');
+      expect(MatchTrust.unknown.basis, 'unknown');
+    });
   });
 
   test('keine Zutaten: leer, auch wenn Titel und Hinweis da sind', () {

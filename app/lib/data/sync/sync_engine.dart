@@ -44,6 +44,8 @@ final syncTables = <SyncTableDef>[
   // Fremdschluessel auf receipt_items (Vorschlaege) und products
   SyncTableDef('inventory_items', (db, j) => db.into(db.inventoryItems).insertOnConflictUpdate(inventoryItemFromRemote(j))),
   SyncTableDef('inventory_movements', (db, j) => db.into(db.inventoryMovements).insertOnConflictUpdate(inventoryMovementFromRemote(j))),
+  // Gedaechtnis des Haushalts (Phase N1): Name -> BLS-Eintrag
+  SyncTableDef('household_food_links', (db, j) => db.into(db.householdFoodLinks).insertOnConflictUpdate(householdFoodLinkFromRemote(j))),
   // Essenstagebuch (Phase 7): Zutaten zeigen auf ihre Mahlzeit, deshalb zuerst die Mahlzeiten
   SyncTableDef('meals', (db, j) => db.into(db.meals).insertOnConflictUpdate(mealFromRemote(j))),
   SyncTableDef('meal_ingredients', (db, j) => db.into(db.mealIngredients).insertOnConflictUpdate(mealIngredientFromRemote(j))),

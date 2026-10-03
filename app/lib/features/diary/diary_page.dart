@@ -13,6 +13,7 @@ import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
+import 'product_nutrients_card.dart';
 import 'target_rows.dart';
 
 /// Inhalt des Tabs "Tagebuch" (Doku 15 §3.5, Phase 7b/7d): Mahlzeiten nach Tagen, je Tag mit Naehrwertsumme,
@@ -114,6 +115,7 @@ class DiaryPage extends ConsumerWidget {
       if (currentWeek != null)
         _weekCard(t, currentWeek, targets, partial: days.any((d) => !d.day.isBefore(currentWeek.weekStart) && d.dataQuality < 1)),
       BalanceCard(now: now),
+      ProductNutrientsCard(now: now),
       _frequentChips(context, t, meals),
       for (final day in dayKeys) ...[
         _dayHeader(t, day, today, dayInfo[day], targets),
