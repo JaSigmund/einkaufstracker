@@ -8,6 +8,7 @@ import '../features/auth/login_page.dart';
 import '../features/categories/categories_page.dart';
 import '../features/diary/balance_page.dart';
 import '../features/diary/journal_page.dart';
+import '../features/diary/product_nutrients_page.dart';
 import '../features/diary/meal_form_page.dart';
 import '../features/diary/targets_page.dart';
 import '../features/home/home_shell.dart';
@@ -130,6 +131,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/nutrition-targets', builder: (_, _) => const TargetsPage()),
       GoRoute(path: '/balance', builder: (_, _) => const BalancePage()),
       GoRoute(path: '/journal', builder: (_, _) => const JournalPage()),
+      GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
       GoRoute(
         path: '/stock-entry',
         builder: (_, state) {

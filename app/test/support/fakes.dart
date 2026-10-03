@@ -26,6 +26,7 @@ import 'package:einkaufstracker/data/barcode/barcode_scanner.dart';
 import 'package:einkaufstracker/data/products/off_client.dart';
 import 'package:einkaufstracker/data/repositories/bug_report_repository.dart';
 import 'package:einkaufstracker/data/repositories/inventory_repository.dart';
+import 'package:einkaufstracker/data/repositories/food_link_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/nutrition_targets_repository.dart';
 import 'package:einkaufstracker/data/repositories/product_repository.dart';
@@ -345,6 +346,9 @@ InventoryRepository inventoryRepo(AppDatabase db,
 MealRepository mealRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged, InventoryRepository? inventory}) =>
     MealRepository(db, householdId: () async => household, inventory: inventory ?? inventoryRepo(db, household: household), onChanged: onChanged);
 
+FoodLinkRepository foodLinkRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
+    FoodLinkRepository(db, householdId: () async => household, onChanged: onChanged);
+
 NutritionTargetsRepository nutritionTargetsRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     NutritionTargetsRepository(db, householdId: () async => household, onChanged: onChanged);
 
@@ -410,21 +414,39 @@ class FakeOffClient implements OffClient {
 BugReportRepository bugReportRepo(AppDatabase db, {String household = 'h1', void Function()? onChanged}) =>
     BugReportRepository(db, householdId: () async => household, onChanged: onChanged);
 
-/// Attrappe fuer die Online-Suche in der Lebensmitteldatenbank (BLS, ADR-024).
+/// Attrappe fuer die Online-Suche in der Lebensmitteldatenbank (BLS, ADR-024, Zuordnung Phase N1). Die Reihung der echten
+/// Suche steckt im Server; hier genuegt: Treffer enthaelt die Eingabe, Namen mit der Eingabe am Anfang zuerst.
 class FakeBlsFoodSearch implements BlsFoodSearch {
-  FakeBlsFoodSearch({this.foods = const [], this.fail = false});
+  FakeBlsFoodSearch({this.foods = const [], this.fail = false, Map<String, List<BlsFood>>? resolved}) : resolved = resolved ?? {};
 
   List<BlsFood> foods;
+
+  /// Vorgegebene Antworten von [resolve] je Name (kleingeschrieben); ohne Eintrag ist die Antwort leer.
+  Map<String, List<BlsFood>> resolved;
 
   /// true = Suche meldet [BlsSearchUnavailable]
   bool fail;
   final queries = <String>[];
+  final resolveQueries = <String>[];
 
   @override
   Future<List<BlsFood>> search(String query) async {
     queries.add(query);
     if (fail) throw const BlsSearchUnavailable();
-    return rankBlsFoods(foods.where((f) => f.nameDe.toLowerCase().contains(query.trim().toLowerCase())), query);
+    final q = query.trim().toLowerCase();
+    final hits = foods.where((f) => f.nameDe.toLowerCase().contains(q)).toList()
+      ..sort((a, b) {
+        final byStart = (a.nameDe.toLowerCase().startsWith(q) ? 0 : 1).compareTo(b.nameDe.toLowerCase().startsWith(q) ? 0 : 1);
+        return byStart != 0 ? byStart : a.nameDe.length.compareTo(b.nameDe.length);
+      });
+    return hits.take(blsSearchMaxResults).toList();
+  }
+
+  @override
+  Future<List<BlsFood>> resolve(String name, {int limit = 3}) async {
+    resolveQueries.add(name);
+    if (fail) throw const BlsSearchUnavailable();
+    return (resolved[name.trim().toLowerCase()] ?? const <BlsFood>[]).take(limit).toList();
   }
 }
 

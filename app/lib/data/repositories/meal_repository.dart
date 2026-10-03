@@ -37,6 +37,8 @@ class IngredientDraft {
     this.manualNutrients,
     this.deduct = true,
     this.confidence,
+    this.blsCode,
+    this.nutrientBasis,
   }) : assert(productId != null || freeText != null, 'Eine Zutat braucht ein Produkt oder einen Text');
 
   final String? productId;
@@ -60,6 +62,11 @@ class IngredientDraft {
   /// Bestand abziehen? Nur bei einem Produkt sinnvoll; `false` z.B. fuer Restaurantessen oder Reste.
   final bool deduct;
   final double? confidence;
+
+  /// BLS-Eintrag, aus dem [per100] stammt (Phase N1), und wie sicher die Zuordnung ist (`bls_exact`, `bls_matched`, ...).
+  /// Ohne Angabe von [nutrientBasis] leitet das Repository sie ab (Produktprofil: `product`, Handwerte: `manual`).
+  final String? blsCode;
+  final String? nutrientBasis;
 }
 
 /// Eine Mahlzeit samt Zutaten, wie sie gespeichert werden soll.
@@ -207,8 +214,13 @@ class MealRepository {
       final product = d.productId == null
           ? null
           : await (_db.select(_db.products)..where((p) => p.id.equals(d.productId!))).getSingleOrNull();
-      final per100 = product != null ? productNutrientProfile(product) : d.per100;
-      final basis = product != null ? (per100 == null ? null : product.nutrientsBasis) : (per100 == null ? null : d.per100Basis);
+      // Ein Produkt mit eigenen Naehrwerten gilt zuerst; hat es keine (35 von 39 Produkten vom Bon), springt das Profil des
+      // zugeordneten BLS-Eintrags ein (Phase N1), das die Zeile mitbringt.
+      final productProfile = product == null ? null : productNutrientProfile(product);
+      final per100 = productProfile ?? d.per100;
+      final basis = productProfile != null ? product!.nutrientsBasis : (per100 == null ? null : d.per100Basis);
+      final String? nutrientBasis = d.nutrientBasis ??
+          (productProfile != null ? 'product' : (d.manualNutrients != null ? 'manual' : (per100 != null && d.blsCode != null ? 'bls_exact' : null)));
       final amount = resolveIngredientAmount(
         quantity: d.quantity,
         entryUnit: d.entryUnit,
@@ -245,6 +257,8 @@ class MealRepository {
         amountG: amount.nutrientBasisAmount,
         source: d.source ?? (deducted ? 'inventory' : 'manual'),
         confidence: d.confidence,
+        blsCode: productProfile != null || d.manualNutrients != null ? null : d.blsCode,
+        nutrientBasis: nutrientBasis,
         kcal: nutrients?.kcal,
         proteinG: nutrients?.proteinG,
         fatG: nutrients?.fatG,

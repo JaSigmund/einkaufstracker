@@ -53,8 +53,12 @@ class Products extends Table {
   /// 'g' | 'ml', nur gesetzt wenn nutrientsPer100 gesetzt ist.
   TextColumn get nutrientsBasis => text().nullable()();
 
-  /// 'off' | 'usda' | 'manual' | 'llm_estimate'
+  /// 'off' | 'bls' | 'usda' | 'manual' | 'llm_estimate'
   TextColumn get nutrientsSource => text().nullable()();
+
+  /// Mit welchem Eintrag der Lebensmitteldatenbank (BLS) ist das Produkt verknuepft (Phase N1). Das Profil steht als
+  /// Snapshot in [nutrientsPer100], damit die Mahlzeitenerfassung ohne Abfrage offline laeuft.
+  TextColumn get blsCode => text().nullable()();
 
   /// Gewicht eines Stuecks in Gramm (z.B. Paprika ~150), fuer die Umrechnung Stueck <-> Gewicht.
   RealColumn get unitWeightG => real().nullable()();
@@ -315,6 +319,13 @@ class MealIngredients extends Table {
   /// 'inventory' | 'photo_ai' | 'recipe' | 'manual' | 'estimate'
   TextColumn get source => text().withDefault(const Constant('manual'))();
   RealColumn get confidence => real().nullable()();
+
+  /// Aus welchem BLS-Eintrag stammen die Naehrwerte (Phase N1), null bei Produkt- und Handwerten.
+  TextColumn get blsCode => text().nullable()();
+
+  /// Wie sicher die Naehrwerte sind: 'product' | 'bls_exact' | 'bls_matched' (automatisch zugeordnet, in der App mit ~
+  /// markiert) | 'llm_estimate' | 'manual' | 'unknown'. null bei Zutaten aus aelteren Versionen.
+  TextColumn get nutrientBasis => text().nullable()();
   RealColumn get kcal => real().nullable()();
   RealColumn get proteinG => real().nullable()();
   RealColumn get fatG => real().nullable()();
@@ -510,6 +521,22 @@ class OnlinePriceCache extends Table {
   Set<Column> get primaryKey => {store, externalId};
 }
 
+/// Gedaechtnis des Haushalts: "diesen Namen habe ich diesem BLS-Eintrag zugeordnet" (Spiegel von public.household_food_links,
+/// Phase N1, ADR-031). Der Server macht aus [nameNorm] den Schluessel (food_key), lokal steht zunaechst der Name, wie der Nutzer
+/// ihn sah. Beim naechsten Foto sucht der Server zuerst hier.
+@DataClassName('HouseholdFoodLink')
+class HouseholdFoodLinks extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get nameNorm => text()();
+  TextColumn get blsCode => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Kleine Schluessel-Wert-Ablage (z.B. zuletzt bekannte Haushalts-ID fuer den Offline-Start).
 @DataClassName('KeyValueEntry')
 class KeyValues extends Table {
@@ -523,7 +550,7 @@ class KeyValues extends Table {
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
   ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
-  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, Outbox, SyncStates, KeyValues,
+  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -542,7 +569,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -629,6 +656,16 @@ class AppDatabase extends _$AppDatabase {
           if (from < 16) {
             await m.createTable(productOnlineLinks);
             await m.createTable(onlinePriceCache);
+          }
+          // 16 -> 17: Zuordnung von Zutaten zur Lebensmitteldatenbank (Phase N1): BLS-Code und Sicherheit der Naehrwerte
+          if (from < 17) {
+            await m.addColumn(products, products.blsCode);
+            // Installationen vor 14 haben die Zutaten-Tabelle oben schon mit den neuen Spalten angelegt bekommen
+            if (from >= 14) {
+              await m.addColumn(mealIngredients, mealIngredients.blsCode);
+              await m.addColumn(mealIngredients, mealIngredients.nutrientBasis);
+            }
+            await m.createTable(householdFoodLinks);
           }
         },
       );

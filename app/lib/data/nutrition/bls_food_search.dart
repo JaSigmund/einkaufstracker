@@ -1,15 +1,33 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../domain/nutrition/food_match.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 
 /// Ein Lebensmittel aus dem Bundeslebensmittelschluessel (Tabelle `bls_foods`, ADR-024) mit Naehrwerten je 100 g.
+///
+/// Kommt es aus der Zuordnungs-Suche (SQL-Funktion `search_bls_foods`, Phase N1), steht dabei, woher der Treffer stammt
+/// ([method]: `memory` | `synonym` | `search`) und wie sicher er ist ([confidence]: `sure` | `auto` | `unsure`, nur fuer
+/// den ersten Treffer sinnvoll).
 class BlsFood {
-  const BlsFood({required this.code, required this.nameDe, this.nameEn, required this.per100});
+  const BlsFood({required this.code, required this.nameDe, this.nameEn, required this.per100, this.method, this.confidence});
 
   final String code;
   final String nameDe;
   final String? nameEn;
   final NutrientsPer100 per100;
+  final String? method;
+  final String? confidence;
+
+  /// Als Treffer mit Sicherheit: sicher (Gedaechtnis, Synonym) oder automatisch, `unknown` bei `unsure`/ohne Angabe.
+  MatchTrust get trust => confidence == 'sure' ? MatchTrust.sure : (confidence == 'auto' ? MatchTrust.auto : MatchTrust.unknown);
+
+  FoodMatch toMatch({MatchTrust? trust}) => FoodMatch(
+        code: code,
+        name: nameDe,
+        per100: per100,
+        method: method ?? 'search',
+        trust: trust ?? (this.trust == MatchTrust.unknown ? MatchTrust.auto : this.trust),
+      );
 }
 
 /// Die Lebensmitteldatenbank ist gerade nicht erreichbar (kein Netz, Serverfehler). Die Eingabe einer Zutat
@@ -22,37 +40,20 @@ class BlsSearchUnavailable implements Exception {
 }
 
 abstract class BlsFoodSearch {
-  /// Sucht Lebensmittel nach deutschem Namen. Bei zu kurzer Eingabe leer, ohne Anfrage.
+  /// Handsuche nach einem Namen: auch Treffer, die nur einen Teil der Woerter enthalten, die besten zuerst (Gedaechtnis des
+  /// Haushalts und Synonyme vor der Namenssuche). Bei zu kurzer Eingabe leer, ohne Anfrage.
   Future<List<BlsFood>> search(String query);
+
+  /// Ordnet einen Namen zu: die besten [limit] Treffer, der erste mit Sicherheit ([BlsFood.confidence]). Leer, wenn nichts
+  /// passt. Wirft [BlsSearchUnavailable] ohne Netz.
+  Future<List<BlsFood>> resolve(String name, {int limit = 3});
 }
 
 const blsSearchMinChars = 2;
 const blsSearchMaxResults = 25;
 
-/// Sortiert Treffer so, dass das Naheliegende oben steht: Namen, die mit der Eingabe beginnen, vor Namen, in
-/// denen ein Wort damit beginnt, vor sonstigen Treffern; innerhalb einer Stufe kuerzere Namen zuerst ("Apfel roh"
-/// vor "Apfelkuchen mit Streuseln"), dann alphabetisch. Begrenzt auf [blsSearchMaxResults].
-List<BlsFood> rankBlsFoods(Iterable<BlsFood> foods, String query) {
-  final q = query.trim().toLowerCase();
-  int rank(BlsFood f) {
-    final name = f.nameDe.toLowerCase();
-    if (name.startsWith(q)) return 0;
-    if (RegExp('(^|[\\s,(/-])${RegExp.escape(q)}').hasMatch(name)) return 1;
-    return 2;
-  }
-
-  final sorted = foods.toList()
-    ..sort((a, b) {
-      final byRank = rank(a).compareTo(rank(b));
-      if (byRank != 0) return byRank;
-      final byLength = a.nameDe.length.compareTo(b.nameDe.length);
-      return byLength != 0 ? byLength : a.nameDe.compareTo(b.nameDe);
-    });
-  return sorted.take(blsSearchMaxResults).toList();
-}
-
-/// Liest eine Zeile von `bls_foods`. PostgREST liefert `numeric` als Zahl, aelterer oder anders konfigurierter Server
-/// auch als Text: beides wird gelesen, Unlesbares wird `null`.
+/// Liest eine Zeile von `search_bls_foods` oder `bls_foods`. PostgREST liefert `numeric` als Zahl, aelter oder anders
+/// konfigurierter Server auch als Text: beides wird gelesen, Unlesbares wird `null`.
 BlsFood blsFoodFromRow(Map<String, dynamic> row) {
   double? n(String key) {
     final v = row[key];
@@ -61,6 +62,8 @@ BlsFood blsFoodFromRow(Map<String, dynamic> row) {
     return null;
   }
 
+  final method = row['method'];
+  final confidence = row['confidence'];
   return BlsFood(
     code: row['bls_code'] as String,
     nameDe: row['name_de'] as String,
@@ -75,26 +78,37 @@ BlsFood blsFoodFromRow(Map<String, dynamic> row) {
       fiberG: n('fiber_g'),
       saltG: n('salt_g'),
     ),
+    method: method is String ? method : null,
+    confidence: confidence is String ? confidence : null,
   );
 }
 
-/// Sucht online in `bls_foods` (nur lesbar fuer angemeldete Nutzer, Migration 0014).
+/// Sucht ueber die SQL-Funktion `search_bls_foods` (Migration 0022): Gedaechtnis des Haushalts, Synonyme, Namenssuche mit
+/// Wertung. Die Reihung steckt im Server, damit App, Edge Function und Test dieselbe haben.
 class SupabaseBlsFoodSearch implements BlsFoodSearch {
   SupabaseBlsFoodSearch(this._client);
   final SupabaseClient _client;
 
-  static const _columns = 'bls_code,name_de,name_en,kcal,protein_g,fat_g,sat_fat_g,carbs_g,sugar_g,fiber_g,salt_g';
-
-  @override
-  Future<List<BlsFood>> search(String query) async {
-    final q = query.trim();
-    if (q.length < blsSearchMinChars) return const [];
+  Future<List<BlsFood>> _call(String query, {required int limit, required bool loose}) async {
     try {
-      // Mehr holen als angezeigt, weil erst clientseitig sinnvoll sortiert wird (alphabetisch waere "Apfelkuchen" vor "Apfel roh").
-      final rows = await _client.from('bls_foods').select(_columns).ilike('name_de', '%$q%').limit(150).timeout(const Duration(seconds: 15));
-      return rankBlsFoods([for (final r in rows) blsFoodFromRow(r)], q);
+      final rows = await _client
+          .rpc('search_bls_foods', params: {'q': query.trim(), 'n': limit, 'p_loose': loose})
+          .timeout(const Duration(seconds: 15));
+      return [for (final r in rows as List) blsFoodFromRow(Map<String, dynamic>.from(r as Map))];
     } catch (e) {
       throw BlsSearchUnavailable(e.toString());
     }
+  }
+
+  @override
+  Future<List<BlsFood>> search(String query) async {
+    if (query.trim().length < blsSearchMinChars) return const [];
+    return _call(query, limit: blsSearchMaxResults, loose: true);
+  }
+
+  @override
+  Future<List<BlsFood>> resolve(String name, {int limit = 3}) async {
+    if (name.trim().length < blsSearchMinChars) return const [];
+    return _call(name, limit: limit, loose: false);
   }
 }

@@ -288,9 +288,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('pick-bls-G543100')));
     await tester.pumpAndSettle();
-    expect(find.text('Paprika rot, roh'), findsOneWidget);
+    // Der Name der Zeile bleibt, wie der Nutzer ihn sah; woher die Werte stammen, steht darunter (Phase N1)
+    expect(tester.widget<Text>(find.byKey(const Key('ingredient-match-1'))).data, 'Nährwerte: Paprika rot, roh');
     expect(find.text('80 g · 29 kcal · unsicher geschätzt'), findsOneWidget, reason: 'Menge bleibt, Werte kommen aus der Datenbank');
     expect(find.byKey(const Key('ingredient-lookup-1')), findsNothing);
+    expect(find.byKey(const Key('ingredient-trust-sure-1')), findsOneWidget, reason: 'vom Nutzer gewaehlt: sicher');
   });
 
   testWidgets('Bearbeiten einer Mahlzeit mit Foto: Vorschlag nutzt das gespeicherte Foto', (tester) async {

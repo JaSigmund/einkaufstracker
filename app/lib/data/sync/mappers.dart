@@ -51,6 +51,7 @@ Map<String, dynamic> productToRemote(Product p) => {
       'nutrients_per_100': p.nutrientsPer100 == null ? null : jsonDecode(p.nutrientsPer100!),
       'nutrients_basis': p.nutrientsBasis,
       'nutrients_source': p.nutrientsSource,
+      'bls_code': p.blsCode,
       'unit_weight_g': p.unitWeightG,
       'updated_at': p.updatedAt.toUtc().toIso8601String(),
       'deleted_at': p.deletedAt?.toUtc().toIso8601String(),
@@ -73,6 +74,7 @@ ProductsCompanion productFromRemote(Map<String, dynamic> j) => ProductsCompanion
       nutrientsPer100: Value(j['nutrients_per_100'] == null ? null : jsonEncode(j['nutrients_per_100'])),
       nutrientsBasis: Value(j['nutrients_basis'] as String?),
       nutrientsSource: Value(j['nutrients_source'] as String?),
+      blsCode: Value(j['bls_code'] as String?),
       unitWeightG: Value((j['unit_weight_g'] as num?)?.toDouble()),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
@@ -347,6 +349,8 @@ Map<String, dynamic> mealIngredientToRemote(MealIngredient i) => {
       'amount_g': i.amountG,
       'source': i.source,
       'confidence': i.confidence,
+      'bls_code': i.blsCode,
+      'nutrient_basis': i.nutrientBasis,
       'kcal': i.kcal,
       'protein_g': i.proteinG,
       'fat_g': i.fatG,
@@ -372,6 +376,8 @@ MealIngredientsCompanion mealIngredientFromRemote(Map<String, dynamic> j) {
     amountG: Value(n('amount_g')),
     source: Value(j['source'] as String? ?? 'manual'),
     confidence: Value(n('confidence')),
+    blsCode: Value(j['bls_code'] as String?),
+    nutrientBasis: Value(j['nutrient_basis'] as String?),
     kcal: Value(n('kcal')),
     proteinG: Value(n('protein_g')),
     fatG: Value(n('fat_g')),
@@ -383,6 +389,24 @@ MealIngredientsCompanion mealIngredientFromRemote(Map<String, dynamic> j) {
     deletedAt: Value(_dt(j['deleted_at'])),
   );
 }
+
+Map<String, dynamic> householdFoodLinkToRemote(HouseholdFoodLink l) => {
+      'id': l.id,
+      'household_id': l.householdId,
+      'name_norm': l.nameNorm,
+      'bls_code': l.blsCode,
+      'updated_at': l.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': l.deletedAt?.toUtc().toIso8601String(),
+    };
+
+HouseholdFoodLinksCompanion householdFoodLinkFromRemote(Map<String, dynamic> j) => HouseholdFoodLinksCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      nameNorm: Value(j['name_norm'] as String),
+      blsCode: Value(j['bls_code'] as String),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
 
 Map<String, dynamic> productAliasToRemote(ProductAlias a) => {
       'id': a.id,

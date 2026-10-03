@@ -20,8 +20,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -101,5 +101,38 @@ void main() {
         ));
     expect(await db.select(db.productOnlineLinks).get(), hasLength(1));
     expect((await db.select(db.onlinePriceCache).getSingle()).available, isTrue, reason: 'Standardwert: verfuegbar');
+  });
+
+  test('Daten aus Version 16 bleiben beim Hochziehen erhalten, neue Spalten sind leer, das Gedaechtnis der Zuordnung ist nutzbar', () async {
+    final schema = await verifier.schemaAt(16);
+    schema.rawDatabase.execute(
+      "INSERT INTO products (id, household_id, name, updated_at) VALUES ('p1', 'h1', 'Vollmilch', '2026-09-01T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meals (id, household_id, eaten_at, meal_type, title, servings_eaten, servings_made, source, is_estimate, updated_at) "
+      "VALUES ('m1', 'h1', '2026-09-02T10:00:00.000Z', 'lunch', 'Reis', 1.0, 1.0, 'manual', 0, '2026-09-02T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meal_ingredients (id, household_id, meal_id, free_text, quantity, unit, amount_g, source, updated_at) "
+      "VALUES ('i1', 'h1', 'm1', 'Paprika', 0.08, 'kg', 80.0, 'manual', '2026-09-02T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    final product = await db.select(db.products).getSingle();
+    expect(product.name, 'Vollmilch');
+    expect(product.blsCode, isNull, reason: 'neue Spalte, bestehende Produkte bleiben ohne Zuordnung');
+    final ingredient = await db.select(db.mealIngredients).getSingle();
+    expect(ingredient.freeText, 'Paprika');
+    expect(ingredient.blsCode, isNull);
+    expect(ingredient.nutrientBasis, isNull, reason: 'bei alten Zeilen ist die Herkunft nicht bekannt');
+    expect(await db.select(db.householdFoodLinks).get(), isEmpty);
+
+    await db.into(db.householdFoodLinks).insert(HouseholdFoodLinksCompanion.insert(
+          id: 'l1', householdId: 'h1', nameNorm: 'Quark', blsCode: 'M713300', updatedAt: DateTime.utc(2026, 10, 3),
+        ));
+    expect((await db.select(db.householdFoodLinks).getSingle()).blsCode, 'M713300');
   });
 }

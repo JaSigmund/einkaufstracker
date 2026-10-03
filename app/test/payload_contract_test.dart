@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
@@ -55,7 +56,19 @@ Future<List<Map<String, dynamic>>> _collect() async {
         entryUnit: EntryUnit.g,
         per100: NutrientsPer100(kcal: 36, proteinG: 1.0, fatG: 0.3, carbsG: 4.9, sugarG: 4.2, fiberG: 3.6, saltG: 0.01),
         per100Basis: 'g',
+        blsCode: 'G543100',
+        nutrientBasis: 'bls_exact',
       ),
+      const IngredientDraft(
+        freeText: 'Quark',
+        quantity: 50,
+        entryUnit: EntryUnit.g,
+        per100: NutrientsPer100(kcal: 100, proteinG: 12),
+        per100Basis: 'g',
+        blsCode: 'M713300',
+        nutrientBasis: 'bls_matched',
+      ),
+      const IngredientDraft(freeText: 'Gewürzmischung', quantity: 5, entryUnit: EntryUnit.g),
       const IngredientDraft(
         freeText: 'Nachspeise im Restaurant',
         quantity: 1,
@@ -86,6 +99,17 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await nutritionTargetsRepo(db).save(const NutritionTargets()
       .withTarget(NutrientKey.kcal, const NutrientTarget(min: 1800, max: 2200))
       .withTarget(NutrientKey.saltG, const NutrientTarget(max: 6)));
+
+  // Zuordnung zur Lebensmitteldatenbank (Phase N1): Produkt ohne Profil bekommt eins, Gedaechtnis lernen und vergessen
+  final milch = await productRepo(db).create(name: 'Milch', baseUnit: 'l');
+  await productRepo(db).setBlsProfile(
+    milch.id,
+    const BlsFood(code: 'M111300', nameDe: 'Vollmilch frisch, 3,5 % Fett', per100: NutrientsPer100(kcal: 65, proteinG: 3.4, fatG: 3.6, satFatG: 2.3, carbsG: 4.7, sugarG: 4.7, fiberG: 0, saltG: 0.1)),
+  );
+  final links = foodLinkRepo(db);
+  await links.learn('Quark', 'M713300');
+  await links.learn('Skyr', 'M710100');
+  await links.forget((await links.all()).firstWhere((l) => l.nameNorm == 'Skyr').id);
 
   // Online-Preise (ADR-019): zwei Artikel beim selben Haendler (Bio und normal), einer bei einem anderen, einer wieder geloest
   final online = OnlinePriceRepository(db, FakeOnlinePriceRemote(), householdId: () async => 'h1');
@@ -131,7 +155,7 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
@@ -144,6 +168,11 @@ void main() {
     expect({for (final i in rows('meal_ingredients')) i['source']}, containsAll(['photo_ai', 'estimate', 'inventory', 'manual']));
     expect(rows('meal_ingredients').any((i) => i['confidence'] != null), isTrue);
     expect(rows('meal_ingredients').any((i) => i['product_id'] == null && i['free_text'] != null), isTrue);
+    expect({for (final i in rows('meal_ingredients')) i['nutrient_basis']}, containsAll(['bls_exact', 'bls_matched', 'product', 'manual', null]));
+    expect(rows('meal_ingredients').any((i) => i['bls_code'] == 'G543100'), isTrue);
+    expect(rows('products').any((p) => p['bls_code'] == 'M111300' && p['nutrients_source'] == 'bls'), isTrue, reason: 'Profil aus der BLS im Produkt');
+    expect(rows('household_food_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Zuordnung vergessen (Soft-Delete)');
+    expect({for (final l in rows('household_food_links')) l['bls_code']}, {'M713300', 'M710100'}, reason: 'Quark gelernt, Skyr gelernt und wieder vergessen');
     expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
     expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
     expect(

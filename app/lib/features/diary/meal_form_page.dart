@@ -12,6 +12,7 @@ import '../../data/local/database.dart';
 import '../../data/repositories/meal_repository.dart';
 import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
+import '../../domain/nutrition/food_match.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
@@ -35,7 +36,22 @@ class MealFormArgs {
 
 /// Eine Zutat im Formular, noch nicht gespeichert.
 class _Row {
-  _Row({this.product, this.freeText, required this.quantity, required this.unit, this.per100, this.per100Basis, this.manual, this.deduct = false, this.source, this.confidence});
+  _Row({
+    this.product,
+    this.freeText,
+    required this.quantity,
+    required this.unit,
+    this.per100,
+    this.per100Basis,
+    this.manual,
+    this.deduct = false,
+    this.source,
+    this.confidence,
+    this.blsCode,
+    this.matchName,
+    this.matchTrust = MatchTrust.sure,
+    this.learn = false,
+  });
 
   Product? product;
   String? freeText;
@@ -50,7 +66,26 @@ class _Row {
   /// Sicherheit der Foto-Analyse (0 bis 1), nur bei Zutaten aus einem KI-Vorschlag.
   double? confidence;
 
+  /// BLS-Eintrag, aus dem [per100] stammt (Phase N1), sein Name und wie sicher die Zuordnung ist. [learn]: beim Speichern
+  /// im Gedaechtnis des Haushalts vermerken (nur sinnvoll, wenn die Zuordnung dem Server noch nicht bekannt war).
+  String? blsCode;
+  String? matchName;
+  MatchTrust matchTrust;
+  bool learn;
+
   String get label => product?.name ?? freeText ?? 'Zutat';
+
+  /// Naehrwertprofil des Produkts, falls es eines hat (Produkte vom Bon haben meist keines).
+  NutrientsPer100? get _productProfile => product == null ? null : productNutrientProfile(product!);
+
+  /// Wie sicher die Naehrwerte dieser Zeile sind: Produkt mit eigenem Profil und Handwerte gelten als sicher, ein BLS-Treffer
+  /// nach seiner Zuordnung, ohne Naehrwerte ist es unbekannt.
+  MatchTrust get trust {
+    if (manual != null) return MatchTrust.sure;
+    if (_productProfile != null) return MatchTrust.sure;
+    if (per100 == null) return MatchTrust.unknown;
+    return blsCode != null ? matchTrust : MatchTrust.sure;
+  }
 
   IngredientDraft toDraft() => IngredientDraft(
         productId: product?.id,
@@ -63,12 +98,15 @@ class _Row {
         manualNutrients: manual,
         deduct: deduct && product != null,
         confidence: confidence,
+        blsCode: blsCode,
+        nutrientBasis: manual != null ? 'manual' : (_productProfile != null ? 'product' : (blsCode != null && per100 != null ? trust.basis : null)),
       );
 
-  /// Naehrwerte dieser Zutat, wie sie beim Speichern berechnet wuerden; `null`, wenn unbekannt.
+  /// Naehrwerte dieser Zutat, wie sie beim Speichern berechnet wuerden; `null`, wenn unbekannt. Ein Produkt ohne eigenes Profil
+  /// nutzt das Profil des zugeordneten BLS-Eintrags (Phase N1).
   NutrientAmounts? get nutrients {
-    final profile = product != null ? productNutrientProfile(product!) : per100;
-    final basis = product != null ? product!.nutrientsBasis : per100Basis;
+    final profile = _productProfile ?? per100;
+    final basis = _productProfile != null ? product!.nutrientsBasis : per100Basis;
     final amount = resolveIngredientAmount(
       quantity: quantity,
       entryUnit: unit,
@@ -207,6 +245,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         deduct: !noDeduction && (i.source == 'inventory' || i.inventoryItemId != null),
         source: i.source,
         confidence: i.confidence,
+        blsCode: i.blsCode,
+        matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
@@ -327,14 +367,27 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       if (a.servingsVisible != null) _made.text = formatQuantity(a.servingsVisible!);
       for (final i in a.ingredients) {
         final product = i.inventoryProductId == null ? null : byId[i.inventoryProductId];
+        // Hat das Produkt eigene Naehrwerte, gelten sie. Sonst (die meisten Produkte vom Bon) springt der automatisch
+        // zugeordnete BLS-Eintrag ein; ohne beides bleibt die Zeile "unbekannt" (Phase N1, ADR-031).
+        final ownProfile = product != null && productNutrientProfile(product) != null;
+        final match = ownProfile ? null : i.match;
         _rows.add(_Row(
           product: product,
           freeText: product == null ? i.name : null,
           quantity: i.estimatedGrams ?? 0,
-          unit: product != null && product.baseUnit == 'l' ? EntryUnit.ml : EntryUnit.g,
-          deduct: product != null && inStock.contains(product.id),
+          // Getraenke fuehrt die App in ml; die Naehrwerte der BLS gelten je 100 g, bei Wasserdichte 1 ist das dasselbe
+          unit: (product != null && product.baseUnit == 'l') || i.isDrink ? EntryUnit.ml : EntryUnit.g,
+          // Gekochtes wiegt mehr als das Rohgewicht im Bestand: kein Abzug vorbelegt (Q-28), der Nutzer kann ihn einschalten
+          deduct: product != null && inStock.contains(product.id) && i.state != 'cooked',
           source: 'photo_ai',
           confidence: i.confidence,
+          per100: match?.per100,
+          per100Basis: match == null ? null : 'g',
+          blsCode: match?.code,
+          matchName: match?.name,
+          matchTrust: match?.trust ?? MatchTrust.sure,
+          // Gedaechtnis und Synonym kennt der Server schon, alles andere merkt sich der Haushalt beim Speichern
+          learn: match != null && !match.alreadyKnown,
         ));
       }
       // FR-17: Mengen aus einem Foto sind Schaetzungen und muessen in allen Auswertungen erkennbar sein.
@@ -361,14 +414,23 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..freeText = null
           ..per100 = null
           ..per100Basis = null
+          ..blsCode = null
+          ..matchName = null
+          ..learn = false
           ..deduct = active.any((i) => i.productId == product.id);
         if (product.baseUnit == 'l' && row.unit == EntryUnit.g) row.unit = EntryUnit.ml;
       } else if (bls != null) {
+        // Der Nutzer hat selbst gewaehlt: sicher, und der Haushalt merkt sich "dieser Name = dieser Eintrag"
+        final asked = row.label;
         row
           ..product = null
-          ..freeText = bls.nameDe
+          ..freeText = asked
           ..per100 = bls.per100
           ..per100Basis = 'g'
+          ..blsCode = bls.code
+          ..matchName = bls.nameDe
+          ..matchTrust = MatchTrust.sure
+          ..learn = true
           ..deduct = false;
       } else {
         row.freeText = picked.freeText;
@@ -417,6 +479,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           unit: q.unit,
           per100: bls?.per100,
           per100Basis: bls == null ? null : 'g',
+          blsCode: bls?.code,
+          matchName: bls?.nameDe,
           deduct: q.deduct,
         )));
   }
@@ -517,6 +581,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       final repo = ref.read(mealRepositoryProvider);
       final saved = _isEdit ? await repo.update(widget.existing!.id, draft) : await repo.create(draft);
       final photoProblem = await _applyPhoto(saved);
+      await _learnLinks();
       if (!mounted) return;
       if (photoProblem != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(photoProblem)));
       context.pop(true);
@@ -524,6 +589,19 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       if (mounted) setState(() => _error = 'Speichern nicht möglich: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Merkt sich die Zuordnungen "Name -> BLS-Eintrag", die der Nutzer gewaehlt oder durch Speichern bestaetigt hat (Phase N1,
+  /// ADR-031): beim naechsten Foto kennt der Server sie. Ein Fehler hier darf das Speichern der Mahlzeit nie kippen.
+  Future<void> _learnLinks() async {
+    try {
+      final links = ref.read(foodLinkRepositoryProvider);
+      for (final r in _rows) {
+        if (r.learn && r.blsCode != null && r.product == null && r.per100 != null) await links.learn(r.label, r.blsCode!);
+      }
+    } catch (_) {
+      // das Gedaechtnis ist eine Zugabe
     }
   }
 
@@ -653,6 +731,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text('Noch keine Zutat. Aus dem Inventar, der Lebensmitteldatenbank oder als Freitext.', style: t.textTheme.bodySmall),
           ),
+        if (_rows.isNotEmpty) _trustSummary(t),
         for (var i = 0; i < _rows.length; i++) _ingredientTile(i, t),
         Align(
           alignment: Alignment.centerLeft,
@@ -762,20 +841,71 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       if (r.deduct && r.product != null) 'vom Bestand',
       if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
     ];
+    // Woher die Naehrwerte stammen, wenn nicht aus dem Namen der Zeile selbst ersichtlich ("Paprika" -> "Gemüsepaprika rot, roh")
+    final matched = r.matchName != null && r.matchName != r.label && r.per100 != null && r.product == null;
     return ListTile(
       key: Key('ingredient-row-$i'),
       contentPadding: EdgeInsets.zero,
       dense: true,
       leading: Icon(r.product != null ? Icons.kitchen_outlined : (_isManual(r) ? Icons.edit_note : Icons.eco_outlined), size: 20),
       title: Text(r.label),
-      subtitle: Text(parts.join(' · ')),
+      isThreeLine: matched,
+      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (matched) Text('Nährwerte: ${r.matchName}', key: Key('ingredient-match-$i')),
+        Text(parts.join(' · ')),
+      ]),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        _trustMark(i, r, t),
         // Ohne bekannte Naehrwerte: direkt ein Produkt oder einen Datenbank-Treffer dazu suchen
         if (n == null)
           IconButton(key: Key('ingredient-lookup-$i'), tooltip: 'Nährwerte suchen', icon: const Icon(Icons.search), onPressed: () => _lookupNutrients(i)),
         IconButton(key: Key('ingredient-remove-$i'), tooltip: 'Entfernen', icon: const Icon(Icons.close), onPressed: () => setState(() => _rows.removeAt(i))),
       ]),
       onTap: () => _editIngredient(i),
+    );
+  }
+
+  /// Marke je Zutat: ✓ sicher, ~ automatisch zugeordnet (antippen bestaetigt), ? unbekannt (Phase N1, ADR-031).
+  Widget _trustMark(int i, _Row r, ThemeData t) {
+    switch (r.trust) {
+      case MatchTrust.sure:
+        return Icon(Icons.check_circle_outline, key: Key('ingredient-trust-sure-$i'), size: 20, color: t.colorScheme.primary);
+      case MatchTrust.auto:
+        return IconButton(
+          key: Key('ingredient-trust-auto-$i'),
+          tooltip: 'Automatisch zugeordnet. Antippen bestätigt.',
+          icon: Icon(Icons.change_circle_outlined, size: 20, color: t.colorScheme.tertiary),
+          onPressed: () => setState(() => r.matchTrust = MatchTrust.sure),
+        );
+      case MatchTrust.unknown:
+        return Icon(Icons.help_outline, key: Key('ingredient-trust-unknown-$i'), size: 20, color: t.colorScheme.outline);
+    }
+  }
+
+  /// "7 von 8 Zutaten mit Nährwerten, 2 automatisch zugeordnet" und der Knopf, alle automatischen Zuordnungen zu bestaetigen.
+  Widget _trustSummary(ThemeData t) {
+    final auto = _rows.where((r) => r.trust == MatchTrust.auto).length;
+    final unknown = _rows.where((r) => r.trust == MatchTrust.unknown).length;
+    if (auto == 0 && unknown == 0) return const SizedBox.shrink();
+    final known = _rows.length - unknown;
+    final text = StringBuffer('$known von ${_rows.length} Zutaten mit Nährwerten');
+    if (auto > 0) text.write(', $auto automatisch zugeordnet (~)');
+    if (unknown > 0) text.write(', $unknown unbekannt (?)');
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Row(children: [
+        Expanded(child: Text(text.toString(), key: const Key('ingredient-summary'), style: t.textTheme.bodySmall)),
+        if (auto > 0)
+          TextButton(
+            key: const Key('ingredient-confirm-all'),
+            onPressed: () => setState(() {
+              for (final r in _rows) {
+                if (r.trust == MatchTrust.auto) r.matchTrust = MatchTrust.sure;
+              }
+            }),
+            child: const Text('Alle übernehmen'),
+          ),
+      ]),
     );
   }
 

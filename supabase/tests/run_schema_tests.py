@@ -464,6 +464,170 @@ def main():
     db("delete from online_prices")
     db("delete from online_feed_status")
 
+    # --- Food Resolver (0022, Phase N1, ADR-031): Zuordnung von Zutatennamen zu BLS-Eintraegen -------------------
+    # Mit der ECHTEN BLS (7.140 Eintraege) und den echten Synonymen, damit der Golden-Test die Funktionen so prueft, wie sie
+    # auf Produktion laufen. Die SQL-Dateien erzeugen tools/import_bls_foods.py und tools/build_food_synonyms.py.
+    import csv
+    repo_root = ROOT.parent
+    db((repo_root / "tools" / "bls_foods_import.sql").read_text(encoding="utf-8"))
+    db((repo_root / "tools" / "food_synonyms_import.sql").read_text(encoding="utf-8"))
+    check("BLS: alle 7.140 Eintraege eingespielt", one("select count(*) from bls_foods where bls_code <> 'TEST01'") == 7140)
+
+    norm_cases = [
+        ("200 g frische Tomaten", "tomate", "tomate"),
+        ("Tomaten", "tomate", "tomate"),
+        ("rote Paprika", "rot paprika", "paprika rot"),
+        ("Paprika rot", "paprika rot", "paprika rot"),
+        ("gekochter Reis", "reis", "reis"),
+        ("Crème fraîche", "creme fraiche", "creme fraiche"),
+        ("Milch 1,5%", "milch fettarm", "fettarm milch"),
+        ("Milch 3,5 %", "milch", "milch"),
+        ("Bio Karotten", "karotte", "karotte"),
+        ("Kiwis", "kiwi", "kiwi"),
+        ("Ananas", "ananas", "ananas"),
+        ("Kürbis", "kürbis", "kürbis"),
+        ("Reis", "reis", "reis"),
+        ("geriebener Käse", "käse", "käse"),
+        ("Eier hartgekocht", "eier", "eier"),
+        ("Brötchen", "brötchen", "brötchen"),
+        ("", "", ""),
+        ("123 !!", "", ""),
+    ]
+    bad_norm = [(t, one("select public.food_core(%s)", (t,)), one("select public.food_key(%s)", (t,)), c, k)
+                for t, c, k in norm_cases
+                if (one("select public.food_core(%s)", (t,)), one("select public.food_key(%s)", (t,))) != (c, k)]
+    check("food_core und food_key: Normalisierung (Plural, Farben, Akzente, Fettstufe, Fuellwoerter, Zustand)", not bad_norm, str(bad_norm[:3]))
+    state_cases = [("gekochter Reis", "gekocht"), ("rohe Karotten", "roh"), ("Hähnchen gebraten", "gebraten"), ("gedünstete Zucchini", "gedünstet"),
+                   ("Ei hartgekocht", "gekocht"), ("Reis", None), ("Rohschinken", None), ("überbackener Käse", "gebacken")]
+    bad_state = [(t, one("select public.food_state(%s)", (t,)), e) for t, e in state_cases if one("select public.food_state(%s)", (t,)) != e]
+    check("food_state: Zustandswunsch im Namen (Rohschinken ist kein 'roh')", not bad_state, str(bad_state[:3]))
+
+    # Synonyme
+    n_syn = one("select count(*) from food_synonyms")
+    check("Synonyme: mindestens 500 eingespielt", n_syn >= 500, str(n_syn))
+    check("Synonyme: jeder Begriff ist bereits normalisiert (food_key(term) = term), sonst fand ihn die Suche nie",
+          one("select count(*) from food_synonyms where public.food_key(term_norm) <> term_norm") == 0)
+    check("Synonyme: Nutzer kann lesen", one("select count(*) from food_synonyms", user=A) == n_syn)
+    check("Synonyme: Nutzer darf nicht einfuegen", raises("insert into food_synonyms (term_norm, bls_code) values ('x', 'C352000')", user=A))
+    check("Synonyme: Nutzer darf nicht aendern (RLS filtert, 0 betroffen)", db("update food_synonyms set bls_code = 'C352000'", user=A)[1] == 0)
+    check("Synonyme: Code muss in der BLS existieren", raises("insert into food_synonyms (term_norm, bls_code) values ('zzz', 'NICHT00')"))
+
+    def top1(name, **kw):
+        r = db("select bls_code, name_de, method, confidence, coverage from search_bls_foods(%s, %s, %s, %s)",
+               (name, kw.get("n", 1), kw.get("household"), kw.get("loose", False)), user=kw.get("user", A))[0]
+        return r[0] if r else None
+
+    def code1(name, **kw):
+        r = top1(name, **kw)
+        return r[0] if r else None
+
+    # Golden-Test: 380+ Alltagsnamen mit erwartetem BLS-Code (tools/food_golden.csv)
+    golden = list(csv.DictReader((repo_root / "tools" / "food_golden.csv").open(encoding="utf-8", newline="")))
+    syn_terms = {r[0] for r in db("select term_norm from food_synonyms")[0]}
+    ok = held = held_ok = silent = unsure_miss = 0
+    problems = []
+    for g in golden:
+        name, expected, mode = g["name"], {x for x in g["expected"].split("|") if x}, g["mode"]
+        r = top1(name)
+        is_held = one("select public.food_key(%s)", (name,)) not in syn_terms
+        held += is_held
+        sure = bool(r) and r[3] in ("sure", "auto")
+        if mode == "none":
+            good = not sure
+        elif r and r[0] in expected:
+            good = sure or mode == "top"
+        else:
+            good = False
+        if r and sure and (mode == "none" or r[0] not in expected):
+            silent += 1
+            problems.append(f"STILL FALSCH {name}: {r[1]} [{r[0]}]")
+        elif not good:
+            unsure_miss += 1
+            problems.append(f"daneben {name}: {r[1] if r else 'kein Treffer'}")
+        ok += good
+        held_ok += good and is_held
+    check(f"Golden-Test: {len(golden)} Namen, mindestens 95 % richtig ({ok} = {ok / len(golden):.1%})", ok / len(golden) >= 0.95, "; ".join(problems[:4]))
+    check(f"Golden-Test: auch ausserhalb der Synonyme mindestens 90 % ({held_ok} von {held})", held and held_ok / held >= 0.90, "; ".join(problems[:4]))
+    check("Golden-Test: nie stillschweigend falsch (sicher oder automatisch zugeordnet, aber falscher Eintrag)", silent == 0, "; ".join(problems[:4]))
+
+    check("Suche: Zustand aus dem Namen waehlt das Geschwister (gekochter Reis -> Reis gekocht)", code1("gekochter Reis") == "C352032")
+    check("Suche: Zustand gedünstet (Karotten gedünstet)", code1("Karotten gedünstet") == "G620152")
+    check("Suche: Zustand gebraten (Pfanne) bei Haehnchenbrust", code1("Hähnchenbrust gebraten") == "V416182")
+    check("Suche: ohne Geschwister bleibt es beim rohen Eintrag (gekochte Banane)", code1("gekochte Banane") == "F503100")
+    check("Suche: ohne Zustandswunsch der rohe Eintrag", code1("Karotten") == "G620100")
+    r = db("select bls_code, method, confidence from search_bls_foods('Reis', 1, null, false)", user=A)[0][0]
+    check("Suche: Synonym ist sicher (Reis)", r[1] == "synonym" and r[2] == "sure", str(r))
+    r = db("select bls_code, method, confidence from search_bls_foods('Kohlrabi', 1, null, false)", user=A)[0][0]
+    check("Suche: eindeutiger Name der BLS ist automatisch, ohne Synonym (Kohlrabi)", r == ("G331100", "search", "auto"), str(r))
+    check("Suche: Kirschen ergibt die Kirsche und nicht Weinbrand-Kirschen (Synonym vor Zufallstreffer)", code1("Kirschen") == "F211100")
+    check("Suche: nur Rang 1 kann sicher oder automatisch sein, alle anderen Treffer sind 'unsure'",
+          all(c == "unsure" for (rk, c) in db("select rank, confidence from search_bls_foods('Apfel', 8)", user=A)[0] if rk > 1))
+    check("Suche: leere und unsinnige Anfragen ergeben nichts, ohne Fehler",
+          db("select count(*) from search_bls_foods('')", user=A)[0][0][0] == 0
+          and db("select count(*) from search_bls_foods(%s)", ("'; drop table bls_foods; --",), user=A)[0][0][0] >= 0
+          and db("select count(*) from search_bls_foods('123')", user=A)[0][0][0] == 0)
+    check("Suche: Anzahl der Treffer ist begrenzt (n = 100 ergibt hoechstens 25)", db("select count(*) from search_bls_foods('Apfel', 100)", user=A)[0][0][0] <= 25)
+    strict_n = db("select count(*) from search_bls_foods('Paprika rot geröstet', 10, null, false)", user=A)[0][0][0]
+    loose_n = db("select count(*) from search_bls_foods('Paprika rot geröstet', 10, null, true)", user=A)[0][0][0]
+    check("Suche: lockere Suche findet auch Namen mit nur einem Teil der Woerter", loose_n > strict_n, f"{strict_n} / {loose_n}")
+    check("Suche: liefert die acht Naehrwerte des Eintrags mit",
+          one("select s.kcal is not distinct from f.kcal and s.protein_g is not distinct from f.protein_g and s.salt_g is not distinct from f.salt_g "
+              "from search_bls_foods('Apfel', 1) s join bls_foods f on f.bls_code = s.bls_code", user=A))
+
+    # Gedaechtnis des Haushalts
+    paprika_gruen = "G541100"
+    ins_food_link = "insert into household_food_links (household_id, name_norm, bls_code) values (%s,%s,%s)"
+    check("Gedaechtnis: A kann die eigene Zuordnung anlegen", not raises(ins_food_link, (ha, one("select public.food_key('Paprika')"), paprika_gruen), user=A))
+    r = db("select bls_code, method, confidence from search_bls_foods('Paprika', 1)", user=A)[0][0]
+    check("Gedaechtnis: eigene Zuordnung geht vor das Synonym (Paprika -> gruen), sicher", r == (paprika_gruen, "memory", "sure"), str(r))
+    r = db("select bls_code, method from search_bls_foods('frische Paprika', 1)", user=A)[0][0]
+    check("Gedaechtnis: gilt auch fuer Schreibvarianten (frische Paprika)", r == (paprika_gruen, "memory"), str(r))
+    r = db("select bls_code, method from search_bls_foods('Paprika', 1)", user=B)[0][0]
+    check("Gedaechtnis: Haushalt B sieht die Zuordnung von A nicht, bekommt das Synonym", r == ("G543100", "synonym"), str(r))
+    check("Gedaechtnis: B sieht die Zeile nicht", one("select count(*) from household_food_links", user=B) == 0)
+    check("Gedaechtnis: B kann nicht in Haushalt A schreiben", raises(ins_food_link, (ha, "x", paprika_gruen), user=B))
+    check("Gedaechtnis: je Haushalt und Name nur eine aktive Zeile", raises(ins_food_link, (ha, one("select public.food_key('Paprika')"), "G542100"), user=A))
+    r = db("select bls_code, method from search_bls_foods('Paprika', 1, %s)", (ha,))[0][0]
+    check("Gedaechtnis: mit Haushaltsangabe (Service-Aufruf) wird das Gedaechtnis dieses Haushalts genutzt", r == (paprika_gruen, "memory"), str(r))
+    r = db("select bls_code, method from search_bls_foods('Paprika', 1, %s)", (hb,))[0][0]
+    check("Gedaechtnis: mit dem anderen Haushalt nicht", r == ("G543100", "synonym"), str(r))
+    db("update household_food_links set deleted_at = now() where household_id = %s", (ha,))
+    r = db("select bls_code, method from search_bls_foods('Paprika', 1)", user=A)[0][0]
+    check("Gedaechtnis: eine geloeschte Zuordnung gilt nicht mehr", r == ("G543100", "synonym"), str(r))
+    check("Gedaechtnis: nach dem Loeschen ist der Name wieder zuordenbar",
+          not raises(ins_food_link, (ha, one("select public.food_key('Paprika')"), "G542100"), user=A))
+    before_touch = one("select updated_at from household_food_links where deleted_at is null and household_id = %s", (ha,))
+    db("update household_food_links set bls_code = 'G541100' where deleted_at is null and household_id = %s", (ha,))
+    check("Gedaechtnis: updated_at wird beim Aendern gesetzt",
+          one("select updated_at > %s from household_food_links where deleted_at is null and household_id = %s", (before_touch, ha)))
+    db("delete from household_food_links")
+    # Der Server normalisiert den Namen (die App schickt ihn roh)
+    db(ins_food_link, (ha, "Frische Rote Paprika", "G543100"))
+    check("Gedaechtnis: der Name wird beim Speichern zum Schluessel (Frische Rote Paprika -> paprika rot)",
+          one("select name_norm from household_food_links where household_id = %s", (ha,)) == "paprika rot")
+    check("Gedaechtnis: derselbe Name in anderer Schreibweise ist dieselbe Zeile (Unique-Index nach der Normalisierung)",
+          raises(ins_food_link, (ha, "paprika, ROTE", "G542100")))
+    check("Gedaechtnis: ein Name ohne Kernwoerter wird abgelehnt", raises(ins_food_link, (ha, "200 g", "G543100")))
+    db("update household_food_links set name_norm = 'Gelbe Paprika' where household_id = %s", (ha,))
+    check("Gedaechtnis: auch beim Aendern des Namens", one("select name_norm from household_food_links where household_id = %s", (ha,)) == "gelb paprika")
+    db("delete from household_food_links")
+
+    # Spalten fuer die Herkunft der Naehrwerte (0023)
+    db("insert into meals (household_id, eaten_at, title) values (%s, now(), 'Test N1')", (ha,))
+    meal_n1 = one("select id from meals where title = 'Test N1'")
+    ins_ing = ("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit, bls_code, nutrient_basis) "
+               "values (%s,%s,'Paprika',0.1,'kg',%s,%s)")
+    check("Zutat: bls_code und nutrient_basis lassen sich speichern", not raises(ins_ing, (ha, meal_n1, "G543100", "bls_matched")))
+    check("Zutat: unbekannter BLS-Code wird abgelehnt (Fremdschluessel)", raises(ins_ing, (ha, meal_n1, "NICHT00", "bls_matched")))
+    check("Zutat: unbekannte nutrient_basis wird abgelehnt", raises(ins_ing, (ha, meal_n1, "G543100", "geraten")))
+    for basis in ("product", "bls_exact", "bls_matched", "llm_estimate", "manual", "unknown"):
+        check(f"Zutat: nutrient_basis {basis} erlaubt", not raises(ins_ing, (ha, meal_n1, None, basis)))
+    db("update products set bls_code = 'G543100' where household_id = %s", (ha,))
+    check("Produkt: bls_code lässt sich setzen", one("select count(*) from products where household_id = %s and bls_code = 'G543100'", (ha,)) >= 1)
+    check("Produkt: unbekannter BLS-Code wird abgelehnt", raises("update products set bls_code = 'NICHT00' where household_id = %s", (ha,)))
+    db("delete from meals where id = %s", (meal_n1,))
+    db("update products set bls_code = null")
+
     # --- Haushalts-Einladungen (0017, Phase 6, ADR-017 Option A) -----------------------------------------------
     import re
     codes = [one("select new_invite_code()") for _ in range(300)]

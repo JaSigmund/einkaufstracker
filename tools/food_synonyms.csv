@@ -1,0 +1,533 @@
+term,bls_code,note
+apfel,F110100,Apfel roh
+äpfel,F110100,Apfel roh
+birnen,F130100,Birne roh
+bananen,F503100,Banane roh
+orangen,F603100,Orange roh
+mandarinen,F606100,Mandarine roh
+zitronen,F601100,Zitrone roh
+limetten,F602100,Limette roh
+kirsche,F211100,Süßkirsche roh
+kirschen,F211100,Süßkirsche roh
+sauerkirschen,F212100,Sauerkirsche roh
+blaubeeren,F304100,Heidelbeere roh
+heidelbeeren,F304100,Heidelbeere roh
+johannisbeeren,F321100,Johannisbeere rot roh
+stachelbeeren,F305100,Stachelbeere roh
+holunderbeeren,F406100,Holunderbeere roh
+zwetschke,F223100,Zwetschge roh
+zwetschge,F223100,Zwetschge roh
+pflaumen,F220100,Pflaume roh
+marille,F201100,Aprikose roh
+aprikosen,F201100,Aprikose roh
+pfirsiche,F203100,Pfirsich roh
+melone,F533100,Honigmelone roh
+honigmelone,F533100,Honigmelone roh
+trauben,F310100,Weintraube roh
+weintrauben,F310100,Weintraube roh
+cranberry,F414400,Cranberries getrocknet gezuckert
+cranberries,F414400,Cranberries getrocknet gezuckert
+preiselbeeren,F401100,Preiselbeere roh
+rosinen,F840100,Rosine/Sultanine
+sultaninen,F840100,Rosine/Sultanine
+kokosnuss,H150100,Kokos Fruchtfleisch roh
+kokos,H150100,Kokos Fruchtfleisch roh
+datteln,F504100,Dattel roh
+feigen,F505100,Feige roh
+paprika,G543100,Gemüsepaprika rot roh
+paprikaschote,G543100,Gemüsepaprika rot roh
+paprika rot,G543100,Gemüsepaprika rot roh
+paprika gelb,G542100,Gemüsepaprika gelb roh
+paprika grün,G541100,Gemüsepaprika grün roh
+spitzpaprika,G543100,Gemüsepaprika rot roh
+peperoni,G553100,Pfefferschote grün roh
+pepperoni,G553100,Pfefferschote grün roh
+chili,G554100,Pfefferschote rot roh
+chilischote,G554100,Pfefferschote rot roh
+zwiebel,G480100,Speisezwiebel roh
+rote zwiebel,G480100,Speisezwiebel roh
+gemüsezwiebel,G480100,Speisezwiebel roh
+lauchzwiebel,G482100,Frühlingszwiebel roh
+frühlingszwiebel,G482100,Frühlingszwiebel roh
+schalotten,G485100,Schalotte roh
+knoblauchzehe,G490100,Knoblauch roh
+karotten,G620100,Karotte/Möhre roh
+mohrrübe,G620100,Karotte/Möhre roh
+möhren,G620100,Karotte/Möhre roh
+tomate,G561100,Tomate roh
+cherrytomaten,G561100,Tomate roh
+cocktailtomaten,G561100,Tomate roh
+kirschtomaten,G561100,Tomate roh
+strauchtomaten,G561100,Tomate roh
+datteltomaten,G561100,Tomate roh
+tomaten dose,G568900,Tomate geschält Konserve
+geschälte tomaten,G568900,Tomate geschält Konserve
+passierte tomaten,R161200,Tomaten passiert/Tomatenpüree
+tomatenpassata,R161200,Tomaten passiert/Tomatenpüree
+passata,R161200,Tomaten passiert/Tomatenpüree
+gurke,G520100,Gurke roh
+salatgurke,G520100,Gurke roh
+gewürzgurke,G520802,Gurke gesäuert
+essiggurke,G520802,Gurke gesäuert
+salat,G105100,Kopfsalat roh
+blattsalat,G105100,Kopfsalat roh
+grüner salat,G105100,Kopfsalat roh
+gemischter salat,G105100,Kopfsalat roh
+mischsalat,G105100,Kopfsalat roh
+salatmischung,G105100,Kopfsalat roh
+kopfsalat,G105100,Kopfsalat roh
+eisbergsalat,G103100,Eisbergsalat roh
+römersalat,G107100,Römischer Salat roh
+sellerie,G660100,Knollensellerie roh
+knollensellerie,G660100,Knollensellerie roh
+stangensellerie,G220100,Bleichsellerie roh
+bleichsellerie,G220100,Bleichsellerie roh
+petersilie,G250100,Petersilienblatt roh
+kürbis,G581000,Kürbis Hokkaido roh
+hokkaido,G581000,Kürbis Hokkaido roh
+hokkaidokürbis,G581000,Kürbis Hokkaido roh
+butternusskürbis,G581100,Kürbis Pumpkin roh
+mais,G570902,Zuckermais Konserve abgetropft
+maiskörner,G570902,Zuckermais Konserve abgetropft
+zuckermais,G570902,Zuckermais Konserve abgetropft
+erbsen,G760100,Erbse grün roh
+tiefkühlerbsen,G760100,Erbse grün roh
+zuckerschoten,G761100,Zuckererbse roh
+bohnen,G710100,Bohne grün roh
+grüne bohnen,G710100,Bohne grün roh
+brechbohnen,G710100,Bohne grün roh
+weiße bohnen,H739400,Gartenbohne reif
+kidneybohnen,H742100,Kidneybohne reif
+kichererbsen,G770400,Kichererbse reif
+linsen,H725100,Linse reif
+rote linsen,H730000,Linse rot reif
+sojabohnen,G750400,Sojabohne reif
+edamame,G750100,Sojabohne unreif roh
+champignons,K701100,Champignon roh
+champignon,K701100,Champignon roh
+pilze,K701100,Champignon roh
+schwammerl,K701100,Champignon roh
+pfifferlinge,K713100,Pfifferling roh
+eierschwammerl,K713100,Pfifferling roh
+steinpilze,K718100,Steinpilz roh
+blumenkohl,G311100,Blumenkohl roh
+karfiol,G311100,Blumenkohl roh
+brokkoli,G312100,Broccoli roh
+broccoli,G312100,Broccoli roh
+rotkohl,G341100,Rotkohl roh
+blaukraut,G341100,Rotkohl roh
+weißkohl,G342100,Weißkohl roh
+weisskohl,G342100,Weißkohl roh
+kraut,G342100,Weißkohl roh
+krautsalat,G342100,Weißkohl roh
+sauerkraut,G345100,Sauerkraut abgetropft roh
+rote bete,G613100,Rote Rübe roh
+rote rübe,G613100,Rote Rübe roh
+randen,G613100,Rote Rübe roh
+fenchel,G431100,Fenchel roh
+meerrettich,G630100,Meerrettich roh
+kren,G630100,Meerrettich roh
+ingwer,R211200,Ingwer roh
+oliven,H510802,Oliven grün gesäuert
+spargel,G450100,Spargel roh
+kartoffel,K110100,Kartoffel geschält roh
+erdäpfel,K110100,Kartoffel geschält roh
+erdapfel,K110100,Kartoffel geschält roh
+pellkartoffeln,K120134,Kartoffel ungeschält gekocht
+salzkartoffeln,K110132,Kartoffel geschält gekocht
+bratkartoffeln,X651063,Bratkartoffeln aus rohen Kartoffeln mit Zwiebeln
+kartoffelpüree,X634012,Kartoffelpüree mit Milch 3 5 % Fett
+kartoffelbrei,X634012,Kartoffelpüree mit Milch 3 5 % Fett
+püree,X634012,Kartoffelpüree mit Milch 3 5 % Fett
+pommes,K130492,Pommes frites tiefgefroren frittiert
+pommes frites,K130492,Pommes frites tiefgefroren frittiert
+fritten,K130492,Pommes frites tiefgefroren frittiert
+kroketten,K282200,Kartoffelkroketten tiefgefroren
+rösti,K391200,Kartoffelrösti tiefgefroren
+reis,C352000,Reis poliert roh
+basmatireis,C352000,Reis poliert roh
+jasminreis,C352000,Reis poliert roh
+langkornreis,C352000,Reis poliert roh
+weißer reis,C352000,Reis poliert roh
+risottoreis,C352000,Reis poliert roh
+milchreis,C352000,Reis poliert roh
+sushireis,C352000,Reis poliert roh
+vollkornreis,C351000,Reis unpoliert roh
+naturreis,C351000,Reis unpoliert roh
+brauner reis,C351000,Reis unpoliert roh
+parboiled reis,C359000,Reis parboiled poliert roh
+nudeln,E401000,Teigwaren eifrei roh
+spaghetti,E401000,Teigwaren eifrei roh
+penne,E401000,Teigwaren eifrei roh
+fusilli,E401000,Teigwaren eifrei roh
+rigatoni,E401000,Teigwaren eifrei roh
+farfalle,E401000,Teigwaren eifrei roh
+makkaroni,E401000,Teigwaren eifrei roh
+tagliatelle,E401000,Teigwaren eifrei roh
+pasta,E401000,Teigwaren eifrei roh
+teigwaren,E401000,Teigwaren eifrei roh
+spiralen,E401000,Teigwaren eifrei roh
+hörnchen,E401000,Teigwaren eifrei roh
+vollkornnudeln,E510000,Vollkornteigwaren eifrei roh
+vollkornpasta,E510000,Vollkornteigwaren eifrei roh
+vollkornspaghetti,E510000,Vollkornteigwaren eifrei roh
+eiernudeln,E432000,Eierteigwaren roh
+bandnudeln,E432000,Eierteigwaren roh
+spätzle,X711512,Eier-Frischteigwaren Spätzle selbstgemacht roh
+gnocchi,K270000,Gnocchi roh
+couscous,C119200,Couscous Hartweizen roh
+haferflocken,C133000,Hafer Flocken
+kernige haferflocken,C133000,Hafer Flocken
+zarte haferflocken,C133000,Hafer Flocken
+porridge,C133000,Hafer Flocken
+müsli,C512600,Müslimischung Bircher Art ungesüßt
+muesli,C512600,Müslimischung Bircher Art ungesüßt
+knuspermüsli,C514200,Knuspermüslimischung klassisch gesüßt
+granola,X0A3000,Knuspermüsli (Granola) gesüßt gebacken
+cornflakes,C515000,Cornflakes gesüßt
+mehl,C214100,Weizen Mehl Type 405
+weizenmehl,C214100,Weizen Mehl Type 405
+vollkornmehl,C211000,Weizen Vollkornmehl
+dinkelmehl,C234000,Dinkel Mehl Type 630
+brot,B271000,Roggenmischbrot
+mischbrot,B271000,Roggenmischbrot
+roggenbrot,B271000,Roggenmischbrot
+bauernbrot,B271000,Roggenmischbrot
+weißbrot,B311000,Weizenbrot/Weißbrot
+weissbrot,B311000,Weizenbrot/Weißbrot
+toast,B311000,Weizenbrot/Weißbrot
+toastbrot,B311000,Weizenbrot/Weißbrot
+brötchen,B511000,Weizenbrötchen
+semmel,B511000,Weizenbrötchen
+weckerl,B511000,Weizenbrötchen
+kaisersemmel,B511000,Weizenbrötchen
+mehrkornbrötchen,B591000,Mehrkornbrötchen
+knäckebrot,B6A2000,Roggenknäckebrot
+vollkornknäckebrot,B6A2100,Roggenvollkornknäckebrot
+baguette,B311000,Weizenbrot/Weißbrot
+croissant,D771600,Croissant Hefeblätterteig
+reiswaffeln,C532800,Reiswaffeln gesalzen
+semmelbrösel,B821000,Paniermehl/Semmelbrösel
+paniermehl,B821000,Paniermehl/Semmelbrösel
+milch,M111300,Vollmilch frisch 3 5 % Fett pasteurisiert
+vollmilch,M111300,Vollmilch frisch 3 5 % Fett pasteurisiert
+frischmilch,M111300,Vollmilch frisch 3 5 % Fett pasteurisiert
+hmilch,M113300,H-Vollmilch 3 5 % Fett
+haltbarmilch,M113300,H-Vollmilch 3 5 % Fett
+fettarme milch,M111200,Milch fettarm 1 5 % Fett
+magermilch,M111100,Milch entrahmt frisch
+haferdrink,C660000,Haferdrink ungesüßt
+hafermilch,C660000,Haferdrink ungesüßt
+sojadrink,H841100,Sojadrink ungesüßt
+sojamilch,H841100,Sojadrink ungesüßt
+mandeldrink,H800000,Mandeldrink ungesüßt
+mandelmilch,H800000,Mandeldrink ungesüßt
+reisdrink,C650000,Reisdrink ungesüßt
+joghurt,M141300,Joghurt mild mind 3 5 % Fett
+naturjoghurt,M141300,Joghurt mild mind 3 5 % Fett
+griechischer joghurt,M141300,Joghurt mind 3 5 % Fett (Näherung)
+fettarmer joghurt,M141200,Joghurt fettarm 1 5 bis 1 8 % Fett
+magerjoghurt,M141100,Joghurt aus entrahmter Milch
+skyr,M710100,Skyr
+quark,M713300,Speisequark Halbfettstufe 20 % Fett i. Tr.
+topfen,M713300,Speisequark Halbfettstufe 20 % Fett i. Tr.
+speisequark,M713300,Speisequark Halbfettstufe 20 % Fett i. Tr.
+magerquark,M713100,Speisequark Magerstufe
+magertopfen,M713100,Speisequark Magerstufe
+frischkäse,M820600,Frischkäsezubereitung Natur mind 45 % Fett i. Tr.
+doppelrahmfrischkäse,M710700,Frischkäsezubereitung Natur mind 50 % Fett i. Tr.
+hüttenkäse,M711300,Körniger Frischkäse mind 20 % Fett i. Tr.
+körniger frischkäse,M711300,Körniger Frischkäse mind 20 % Fett i. Tr.
+ricotta,M741600,Ricotta
+mascarpone,M7A6800,Mascarpone
+sahne,M173900,Schlagsahne mind 36 % Fett
+schlagsahne,M173900,Schlagsahne mind 36 % Fett
+schlagobers,M173900,Schlagsahne mind 36 % Fett
+obers,M173900,Schlagsahne mind 36 % Fett
+kochsahne,M173800,Schlagsahne mind 30 % Fett
+kaffeesahne,M171500,Kaffeesahne mind 10 % Fett
+sauerrahm,M172500,Sauerrahm/Saure Sahne mind 10 % Fett
+saure sahne,M172500,Sauerrahm/Saure Sahne mind 10 % Fett
+schmand,M172700,Sauerrahm/Schmand mind 20 % Fett
+creme fraiche,M176800,Sauerrahm/Creme fraiche 30 % Fett
+butter,Q611000,Butter mild gesäuert
+sauerrahmbutter,Q611000,Butter mild gesäuert
+süßrahmbutter,Q6A4000,Butter gesalzen (Näherung)
+margarine,Q400000,Pflanzenmargarine Vollfett
+käse,M400600,Schnittkäse mind 45 % Fett i. Tr.
+schnittkäse,M400600,Schnittkäse mind 45 % Fett i. Tr.
+reibkäse,M400600,Schnittkäse mind 45 % Fett i. Tr.
+streukäse,M400600,Schnittkäse mind 45 % Fett i. Tr.
+käsescheiben,M400600,Schnittkäse mind 45 % Fett i. Tr.
+gouda,M402600,Gouda 48 % Fett i. Tr.
+edamer,M401600,Edamer mind 45 % Fett i. Tr.
+emmentaler,M304600,Emmentaler mind 45 % Fett i. Tr.
+bergkäse,M302600,Bergkäse mind 45 % Fett i. Tr.
+cheddar,M303700,Chester (Cheddar) mind 50 % Fett i. Tr.
+mozzarella,M032100,Mozzarella mind 45 % Fett i. Tr.
+parmesan,M306400,Parmesan mind 30 % Fett i. Tr.
+feta,M012200,Feta mind 45 % Fett i. Tr.
+schafskäse,M012200,Feta mind 45 % Fett i. Tr.
+hirtenkäse,M052000,Salzlakenkäse aus Kuhmilch Hirtenkäse
+camembert,M602600,Camembert mind 45 % Fett i. Tr.
+brie,M601600,Brie mind 45 % Fett i. Tr.
+halloumi,M524500,Halloumi Grillkäse
+ei,E111100,Hühnerei roh
+eier,E111100,Hühnerei roh
+hühnerei,E111100,Hühnerei roh
+hühnereier,E111100,Hühnerei roh
+vollei,E111100,Hühnerei roh
+spiegelei,Y710142,Spiegelei gebraten
+spiegeleier,Y710142,Spiegelei gebraten
+rührei,Y720143,Rührei gebraten
+eigelb,E112100,Hühnerei Eigelb roh
+eiweiß,E113100,Hühnerei Eiklar roh
+eiklar,E113100,Hühnerei Eiklar roh
+wachtelei,E106100,Wachtelei roh
+rindfleisch,U202000,Rind Fleisch fett- und sehnenfrei roh
+rind,U202000,Rind Fleisch fett- und sehnenfrei roh
+rindersteak,U131100,Rind Steak (Rücken) roh
+steak,U131100,Rind Steak (Rücken) roh
+rinderfilet,U211100,Rind Filet/Lende roh
+rindergulasch,U151100,Rind Gulasch (Bug) roh
+gulasch,U151100,Rind Gulasch (Bug) roh
+hackfleisch,U050100,Rind/Schwein Hackfleisch gemischt roh
+faschiertes,U050100,Rind/Schwein Hackfleisch gemischt roh
+gemischtes hackfleisch,U050100,Rind/Schwein Hackfleisch gemischt roh
+rinderhackfleisch,U010100,Rind Hackfleisch roh
+rinderhack,U010100,Rind Hackfleisch roh
+rinderfaschiertes,U010100,Rind Hackfleisch roh
+schweinehackfleisch,U020100,Schwein Hackfleisch roh
+schweinehack,U020100,Schwein Hackfleisch roh
+schweinefleisch,U602100,Schwein Fleisch sehnenfrei max 5 % Fett
+schwein,U602100,Schwein Fleisch sehnenfrei max 5 % Fett
+schnitzel,U541100,Schwein Schnitzel (Oberschale) roh
+schweineschnitzel,U541100,Schwein Schnitzel (Oberschale) roh
+schweinefilet,U611100,Schwein Filet/Lende roh
+schweinekotelett,U622100,Schwein Kotelett (Rücken/cranial) roh
+kotelett,U622100,Schwein Kotelett (Rücken/cranial) roh
+kalbsschnitzel,U342100,Kalb Schnitzel (Keule) roh
+kalbfleisch,U342100,Kalb Schnitzel (Keule) roh
+hähnchen,V413000,Hähnchen Fleisch ohne Haut roh
+hühnchen,V413000,Hähnchen Fleisch ohne Haut roh
+huhn,V413000,Hähnchen Fleisch ohne Haut roh
+hendl,V413000,Hähnchen Fleisch ohne Haut roh
+hühnerfleisch,V413000,Hähnchen Fleisch ohne Haut roh
+hähnchenfleisch,V413000,Hähnchen Fleisch ohne Haut roh
+hähnchenbrust,V416100,Hähnchen Brustfilet roh
+hähnchenbrustfilet,V416100,Hähnchen Brustfilet roh
+hühnerbrust,V416100,Hähnchen Brustfilet roh
+hühnerbrustfilet,V416100,Hähnchen Brustfilet roh
+hühnchenbrust,V416100,Hähnchen Brustfilet roh
+hendlbrust,V416100,Hähnchen Brustfilet roh
+chickenbrust,V416100,Hähnchen Brustfilet roh
+hähnchenschenkel,V4A5100,Hähnchen Oberschenkel mit Haut roh
+hühnerschenkel,V4A5100,Hähnchen Oberschenkel mit Haut roh
+hähnchenkeule,V4A5100,Hähnchen Oberschenkel mit Haut roh
+hendlkeule,V4A5100,Hähnchen Oberschenkel mit Haut roh
+hähnchenoberschenkel,V4A5100,Hähnchen Oberschenkel mit Haut roh
+hähnchenunterschenkel,V4B5100,Hähnchen Unterschenkel mit Haut roh
+drumsticks,V4B5100,Hähnchen Unterschenkel mit Haut roh
+pute,V481000,Pute Fleisch ohne Haut roh
+putenfleisch,V481000,Pute Fleisch ohne Haut roh
+putenbrust,V486100,Pute Brust ohne Haut roh
+putenschnitzel,V486100,Pute Brust ohne Haut roh
+putenaufschnitt,W561000,Putenbrust Kochpökelware
+ente,V463000,Ente Fleisch ohne Haut roh
+entenbrust,V463000,Ente Fleisch ohne Haut roh
+gans,V471100,Gans Fleisch ohne Haut roh
+speck,W410400,Schwein Schinkenspeck Rohpökelware geräuchert
+bauchspeck,W410400,Schwein Schinkenspeck Rohpökelware geräuchert
+frühstücksspeck,W415000,Schwein Frühstücksspeck Rohpökelware geräuchert
+bacon,W415000,Schwein Frühstücksspeck Rohpökelware geräuchert
+schinken,W424000,Schwein Kochschinken Kochpökelware
+kochschinken,W424000,Schwein Kochschinken Kochpökelware
+beinschinken,W424000,Schwein Kochschinken Kochpökelware
+rohschinken,U681700,Schwein Rohschinken mager
+prosciutto,U681700,Schwein Rohschinken mager
+parmaschinken,U681700,Schwein Rohschinken mager
+schinkenspeck,W410400,Schwein Schinkenspeck Rohpökelware geräuchert
+wurst,W231100,Lyoner Wurst
+aufschnitt,W231100,Lyoner Wurst
+lyoner,W231100,Lyoner Wurst
+fleischkäse,W233000,Fleischkäse einfach
+leberkäse,W256100,Leberkäse
+leberkas,W256100,Leberkäse
+bratwurst,W222100,Bratwurst mittelgrob
+würstchen,W211200,Wiener Würstchen
+würstel,W211200,Wiener Würstchen
+wiener,W211200,Wiener Würstchen
+frankfurter,W213000,Frankfurter Würstchen
+bockwurst,W211200,Wiener Würstchen
+knacker,W211200,Wiener Würstchen
+leberwurst,W327000,Leberwurst einfach
+fleischwurst,W234000,Fleischwurst
+salami,W140000,Salami
+lachs,T410100,Lachs roh
+lachsfilet,T410100,Lachs roh
+räucherlachs,T411700,Lachs gesalzen (Näherung)
+forelle,T422100,Forelle roh
+thunfisch,T121100,Thunfisch roh
+thunfisch dose,T121902,Thunfisch im eigenen Saft Konserve
+thunfisch konserve,T121902,Thunfisch im eigenen Saft Konserve
+kabeljau,T204100,Dorsch/Kabeljau roh
+dorsch,T204100,Dorsch/Kabeljau roh
+seelachs,T213100,Alaska-Seelachs roh
+fischfilet,T213100,Alaska-Seelachs roh
+fischstäbchen,T930100,Fischstäbchen Alaska-Seelachs paniert tiefgefroren
+garnelen,T753100,Garnele/Granat/Krabbe roh
+shrimps,T753100,Garnele/Granat/Krabbe roh
+scampi,T753100,Garnele/Granat/Krabbe roh
+hering,T102100,Hering roh
+sardinen,T105100,Sardine roh
+tofu,H861000,Tofu
+räuchertofu,H861000,Tofu (Näherung)
+seitan,C558000,Fleischersatz glutenhaltig (Seitan)
+olivenöl,Q120000,Olivenöl
+rapsöl,Q180000,Rapsöl/Rüböl
+sonnenblumenöl,Q320000,Sonnenblumenöl
+öl,Q180000,Rapsöl/Rüböl (Näherung)
+speiseöl,Q180000,Rapsöl/Rüböl (Näherung)
+bratöl,Q180000,Rapsöl/Rüböl (Näherung)
+kokosöl,Q550000,Kokosfett/Kokosöl
+mayonnaise,Q991000,Mayonnaise Fertigprodukt
+mayo,Q991000,Mayonnaise Fertigprodukt
+remoulade,Q999000,Remoulade Fertigprodukt
+ketchup,R141100,Tomatenketchup
+tomatenketchup,R141100,Tomatenketchup
+senf,R132000,Senf mittelscharf
+essig,R121000,Weinessig
+balsamico,R125000,Balsamicoessig
+balsamicoessig,R125000,Balsamicoessig
+sojasauce,R143000,Sojasauce
+sojasoße,R143000,Sojasauce
+salz,R114000,Speisesalz jodiert
+pfeffer,R258100,Pfeffer schwarz getrocknet
+backpulver,R421100,Backpulver
+zucker,S111000,Zucker weiß
+kristallzucker,S111000,Zucker weiß
+haushaltszucker,S111000,Zucker weiß
+rohrzucker,S112000,Zucker braun
+brauner zucker,S112000,Zucker braun
+puderzucker,S111100,Puderzucker
+staubzucker,S111100,Puderzucker
+honig,S120000,Honig
+ahornsirup,S151100,Ahornsirup
+marmelade,S132000,Konfitüre extra
+konfitüre,S132000,Konfitüre extra
+nutella,S145000,Nuss-Nougat-Creme
+nussnougatcreme,S145000,Nuss-Nougat-Creme
+nusscreme,S145000,Nuss-Nougat-Creme
+pesto,X372012,Pesto verde
+tomatenmark,R160000,Tomatenmark
+mandeln,H210100,Mandel süß
+walnüsse,H120100,Walnuss
+walnuss,H120100,Walnuss
+walnusskerne,H120100,Walnuss
+haselnüsse,H130100,Haselnuss
+haselnuss,H130100,Haselnuss
+cashews,H170100,Cashewkern
+cashewkerne,H170100,Cashewkern
+erdnüsse,H110600,Erdnuss geröstet
+erdnuss,H110600,Erdnuss geröstet
+pistazien,H250100,Pistazie
+paranüsse,H180100,Paranuss
+nüsse,H810000,Studentenfutter (Näherung)
+studentenfutter,H810000,Studentenfutter
+sonnenblumenkerne,H430100,Sonnenblumenkern
+kürbiskerne,H310100,Kürbiskern
+leinsamen,H410100,Leinsamen
+chiasamen,H480100,Chia-Samen
+sesam,H420100,Sesam
+erdnussbutter,H880200,Erdnussbutter/Erdnusscreme
+erdnussmus,H110800,Erdnussmus
+wasser,N110000,Trinkwasser
+leitungswasser,N110000,Trinkwasser
+trinkwasser,N110000,Trinkwasser
+mineralwasser,N120000,Natürliches Mineralwasser
+sprudel,N120000,Natürliches Mineralwasser
+sprudelwasser,N120000,Natürliches Mineralwasser
+soda,N120000,Natürliches Mineralwasser
+cola,N330000,Colagetränk koffeinhaltig
+coca cola,N330000,Colagetränk koffeinhaltig
+pepsi,N330000,Colagetränk koffeinhaltig
+colagetränk,N330000,Colagetränk koffeinhaltig
+cola zero,N331000,Colagetränk koffeinhaltig mit Süßungsmitteln
+cola light,N331000,Colagetränk koffeinhaltig mit Süßungsmitteln
+limonade,N310400,Zitronenlimonade
+limo,N310400,Zitronenlimonade
+sprite,N310400,Zitronenlimonade
+fanta,N310300,Orangenlimonade
+orangenlimonade,N310300,Orangenlimonade
+tonic,N314000,Limonade chininhaltig
+tonic water,N314000,Limonade chininhaltig
+eistee,N019000,Eistee mit Zitronen-/Pfirsichgeschmack gesüßt
+orangensaft,F603600,Orangensaft
+apfelsaft,F110600,Apfelsaft
+traubensaft,F310600,Traubensaft
+kaffee,N410100,Kaffee Getränk
+espresso,N411100,Espresso Getränk
+cappuccino,N414000,Cappuccino mit Milch 3 5 % Fett
+latte macchiato,N418000,Latte macchiato mit Milch 3 5 % Fett
+milchkaffee,N414000,Cappuccino mit Milch 3 5 % Fett (Näherung)
+tee,N630000,Schwarztee Getränk
+schwarztee,N630000,Schwarztee Getränk
+grüntee,N610100,Grüntee Getränk
+kräutertee,N720100,Kräutertee Getränk
+früchtetee,N710000,Früchtetee Getränk
+pfefferminztee,N721000,Pfefferminztee Getränk
+bier,P163000,Pilsner Bier
+pils,P163000,Pilsner Bier
+lagerbier,P161000,Lagerbier hell
+weizenbier,P151100,Hefeweizen naturtrüb
+radler,P192000,Radler Pilsner mit Zitronenlimonade
+wein,P210000,Weißwein trocken
+weißwein,P210000,Weißwein trocken
+weisswein,P210000,Weißwein trocken
+rotwein,P2A3000,Rotwein trocken
+sekt,P2A6000,Qualitätsschaumwein Sekt trocken
+prosecco,P2A6000,Qualitätsschaumwein Sekt trocken
+schokolade,S500000,Schokolade
+milchschokolade,S530000,Milchschokolade
+vollmilchschokolade,S539900,Vollmilchschokolade
+zartbitterschokolade,S560000,Zartbitter-/Halbbitterschokolade
+bitterschokolade,S570000,Bitterschokolade
+weiße schokolade,S580000,Schokolade weiß
+gummibärchen,S361000,Fruchtgummi
+gummibären,S361000,Fruchtgummi
+fruchtgummi,S361000,Fruchtgummi
+gummibonbons,S361000,Fruchtgummi
+haribo,S361000,Fruchtgummi
+kekse,D630400,Butterkekse/Butterplätzchen
+keks,D630400,Butterkekse/Butterplätzchen
+butterkekse,D630400,Butterkekse/Butterplätzchen
+plätzchen,D630400,Butterkekse/Butterplätzchen
+chips,K280100,Kartoffelchips/Stapelchips
+kartoffelchips,K280100,Kartoffelchips/Stapelchips
+chips paprika,K280100,Kartoffelchips/Stapelchips
+popcorn,C518000,Popcorn gesalzen
+eis,S241000,Vanilleeis
+speiseeis,S241000,Vanilleeis
+eiscreme,S241000,Vanilleeis
+vanilleeis,S241000,Vanilleeis
+schokoladeneis,S242000,Schokoladeneis
+müsliriegel,S830000,Müsli-Riegel
+penne rigate,E401000,Teigwaren eifrei roh
+vollkorn nudeln,E510000,Vollkornteigwaren eifrei roh
+hartweizennudeln,E401000,Teigwaren eifrei roh
+dinkelnudeln,E632000,Dinkelteigwaren eifrei roh
+spaghetti vollkorn,E510000,Vollkornteigwaren eifrei roh
+reisnudeln,C559000,Reisnudeln roh
+glasnudeln,C559000,Reisnudeln roh (Näherung)
+basmati reis,C352000,Reis poliert roh
+cottage cheese,M711300,Körniger Frischkäse
+weißkraut,G342100,Weißkohl roh
+weisskraut,G342100,Weißkohl roh
+zwiebelringe,G480100,Speisezwiebel roh
+gurkenscheiben,G520100,Gurke roh
+tomatenscheiben,G561100,Tomate roh
+paprikastreifen,G543100,Gemüsepaprika rot roh
+salatblätter,G105100,Kopfsalat roh
+kabeljaufilet,T204100,Dorsch/Kabeljau roh
+hühnerleber,V634100,Hähnchen Leber roh
+butterschmalz,Q683000,Butterschmalz

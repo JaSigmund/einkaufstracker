@@ -37,6 +37,10 @@ jobs:
           python-version: "3.12"
       - run: pip install pgserver "psycopg[binary]" tzdata
       - run: python supabase/tests/run_schema_tests.py
+      # Die Synonymliste (CSV) ist die Quelle, die SQL-Datei wird daraus erzeugt: beide muessen zusammenpassen
+      - run: |
+          python tools/build_food_synonyms.py
+          git diff --exit-code tools/food_synonyms_import.sql
 
   function:
     name: Edge Function (Typpruefung)

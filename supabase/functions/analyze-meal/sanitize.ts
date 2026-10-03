@@ -13,6 +13,8 @@ export const MAX_IMAGE_BASE64_CHARS = 1_000_000;
 export const MAX_INGREDIENTS = 20;
 export const MAX_AMOUNT_G = 5000;
 export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack", "drink"] as const;
+export const KINDS = ["food", "drink"] as const;
+export const STATES = ["raw", "cooked", "ready_made"] as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Anfang jedes JPEG in Base64 (FF D8 FF): das Modell bekommt nur JPEG, so passt der media_type, den wir angeben.
@@ -20,7 +22,15 @@ const JPEG_BASE64_PREFIX = "/9j/";
 
 export type Product = { id: string; name: string };
 export type AnalyzeRequest = { household_id: string; image_base64: string; products: Product[]; model?: string };
-export type Ingredient = { name: string; inventory_product_id: string | null; est_amount_g: number | null; confidence: number };
+/// kind: Speise oder Getraenk (Getraenke fuehrt die App in ml). state: roh, gekocht oder fertig gekauft, null = nicht erkennbar.
+export type Ingredient = {
+  name: string;
+  inventory_product_id: string | null;
+  est_amount_g: number | null;
+  confidence: number;
+  kind: "food" | "drink";
+  state: "raw" | "cooked" | "ready_made" | null;
+};
 export type Analysis = {
   dish_title: string;
   meal_type_guess: string | null;
@@ -90,6 +100,8 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
         inventory_product_id: id,
         est_amount_g: amount === null || amount <= 0 ? null : Math.min(amount, MAX_AMOUNT_G),
         confidence: confidence === null ? 0 : Math.min(1, Math.max(0, confidence)),
+        kind: i.kind === "drink" ? "drink" : "food",
+        state: typeof i.state === "string" && (STATES as readonly string[]).includes(i.state) ? i.state as Ingredient["state"] : null,
       });
     }
   }

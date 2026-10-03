@@ -1,42 +1,12 @@
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
+import 'package:einkaufstracker/domain/nutrition/food_match.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Ranking und Zeilen-Parsing der BLS-Suche (ADR-024); die echte Abfrage braucht Netz und wird nicht getestet.
-BlsFood food(String name) => BlsFood(code: name, nameDe: name, per100: const NutrientsPer100(kcal: 1));
-
+/// Zeilen-Parsing der BLS-Suche (ADR-024, Phase N1). Die Reihung steckt seit N1 in der SQL-Funktion `search_bls_foods` und
+/// wird dort mit der echten BLS getestet (Golden-Test in supabase/tests/run_schema_tests.py); die echte Abfrage braucht
+/// Netz und wird hier nicht getestet.
 void main() {
-  group('rankBlsFoods', () {
-    test('Namen, die mit der Eingabe beginnen, kommen vor Wortanfang-Treffern und sonstigen', () {
-      final ranked = rankBlsFoods([food('Birne Apfel Mix'), food('Pfannkuchen mit Apfel'), food('Apfelkuchen'), food('Ananas')], 'apfel');
-      // rankBlsFoods sortiert nur, es filtert nicht (der Server liefert ohnehin nur Treffer): Nicht-Treffer stehen zuletzt
-      expect(ranked.map((f) => f.nameDe), ['Apfelkuchen', 'Birne Apfel Mix', 'Pfannkuchen mit Apfel', 'Ananas']);
-    });
-
-    test('innerhalb einer Stufe kuerzere Namen zuerst: "Apfel roh" vor "Apfelkuchen mit Streuseln"', () {
-      final ranked = rankBlsFoods([food('Apfelkuchen mit Streuseln'), food('Apfel roh')], 'Apfel');
-      expect(ranked.first.nameDe, 'Apfel roh');
-    });
-
-    test('gleiche Stufe, gleiche Laenge: alphabetisch', () {
-      final ranked = rankBlsFoods([food('Apfel B'), food('Apfel A')], 'Apfel');
-      expect(ranked.map((f) => f.nameDe), ['Apfel A', 'Apfel B']);
-    });
-
-    test('Gross-/Kleinschreibung und Leerraum der Eingabe spielen keine Rolle', () {
-      expect(rankBlsFoods([food('Reis roh')], '  REIS ').single.nameDe, 'Reis roh');
-    });
-
-    test('Sonderzeichen in der Eingabe brechen die Sortierung nicht (Regex wird escaped)', () {
-      expect(() => rankBlsFoods([food('Milch (3,5 %)')], '(3'), returnsNormally);
-    });
-
-    test('begrenzt auf die Maximalzahl der Treffer', () {
-      final many = [for (var i = 0; i < 100; i++) food('Apfel $i')];
-      expect(rankBlsFoods(many, 'apfel'), hasLength(blsSearchMaxResults));
-    });
-  });
-
   group('blsFoodFromRow', () {
     test('liest Zahlen und Text-Zahlen, Unlesbares wird null', () {
       final f = blsFoodFromRow({
@@ -56,6 +26,39 @@ void main() {
       expect(f.per100.fatG, 9);
       expect(f.per100.satFatG, isNull);
       expect(f.per100.carbsG, isNull);
+      expect(f.method, isNull);
+      expect(f.confidence, isNull);
+      expect(f.trust, MatchTrust.unknown);
+    });
+
+    test('liest Verfahren und Sicherheit der Zuordnungs-Suche', () {
+      BlsFood row(String method, String confidence) =>
+          blsFoodFromRow({'bls_code': 'C352000', 'name_de': 'Reis poliert, roh', 'kcal': 351, 'method': method, 'confidence': confidence});
+      expect(row('synonym', 'sure').trust, MatchTrust.sure);
+      expect(row('search', 'auto').trust, MatchTrust.auto);
+      expect(row('search', 'unsure').trust, MatchTrust.unknown);
+      expect(row('memory', 'sure').method, 'memory');
+    });
+  });
+
+  group('BlsFood.toMatch', () {
+    const food = BlsFood(code: 'C352000', nameDe: 'Reis poliert, roh', per100: NutrientsPer100(kcal: 351), method: 'synonym', confidence: 'sure');
+
+    test('uebernimmt Code, Name, Naehrwerte, Verfahren und Sicherheit', () {
+      final m = food.toMatch();
+      expect(m.code, 'C352000');
+      expect(m.name, 'Reis poliert, roh');
+      expect(m.per100.kcal, 351);
+      expect(m.method, 'synonym');
+      expect(m.trust, MatchTrust.sure);
+      expect(m.alreadyKnown, isTrue);
+    });
+
+    test('ein unsicherer Treffer wird, wenn der Nutzer ihn waehlt, ein automatischer; die Sicherheit laesst sich vorgeben', () {
+      const unsure = BlsFood(code: 'X', nameDe: 'Y', per100: NutrientsPer100(kcal: 1), method: 'search', confidence: 'unsure');
+      expect(unsure.toMatch().trust, MatchTrust.auto);
+      expect(unsure.toMatch(trust: MatchTrust.sure).trust, MatchTrust.sure);
+      expect(unsure.toMatch().alreadyKnown, isFalse);
     });
   });
 
