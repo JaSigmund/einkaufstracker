@@ -79,6 +79,7 @@ Future<List<Map<String, dynamic>>> _collect() async {
         blsCode: 'B311000',
         nutrientBasis: 'bls_exact',
         unitWeightG: 28,
+        microsPer100: {'iron_mg': 2.0, 'vit_b1_mg': 0.18, 'iodine_ug': 0.0},
       ),
       const IngredientDraft(
         freeText: 'Nachspeise im Restaurant',
@@ -115,7 +116,12 @@ Future<List<Map<String, dynamic>>> _collect() async {
   final milch = await productRepo(db).create(name: 'Milch', baseUnit: 'l');
   await productRepo(db).setBlsProfile(
     milch.id,
-    const BlsFood(code: 'M111300', nameDe: 'Vollmilch frisch, 3,5 % Fett', per100: NutrientsPer100(kcal: 65, proteinG: 3.4, fatG: 3.6, satFatG: 2.3, carbsG: 4.7, sugarG: 4.7, fiberG: 0, saltG: 0.1)),
+    const BlsFood(
+      code: 'M111300',
+      nameDe: 'Vollmilch frisch, 3,5 % Fett',
+      per100: NutrientsPer100(kcal: 65, proteinG: 3.4, fatG: 3.6, satFatG: 2.3, carbsG: 4.7, sugarG: 4.7, fiberG: 0, saltG: 0.1),
+      micros: {'calcium_mg': 117.0, 'vit_b12_ug': 0.37},
+    ),
   );
   final links = foodLinkRepo(db);
   await links.learn('Quark', 'M713300');
@@ -188,6 +194,9 @@ void main() {
     expect({for (final l in rows('household_food_links')) l['bls_code']}, {'M713300', 'M710100', 'F503100'}, reason: 'Quark gelernt, Skyr gelernt und wieder vergessen, Banane mit eigenem Gewicht');
     expect(rows('household_food_links').any((l) => l['unit_weight_g'] == 135), isTrue);
     expect(rows('meal_ingredients').any((i) => i['unit'] == 'piece' && i['amount_g'] == 56), isTrue, reason: '2 Scheiben a 28 g');
+    expect(rows('meal_ingredients').any((i) => i['micros'] is Map && (i['micros'] as Map)['iron_mg'] == 1.12), isTrue, reason: 'Mikronaehrstoffe der verzehrten Menge als Objekt');
+    expect(rows('meal_ingredients').any((i) => i['micros'] == null), isTrue, reason: 'Zutaten ohne Daten schicken null');
+    expect(rows('products').any((p) => (p['nutrients_per_100'] as Map?)?['calcium_mg'] == 117), isTrue, reason: 'Profil aus der BLS mit Mikronaehrstoffen');
     expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
     expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
     expect(

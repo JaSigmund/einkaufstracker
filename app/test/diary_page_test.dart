@@ -20,9 +20,9 @@ Meal _meal(String id, DateTime utc, {String title = 'Mahlzeit', String type = 'l
       source: 'manual', isEstimate: estimate, updatedAt: DateTime.utc(2026),
     );
 
-MealIngredient _ing(String id, String mealId, {double? kcal, double? protein}) => MealIngredient(
-      id: id, householdId: 'h1', mealId: mealId, freeText: 'Zutat', quantity: 1, unit: 'kg', source: 'manual',
-      kcal: kcal, proteinG: protein, updatedAt: DateTime.utc(2026),
+MealIngredient _ing(String id, String mealId, {double? kcal, double? protein, String? micros, String name = 'Zutat'}) => MealIngredient(
+      id: id, householdId: 'h1', mealId: mealId, freeText: name, quantity: 1, unit: 'kg', source: 'manual',
+      kcal: kcal, proteinG: protein, micros: micros, updatedAt: DateTime.utc(2026),
     );
 
 void main() {
@@ -43,6 +43,7 @@ void main() {
         child: MaterialApp.router(
           routerConfig: GoRouter(routes: [
             GoRoute(path: '/', builder: (_, _) => Scaffold(body: DiaryPage(now: now))),
+            GoRoute(path: '/nutrients', builder: (_, _) => const Scaffold(body: Text('NAEHRSTOFFE'))),
             GoRoute(
               path: '/meal-form',
               builder: (_, s) {
@@ -306,5 +307,68 @@ void main() {
         expect(find.text(expected), findsOneWidget);
       });
     }
+  });
+
+  group('Mikronaehrstoffe (Phase N3)', () {
+    testWidgets('die Karte "Nährstoffe" fuehrt zur Seite', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('diary-nutrients')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('diary-nutrients')));
+      await tester.pumpAndSettle();
+      expect(find.text('NAEHRSTOFFE'), findsOneWidget);
+    });
+
+    testWidgets('ohne Mahlzeit gibt es die Karte nicht', (tester) async {
+      await tester.pumpWidget(host(const [], const []));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('diary-nutrients')), findsNothing);
+    });
+
+    testWidgets('langer Druck: "Mehr Nährwerte" zeigt die Mikronaehrstoffe der Mahlzeit, "mind." bei Luecken', (tester) async {
+      await tester.pumpWidget(host(
+        [_meal('m1', DateTime.utc(2026, 10, 2, 10), title: 'Reispfanne')],
+        [
+          _ing('i1', 'm1', kcal: 100, name: 'Paprika', micros: '{"vit_c_mg":40,"iron_mg":1.2}'),
+          _ing('i2', 'm1', kcal: 100, name: 'Reis', micros: '{"iron_mg":0.4}'),
+          _ing('i3', 'm1', kcal: 100, name: 'Gewuerz'),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const Key('meal-m1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('meal-action-micros')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mehr Nährwerte'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('meal-micro-vit_c_mg')), matching: find.text('mind. 40 mg')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const Key('meal-micro-iron_mg')), matching: find.text('mind. 1,6 mg')), findsOneWidget);
+      expect(find.byKey(const Key('meal-micro-iodine_ug')), findsNothing, reason: 'unbekannte Werte stehen nicht als 0 da');
+      expect(find.textContaining('aus 1 von 3 Zutaten'), findsOneWidget);
+      expect(find.textContaining('Garverluste'), findsOneWidget);
+    });
+
+    testWidgets('Mahlzeit ohne Mikronaehrstoffdaten: ehrlicher Hinweis', (tester) async {
+      await tester.pumpWidget(host([_meal('m1', DateTime.utc(2026, 10, 2, 10))], [_ing('i1', 'm1', kcal: 100)]));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const Key('meal-m1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('meal-action-micros')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('meal-micros-none')), findsOneWidget);
+    });
+
+    testWidgets('Portionsanteil gilt auch im Blatt', (tester) async {
+      await tester.pumpWidget(host(
+        [_meal('m1', DateTime.utc(2026, 10, 2, 10), eaten: 1, made: 4)],
+        [_ing('i1', 'm1', kcal: 100, micros: '{"vit_c_mg":80}')],
+      ));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.byKey(const Key('meal-m1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('meal-action-micros')));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('meal-micro-vit_c_mg')), matching: find.text('20 mg')), findsOneWidget);
+    });
   });
 }

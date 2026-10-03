@@ -16,6 +16,7 @@ import '../../domain/nutrition/food_match.dart';
 import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_analysis.dart';
+import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'ingredient_picker.dart';
@@ -55,6 +56,7 @@ class _Row {
     this.unitKey,
     this.unitWeightG,
     this.learnWeight = false,
+    this.microsPer100,
   });
 
   Product? product;
@@ -82,6 +84,10 @@ class _Row {
   FoodUnitKey? unitKey;
   double? unitWeightG;
   bool learnWeight;
+
+  /// Mikronaehrstoffe je 100 g des zugeordneten BLS-Eintrags (Phase N3); bei Produkten mit eigenem Profil nimmt das Repository
+  /// das Profil des Produkts.
+  Micros? microsPer100;
 
   String get label => product?.name ?? freeText ?? 'Zutat';
 
@@ -111,6 +117,7 @@ class _Row {
         blsCode: blsCode,
         nutrientBasis: manual != null ? 'manual' : (_productProfile != null ? 'product' : (blsCode != null && per100 != null ? trust.basis : null)),
         unitWeightG: unit == EntryUnit.piece ? unitWeightG : null,
+        microsPer100: microsPer100,
       );
 
   /// Das Naehrwertprofil, mit dem diese Zeile rechnet (Produkt vor BLS-Eintrag).
@@ -266,6 +273,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
         // Bei Stueckmengen steht das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl)
         unitWeightG: unit == EntryUnit.piece && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null,
+        microsPer100: product == null ? micros100From(parseMicros(i.micros), i.amountG) : null,
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
@@ -408,6 +416,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           per100Basis: match == null ? null : 'g',
           blsCode: match?.code,
           matchName: match?.name,
+          microsPer100: match?.micros,
           matchTrust: match?.trust ?? MatchTrust.sure,
           // Gedaechtnis und Synonym kennt der Server schon, alles andere merkt sich der Haushalt beim Speichern
           learn: match != null && !match.alreadyKnown,
@@ -485,6 +494,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..per100Basis = null
           ..blsCode = null
           ..matchName = null
+          ..microsPer100 = null
           ..learn = false
           ..deduct = active.any((i) => i.productId == product.id);
         if (product.baseUnit == 'l' && row.unit == EntryUnit.g) row.unit = EntryUnit.ml;
@@ -498,6 +508,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..per100Basis = 'g'
           ..blsCode = bls.code
           ..matchName = bls.nameDe
+          ..microsPer100 = bls.micros
           ..matchTrust = MatchTrust.sure
           ..learn = true
           ..deduct = false;
@@ -556,6 +567,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           per100Basis: bls == null ? null : 'g',
           blsCode: bls?.code,
           matchName: bls?.nameDe,
+          microsPer100: bls?.micros,
           deduct: q.deduct,
           unitKey: q.unitKey,
           unitWeightG: q.unitWeightG,

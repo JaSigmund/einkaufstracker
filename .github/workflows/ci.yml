@@ -43,6 +43,8 @@ jobs:
           git diff --exit-code tools/food_synonyms_import.sql
       # Dasselbe fuer die Stueckgewichte: CSV (gebaut aus den USDA-Daten) und SQL-Datei muessen zusammenpassen
       - run: python tools/build_food_units.py --check
+      # Register der Mikronaehrstoffe (JSON) -> Dart-Datei und SQL-Import muessen zusammenpassen
+      - run: python tools/build_bls_nutrients.py --check
 
   function:
     name: Edge Function (Typpruefung)

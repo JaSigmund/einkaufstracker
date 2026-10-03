@@ -9,6 +9,7 @@ import {
   MAX_CANDIDATES,
   matchFromRow,
   parseFoodRow,
+  parseNutrients,
   pickMatch,
   sanitizeChoices,
   searchQuery,
@@ -28,6 +29,7 @@ const row = (over: Partial<FoodRow> & { bls_code: string; name_de: string }): Fo
   sugar_g: 3,
   fiber_g: 2,
   salt_g: 0.1,
+  nutrients: null,
   ...over,
 });
 
@@ -224,4 +226,21 @@ Deno.test("resolveIngredients: leere Zutatenliste", async () => {
   const r = await resolveIngredients([], d);
   assertEquals(r.matches, []);
   assertEquals(d.calls.search.length, 0);
+});
+
+Deno.test("parseNutrients: nur Zahlen, nicht negativ, Text-Zahlen gelesen; leer oder falscher Typ ist null", () => {
+  assertEquals(parseNutrients({ vit_c_mg: 11, iron_mg: "0,4", zinc_mg: -1, x: "viel", y: null, z: NaN }), { vit_c_mg: 11, iron_mg: 0.4 });
+  assertEquals(parseNutrients({}), null);
+  assertEquals(parseNutrients(null), null);
+  assertEquals(parseNutrients([1, 2]), null);
+  assertEquals(parseNutrients("{}"), null);
+  assertEquals(parseNutrients({ a: 0 }), { a: 0 }, "eine echte 0 bleibt");
+});
+
+Deno.test("parseFoodRow und Treffer: die Naehrstoffe werden mitgenommen", () => {
+  const r = parseFoodRow({ bls_code: "F503100", name_de: "Banane roh", confidence: "sure", method: "synonym", rank: 1, nutrients: { vit_c_mg: 11, potassium_mg: 334 } })!;
+  assertEquals(r.nutrients, { vit_c_mg: 11, potassium_mg: 334 });
+  assertEquals(matchFromRow(r).nutrients, { vit_c_mg: 11, potassium_mg: 334 });
+  assertEquals(parseFoodRow({ bls_code: "A", name_de: "B" })!.nutrients, null);
+  assertEquals(pickMatch([row({ bls_code: "F503100", name_de: "Banane roh", confidence: "sure", method: "synonym", nutrients: { vit_c_mg: 11 } })])!.nutrients, { vit_c_mg: 11 });
 });

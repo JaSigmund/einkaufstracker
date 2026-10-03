@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/nutrition/food_match.dart';
+import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 
 /// Ein Lebensmittel aus dem Bundeslebensmittelschluessel (Tabelle `bls_foods`, ADR-024) mit Naehrwerten je 100 g.
@@ -9,7 +10,7 @@ import '../../domain/nutrition/nutrient_scaling.dart';
 /// ([method]: `memory` | `synonym` | `search`) und wie sicher er ist ([confidence]: `sure` | `auto` | `unsure`, nur fuer
 /// den ersten Treffer sinnvoll).
 class BlsFood {
-  const BlsFood({required this.code, required this.nameDe, this.nameEn, required this.per100, this.method, this.confidence});
+  const BlsFood({required this.code, required this.nameDe, this.nameEn, required this.per100, this.method, this.confidence, this.micros});
 
   final String code;
   final String nameDe;
@@ -17,6 +18,9 @@ class BlsFood {
   final NutrientsPer100 per100;
   final String? method;
   final String? confidence;
+
+  /// Die 38 Mikronaehrstoffe je 100 g (Phase N3), `null`, wenn die Zeile keine mitbrachte.
+  final Micros? micros;
 
   /// Als Treffer mit Sicherheit: sicher (Gedaechtnis, Synonym) oder automatisch, `unknown` bei `unsure`/ohne Angabe.
   MatchTrust get trust => confidence == 'sure' ? MatchTrust.sure : (confidence == 'auto' ? MatchTrust.auto : MatchTrust.unknown);
@@ -27,6 +31,7 @@ class BlsFood {
         per100: per100,
         method: method ?? 'search',
         trust: trust ?? (this.trust == MatchTrust.unknown ? MatchTrust.auto : this.trust),
+        micros: micros,
       );
 }
 
@@ -80,6 +85,7 @@ BlsFood blsFoodFromRow(Map<String, dynamic> row) {
     ),
     method: method is String ? method : null,
     confidence: confidence is String ? confidence : null,
+    micros: parseMicros(row['nutrients']),
   );
 }
 

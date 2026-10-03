@@ -30,6 +30,8 @@ export type FoodRow = {
   sugar_g: number | null;
   fiber_g: number | null;
   salt_g: number | null;
+  /// Die 38 Mikronaehrstoffe je 100 g (Phase N3), nur Zahlen; `null` ohne Daten.
+  nutrients: Record<string, number> | null;
 };
 
 export type Per100 = {
@@ -51,6 +53,8 @@ export type Match = {
   method: "memory" | "synonym" | "search" | "llm";
   trust: "sure" | "auto";
   per100: Per100;
+  /// Mikronaehrstoffe je 100 g, `null` ohne Daten (Phase N3).
+  nutrients: Record<string, number> | null;
 };
 
 export type Candidate = { code: string; name: string };
@@ -63,6 +67,17 @@ const num = (v: unknown): number | null => {
   }
   return null;
 };
+
+/// Liest das jsonb der Naehrstoffe defensiv: nur endliche, nicht negative Zahlen; `null`, wenn nichts uebrig bleibt.
+export function parseNutrients(raw: unknown): Record<string, number> | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = num(v);
+    if (n !== null && n >= 0) out[k] = n;
+  }
+  return Object.keys(out).length === 0 ? null : out;
+}
 
 /// Liest eine Zeile der Suchfunktion defensiv; `null`, wenn Code oder Name fehlen.
 export function parseFoodRow(raw: unknown): FoodRow | null {
@@ -87,6 +102,7 @@ export function parseFoodRow(raw: unknown): FoodRow | null {
     sugar_g: num(r.sugar_g),
     fiber_g: num(r.fiber_g),
     salt_g: num(r.salt_g),
+    nutrients: parseNutrients(r.nutrients),
   };
 }
 
@@ -112,7 +128,7 @@ function per100Of(row: FoodRow): Per100 {
 }
 
 export function matchFromRow(row: FoodRow, method: Match["method"] = row.method, trust: Match["trust"] = row.confidence === "sure" ? "sure" : "auto"): Match {
-  return { code: row.bls_code, name: row.name_de, method, trust, per100: per100Of(row) };
+  return { code: row.bls_code, name: row.name_de, method, trust, per100: per100Of(row), nutrients: row.nutrients };
 }
 
 /// Der Treffer auf Rang 1, wenn die Suche ihn als sicher oder automatisch einstuft; sonst `null`.

@@ -286,6 +286,8 @@ class ProductRepository {
     if (product.nutrientsPer100 != null && !overwrite) return null;
     final p = food.per100;
     final profile = <String, double>{
+      // Mikronaehrstoffe (Phase N3) stehen mit denselben Schluesseln im selben Profil
+      ...?food.micros,
       if (p.kcal != null) 'kcal': p.kcal!,
       if (p.proteinG != null) 'protein_g': p.proteinG!,
       if (p.fatG != null) 'fat_g': p.fatG!,
