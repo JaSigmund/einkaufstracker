@@ -24,6 +24,7 @@ import '../data/photos/photo_picker.dart';
 import '../data/ocr/mlkit_receipt_scanner.dart';
 import '../data/remote/remote_store.dart';
 import '../data/nutrition/bls_food_search.dart';
+import '../data/nutrition/food_units_source.dart';
 import '../data/online_prices/online_price_remote.dart';
 import '../data/repositories/online_price_repository.dart';
 import '../data/repositories/food_link_repository.dart';
@@ -367,6 +368,9 @@ final mealPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto
 
 /// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
 final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));
+
+/// Haushaltsmasse (Stueck, Scheibe, EL ...) der BLS-Lebensmittel aus `food_units` (Phase N2, ADR-033).
+final foodUnitsSourceProvider = Provider<FoodUnitsSource>((ref) => SupabaseFoodUnitsSource(ref.watch(supabaseClientProvider)));
 
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   return ShoppingListRepository(

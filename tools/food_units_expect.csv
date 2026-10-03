@@ -1,0 +1,33 @@
+bls_code,unit_key,size,grams,note
+F503100,piece,medium,120,Banane ohne Schale
+F110100,piece,medium,170,Apfel ohne Gehaeuse
+F130100,piece,medium,170,Birne
+F603100,piece,medium,130,Orange ohne Schale
+F606100,piece,medium,80,Mandarine
+F203100,piece,medium,150,Pfirsich
+F301100,piece,medium,15,Erdbeere
+F514100,piece,,70,Kiwi ohne Schale
+F502100,piece,,150,Avocado ohne Schale und Kern
+E111100,piece,medium,50,Ei Groesse M ohne Schale
+E111100,piece,large,58,Ei Groesse L ohne Schale
+G620100,piece,medium,70,Karotte
+G480100,piece,medium,90,Zwiebel
+G541100,piece,medium,150,Paprika
+G561100,piece,medium,100,Tomate
+G520100,piece,,350,Salatgurke
+G582100,piece,medium,250,Zucchini
+K110100,piece,medium,150,Kartoffel geschaelt
+G490100,clove,,4,Knoblauchzehe
+Q120000,tbsp,,12,Esslöffel Öl
+S120000,tbsp,,20,Esslöffel Honig
+S111000,tsp,,5,Teeloeffel Zucker
+Q6A4000,tbsp,,12,Esslöffel Butter
+B311000,slice,,25,Scheibe Toastbrot
+B511000,piece,,50,Semmel/Broetchen
+D771600,piece,medium,55,Croissant
+M303700,slice,,25,Scheibe Kaese
+W140000,slice,,8,Scheibe Salami
+W213000,piece,,50,Frankfurter
+T930100,piece,,28,Fischstaebchen
+R114000,tsp,,6,Teeloeffel Salz
+H110800,tbsp,,15,Esslöffel Erdnussmus

@@ -6,6 +6,7 @@
 library;
 
 import 'food_match.dart';
+import 'food_unit.dart';
 
 /// Eine erkannte Zutat. [inventoryProductId] ist nur gesetzt, wenn die Zutat eindeutig zu einem Produkt des Haushalts
 /// passt, das die App vorab mitgeschickt hat.
@@ -18,6 +19,7 @@ class AnalyzedIngredient {
     this.kind = 'food',
     this.state,
     this.match,
+    this.unit,
   });
 
   final String name;
@@ -37,6 +39,9 @@ class AnalyzedIngredient {
 
   /// Zugeordneter Eintrag der Lebensmitteldatenbank mit Naehrwerten, `null` = unbekannt (Phase N1).
   final FoodMatch? match;
+
+  /// Bei Stueckware, deren Gewicht der Server kennt: "2 Stk a 59 g" (Phase N2). Dann ersetzt es die Gramm-Schaetzung.
+  final AnalyzedUnit? unit;
 
   bool get isDrink => kind == 'drink';
 }
@@ -82,6 +87,7 @@ MealAnalysis parseMealAnalysis(Object? json) {
         kind: item['kind'] == 'drink' ? 'drink' : 'food',
         state: state is String && const {'raw', 'cooked', 'ready_made'}.contains(state) ? state : null,
         match: parseFoodMatch(item['match']),
+        unit: parseAnalyzedUnit(item['unit']),
       ));
     }
   }

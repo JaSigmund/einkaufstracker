@@ -263,6 +263,19 @@ class ProductRepository {
     onChanged?.call();
   }
 
+  /// Merkt sich das Gewicht von 1 Stueck des Produkts in g (Phase N2): einmal angegeben, gilt es fuer jede Mahlzeit. `null` bei
+  /// unbekanntem oder geloeschtem Produkt oder einem Gewicht ohne Sinn.
+  Future<Product?> setUnitWeight(String productId, double grams) async {
+    if (!(grams > 0) || grams > 5000) return null;
+    final product = await byId(productId);
+    if (product == null || product.deletedAt != null) return null;
+    if (product.unitWeightG == grams) return product;
+    final updated = product.copyWith(unitWeightG: Value(grams), updatedAt: DateTime.now().toUtc());
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+    return updated;
+  }
+
   /// Verknuepft das Produkt mit einem Eintrag der Lebensmitteldatenbank (Phase N1, ADR-031): `bls_code` und das Profil je
   /// 100 g als Snapshot in `nutrients_per_100` (`nutrients_source = 'bls'`), damit die Mahlzeitenerfassung offline ohne Abfrage
   /// rechnet. Ein vorhandenes Profil (z.B. von Open Food Facts, packungsgenau) bleibt, ausser mit [overwrite].

@@ -39,6 +39,7 @@ class IngredientDraft {
     this.confidence,
     this.blsCode,
     this.nutrientBasis,
+    this.unitWeightG,
   }) : assert(productId != null || freeText != null, 'Eine Zutat braucht ein Produkt oder einen Text');
 
   final String? productId;
@@ -67,6 +68,11 @@ class IngredientDraft {
   /// Ohne Angabe von [nutrientBasis] leitet das Repository sie ab (Produktprofil: `product`, Handwerte: `manual`).
   final String? blsCode;
   final String? nutrientBasis;
+
+  /// Gewicht einer Einheit ("1 Stk", "1 Scheibe", "1 EL") in g, wenn die Menge in [entryUnit] = Stueck erfasst ist und das
+  /// Produkt kein eigenes Gewicht hat (Phase N2). Es geht dem Gewicht des Produkts vor, weil die Oberflaeche die Kette
+  /// Haushalt > Produkt > Tabelle schon aufgeloest hat.
+  final double? unitWeightG;
 }
 
 /// Eine Mahlzeit samt Zutaten, wie sie gespeichert werden soll.
@@ -226,7 +232,7 @@ class MealRepository {
         entryUnit: d.entryUnit,
         baseUnit: product?.baseUnit ?? d.entryUnit.dimensionBaseUnit,
         nutrientsBasis: basis,
-        unitWeightG: product?.unitWeightG,
+        unitWeightG: d.unitWeightG ?? product?.unitWeightG,
       );
       final nutrients = d.manualNutrients ?? ingredientNutrients(per100, amount);
 

@@ -2,6 +2,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   MAX_AMOUNT_G,
+  MAX_COUNT,
   MAX_IMAGE_BASE64_CHARS,
   MAX_INGREDIENTS,
   MAX_PRODUCTS,
@@ -78,7 +79,7 @@ Deno.test("sanitizeAnalysis: normale Antwort bleibt erhalten", () => {
     dish_title: "Reispfanne",
     meal_type_guess: "dinner",
     servings_visible: 2,
-    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8, kind: "food", state: null }],
+    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8, kind: "food", state: null, count: null, count_unit: "piece" }],
     notes: "Oel nicht sichtbar",
   });
 });
@@ -160,4 +161,45 @@ Deno.test("sanitizeAnalysis: kind und state werden gelesen, Unbekanntes wird zu 
     ["food", null],
     ["food", null],
   ]);
+});
+
+Deno.test("sanitizeAnalysis: count in halben Schritten, begrenzt; Getraenke und Unsinn ohne Anzahl", () => {
+  const a = sanitizeAnalysis({
+    ingredients: [
+      { name: "Ei", count: 2, count_unit: "piece" },
+      { name: "Banane", count: 1.4, count_unit: "piece" },
+      { name: "Brot", count: 3, count_unit: "slice" },
+      { name: "Oel", count: 2, count_unit: "tbsp" },
+      { name: "Haufen", count: 5000, count_unit: "piece" },
+      { name: "Cola", count: 1, kind: "drink" },
+      { name: "Reis", count: 0 },
+      { name: "Sosse", count: -2 },
+      { name: "Nudeln", count: "viele" },
+      { name: "Schale", count: 0.2 },
+    ],
+  }, new Set());
+  assertEquals(a.ingredients.map((i) => [i.name, i.count]), [
+    ["Ei", 2],
+    ["Banane", 1.5],
+    ["Brot", 3],
+    ["Oel", 2],
+    ["Haufen", MAX_COUNT],
+    ["Cola", null],
+    ["Reis", null],
+    ["Sosse", null],
+    ["Nudeln", null],
+    ["Schale", null],
+  ]);
+});
+
+Deno.test("sanitizeAnalysis: count_unit nur aus der Liste, sonst Stueck", () => {
+  const a = sanitizeAnalysis({
+    ingredients: [
+      { name: "a", count: 1, count_unit: "slice" },
+      { name: "b", count: 1, count_unit: "handvoll" },
+      { name: "c", count: 1 },
+      { name: "d", count: 1, count_unit: 7 },
+    ],
+  }, new Set());
+  assertEquals(a.ingredients.map((i) => i.count_unit), ["slice", "piece", "piece", "piece"]);
 });

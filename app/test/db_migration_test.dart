@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -134,5 +135,25 @@ void main() {
           id: 'l1', householdId: 'h1', nameNorm: 'Quark', blsCode: 'M713300', updatedAt: DateTime.utc(2026, 10, 3),
         ));
     expect((await db.select(db.householdFoodLinks).getSingle()).blsCode, 'M713300');
+  });
+
+  test('Daten aus Version 17 bleiben beim Hochziehen erhalten, das Stueckgewicht der Zuordnung ist leer und nutzbar', () async {
+    final schema = await verifier.schemaAt(17);
+    schema.rawDatabase.execute(
+      "INSERT INTO household_food_links (id, household_id, name_norm, bls_code, updated_at) "
+      "VALUES ('l1', 'h1', 'Quark', 'M713300', '2026-10-02T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    final link = await db.select(db.householdFoodLinks).getSingle();
+    expect(link.nameNorm, 'Quark');
+    expect(link.blsCode, 'M713300');
+    expect(link.unitWeightG, isNull, reason: 'neue Spalte, bestehende Zuordnungen haben noch kein eigenes Gewicht');
+
+    await (db.update(db.householdFoodLinks)..where((l) => l.id.equals('l1'))).write(const HouseholdFoodLinksCompanion(unitWeightG: Value(135)));
+    expect((await db.select(db.householdFoodLinks).getSingle()).unitWeightG, 135);
   });
 }

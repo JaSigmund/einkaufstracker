@@ -530,6 +530,10 @@ class HouseholdFoodLinks extends Table {
   TextColumn get householdId => text()();
   TextColumn get nameNorm => text()();
   TextColumn get blsCode => text()();
+
+  /// Eigenes Gewicht von 1 Stueck in g (essbarer Anteil), wenn der Haushalt es einmal angegeben hat (Phase N2, ADR-033).
+  /// Es geht jedem Tabellenwert vor.
+  RealColumn get unitWeightG => real().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
@@ -569,7 +573,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -666,6 +670,11 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(mealIngredients, mealIngredients.nutrientBasis);
             }
             await m.createTable(householdFoodLinks);
+          }
+          // 17 -> 18: eigenes Stueckgewicht je Zuordnung (Phase N2). Installationen vor 17 legen die Tabelle oben schon mit
+          // der Spalte an.
+          if (from >= 17 && from < 18) {
+            await m.addColumn(householdFoodLinks, householdFoodLinks.unitWeightG);
           }
         },
       );

@@ -1,0 +1,110 @@
+bls_code,fdc_id,fdc_id2,filter,size_map,factor,unit,note
+F110100,171688,,,,,,Apfel roh; USDA Apples raw with skin
+F130100,169118,746773,,,,,Birne roh; zweite Quelle Foundation Foods (Bartlett)
+F201100,171697,,,,,,Aprikose
+F202100,169914,,,,,,Nektarine
+F203100,169928,325430,,,,,Pfirsich; zweite Quelle Foundation Foods
+F211100,171719,,,,,,Suesskirsche (ein Stueck ohne Stein)
+F220100,169949,,,,,,Pflaume
+F223100,169949,,,,,,Zwetschge wie Pflaume
+F301100,167762,,,,,,Erdbeere (S/M/L)
+F310100,174683,,,,,,Weintraube (eine Beere)
+F502100,171706,,,,,,Avocado ohne Schale und Kern
+F503100,173944,,,,,,Banane ohne Schale
+F505100,173021,,,,,,Feige
+F514100,168153,,,,,,Kiwi
+F516100,169910,,,,,,Mango ohne Schale und Kern
+F601100,167746,,^fruit \(2-1/8,,,,Zitrone ohne Schale (kleine Frucht)
+F602100,168155,,,,,,Limette
+F603100,169097,,,,,,Orange
+F606100,169105,,,,,,Mandarine
+F607100,168195,,,,,,Clementine
+G061000,172232,,tbsp,,,,Basilikum gehackt
+G081100,169994,,tbsp,,,,Schnittlauch gehackt
+G103100,169248,,head,,,,Eisbergsalat Kopf
+G105100,168429,,head,,,,Kopfsalat
+G107100,169247,,head,,,,Roemersalat Kopf
+G220100,169988,,stalk,,,,Bleichsellerie Stange
+G250100,170416,,tbsp,,,,Petersilie gehackt
+G311100,169986,,head,,,,Blumenkohl Kopf
+G332100,170383,,sprout,,,,Rosenkohl Roeschen
+G341100,169977,,head,,,,Rotkohl Kopf
+G342100,169975,,head,,,,Weisskohl Kopf (USDA Cabbage)
+G431100,169385,,bulb,,,,Fenchelknolle
+G450100,168389,,^spear.*(small|medium|large) ,,,,Spargelstange
+G470100,169246,,^leek$,,,,Lauch Stange
+G480100,170000,,^(small|medium|large),,,,Zwiebel (mittel und gross)
+G482100,170005,,^(small|medium|large),,,,Fruehlingszwiebel
+G490100,169230,,clove,,,,Knoblauchzehe
+G520100,168409,,^cucumber,,,,Salatgurke mit Schale
+G541100,170427,,^(small|medium|large),,,,Paprika gruen
+G542100,169383,,pepper,,,,Paprika gelb (nur gross)
+G543100,170108,,^(small|medium|large),,,,Paprika rot
+G553100,170497,,^pepper$,,,,Chili gruen
+G554100,170106,,^pepper$,,,,Chili rot
+G561100,170457,,whole,,,,Tomate (S/M/L); Cherrytomaten ausgenommen
+G582100,169291,,^(small|medium|large)$,,,,Zucchini
+G613100,169145,,beet,,,,Rote Bete
+G620100,170393,,^(small|medium|large)( |$),,,,Karotte
+G691100,169276,,^(small|medium|large)( |$),,,,Radieschen
+K110100,170026,,^potato (small|medium|large),,0.85,,Kartoffel geschaelt roh; USDA wiegt mit Schale; Schaelverlust 15 % geschaetzt (Quelle curated)
+K420100,168482,,sweetpotato,,,,Suesskartoffel ungeschaelt
+K701100,169251,,^(small|medium|large)$,,,,Champignon
+E106100,172191,,,,,,Wachtelei
+E111100,171287,,^(medium|large|extra large)$,medium:small;large:medium;extra large:large,,,Huehnerei roh; USDA large entspricht etwa EU-Groesse M (50 g ohne Schale)
+E111132,173424,,^large$,large:,,,Huehnerei gekocht ohne Schale
+E112100,172184,,^large$,large:,,,Eigelb
+E113100,172183,,^large$,large:,,,Eiklar
+Y710142,173423,,^large$,large:,,,Spiegelei gebraten
+Y720143,172187,,^large$,large:,,,Ruehrei gebraten
+B311000,167532,,,,,,Weizenbrot/Toast Scheibe (US-Scheibe)
+B511000,175031,,roll,,,,Weizenbroetchen (hard roll)
+B6A2000,172739,,crispbread,,,slice,Knaeckebrot Scheibe
+B6A2100,172739,,crispbread,,,slice,Knaeckebrot Vollkorn Scheibe
+D771600,174987,,croissant.*(small|medium|large),,,,Croissant
+Q120000,171413,,,,,,Olivenoel
+Q180000,172336,,,,,,Rapsoel
+Q320000,171017,,,,,,Sonnenblumenoel
+Q550000,171412,,,,,,Kokosoel
+Q400000,172346,,^(tbsp|tsp),,,,Margarine
+Q611000,173430,,tbsp,,,,Butter mild gesaeuert
+Q6A4000,173410,,tbsp,,,,Butter gesalzen
+Q683000,173412,,,,,,Butterschmalz
+Q991000,171009,,tbsp,,,,Mayonnaise
+M172500,171257,,,,,,Sauerrahm
+M172700,171257,,,,,,Sauerrahm 20 %
+M173800,170858,,tbsp,,,,Schlagsahne 30 %
+M173900,170859,,tbsp,,,,Schlagsahne 36 %
+M710700,173418,,^tbsp$,,,,Frischkaese
+M820600,173418,,^tbsp$,,,,Frischkaese
+M306400,171247,,tbsp,,,,Parmesan gerieben
+M032100,170845,,slices,,,,Mozzarella Scheibe
+M303700,173414,,slice,,,,Cheddar Scheibe
+M304600,171251,,slice,,,,Emmentaler Scheibe (USDA Swiss)
+W140000,172938,,slice,,,,Salami Scheibe
+W234000,173856,,,,,,Fleischwurst Scheibe (Bologna)
+W213000,173862,,hot dog,,,,Frankfurter Wuerstchen
+W327000,173870,,slice,,,,Leberwurst Scheibe
+W424000,173864,,slice,,,,Kochschinken Scheibe
+T930100,174195,,^stick,,,,Fischstaebchen
+S120000,169640,,tbsp,,,,Honig
+S132000,169641,,tbsp,,,,Konfituere
+S151100,169661,,tbsp,,,,Ahornsirup
+S111000,169655,,^tsp,,,,Zucker weiss Teeloeffel
+S111100,169656,,^(tbsp|tsp),,,,Puderzucker
+H110800,174294,,,,,,Erdnussmus
+H880200,174294,,,,,,Erdnussbutter
+H130100,170581,,nuts,,,,Haselnuss (ein Kern)
+H210100,170567,,almond,,,,Mandel (ein Kern)
+H410100,169414,,whole,,,,Leinsamen ganz
+H420100,170150,,tbsp,,,,Sesam
+R114000,173468,,^(tsp|tbsp),,,,Speisesalz Teeloeffel
+R121000,172240,,,,,,Weinessig
+R123100,173469,,,,,,Apfelessig
+R125000,172241,,,,,,Balsamicoessig
+R132000,172234,,,,,,Senf
+R141100,168556,,,,,,Ketchup
+R143000,174277,,,,,,Sojasauce
+R160000,170459,,tbsp,,,,Tomatenmark
+R258100,170931,,ground,,,,Pfeffer gemahlen
+R421100,172803,,,,,,Backpulver

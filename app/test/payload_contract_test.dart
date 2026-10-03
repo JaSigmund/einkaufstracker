@@ -69,6 +69,17 @@ Future<List<Map<String, dynamic>>> _collect() async {
         nutrientBasis: 'bls_matched',
       ),
       const IngredientDraft(freeText: 'Gewürzmischung', quantity: 5, entryUnit: EntryUnit.g),
+      // Stueckmenge mit Gewicht einer Einheit (Phase N2): 2 Scheiben a 28 g
+      const IngredientDraft(
+        freeText: 'Weizenbrot/Weißbrot',
+        quantity: 2,
+        entryUnit: EntryUnit.piece,
+        per100: NutrientsPer100(kcal: 260, proteinG: 8),
+        per100Basis: 'g',
+        blsCode: 'B311000',
+        nutrientBasis: 'bls_exact',
+        unitWeightG: 28,
+      ),
       const IngredientDraft(
         freeText: 'Nachspeise im Restaurant',
         quantity: 1,
@@ -110,6 +121,8 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await links.learn('Quark', 'M713300');
   await links.learn('Skyr', 'M710100');
   await links.forget((await links.all()).firstWhere((l) => l.nameNorm == 'Skyr').id);
+  await links.setUnitWeight('Banane', 'F503100', 135); // eigenes Stueckgewicht (Phase N2)
+  await productRepo(db).setUnitWeight(milch.id, 250);
 
   // Online-Preise (ADR-019): zwei Artikel beim selben Haendler (Bio und normal), einer bei einem anderen, einer wieder geloest
   final online = OnlinePriceRepository(db, FakeOnlinePriceRemote(), householdId: () async => 'h1');
@@ -172,7 +185,9 @@ void main() {
     expect(rows('meal_ingredients').any((i) => i['bls_code'] == 'G543100'), isTrue);
     expect(rows('products').any((p) => p['bls_code'] == 'M111300' && p['nutrients_source'] == 'bls'), isTrue, reason: 'Profil aus der BLS im Produkt');
     expect(rows('household_food_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Zuordnung vergessen (Soft-Delete)');
-    expect({for (final l in rows('household_food_links')) l['bls_code']}, {'M713300', 'M710100'}, reason: 'Quark gelernt, Skyr gelernt und wieder vergessen');
+    expect({for (final l in rows('household_food_links')) l['bls_code']}, {'M713300', 'M710100', 'F503100'}, reason: 'Quark gelernt, Skyr gelernt und wieder vergessen, Banane mit eigenem Gewicht');
+    expect(rows('household_food_links').any((l) => l['unit_weight_g'] == 135), isTrue);
+    expect(rows('meal_ingredients').any((i) => i['unit'] == 'piece' && i['amount_g'] == 56), isTrue, reason: '2 Scheiben a 28 g');
     expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
     expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
     expect(

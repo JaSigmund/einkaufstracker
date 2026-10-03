@@ -13,6 +13,7 @@ import '../../data/repositories/meal_repository.dart';
 import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/food_match.dart';
+import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
@@ -51,6 +52,9 @@ class _Row {
     this.matchName,
     this.matchTrust = MatchTrust.sure,
     this.learn = false,
+    this.unitKey,
+    this.unitWeightG,
+    this.learnWeight = false,
   });
 
   Product? product;
@@ -72,6 +76,12 @@ class _Row {
   String? matchName;
   MatchTrust matchTrust;
   bool learn;
+
+  /// Haushaltseinheit ("Scheibe", "EL"), wenn die Menge als [EntryUnit.piece] erfasst ist, und das Gewicht von 1 Einheit in g
+  /// (Phase N2, ADR-033). [learnWeight]: das Gewicht hat der Nutzer selbst eingetragen und wird beim Speichern gemerkt.
+  FoodUnitKey? unitKey;
+  double? unitWeightG;
+  bool learnWeight;
 
   String get label => product?.name ?? freeText ?? 'Zutat';
 
@@ -100,7 +110,14 @@ class _Row {
         confidence: confidence,
         blsCode: blsCode,
         nutrientBasis: manual != null ? 'manual' : (_productProfile != null ? 'product' : (blsCode != null && per100 != null ? trust.basis : null)),
+        unitWeightG: unit == EntryUnit.piece ? unitWeightG : null,
       );
+
+  /// Das Naehrwertprofil, mit dem diese Zeile rechnet (Produkt vor BLS-Eintrag).
+  NutrientsPer100? get profile => _productProfile ?? per100;
+
+  /// "2 Scheiben", "1 Stk", "80 g": die Menge, wie der Nutzer sie sieht.
+  String get quantityText => '${formatQuantity(quantity)} ${unit == EntryUnit.piece && unitKey != null ? unitKey!.labelFor(quantity) : unit.label}';
 
   /// Naehrwerte dieser Zutat, wie sie beim Speichern berechnet wuerden; `null`, wenn unbekannt. Ein Produkt ohne eigenes Profil
   /// nutzt das Profil des zugeordneten BLS-Eintrags (Phase N1).
@@ -112,7 +129,7 @@ class _Row {
       entryUnit: unit,
       baseUnit: product?.baseUnit ?? unit.dimensionBaseUnit,
       nutrientsBasis: profile == null ? null : basis,
-      unitWeightG: product?.unitWeightG,
+      unitWeightG: unitWeightG ?? product?.unitWeightG,
     );
     return manual ?? ingredientNutrients(profile, amount);
   }
@@ -247,6 +264,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         confidence: i.confidence,
         blsCode: i.blsCode,
         matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
+        // Bei Stueckmengen steht das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl)
+        unitWeightG: unit == EntryUnit.piece && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null,
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
@@ -371,12 +390,16 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         // zugeordnete BLS-Eintrag ein; ohne beides bleibt die Zeile "unbekannt" (Phase N1, ADR-031).
         final ownProfile = product != null && productNutrientProfile(product) != null;
         final match = ownProfile ? null : i.match;
+        // Hat der Server eine Stueckzahl samt Gewicht geliefert ("2 Eier a 50 g"), gilt sie statt der Gramm-Schaetzung (Phase N2)
+        final counted = i.unit;
         _rows.add(_Row(
           product: product,
           freeText: product == null ? i.name : null,
-          quantity: i.estimatedGrams ?? 0,
+          quantity: counted?.count ?? i.estimatedGrams ?? 0,
+          unitKey: counted?.key,
+          unitWeightG: counted?.weightG,
           // Getraenke fuehrt die App in ml; die Naehrwerte der BLS gelten je 100 g, bei Wasserdichte 1 ist das dasselbe
-          unit: (product != null && product.baseUnit == 'l') || i.isDrink ? EntryUnit.ml : EntryUnit.g,
+          unit: counted != null ? EntryUnit.piece : ((product != null && product.baseUnit == 'l') || i.isDrink ? EntryUnit.ml : EntryUnit.g),
           // Gekochtes wiegt mehr als das Rohgewicht im Bestand: kein Abzug vorbelegt (Q-28), der Nutzer kann ihn einschalten
           deduct: product != null && inStock.contains(product.id) && i.state != 'cooked',
           source: 'photo_ai',
@@ -396,6 +419,52 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       _analysisApplied = true;
       _analysisNotes = a.notes;
     });
+    _fillMissingAmounts();
+  }
+
+  /// Das Gewicht einer Einheit nach der Kette Haushalt > Produkt > Tabelle (Phase N2, ADR-033), die bekannten Einheiten des
+  /// Lebensmittels und woher das Gewicht stammt. Fehler (kein Netz) ergeben nur weniger Angaben, nie eine Ausnahme.
+  Future<({List<FoodUnit> units, double? pieceWeight, String source})> _unitContext({Product? product, String? blsCode}) async {
+    final code = blsCode ?? product?.blsCode;
+    var units = const <FoodUnit>[];
+    double? household;
+    if (code != null) {
+      try {
+        units = await ref.read(foodUnitsSourceProvider).unitsFor(code);
+      } catch (_) {
+        // ohne Tabelle nur Gramm, Milliliter und das eigene Stueckgewicht
+      }
+      try {
+        household = await ref.read(foodLinkRepositoryProvider).unitWeightForCode(code);
+      } catch (_) {
+        // kein gemerktes Gewicht
+      }
+    }
+    if (household != null) return (units: units, pieceWeight: household, source: 'household');
+    if (product?.unitWeightG != null) return (units: units, pieceWeight: product!.unitWeightG, source: 'product');
+    return (units: units, pieceWeight: null, source: 'usda');
+  }
+
+  /// Zutaten ohne Menge ("Gewuerzgurke", von der KI nicht schaetzbar): statt einer leeren Menge 1 Einheit vorbelegen, wenn das
+  /// Lebensmittel eine bekannte hat (Phase N2). Der Nutzer prueft ohnehin jede Zeile; bei unbekannten bleibt die Menge leer.
+  Future<void> _fillMissingAmounts() async {
+    for (final r in List.of(_rows)) {
+      if (r.quantity > 0 || r.blsCode == null && r.product?.blsCode == null) continue;
+      final ctx = await _unitContext(product: r.product, blsCode: r.blsCode);
+      if (!mounted || r.quantity > 0) continue;
+      final keys = unitKeysOf(ctx.units);
+      if (keys.isEmpty) continue;
+      final key = keys.first;
+      final w = key == FoodUnitKey.piece ? (ctx.pieceWeight ?? defaultUnit(ctx.units, key)?.gramsEdible) : defaultUnit(ctx.units, key)?.gramsEdible;
+      if (w == null) continue;
+      setState(() {
+        r
+          ..quantity = 1
+          ..unit = EntryUnit.piece
+          ..unitKey = key
+          ..unitWeightG = w;
+      });
+    }
   }
 
   /// Sucht zu einer Zutat ohne Naehrwerte (z.B. aus der Foto-Analyse) ein Produkt oder einen BLS-Treffer und
@@ -464,12 +533,18 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     final product = picked.product;
     final bls = picked.bls;
     final label = product?.name ?? bls?.nameDe ?? picked.freeText!;
+    final ctx = await _unitContext(product: product, blsCode: bls?.code);
+    if (!mounted) return;
     final q = await askIngredientQuantity(
       context,
       label: label,
       initialUnit: product != null ? EntryUnit.naturalFor(product.baseUnit) : EntryUnit.g,
       canDeduct: product != null,
       stockHint: product == null ? null : _stockHint(product),
+      units: ctx.units,
+      pieceWeightG: ctx.pieceWeight,
+      pieceWeightSource: ctx.source,
+      per100: bls?.per100 ?? (product == null ? null : productNutrientProfile(product)),
     );
     if (q == null || !mounted) return;
     setState(() => _rows.add(_Row(
@@ -482,6 +557,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           blsCode: bls?.code,
           matchName: bls?.nameDe,
           deduct: q.deduct,
+          unitKey: q.unitKey,
+          unitWeightG: q.unitWeightG,
+          learnWeight: q.learnWeight,
         )));
   }
 
@@ -532,6 +610,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   Future<void> _editIngredient(int index) async {
     if (_isManual(_rows[index])) return _editManual(index);
     final row = _rows[index];
+    final ctx = await _unitContext(product: row.product, blsCode: row.blsCode);
+    if (!mounted) return;
     final q = await askIngredientQuantity(
       context,
       label: row.label,
@@ -540,12 +620,21 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       canDeduct: row.product != null,
       initialDeduct: row.deduct,
       stockHint: row.product == null ? null : _stockHint(row.product!),
+      units: ctx.units,
+      pieceWeightG: ctx.pieceWeight,
+      pieceWeightSource: ctx.source,
+      per100: row.profile,
+      initialUnitKey: row.unitKey,
+      initialUnitWeightG: row.unitWeightG,
     );
     if (q == null || !mounted) return;
     setState(() {
       row.quantity = q.quantity;
       row.unit = q.unit;
       row.deduct = q.deduct;
+      row.unitKey = q.unitKey;
+      row.unitWeightG = q.unitWeightG;
+      row.learnWeight = row.learnWeight || q.learnWeight;
     });
   }
 
@@ -582,6 +671,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       final saved = _isEdit ? await repo.update(widget.existing!.id, draft) : await repo.create(draft);
       final photoProblem = await _applyPhoto(saved);
       await _learnLinks();
+      await _learnWeights();
       if (!mounted) return;
       if (photoProblem != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(photoProblem)));
       context.pop(true);
@@ -602,6 +692,24 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       }
     } catch (_) {
       // das Gedaechtnis ist eine Zugabe
+    }
+  }
+
+  /// Merkt sich Stueckgewichte, die der Nutzer selbst eingetragen hat (Phase N2): am Produkt oder, ohne Produkt, im Gedaechtnis
+  /// des Haushalts zum BLS-Eintrag. Ein Fehler hier darf das Speichern der Mahlzeit nie kippen.
+  Future<void> _learnWeights() async {
+    for (final r in _rows) {
+      final w = r.unitWeightG;
+      if (!r.learnWeight || w == null || r.unit != EntryUnit.piece) continue;
+      try {
+        if (r.product != null) {
+          await ref.read(productRepositoryProvider).setUnitWeight(r.product!.id, w);
+        } else if (r.blsCode != null) {
+          await ref.read(foodLinkRepositoryProvider).setUnitWeight(r.label, r.blsCode!, w);
+        }
+      } catch (_) {
+        // das Gewicht ist eine Zugabe
+      }
     }
   }
 
@@ -834,9 +942,12 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         ? 'Handeingabe'
         : r.quantity <= 0
             ? 'Menge eintragen'
-            : '${formatQuantity(r.quantity)} ${r.unit.label}';
+            : r.quantityText;
+    final grams = r.unit == EntryUnit.piece && r.unitWeightG != null && r.quantity > 0 ? r.quantity * r.unitWeightG! : null;
     final parts = <String>[
       amount,
+      // Bei Stueck, Scheibe, EL: was das in Gramm ist, damit nichts verborgen bleibt
+      if (grams != null) '≈ ${formatQuantity(grams.roundToDouble() == grams ? grams : (grams * 10).round() / 10)} g',
       if (n?.kcal != null) formatKcal(n!.kcal!) else 'Nährwerte unbekannt',
       if (r.deduct && r.product != null) 'vom Bestand',
       if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
