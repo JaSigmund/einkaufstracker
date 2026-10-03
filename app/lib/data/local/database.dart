@@ -326,6 +326,10 @@ class MealIngredients extends Table {
   /// Wie sicher die Naehrwerte sind: 'product' | 'bls_exact' | 'bls_matched' (automatisch zugeordnet, in der App mit ~
   /// markiert) | 'llm_estimate' | 'manual' | 'unknown'. null bei Zutaten aus aelteren Versionen.
   TextColumn get nutrientBasis => text().nullable()();
+
+  /// Mikronaehrstoffe der verzehrten Menge als JSON-Objekt mit Registerschluesseln (Phase N3, ADR-032), `null` ohne Daten.
+  /// Ein fehlender Schluessel heisst unbekannt, 0 ist eine echte Null.
+  TextColumn get micros => text().nullable()();
   RealColumn get kcal => real().nullable()();
   RealColumn get proteinG => real().nullable()();
   RealColumn get fatG => real().nullable()();
@@ -573,7 +577,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -675,6 +679,11 @@ class AppDatabase extends _$AppDatabase {
           // der Spalte an.
           if (from >= 17 && from < 18) {
             await m.addColumn(householdFoodLinks, householdFoodLinks.unitWeightG);
+          }
+          // 18 -> 19: Mikronaehrstoffe je Zutat (Phase N3). Installationen vor 14 legen die Zutaten-Tabelle oben schon mit der
+          // Spalte an.
+          if (from >= 14 && from < 19) {
+            await m.addColumn(mealIngredients, mealIngredients.micros);
           }
         },
       );

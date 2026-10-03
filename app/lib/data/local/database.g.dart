@@ -8603,6 +8603,15 @@ class $MealIngredientsTable extends MealIngredients
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _microsMeta = const VerificationMeta('micros');
+  @override
+  late final GeneratedColumn<String> micros = GeneratedColumn<String>(
+    'micros',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _kcalMeta = const VerificationMeta('kcal');
   @override
   late final GeneratedColumn<double> kcal = GeneratedColumn<double>(
@@ -8705,6 +8714,7 @@ class $MealIngredientsTable extends MealIngredients
     confidence,
     blsCode,
     nutrientBasis,
+    micros,
     kcal,
     proteinG,
     fatG,
@@ -8819,6 +8829,12 @@ class $MealIngredientsTable extends MealIngredients
           data['nutrient_basis']!,
           _nutrientBasisMeta,
         ),
+      );
+    }
+    if (data.containsKey('micros')) {
+      context.handle(
+        _microsMeta,
+        micros.isAcceptableOrUnknown(data['micros']!, _microsMeta),
       );
     }
     if (data.containsKey('kcal')) {
@@ -8938,6 +8954,10 @@ class $MealIngredientsTable extends MealIngredients
         DriftSqlType.string,
         data['${effectivePrefix}nutrient_basis'],
       ),
+      micros: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}micros'],
+      ),
       kcal: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}kcal'],
@@ -9010,6 +9030,10 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
   /// Wie sicher die Naehrwerte sind: 'product' | 'bls_exact' | 'bls_matched' (automatisch zugeordnet, in der App mit ~
   /// markiert) | 'llm_estimate' | 'manual' | 'unknown'. null bei Zutaten aus aelteren Versionen.
   final String? nutrientBasis;
+
+  /// Mikronaehrstoffe der verzehrten Menge als JSON-Objekt mit Registerschluesseln (Phase N3, ADR-032), `null` ohne Daten.
+  /// Ein fehlender Schluessel heisst unbekannt, 0 ist eine echte Null.
+  final String? micros;
   final double? kcal;
   final double? proteinG;
   final double? fatG;
@@ -9033,6 +9057,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     this.confidence,
     this.blsCode,
     this.nutrientBasis,
+    this.micros,
     this.kcal,
     this.proteinG,
     this.fatG,
@@ -9072,6 +9097,9 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     }
     if (!nullToAbsent || nutrientBasis != null) {
       map['nutrient_basis'] = Variable<String>(nutrientBasis);
+    }
+    if (!nullToAbsent || micros != null) {
+      map['micros'] = Variable<String>(micros);
     }
     if (!nullToAbsent || kcal != null) {
       map['kcal'] = Variable<double>(kcal);
@@ -9130,6 +9158,9 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       nutrientBasis: nutrientBasis == null && nullToAbsent
           ? const Value.absent()
           : Value(nutrientBasis),
+      micros: micros == null && nullToAbsent
+          ? const Value.absent()
+          : Value(micros),
       kcal: kcal == null && nullToAbsent ? const Value.absent() : Value(kcal),
       proteinG: proteinG == null && nullToAbsent
           ? const Value.absent()
@@ -9173,6 +9204,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       confidence: serializer.fromJson<double?>(json['confidence']),
       blsCode: serializer.fromJson<String?>(json['blsCode']),
       nutrientBasis: serializer.fromJson<String?>(json['nutrientBasis']),
+      micros: serializer.fromJson<String?>(json['micros']),
       kcal: serializer.fromJson<double?>(json['kcal']),
       proteinG: serializer.fromJson<double?>(json['proteinG']),
       fatG: serializer.fromJson<double?>(json['fatG']),
@@ -9201,6 +9233,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       'confidence': serializer.toJson<double?>(confidence),
       'blsCode': serializer.toJson<String?>(blsCode),
       'nutrientBasis': serializer.toJson<String?>(nutrientBasis),
+      'micros': serializer.toJson<String?>(micros),
       'kcal': serializer.toJson<double?>(kcal),
       'proteinG': serializer.toJson<double?>(proteinG),
       'fatG': serializer.toJson<double?>(fatG),
@@ -9227,6 +9260,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     Value<double?> confidence = const Value.absent(),
     Value<String?> blsCode = const Value.absent(),
     Value<String?> nutrientBasis = const Value.absent(),
+    Value<String?> micros = const Value.absent(),
     Value<double?> kcal = const Value.absent(),
     Value<double?> proteinG = const Value.absent(),
     Value<double?> fatG = const Value.absent(),
@@ -9254,6 +9288,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     nutrientBasis: nutrientBasis.present
         ? nutrientBasis.value
         : this.nutrientBasis,
+    micros: micros.present ? micros.value : this.micros,
     kcal: kcal.present ? kcal.value : this.kcal,
     proteinG: proteinG.present ? proteinG.value : this.proteinG,
     fatG: fatG.present ? fatG.value : this.fatG,
@@ -9287,6 +9322,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       nutrientBasis: data.nutrientBasis.present
           ? data.nutrientBasis.value
           : this.nutrientBasis,
+      micros: data.micros.present ? data.micros.value : this.micros,
       kcal: data.kcal.present ? data.kcal.value : this.kcal,
       proteinG: data.proteinG.present ? data.proteinG.value : this.proteinG,
       fatG: data.fatG.present ? data.fatG.value : this.fatG,
@@ -9315,6 +9351,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
           ..write('confidence: $confidence, ')
           ..write('blsCode: $blsCode, ')
           ..write('nutrientBasis: $nutrientBasis, ')
+          ..write('micros: $micros, ')
           ..write('kcal: $kcal, ')
           ..write('proteinG: $proteinG, ')
           ..write('fatG: $fatG, ')
@@ -9343,6 +9380,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     confidence,
     blsCode,
     nutrientBasis,
+    micros,
     kcal,
     proteinG,
     fatG,
@@ -9370,6 +9408,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
           other.confidence == this.confidence &&
           other.blsCode == this.blsCode &&
           other.nutrientBasis == this.nutrientBasis &&
+          other.micros == this.micros &&
           other.kcal == this.kcal &&
           other.proteinG == this.proteinG &&
           other.fatG == this.fatG &&
@@ -9395,6 +9434,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
   final Value<double?> confidence;
   final Value<String?> blsCode;
   final Value<String?> nutrientBasis;
+  final Value<String?> micros;
   final Value<double?> kcal;
   final Value<double?> proteinG;
   final Value<double?> fatG;
@@ -9419,6 +9459,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     this.confidence = const Value.absent(),
     this.blsCode = const Value.absent(),
     this.nutrientBasis = const Value.absent(),
+    this.micros = const Value.absent(),
     this.kcal = const Value.absent(),
     this.proteinG = const Value.absent(),
     this.fatG = const Value.absent(),
@@ -9444,6 +9485,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     this.confidence = const Value.absent(),
     this.blsCode = const Value.absent(),
     this.nutrientBasis = const Value.absent(),
+    this.micros = const Value.absent(),
     this.kcal = const Value.absent(),
     this.proteinG = const Value.absent(),
     this.fatG = const Value.absent(),
@@ -9474,6 +9516,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     Expression<double>? confidence,
     Expression<String>? blsCode,
     Expression<String>? nutrientBasis,
+    Expression<String>? micros,
     Expression<double>? kcal,
     Expression<double>? proteinG,
     Expression<double>? fatG,
@@ -9499,6 +9542,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
       if (confidence != null) 'confidence': confidence,
       if (blsCode != null) 'bls_code': blsCode,
       if (nutrientBasis != null) 'nutrient_basis': nutrientBasis,
+      if (micros != null) 'micros': micros,
       if (kcal != null) 'kcal': kcal,
       if (proteinG != null) 'protein_g': proteinG,
       if (fatG != null) 'fat_g': fatG,
@@ -9526,6 +9570,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     Value<double?>? confidence,
     Value<String?>? blsCode,
     Value<String?>? nutrientBasis,
+    Value<String?>? micros,
     Value<double?>? kcal,
     Value<double?>? proteinG,
     Value<double?>? fatG,
@@ -9551,6 +9596,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
       confidence: confidence ?? this.confidence,
       blsCode: blsCode ?? this.blsCode,
       nutrientBasis: nutrientBasis ?? this.nutrientBasis,
+      micros: micros ?? this.micros,
       kcal: kcal ?? this.kcal,
       proteinG: proteinG ?? this.proteinG,
       fatG: fatG ?? this.fatG,
@@ -9606,6 +9652,9 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     if (nutrientBasis.present) {
       map['nutrient_basis'] = Variable<String>(nutrientBasis.value);
     }
+    if (micros.present) {
+      map['micros'] = Variable<String>(micros.value);
+    }
     if (kcal.present) {
       map['kcal'] = Variable<double>(kcal.value);
     }
@@ -9655,6 +9704,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
           ..write('confidence: $confidence, ')
           ..write('blsCode: $blsCode, ')
           ..write('nutrientBasis: $nutrientBasis, ')
+          ..write('micros: $micros, ')
           ..write('kcal: $kcal, ')
           ..write('proteinG: $proteinG, ')
           ..write('fatG: $fatG, ')
@@ -18717,6 +18767,7 @@ typedef $$MealIngredientsTableCreateCompanionBuilder =
       Value<double?> confidence,
       Value<String?> blsCode,
       Value<String?> nutrientBasis,
+      Value<String?> micros,
       Value<double?> kcal,
       Value<double?> proteinG,
       Value<double?> fatG,
@@ -18743,6 +18794,7 @@ typedef $$MealIngredientsTableUpdateCompanionBuilder =
       Value<double?> confidence,
       Value<String?> blsCode,
       Value<String?> nutrientBasis,
+      Value<String?> micros,
       Value<double?> kcal,
       Value<double?> proteinG,
       Value<double?> fatG,
@@ -18826,6 +18878,11 @@ class $$MealIngredientsTableFilterComposer
 
   ColumnFilters<String> get nutrientBasis => $composableBuilder(
     column: $table.nutrientBasis,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get micros => $composableBuilder(
+    column: $table.micros,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -18949,6 +19006,11 @@ class $$MealIngredientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get micros => $composableBuilder(
+    column: $table.micros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get kcal => $composableBuilder(
     column: $table.kcal,
     builder: (column) => ColumnOrderings(column),
@@ -19051,6 +19113,9 @@ class $$MealIngredientsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get micros =>
+      $composableBuilder(column: $table.micros, builder: (column) => column);
+
   GeneratedColumn<double> get kcal =>
       $composableBuilder(column: $table.kcal, builder: (column) => column);
 
@@ -19129,6 +19194,7 @@ class $$MealIngredientsTableTableManager
                 Value<double?> confidence = const Value.absent(),
                 Value<String?> blsCode = const Value.absent(),
                 Value<String?> nutrientBasis = const Value.absent(),
+                Value<String?> micros = const Value.absent(),
                 Value<double?> kcal = const Value.absent(),
                 Value<double?> proteinG = const Value.absent(),
                 Value<double?> fatG = const Value.absent(),
@@ -19153,6 +19219,7 @@ class $$MealIngredientsTableTableManager
                 confidence: confidence,
                 blsCode: blsCode,
                 nutrientBasis: nutrientBasis,
+                micros: micros,
                 kcal: kcal,
                 proteinG: proteinG,
                 fatG: fatG,
@@ -19179,6 +19246,7 @@ class $$MealIngredientsTableTableManager
                 Value<double?> confidence = const Value.absent(),
                 Value<String?> blsCode = const Value.absent(),
                 Value<String?> nutrientBasis = const Value.absent(),
+                Value<String?> micros = const Value.absent(),
                 Value<double?> kcal = const Value.absent(),
                 Value<double?> proteinG = const Value.absent(),
                 Value<double?> fatG = const Value.absent(),
@@ -19203,6 +19271,7 @@ class $$MealIngredientsTableTableManager
                 confidence: confidence,
                 blsCode: blsCode,
                 nutrientBasis: nutrientBasis,
+                micros: micros,
                 kcal: kcal,
                 proteinG: proteinG,
                 fatG: fatG,

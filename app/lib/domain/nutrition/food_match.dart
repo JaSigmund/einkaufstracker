@@ -4,6 +4,7 @@
 /// was die App damit macht: lesen, anzeigen, als Naehrwertprofil verwenden.
 library;
 
+import 'micros.dart';
 import 'nutrient_scaling.dart';
 
 /// Wie sicher die Zuordnung ist. Die Oberflaeche zeigt drei Marken: sicher (✓), automatisch zugeordnet (~, antippen zum
@@ -24,7 +25,7 @@ enum MatchTrust {
 
 /// Ein zugeordneter BLS-Eintrag mit Naehrwerten je 100 g.
 class FoodMatch {
-  const FoodMatch({required this.code, required this.name, required this.per100, this.method = 'search', this.trust = MatchTrust.auto});
+  const FoodMatch({required this.code, required this.name, required this.per100, this.method = 'search', this.trust = MatchTrust.auto, this.micros});
 
   final String code;
 
@@ -37,10 +38,13 @@ class FoodMatch {
   final String method;
   final MatchTrust trust;
 
+  /// Mikronaehrstoffe je 100 g (Phase N3), `null`, wenn der Eintrag keine hat.
+  final Micros? micros;
+
   /// Diese Zuordnung ist dem Haushalt oder den Synonymen schon bekannt (Lernen waere ueberfluessig).
   bool get alreadyKnown => method == 'memory' || method == 'synonym';
 
-  FoodMatch confirmed() => FoodMatch(code: code, name: name, per100: per100, method: method, trust: MatchTrust.sure);
+  FoodMatch confirmed() => FoodMatch(code: code, name: name, per100: per100, method: method, trust: MatchTrust.sure, micros: micros);
 }
 
 /// Liest den Treffer aus der Antwort von `analyze-meal` (`match`-Objekt). `null` bei fehlendem oder unlesbarem Treffer.
@@ -59,5 +63,6 @@ FoodMatch? parseFoodMatch(Object? json) {
     per100: per100,
     method: method is String && const {'memory', 'synonym', 'search', 'llm'}.contains(method) ? method : 'search',
     trust: json['trust'] == 'sure' ? MatchTrust.sure : MatchTrust.auto,
+    micros: parseMicros(json['nutrients']),
   );
 }

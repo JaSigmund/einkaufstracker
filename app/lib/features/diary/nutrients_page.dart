@@ -1,0 +1,425 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/providers.dart';
+import '../../core/format.dart';
+import '../../data/local/database.dart';
+import '../../domain/nutrition/micro_nutrition.dart';
+import '../../domain/nutrition/micros.dart';
+import '../../domain/nutrition/nutrient_registry.dart';
+import '../../domain/receipt/vienna_time.dart';
+
+/// KV-Schluessel: Referenzmengen anzeigen (`true`/`false`, Standard aus) und eigene Referenzwerte je Naehrstoff (JSON-Objekt).
+const microReferenceOnKey = 'micro_reference_on';
+const microReferenceOverridesKey = 'micro_reference_overrides';
+
+/// Hinweis zu den Tabellenwerten, im Info-Dialog der Seite und unter jeder Aufschluesselung ehrlich genannt (ADR-032).
+const nutrientsLimitsText = 'Die Werte stammen aus dem Bundeslebensmittelschlüssel: Durchschnittswerte, zu rund drei Vierteln berechnet. '
+    'Garverluste (besonders bei Vitamin C, B-Vitaminen und Folat) sind nicht berücksichtigt, Nahrungsergänzung ist nicht erfasst. '
+    'Selen und Koffein fehlen in der Quelle. Die Zahlen sind kein Maßstab für deinen eigenen Bedarf.';
+
+/// Hinweis zu den Referenzmengen: Kennzeichnungswerte, keine Empfehlung.
+const nutrientsReferenceText = 'Referenzmengen laut Lebensmittelkennzeichnung (Verordnung (EU) Nr. 1169/2011) für einen durchschnittlichen Erwachsenen. '
+    'Das ist keine Empfehlung für dich: Kinder, Schwangere, Sportler und ältere Menschen haben anderen Bedarf.';
+
+/// Mikronaehrstoffe pro Tag und Woche (Phase N3, ADR-032): Gruppen, Datenabdeckung je Naehrstoff, "Woher kommt das?" und optional die
+/// Kennzeichnungs-Referenzmengen. Keine Ampel, keine Bewertung.
+class NutrientsPage extends ConsumerStatefulWidget {
+  const NutrientsPage({super.key, this.now});
+
+  /// Aktueller Zeitpunkt (UTC), austauschbar fuer Tests.
+  final DateTime? now;
+
+  @override
+  ConsumerState<NutrientsPage> createState() => _NutrientsPageState();
+}
+
+class _NutrientsPageState extends ConsumerState<NutrientsPage> {
+  late DateTime _day;
+  var _week = false;
+  var _showAll = false;
+  var _referenceOn = false;
+  Map<String, double> _overrides = {};
+
+  DateTime get _today {
+    final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    return DateTime(l.year, l.month, l.day);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _day = _today;
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final on = await db.getKv(microReferenceOnKey) == 'true';
+      final raw = await db.getKv(microReferenceOverridesKey);
+      final map = <String, double>{};
+      if (raw != null) {
+        for (final e in (jsonDecode(raw) as Map).entries) {
+          final v = e.value;
+          if (e.key is String && v is num && v > 0 && nutrientDef(e.key as String) != null) map[e.key as String] = v.toDouble();
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _referenceOn = on;
+          _overrides = map;
+        });
+      }
+    } catch (_) {
+      // ohne lesbare Ablage zeigt die Seite einfach keine Referenzen
+    }
+  }
+
+  Future<void> _setReference(bool on) async {
+    setState(() => _referenceOn = on);
+    try {
+      await ref.read(databaseProvider).setKv(microReferenceOnKey, on.toString());
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
+  }
+
+  Future<void> _setOverride(String key, double? value) async {
+    setState(() {
+      if (value == null) {
+        _overrides = {..._overrides}..remove(key);
+      } else {
+        _overrides = {..._overrides, key: value};
+      }
+    });
+    try {
+      await ref.read(databaseProvider).setKv(microReferenceOverridesKey, jsonEncode(_overrides));
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
+  }
+
+  /// Referenzwert je Tag in der Einheit des Naehrstoffs: eigener Wert, sonst die Kennzeichnungsmenge. Ohne eingeschaltete
+  /// Referenzmengen zeigt die Seite keine (auch keinen eigenen Wert): `null`.
+  double? _referenceOf(NutrientDef def) => !_referenceOn ? null : (_overrides[def.key] ?? def.euReference);
+
+  void _shift(int days) => setState(() => _day = _week ? _day.add(Duration(days: 7 * days)) : DateTime(_day.year, _day.month, _day.day + days));
+
+  String _title() {
+    if (_week) {
+      final monday = DateTime(_day.year, _day.month, _day.day - (_day.weekday - 1));
+      return formatWeekRange(monday, _today);
+    }
+    return formatDayHeading(_day, _today);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final meals = ref.watch(mealsStreamProvider);
+    final ingredients = ref.watch(mealIngredientsStreamProvider);
+    final Widget body;
+    if (meals.isLoading || ingredients.isLoading) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (meals.hasError || ingredients.hasError) {
+      body = Center(child: Text('Fehler: ${meals.error ?? ingredients.error}'));
+    } else {
+      body = _content(context, t, meals.value!, ingredients.value!);
+    }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Nährstoffe'),
+        actions: [
+          IconButton(
+            key: const Key('nutrients-info'),
+            tooltip: 'Woher stammen die Werte?',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Woher stammen die Werte?'),
+                content: SingleChildScrollView(child: Text('$nutrientsLimitsText\n\n$nutrientsReferenceText')),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Schließen'))],
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: body,
+    );
+  }
+
+  Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients) {
+    final micros = buildDailyMicros(
+      [for (final m in meals) (id: m.id, title: m.title, eatenAtUtc: m.eatenAt, servingsEaten: m.servingsEaten, servingsMade: m.servingsMade)],
+      [for (final i in ingredients) (mealId: i.mealId, name: i.freeText ?? 'Zutat', micros: parseMicros(i.micros))],
+      isEstimate: (id) => meals.where((m) => m.id == id).any((m) => m.isEstimate),
+    );
+    final byDay = {for (final d in micros) d.day: d};
+    final monday = DateTime(_day.year, _day.month, _day.day - (_day.weekday - 1));
+    final week = buildWeeklyMicros(micros).where((w) => w.weekStart == monday).firstOrNull;
+
+    final hasData = _week ? week != null : byDay[_day] != null;
+    final MicroValue Function(String key) valueOf = _week ? (k) => week!.valueOf(k) : (k) => byDay[_day]!.valueOf(k);
+    final estimates = _week ? false : (byDay[_day]?.hasEstimates ?? false);
+
+    return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: SegmentedButton<bool>(
+          key: const Key('nutrients-mode'),
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: false, label: Text('Tag')),
+            ButtonSegment(value: true, label: Text('Woche')),
+          ],
+          selected: {_week},
+          onSelectionChanged: (s) => setState(() => _week = s.first),
+        ),
+      ),
+      Row(children: [
+        IconButton(key: const Key('nutrients-prev'), icon: const Icon(Icons.chevron_left), onPressed: () => _shift(-1)),
+        Expanded(child: Text(_title(), key: const Key('nutrients-title'), textAlign: TextAlign.center, style: t.textTheme.titleMedium)),
+        IconButton(key: const Key('nutrients-next'), icon: const Icon(Icons.chevron_right), onPressed: () => _shift(1)),
+      ]),
+      if (_week && week != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Ø pro erfasstem Tag, ${week.daysLogged} von 7 Tagen erfasst',
+            key: const Key('nutrients-week-info'),
+            textAlign: TextAlign.center,
+            style: t.textTheme.bodySmall,
+          ),
+        ),
+      SwitchListTile(
+        key: const Key('nutrients-reference'),
+        title: const Text('Referenzmengen anzeigen'),
+        subtitle: const Text('Kennzeichnungswerte für Erwachsene, keine Empfehlung'),
+        value: _referenceOn,
+        onChanged: _setReference,
+      ),
+      if (!hasData)
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            _week ? 'In dieser Woche ist nichts erfasst.' : 'Für diesen Tag ist nichts erfasst.',
+            key: const Key('nutrients-none'),
+            textAlign: TextAlign.center,
+          ),
+        )
+      else ...[
+        if (estimates)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('Enthält Schätzwerte', key: const Key('nutrients-estimates'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          ),
+        for (final g in NutrientGroup.values) ..._group(context, t, g, valueOf),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextButton(
+              key: const Key('nutrients-show-all'),
+              onPressed: () => setState(() => _showAll = !_showAll),
+              child: Text(_showAll ? 'Nur die häufig gefragten zeigen' : 'Alle ${nutrientRegistry.length} Nährstoffe zeigen'),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Text(nutrientsLimitsText, key: const Key('nutrients-limits'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+        ),
+      ],
+    ]);
+  }
+
+  List<Widget> _group(BuildContext context, ThemeData t, NutrientGroup g, MicroValue Function(String) valueOf) {
+    final defs = [for (final n in nutrientRegistry) if (n.group == g && (_showAll || n.featured)) n];
+    if (defs.isEmpty) return const [];
+    return [
+      Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), child: Text(g.label, key: Key('nutrients-group-${g.name}'), style: t.textTheme.titleSmall)),
+      for (final d in defs) _row(context, t, d, valueOf(d.key)),
+    ];
+  }
+
+  Widget _row(BuildContext context, ThemeData t, NutrientDef def, MicroValue v) {
+    final ref = _referenceOf(def);
+    final fraction = v.unknown ? null : referenceFraction(v.total, ref);
+    final valueText = v.unknown ? 'unbekannt' : '${v.complete ? '' : 'mindestens '}${formatMicro(def, v.total)}';
+    return ListTile(
+      key: Key('nutrient-row-${def.key}'),
+      dense: true,
+      title: Text(def.label),
+      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (v.ingredients > 0 && !v.complete)
+          Text(
+            v.unknown ? 'keine Daten in ${v.ingredients} ${v.ingredients == 1 ? 'Zutat' : 'Zutaten'}' : 'aus ${v.withData} von ${v.ingredients} Zutaten mit Daten',
+            key: Key('nutrient-coverage-${def.key}'),
+            style: t.textTheme.bodySmall,
+          ),
+        if (fraction != null) ...[
+          Text(referenceText(fraction), key: Key('nutrient-reference-${def.key}'), style: t.textTheme.bodySmall),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: LinearProgressIndicator(value: fraction.clamp(0.0, 1.0), minHeight: 4, color: t.colorScheme.outline, backgroundColor: t.colorScheme.surfaceContainerHighest),
+          ),
+        ],
+      ]),
+      trailing: Text(valueText, key: Key('nutrient-value-${def.key}'), style: t.textTheme.bodyMedium),
+      onTap: () => _showSources(context, def, v),
+    );
+  }
+
+  /// "Woher kommt das?": die groessten Beitraege, die Abdeckung und der Referenzwert.
+  void _showSources(BuildContext context, NutrientDef def, MicroValue v) {
+    final t = Theme.of(context);
+    final ref = _referenceOf(def);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(def.label, key: const Key('nutrient-sheet-title'), style: t.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              v.unknown ? 'unbekannt' : '${v.complete ? '' : 'mindestens '}${formatMicro(def, v.total)}',
+              key: const Key('nutrient-sheet-total'),
+              style: t.textTheme.titleLarge,
+            ),
+            if (v.ingredients > 0)
+              Text(
+                v.unknown
+                    ? 'Für keine der ${v.ingredients} Zutaten gibt es einen Wert.'
+                    : v.complete
+                        ? 'Alle ${v.ingredients} Zutaten haben einen Wert.'
+                        : 'Aus ${v.withData} von ${v.ingredients} Zutaten mit Daten, der Rest ist unbekannt.',
+                key: const Key('nutrient-sheet-coverage'),
+                style: t.textTheme.bodySmall,
+              ),
+            const SizedBox(height: 12),
+            if (v.contributions.isNotEmpty) Text('Woher kommt das?', style: t.textTheme.titleSmall),
+            for (var i = 0; i < v.contributions.length && i < 3; i++)
+              ListTile(
+                key: Key('nutrient-contrib-$i'),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(v.contributions[i].ingredient),
+                subtitle: Text(v.contributions[i].mealTitle),
+                trailing: Text(formatMicro(def, v.contributions[i].amount)),
+              ),
+            const Divider(),
+            Text(
+              def.euReference == null
+                  ? 'Für diesen Wert gibt es keine Kennzeichnungs-Referenzmenge.'
+                  : 'Kennzeichnungs-Referenzmenge: ${formatMicro(def, def.euReference!)} pro Tag${_overrides.containsKey(def.key) ? '. Du hast ${formatMicro(def, _overrides[def.key]!)} festgelegt' : ''}',
+              key: const Key('nutrient-sheet-reference'),
+              style: t.textTheme.bodySmall,
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 8, children: [
+                TextButton(
+                  key: const Key('nutrient-override-edit'),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final value = await _askOverride(context, def, _overrides[def.key] ?? def.euReference);
+                    if (value != null) await _setOverride(def.key, value > 0 ? value : null);
+                  },
+                  child: Text(ref == null && !_referenceOn ? 'Eigenen Referenzwert festlegen' : 'Referenzwert ändern'),
+                ),
+                if (_overrides.containsKey(def.key))
+                  TextButton(
+                    key: const Key('nutrient-override-reset'),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _setOverride(def.key, null);
+                    },
+                    child: const Text('Zurücksetzen'),
+                  ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<double?> _askOverride(BuildContext context, NutrientDef def, double? initial) {
+    final controller = TextEditingController(text: initial == null ? '' : formatQuantity(initial));
+    return showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Referenzwert ${def.label}'),
+        content: TextField(
+          key: const Key('nutrient-override-field'),
+          controller: controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: 'Pro Tag', suffixText: def.unit, helperText: 'Leer lassen oder 0: eigenen Wert entfernen'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(
+            key: const Key('nutrient-override-ok'),
+            onPressed: () => Navigator.pop(ctx, double.tryParse(controller.text.replaceAll(',', '.').trim()) ?? 0),
+            child: const Text('Übernehmen'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mikronaehrstoffe einer Mahlzeit ("Mehr Nährwerte"), nur die Werte mit Daten, nach Gruppen.
+Future<void> showMealMicros(BuildContext context, Meal meal, List<MealIngredient> ingredients) {
+  final days = buildDailyMicros(
+    [(id: meal.id, title: meal.title, eatenAtUtc: meal.eatenAt, servingsEaten: meal.servingsEaten, servingsMade: meal.servingsMade)],
+    [for (final i in ingredients) (mealId: i.mealId, name: i.freeText ?? 'Zutat', micros: parseMicros(i.micros))],
+  );
+  final day = days.firstOrNull;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) {
+      final t = Theme.of(ctx);
+      final known = day == null ? const <NutrientDef>[] : [for (final n in nutrientRegistry) if (!day.valueOf(n.key).unknown) n];
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), shrinkWrap: true, children: [
+            Text('Mehr Nährwerte', style: t.textTheme.titleMedium),
+            Text(meal.title, style: t.textTheme.bodySmall),
+            if (known.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                key: Key('meal-micros-none'),
+                child: Text('Für diese Mahlzeit gibt es keine Mikronährstoffwerte.'),
+              ),
+            for (final g in NutrientGroup.values) ...[
+              if (known.any((n) => n.group == g)) Padding(padding: const EdgeInsets.only(top: 12), child: Text(g.label, style: t.textTheme.titleSmall)),
+              for (final n in known.where((n) => n.group == g))
+                ListTile(
+                  key: Key('meal-micro-${n.key}'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(n.label),
+                  subtitle: day!.valueOf(n.key).complete ? null : Text('aus ${day.valueOf(n.key).withData} von ${day.ingredients} Zutaten', style: t.textTheme.bodySmall),
+                  trailing: Text('${day.valueOf(n.key).complete ? '' : 'mind. '}${formatMicro(n, day.valueOf(n.key).total)}'),
+                ),
+            ],
+            const SizedBox(height: 8),
+            Text(nutrientsLimitsText, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          ]),
+        ),
+      );
+    },
+  );
+}

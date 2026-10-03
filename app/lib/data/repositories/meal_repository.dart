@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../domain/nutrition/ingredient_nutrition.dart';
+import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
@@ -21,6 +22,9 @@ NutrientsPer100? productNutrientProfile(Product p) {
     return null;
   }
 }
+
+/// Mikronaehrstoffe je 100 g aus dem Profil eines Produkts (`nutrients_per_100`, Phase N3), `null` ohne.
+Micros? productMicros(Product p) => parseMicros(p.nutrientsPer100);
 
 /// Eine Zutat, wie der Nutzer sie erfasst (Doku 15 §3.1): entweder ein Produkt aus dem Haushalt (Naehrwerte und
 /// Stueckgewicht stehen am Produkt, der Bestand wird abgezogen) oder ein Freitext, etwa ein Treffer aus dem
@@ -40,6 +44,7 @@ class IngredientDraft {
     this.blsCode,
     this.nutrientBasis,
     this.unitWeightG,
+    this.microsPer100,
   }) : assert(productId != null || freeText != null, 'Eine Zutat braucht ein Produkt oder einen Text');
 
   final String? productId;
@@ -73,6 +78,9 @@ class IngredientDraft {
   /// Produkt kein eigenes Gewicht hat (Phase N2). Es geht dem Gewicht des Produkts vor, weil die Oberflaeche die Kette
   /// Haushalt > Produkt > Tabelle schon aufgeloest hat.
   final double? unitWeightG;
+
+  /// Mikronaehrstoffe je 100 g des zugeordneten BLS-Eintrags (Phase N3). Bei einem Produkt mit eigenem Profil gilt dessen Profil.
+  final Micros? microsPer100;
 }
 
 /// Eine Mahlzeit samt Zutaten, wie sie gespeichert werden soll.
@@ -227,6 +235,8 @@ class MealRepository {
       final basis = productProfile != null ? product!.nutrientsBasis : (per100 == null ? null : d.per100Basis);
       final String? nutrientBasis = d.nutrientBasis ??
           (productProfile != null ? 'product' : (d.manualNutrients != null ? 'manual' : (per100 != null && d.blsCode != null ? 'bls_exact' : null)));
+      // Mikronaehrstoffe wie die Makros: das Profil des Produkts zuerst, sonst das der Zeile (BLS), nur mit bekannter Menge in g/ml
+      final microsPer100 = productProfile != null ? productMicros(product!) : d.microsPer100;
       final amount = resolveIngredientAmount(
         quantity: d.quantity,
         entryUnit: d.entryUnit,
@@ -235,6 +245,7 @@ class MealRepository {
         unitWeightG: d.unitWeightG ?? product?.unitWeightG,
       );
       final nutrients = d.manualNutrients ?? ingredientNutrients(per100, amount);
+      final micros = d.manualNutrients != null ? null : scaleMicros(microsPer100, amount.nutrientBasisAmount);
 
       String? inventoryItemId;
       var deducted = false;
@@ -265,6 +276,7 @@ class MealRepository {
         confidence: d.confidence,
         blsCode: productProfile != null || d.manualNutrients != null ? null : d.blsCode,
         nutrientBasis: nutrientBasis,
+        micros: encodeMicros(micros),
         kcal: nutrients?.kcal,
         proteinG: nutrients?.proteinG,
         fatG: nutrients?.fatG,

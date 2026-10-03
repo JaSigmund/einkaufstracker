@@ -351,6 +351,8 @@ Map<String, dynamic> mealIngredientToRemote(MealIngredient i) => {
       'confidence': i.confidence,
       'bls_code': i.blsCode,
       'nutrient_basis': i.nutrientBasis,
+      // jsonb auf dem Server, lokal als Text
+      'micros': i.micros == null ? null : jsonDecode(i.micros!),
       'kcal': i.kcal,
       'protein_g': i.proteinG,
       'fat_g': i.fatG,
@@ -378,6 +380,7 @@ MealIngredientsCompanion mealIngredientFromRemote(Map<String, dynamic> j) {
     confidence: Value(n('confidence')),
     blsCode: Value(j['bls_code'] as String?),
     nutrientBasis: Value(j['nutrient_basis'] as String?),
+    micros: Value(j['micros'] == null ? null : jsonEncode(j['micros'])),
     kcal: Value(n('kcal')),
     proteinG: Value(n('protein_g')),
     fatG: Value(n('fat_g')),

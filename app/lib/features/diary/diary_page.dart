@@ -13,6 +13,7 @@ import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
+import 'nutrients_page.dart';
 import 'product_nutrients_card.dart';
 import 'target_rows.dart';
 
@@ -116,6 +117,17 @@ class DiaryPage extends ConsumerWidget {
         _weekCard(t, currentWeek, targets, partial: days.any((d) => !d.day.isBefore(currentWeek.weekStart) && d.dataQuality < 1)),
       BalanceCard(now: now),
       ProductNutrientsCard(now: now),
+      Card(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: ListTile(
+          key: const Key('diary-nutrients'),
+          leading: const Icon(Icons.science_outlined),
+          title: const Text('Nährstoffe'),
+          subtitle: const Text('Vitamine, Mineralstoffe, Fettsäuren pro Tag und Woche'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/nutrients'),
+        ),
+      ),
       _frequentChips(context, t, meals),
       for (final day in dayKeys) ...[
         _dayHeader(t, day, today, dayInfo[day], targets),
@@ -137,7 +149,7 @@ class DiaryPage extends ConsumerWidget {
             ].join(' · ')),
             trailing: (ingredientsByMeal[m.id] ?? const []).any((i) => i.kcal != null) ? Text(formatKcal(perMeal[m.id]!.kcal)) : null,
             onTap: () => context.push('/meal-form', extra: MealFormArgs(existing: m)),
-            onLongPress: () => _showMealActions(context, m),
+            onLongPress: () => _showMealActions(context, m, ingredientsByMeal[m.id] ?? const <MealIngredient>[]),
           ),
       ],
     ]);
@@ -174,19 +186,25 @@ class DiaryPage extends ConsumerWidget {
   }
 
   /// Aktionen zu einer Mahlzeit per langem Druck: Kopie als neue Mahlzeit oder als Rest ohne Abzug (Doku 15 §3.2).
-  Future<void> _showMealActions(BuildContext context, Meal m) async {
+  Future<void> _showMealActions(BuildContext context, Meal m, List<MealIngredient> own) async {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(key: const Key('meal-action-repeat'), leading: const Icon(Icons.replay), title: const Text('Nochmal erfassen'), subtitle: const Text('Kopie mit denselben Zutaten, Bestand wird wieder abgezogen'), onTap: () => Navigator.pop(ctx, 'repeat')),
           ListTile(key: const Key('meal-action-leftover'), leading: const Icon(Icons.takeout_dining_outlined), title: const Text('Als Rest erfassen'), subtitle: const Text('Gleiche Nährwerte, ohne erneuten Abzug vom Bestand'), onTap: () => Navigator.pop(ctx, 'leftover')),
+          ListTile(key: const Key('meal-action-micros'), leading: const Icon(Icons.science_outlined), title: const Text('Mehr Nährwerte'), subtitle: const Text('Vitamine, Mineralstoffe und Fettsäuren dieser Mahlzeit'), onTap: () => Navigator.pop(ctx, 'micros')),
           ListTile(key: const Key('meal-action-edit'), leading: const Icon(Icons.edit_outlined), title: const Text('Bearbeiten'), onTap: () => Navigator.pop(ctx, 'edit')),
-        ]),
+        ])),
       ),
     );
     if (action == null || !context.mounted) return;
+    if (action == 'micros') {
+      await showMealMicros(context, m, own);
+      return;
+    }
     final args = switch (action) {
       'repeat' => MealFormArgs(template: m),
       'leftover' => MealFormArgs(template: m, leftover: true),

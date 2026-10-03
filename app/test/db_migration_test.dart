@@ -21,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -155,5 +155,29 @@ void main() {
 
     await (db.update(db.householdFoodLinks)..where((l) => l.id.equals('l1'))).write(const HouseholdFoodLinksCompanion(unitWeightG: Value(135)));
     expect((await db.select(db.householdFoodLinks).getSingle()).unitWeightG, 135);
+  });
+
+  test('Daten aus Version 18 bleiben beim Hochziehen erhalten, Zutaten bekommen eine leere Mikronaehrstoff-Spalte', () async {
+    final schema = await verifier.schemaAt(18);
+    schema.rawDatabase.execute(
+      "INSERT INTO meals (id, household_id, eaten_at, meal_type, title, servings_eaten, servings_made, source, is_estimate, updated_at) "
+      "VALUES ('m1', 'h1', '2026-10-02T10:00:00.000Z', 'lunch', 'Reis', 1.0, 1.0, 'manual', 0, '2026-10-02T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meal_ingredients (id, household_id, meal_id, free_text, quantity, unit, amount_g, source, kcal, updated_at) "
+      "VALUES ('i1', 'h1', 'm1', 'Banane', 2.0, 'piece', 236.0, 'manual', 186.0, '2026-10-02T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    final ing = await db.select(db.mealIngredients).getSingle();
+    expect(ing.freeText, 'Banane');
+    expect(ing.kcal, 186);
+    expect(ing.micros, isNull, reason: 'alte Zutaten haben keine Mikronaehrstoffe, das ist "unbekannt" und nicht 0');
+
+    await (db.update(db.mealIngredients)..where((i) => i.id.equals('i1'))).write(const MealIngredientsCompanion(micros: Value('{"vit_c_mg":26}')));
+    expect((await db.select(db.mealIngredients).getSingle()).micros, '{"vit_c_mg":26}');
   });
 }

@@ -678,6 +678,41 @@ def main():
     check("Gedaechtnis: ohne Stueckgewicht (null) bleibt moeglich", not raises("update household_food_links set unit_weight_g = null where household_id = %s", (ha,)))
     db("delete from household_food_links")
 
+    # --- Mikronaehrstoffe (0025, Phase N3, ADR-032) ------------------------------------------------------------------
+    db((repo_root / "tools" / "bls_nutrients_import.sql").read_text(encoding="utf-8"))
+    check("Mikronaehrstoffe: alle 7.140 BLS-Eintraege haben ein nutrients-Objekt",
+          one("select count(*) from bls_foods where bls_code <> 'TEST01' and nutrients is not null") == 7140)
+    check("Mikronaehrstoffe: hoechstens 38 Schluessel je Eintrag",
+          one("select max((select count(*) from jsonb_object_keys(nutrients))) from bls_foods where nutrients is not null") <= 38)
+    check("Mikronaehrstoffe: alle Werte sind Zahlen und nicht negativ",
+          one("select count(*) from bls_foods b, jsonb_each(b.nutrients) e where jsonb_typeof(e.value) <> 'number' or (e.value)::numeric < 0") == 0)
+    check("Mikronaehrstoffe: Banane hat 11 mg Vitamin C und 334 mg Kalium",
+          [float(x) for x in db("select nutrients->>'vit_c_mg', nutrients->>'potassium_mg' from bls_foods where bls_code = 'F503100'")[0][0]] == [11.0, 334.0])
+    check("Mikronaehrstoffe: Vitamin B6 und Kupfer sind von ug in mg umgerechnet (Banane unter 1 mg B6)",
+          float(one("select nutrients->>'vit_b6_mg' from bls_foods where bls_code = 'F503100'")) < 1)
+    check("Mikronaehrstoffe: ein fehlender Wert ist ein fehlender Schluessel, keine 0 (Jod fehlt bei vielen Eintraegen)",
+          one("select count(*) from bls_foods where bls_code <> 'TEST01' and not (nutrients ? 'iodine_ug')") > 100)
+    check("Mikronaehrstoffe: eine echte Null bleibt 0 (Vitamin D der Banane)",
+          float(one("select nutrients->>'vit_d_ug' from bls_foods where bls_code = 'F503100'")) == 0.0)
+    check("Mikronaehrstoffe: Nutzer kann lesen", one("select count(*) from bls_foods where nutrients is not null", user=A) >= 7140)
+    check("Mikronaehrstoffe: Nutzer darf nicht aendern (RLS filtert, 0 betroffen)", db("update bls_foods set nutrients = '{}'::jsonb", user=A)[1] == 0)
+    check("Mikronaehrstoffe: ein Array als nutrients wird abgelehnt", raises("update bls_foods set nutrients = '[1]'::jsonb where bls_code = 'F503100'"))
+    check("Suche: liefert die Naehrstoffe mit (Banane, Vitamin C 11 mg)",
+          float(one("select nutrients->>'vit_c_mg' from search_bls_foods('Banane', 1)")) == 11.0)
+    check("Suche: die Reihung ist unveraendert (Rang 1 zuerst, Synonym Paprika -> Gemuesepaprika rot)",
+          [r[0] for r in db("select bls_code from search_bls_foods('Paprika', 3)")[0]][0] == "G543100")
+    check("Suche: die Basisfunktion gibt es weiter", one("select count(*) from search_bls_foods_base('Banane', 1)") == 1)
+
+    db("insert into meals (household_id, eaten_at, title) values (%s, now(), 'Test N3')", (ha,))
+    meal_n3 = one("select id from meals where title = 'Test N3'")
+    ins_micro = ("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit, micros) "
+                 "values (%s,%s,'Banane',0.12,'kg',%s::jsonb)")
+    check("Zutat: micros als Objekt lassen sich speichern", not raises(ins_micro, (ha, meal_n3, '{"vit_c_mg": 13.2, "iron_mg": 0.5}')))
+    check("Zutat: micros ohne Werte (null) bleiben moeglich", not raises("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit) values (%s,%s,'Etwas',1,'piece')", (ha, meal_n3)))
+    check("Zutat: micros als Array werden abgelehnt", raises(ins_micro, (ha, meal_n3, '[1,2]')))
+    check("Zutat: micros als Zahl werden abgelehnt", raises(ins_micro, (ha, meal_n3, '5')))
+    db("delete from meals where id = %s", (meal_n3,))
+
     # --- Haushalts-Einladungen (0017, Phase 6, ADR-017 Option A) -----------------------------------------------
     import re
     codes = [one("select new_invite_code()") for _ in range(300)]
