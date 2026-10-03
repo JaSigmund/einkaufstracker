@@ -23,6 +23,16 @@ NutrientsPer100? productNutrientProfile(Product p) {
   }
 }
 
+/// Menge einer gespeicherten Zutat in g (oder ml), wie sie fuer Schaetzungen gilt: der Snapshot, sonst bei kg und l die erfasste
+/// Menge. Stueckmengen ohne Gewicht haben keine bekannte Menge.
+double? ingredientGrams(MealIngredient i) {
+  if (i.amountG != null && i.amountG! > 0) return i.amountG;
+  return switch (i.unit) {
+    'kg' || 'l' => i.quantity > 0 ? i.quantity * 1000 : null,
+    _ => null,
+  };
+}
+
 /// Mikronaehrstoffe je 100 g aus dem Profil eines Produkts (`nutrients_per_100`, Phase N3), `null` ohne.
 Micros? productMicros(Product p) => parseMicros(p.nutrientsPer100);
 
@@ -134,6 +144,27 @@ class MealRepository {
   /// Alle nicht geloeschten Zutaten (Grundlage der Tages- und Wochenwerte, die rein clientseitig berechnet werden).
   Stream<List<MealIngredient>> watchIngredients() =>
       (_db.select(_db.mealIngredients)..where((i) => i.deletedAt.isNull())).watch();
+
+  /// Die letzten [limit] Mahlzeiten samt Zutaten, juengste zuerst (Grundlage fuer "Fehlt etwas?"). [excludeMealId] laesst die
+  /// Mahlzeit aus, die gerade bearbeitet wird.
+  Future<List<(Meal, List<MealIngredient>)>> recentHistory({int limit = 80, String? excludeMealId}) async {
+    final recent = await (_db.select(_db.meals)
+          ..where((m) => m.deletedAt.isNull())
+          ..orderBy([(m) => OrderingTerm.desc(m.eatenAt)])
+          ..limit(limit + (excludeMealId == null ? 0 : 1)))
+        .get();
+    final meals = [for (final m in recent) if (m.id != excludeMealId) m].take(limit).toList();
+    if (meals.isEmpty) return const [];
+    final ings = await (_db.select(_db.mealIngredients)
+          ..where((i) => i.mealId.isIn([for (final m in meals) m.id]) & i.deletedAt.isNull())
+          ..orderBy([(i) => OrderingTerm.asc(i.updatedAt)]))
+        .get();
+    final byMeal = <String, List<MealIngredient>>{};
+    for (final i in ings) {
+      byMeal.putIfAbsent(i.mealId, () => []).add(i);
+    }
+    return [for (final m in meals) (m, byMeal[m.id] ?? const <MealIngredient>[])];
+  }
 
   Future<Meal?> get(String id) => (_db.select(_db.meals)..where((m) => m.id.equals(id))).getSingleOrNull();
 

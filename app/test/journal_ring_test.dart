@@ -1,5 +1,6 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
 import 'package:einkaufstracker/features/diary/journal_page.dart';
 import 'package:flutter/material.dart';

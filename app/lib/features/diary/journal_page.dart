@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../data/repositories/meal_repository.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/journal.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
@@ -17,16 +18,6 @@ import 'target_rows.dart';
 
 /// KV-Schluessel: Schaetzung des Nicht-Erfassten im Journal (`true`/`false`, Standard aus).
 const journalEstimateKey = 'journal_estimate_unrecorded';
-
-/// Menge einer Zutat in g (oder ml), wie sie fuer die Schaetzung des Nicht-Erfassten gilt: der Snapshot, sonst bei kg und l die erfasste
-/// Menge. Stueckmengen ohne Gewicht haben keine bekannte Menge.
-double? ingredientGrams(MealIngredient i) {
-  if (i.amountG != null && i.amountG! > 0) return i.amountG;
-  return switch (i.unit) {
-    'kg' || 'l' => i.quantity > 0 ? i.quantity * 1000 : null,
-    _ => null,
-  };
-}
 
 /// Ring um einen Anteil (0 bis 1) in einer Farbe, ohne Bewertung (keine Ampel).
 class _RingPainter extends CustomPainter {
