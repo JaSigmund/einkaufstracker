@@ -17,6 +17,7 @@ import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/micros.dart';
+import '../../domain/nutrition/usual_ingredients.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
 import 'ingredient_picker.dart';
@@ -182,6 +183,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   var _analyzing = false;
   var _analysisApplied = false;
   String? _analysisNotes;
+
+  /// "Fehlt etwas?": uebliche Zutaten aus aehnlichen frueheren Mahlzeiten, die auf dem Foto nicht zu sehen sind (Ausbau 1.12).
+  List<UsualIngredient> _usual = const [];
 
   /// `manual` | `photo_ai` | `recipe`: woher die Mahlzeit stammt. Nach einem angewendeten KI-Vorschlag `photo_ai`.
   late String _source = widget.existing?.source ?? widget.template?.source ?? 'manual';
@@ -429,6 +433,68 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       _analysisNotes = a.notes;
     });
     _fillMissingAmounts();
+    _suggestUsual();
+  }
+
+  /// Sucht in den letzten Mahlzeiten nach ueblichen Zutaten, die in dieser fehlen. Ein Fehler hier bleibt ohne Folgen: es gibt dann
+  /// einfach keine Vorschlaege.
+  Future<void> _suggestUsual() async {
+    try {
+      final history = await ref.read(mealRepositoryProvider).recentHistory(excludeMealId: widget.existing?.id);
+      final products = {for (final p in await ref.read(productRepositoryProvider).allSnapshot()) p.id: p};
+      final past = <PastMeal>[
+        for (final (m, ings) in history)
+          (
+            id: m.id,
+            ingredients: [
+              for (final i in ings)
+                if ((i.productId == null ? i.freeText : products[i.productId]?.name) case final label? when label.trim().isNotEmpty)
+                  (
+                    label: label,
+                    productId: i.productId,
+                    blsCode: i.blsCode,
+                    grams: ingredientGrams(i),
+                    kcal: i.kcal,
+                    proteinG: i.proteinG,
+                    fatG: i.fatG,
+                    carbsG: i.carbsG,
+                    sugarG: i.sugarG,
+                    fiberG: i.fiberG,
+                    saltG: i.saltG,
+                    micros: parseMicros(i.micros),
+                  ),
+            ],
+          ),
+      ];
+      final current = {for (final r in _rows) ingredientKey(productId: r.product?.id, blsCode: r.blsCode, name: r.label)};
+      final names = {for (final r in _rows) ingredientKey(name: r.label)};
+      final found = suggestMissingIngredients(current: current, currentNames: names, history: past);
+      if (mounted) setState(() => _usual = found);
+    } catch (_) {
+      // Vorschlaege sind eine Zugabe
+    }
+  }
+
+  Future<void> _addUsual(UsualIngredient u) async {
+    final products = {for (final p in await ref.read(productRepositoryProvider).allSnapshot()) p.id: p};
+    final active = ref.read(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+    final product = u.productId == null ? null : products[u.productId];
+    if (!mounted) return;
+    setState(() {
+      _rows.add(_Row(
+        product: product,
+        freeText: product == null ? u.label : null,
+        quantity: u.medianGrams == null ? 0 : (u.medianGrams! * 10).round() / 10,
+        unit: product != null && product.baseUnit == 'l' ? EntryUnit.ml : EntryUnit.g,
+        per100: product == null ? NutrientsPer100.fromMap(u.per100) : null,
+        per100Basis: product == null && u.per100 != null ? 'g' : null,
+        blsCode: product == null ? u.blsCode : null,
+        microsPer100: product == null ? u.micros100 : null,
+        deduct: product != null && active.any((i) => i.productId == product.id),
+        source: 'estimate',
+      ));
+      _usual = [for (final x in _usual) if (x.key != u.key) x];
+    });
   }
 
   /// Das Gewicht einer Einheit nach der Kette Haushalt > Produkt > Tabelle (Phase N2, ADR-033), die bekannten Einheiten des
@@ -926,6 +992,33 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             ),
         ]),
         if (_analyzing) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(key: Key('meal-analyzing'))),
+        if (_usual.isNotEmpty)
+          Card(
+            key: const Key('meal-usual'),
+            margin: const EdgeInsets.only(top: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Fehlt etwas?', style: t.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                const Text('In ähnlichen früheren Mahlzeiten war meist auch dabei:'),
+                const SizedBox(height: 4),
+                Wrap(spacing: 8, runSpacing: 4, children: [
+                  for (var i = 0; i < _usual.length; i++)
+                    ActionChip(
+                      key: Key('usual-chip-$i'),
+                      avatar: const Icon(Icons.add, size: 18),
+                      label: Text(_usual[i].medianGrams == null ? _usual[i].label : '${_usual[i].label} (ca. ${formatQuantity((_usual[i].medianGrams! * 10).round() / 10)} g)'),
+                      onPressed: () => _addUsual(_usual[i]),
+                    ),
+                ]),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(key: const Key('usual-dismiss'), onPressed: () => setState(() => _usual = const []), child: const Text('Nein danke')),
+                ),
+              ]),
+            ),
+          ),
         if (_analysisApplied)
           Card(
             key: const Key('meal-analysis-info'),

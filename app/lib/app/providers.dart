@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -655,6 +656,15 @@ final acceptInviteApiProvider = Provider<AcceptInviteApi>((ref) => SupabaseAccep
 typedef ShareText = Future<void> Function(String text);
 
 final shareTextProvider = Provider<ShareText>((ref) => (text) => SharePlus.instance.share(ShareParams(text: text)));
+
+/// Eine Datei (z.B. das PDF des Monats) ueber das Teilen-Menue weitergeben, im Browser als Download (in Tests ersetzbar).
+typedef ShareFile = Future<void> Function({required Uint8List bytes, required String fileName, required String mimeType, String? text});
+
+final shareFileProvider = Provider<ShareFile>(
+  (ref) => ({required bytes, required fileName, required mimeType, text}) => SharePlus.instance.share(
+        ShareParams(files: [XFile.fromData(bytes, mimeType: mimeType, name: fileName)], fileNameOverrides: [fileName], text: text),
+      ),
+);
 
 /// Foto-Analyse einer Mahlzeit (Phase 7c). Einwilligung und Tageslimit prueft der Server, die Update-Sperre
 /// (ADR-022) wie bei den Rezeptvorschlaegen schon vor dem Netzzugriff.

@@ -13,6 +13,7 @@ import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
+import 'meal_shopping_dialog.dart';
 import 'nutrients_page.dart';
 import 'product_nutrients_card.dart';
 import 'target_rows.dart';
@@ -195,6 +196,7 @@ class DiaryPage extends ConsumerWidget {
         child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(key: const Key('meal-action-repeat'), leading: const Icon(Icons.replay), title: const Text('Nochmal erfassen'), subtitle: const Text('Kopie mit denselben Zutaten, Bestand wird wieder abgezogen'), onTap: () => Navigator.pop(ctx, 'repeat')),
           ListTile(key: const Key('meal-action-leftover'), leading: const Icon(Icons.takeout_dining_outlined), title: const Text('Als Rest erfassen'), subtitle: const Text('Gleiche Nährwerte, ohne erneuten Abzug vom Bestand'), onTap: () => Navigator.pop(ctx, 'leftover')),
+          ListTile(key: const Key('meal-action-shopping'), leading: const Icon(Icons.add_shopping_cart_outlined), title: const Text('Fehlende Zutaten einkaufen'), subtitle: const Text('Zutaten, die im Bestand fehlen, auf die Einkaufsliste setzen'), onTap: () => Navigator.pop(ctx, 'shopping')),
           ListTile(key: const Key('meal-action-micros'), leading: const Icon(Icons.science_outlined), title: const Text('Mehr Nährwerte'), subtitle: const Text('Vitamine, Mineralstoffe und Fettsäuren dieser Mahlzeit'), onTap: () => Navigator.pop(ctx, 'micros')),
           ListTile(key: const Key('meal-action-edit'), leading: const Icon(Icons.edit_outlined), title: const Text('Bearbeiten'), onTap: () => Navigator.pop(ctx, 'edit')),
         ])),
@@ -203,6 +205,10 @@ class DiaryPage extends ConsumerWidget {
     if (action == null || !context.mounted) return;
     if (action == 'micros') {
       await showMealMicros(context, m, own);
+      return;
+    }
+    if (action == 'shopping') {
+      await showMealShoppingDialog(context, m, own);
       return;
     }
     final args = switch (action) {
