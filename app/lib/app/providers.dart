@@ -12,6 +12,7 @@ import '../data/app_config/app_config_repository.dart';
 import '../domain/inventory/usage_forecast.dart';
 import '../domain/notifications/expiry_stages.dart';
 import '../data/files/meal_photo_service.dart';
+import '../data/ocr/label_text_reader.dart';
 import '../data/household/household_invites.dart';
 import '../domain/sync/sync_conflicts.dart';
 import '../domain/sync/sync_schedule.dart';
@@ -433,6 +434,11 @@ final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {
 
 /// Foto aufnehmen oder aus der Galerie waehlen (in Tests ersetzbar).
 final mealPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto);
+
+/// Foto eines Etiketts aufnehmen (MHD-Foto, Ausbau 1.14; in Tests ersetzbar) und seinen Text auf dem Geraet lesen.
+final labelPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto);
+
+final labelTextReaderProvider = Provider<LabelTextReader>((ref) => MlKitLabelTextReader());
 
 /// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
 final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));
