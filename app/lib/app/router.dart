@@ -38,6 +38,7 @@ import '../features/recipes/saved_recipes_page.dart';
 import '../domain/recipes/recipe_search_url.dart';
 import '../features/report/trend_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/shopping_list/aisle_order_page.dart';
 import 'providers.dart';
 
 class _AuthRefresh extends ChangeNotifier {
@@ -136,6 +137,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/journal', builder: (_, _) => const JournalPage()),
       GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
       GoRoute(path: '/nutrients', builder: (_, _) => const NutrientsPage()),
+      GoRoute(path: '/aisle-order', builder: (_, state) => AisleOrderPage(initialStoreId: state.extra as String?)),
       GoRoute(path: '/supplements', builder: (_, _) => const SupplementsPage()),
       GoRoute(path: '/supplement-form', builder: (_, state) => SupplementFormPage(existing: state.extra as Supplement?)),
       GoRoute(

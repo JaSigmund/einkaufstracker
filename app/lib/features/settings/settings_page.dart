@@ -9,8 +9,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/notifications/expiry_stages.dart';
 import '../../domain/receipt/csv_export.dart';
 import '../common/sync_status_banner.dart';
+import 'expiry_stages_dialog.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -33,6 +35,31 @@ class SettingsPage extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich. Für Einstellungen wird Netz gebraucht.')));
       }
     }
+  }
+
+  /// Stufen der Ablauf-Erinnerung fuer alle Produkte (Ausbau 1.14), gemeinsame Einstellung des Haushalts.
+  Future<void> _editStages(BuildContext context, WidgetRef ref, int leadDays) async {
+    final prefs = await ref.read(householdPrefsOnceProvider.future).catchError((_) => <String, Object?>{});
+    final current = parseExpiryStages(prefs[expiryStagesPref]) ?? [leadDays];
+    if (!context.mounted) return;
+    final picked = await showExpiryStagesDialog(
+      context,
+      initial: current,
+      title: 'Wann erinnern?',
+      helper: 'Die App erinnert zu jedem gewählten Zeitpunkt vor dem Ablauf, zur eingestellten Uhrzeit. Einzelne Produkte können eigene Zeitpunkte haben (im Bestand beim Artikel).',
+    );
+    if (picked == null || picked.isEmpty) return;
+    try {
+      await ref.read(householdPrefsRepositoryProvider).set(expiryStagesPref, picked);
+      ref.invalidate(householdPrefsOnceProvider);
+    } catch (_) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich.')));
+      return;
+    }
+    // Die Erinnerungen werden sofort neu geplant; scheitert das (kein Netz fuer die Einstellungen), gilt es beim naechsten App-Start
+    try {
+      await rescheduleExpiryReminders(ref);
+    } catch (_) {}
   }
 
   /// Monatsbudget setzen oder loeschen (Doku 07 §2 "Budget"), leere Eingabe entfernt das Budget wieder.
@@ -245,6 +272,13 @@ class SettingsPage extends ConsumerWidget {
                 subtitle: const Text('Foto (ohne Zahlungsblock) oder PDF wird beim Bon abgelegt, privat auf dem Server. Gilt für neue Bons.'),
                 value: s.keepReceiptImages,
                 onChanged: (v) => _update(context, ref, {'keep_receipt_images': v}),
+              ),
+              ListTile(
+                key: const Key('settings-reminder-stages'),
+                leading: const Icon(Icons.alarm_add_outlined),
+                title: const Text('Erinnern'),
+                subtitle: Text(describeExpiryStages(parseExpiryStages(ref.watch(householdPrefsOnceProvider).value?[expiryStagesPref]) ?? [s.notifyLeadDays])),
+                onTap: () => _editStages(context, ref, s.notifyLeadDays),
               ),
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),

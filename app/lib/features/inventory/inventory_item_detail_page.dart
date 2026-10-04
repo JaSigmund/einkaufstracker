@@ -6,8 +6,10 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
+import '../../domain/notifications/expiry_stages.dart';
 import '../../data/repositories/inventory_repository.dart';
 import '../products/product_form_page.dart';
+import '../settings/expiry_stages_dialog.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
 const _locationIcons = {
@@ -243,10 +245,36 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     if (mounted) context.pop();
   }
 
+  /// Eigene Erinnerungsstufen fuer dieses Produkt (Ausbau 1.14). "Wie Standard" entfernt sie wieder (leere Liste).
+  Future<void> _editStages(List<int> standard, List<int>? own) async {
+    final picked = await showExpiryStagesDialog(
+      context,
+      initial: own ?? standard,
+      title: 'Erinnerungen für dieses Produkt',
+      helper: 'Gilt für alle Packungen dieses Produkts. „Wie Standard“ nimmt die Zeitpunkte aus den Einstellungen.',
+      allowInherit: true,
+    );
+    if (picked == null) return;
+    try {
+      await ref.read(householdPrefsRepositoryProvider).set(expiryStagesPrefFor(_item.productId), picked);
+      ref.invalidate(householdPrefsOnceProvider);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich.')));
+      return;
+    }
+    // sofort neu planen; scheitert das, gilt es beim naechsten App-Start
+    try {
+      await rescheduleExpiryReminders(ref);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final today = DateTime.now();
+    final prefs = ref.watch(householdPrefsOnceProvider).value ?? const <String, Object?>{};
+    final ownStages = parseExpiryStages(prefs[expiryStagesPrefFor(_item.productId)]);
+    final standardStages = parseExpiryStages(prefs[expiryStagesPref]) ?? const [1];
     final level = expiryLevel(expiresOn: _item.expiresOn, dateKind: _item.dateKind, today: today);
     final color = switch (level) {
       ExpiryLevel.expired => t.colorScheme.error,
@@ -406,6 +434,16 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
               ),
             ),
           ]),
+          const SizedBox(height: 8),
+          ListTile(
+            key: const Key('item-reminder-stages'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.alarm_outlined),
+            title: const Text('Erinnerungen'),
+            subtitle: Text(ownStages == null ? 'Wie Standard (${describeExpiryStages(standardStages)})' : describeExpiryStages(ownStages)),
+            onTap: () => _editStages(standardStages, ownStages),
+          ),
           if (ownMovements.isNotEmpty) ...[
             const Divider(height: 32),
             Text('Verlauf', style: t.textTheme.titleSmall),

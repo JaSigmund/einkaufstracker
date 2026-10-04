@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/inventory/label_dates.dart';
 import 'product_form_page.dart';
 
 class StockEntryArgs {
@@ -23,10 +25,14 @@ const _units = [('piece', 'Stück'), ('kg', 'kg'), ('l', 'l')];
 /// Bestand speichern (Doku 06 §3.5). Ist bereits Bestand vorhanden, bietet die Seite oben die Schnellaktionen
 /// **Öffnen** und **Aufgebraucht** fuer den juengsten aktiven Eintrag an.
 class StockEntryPage extends ConsumerStatefulWidget {
-  const StockEntryPage({super.key, required this.product, required this.ean});
+  const StockEntryPage({super.key, required this.product, required this.ean, this.labelScanAvailable = !kIsWeb});
 
   final Product product;
   final String ean;
+
+  /// Das MHD-Foto (Texterkennung auf dem Geraet) gibt es nicht im Browser. Als Parameter statt einer festverdrahteten `kIsWeb`-Abfrage,
+  /// damit beide Faelle testbar sind.
+  final bool labelScanAvailable;
 
   @override
   ConsumerState<StockEntryPage> createState() => _StockEntryPageState();
@@ -40,6 +46,38 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
   late final _quantity = TextEditingController(text: '1');
   var _rememberUnit = false;
   var _saving = false;
+  var _scanning = false;
+
+  /// MHD fotografieren (Ausbau 1.14): Text auf dem Geraet lesen, Datumsfunde zur Bestaetigung zeigen. Nichts wird ungesehen uebernommen,
+  /// die Texterkennung kann sich irren.
+  Future<void> _scanDate() async {
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    setState(() => _scanning = true);
+    try {
+      final bytes = await ref.read(labelPhotoPickerProvider)(camera: true);
+      if (bytes == null) return;
+      final text = await ref.read(labelTextReaderProvider).read(bytes);
+      final found = extractLabelDates(text ?? '', today: DateTime.now());
+      // das Lesen ist fertig: der Fortschrittskreis darf nicht weiterlaufen, waehrend der Dialog auf die Auswahl wartet
+      if (mounted) setState(() => _scanning = false);
+      if (found.isEmpty) {
+        messenger.showSnackBar(const SnackBar(content: Text('Kein Datum erkannt. Versuch es näher und gerade, oder tipp es ein.')));
+        return;
+      }
+      if (!mounted) return;
+      final choice = await showDialog<LabelDate>(context: context, builder: (ctx) => _ScanChoiceDialog(found: found));
+      if (choice != null && mounted) {
+        setState(() {
+          _date = choice.date;
+          if (choice.kind != null) _dateKind = choice.kind!;
+        });
+      }
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Das Foto konnte nicht gelesen werden. Tipp das Datum ein.')));
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
 
   Future<void> _pickDate({int? addDays}) async {
     if (addDays != null) {
@@ -159,6 +197,13 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
             onTap: () => _pickDate(),
           ),
           Wrap(spacing: 8, children: [
+            if (widget.labelScanAvailable)
+              OutlinedButton.icon(
+                key: const Key('stock-date-scan'),
+                onPressed: _scanning ? null : _scanDate,
+                icon: _scanning ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.photo_camera_outlined),
+                label: Text(_scanning ? 'Lese Etikett …' : 'MHD fotografieren'),
+              ),
             OutlinedButton(onPressed: () => _pickDate(addDays: 7), child: const Text('+7 Tage')),
             OutlinedButton(onPressed: () => _pickDate(addDays: 14), child: const Text('+14 Tage')),
             if (_date != null) TextButton(onPressed: () => setState(() => _date = null), child: const Text('Kein Datum')),
@@ -218,6 +263,53 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Die erkannten Daten zur Auswahl: das beste ist vorgewaehlt, "Uebernehmen" setzt Datum und (falls erkannt) Art.
+class _ScanChoiceDialog extends StatefulWidget {
+  const _ScanChoiceDialog({required this.found});
+  final List<LabelDate> found;
+
+  @override
+  State<_ScanChoiceDialog> createState() => _ScanChoiceDialogState();
+}
+
+class _ScanChoiceDialogState extends State<_ScanChoiceDialog> {
+  late LabelDate _selected = widget.found.first;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return AlertDialog(
+      title: const Text('Erkanntes Datum'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Prüf das Datum, die Texterkennung kann sich irren.', style: t.textTheme.bodySmall),
+          RadioGroup<LabelDate>(
+            groupValue: _selected,
+            onChanged: (v) => setState(() => _selected = v ?? _selected),
+            child: Column(children: [
+              for (var i = 0; i < widget.found.length; i++)
+                RadioListTile<LabelDate>(
+                  key: Key('scan-candidate-$i'),
+                  contentPadding: EdgeInsets.zero,
+                  value: widget.found[i],
+                  title: Text(_formatDate(widget.found[i].date)),
+                  subtitle: Text([
+                    switch (widget.found[i].kind) { 'best_before' => 'Mindestens haltbar bis', 'use_by' => 'Zu verbrauchen bis', _ => 'Art nicht erkannt' },
+                    '„${widget.found[i].source}“',
+                  ].join(' · ')),
+                ),
+            ]),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(key: const Key('scan-accept'), onPressed: () => Navigator.pop(context, _selected), child: const Text('Übernehmen')),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/domain/inventory/usage_forecast.dart';
 import 'package:einkaufstracker/features/shopping_list/shopping_list_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,9 @@ void main() {
     List<Category> categories = const [],
     List<ReceiptItem> receiptItems = const [],
     List<Receipt> receipts = const [],
+    List<ShoppingList> lists = const [],
+    Map<String, UsageForecast> forecasts = const {},
+    List<Store> stores = const [],
   }) =>
       ProviderScope(
         overrides: [
@@ -31,6 +35,9 @@ void main() {
           shoppingListRepositoryProvider.overrideWithValue(shoppingListRepo(db)),
           productRepositoryProvider.overrideWithValue(productRepo(db)),
           shoppingListItemsStreamProvider.overrideWith((ref) => Stream.value(items)),
+          shoppingListsStreamProvider.overrideWith((ref) => Stream.value(lists)),
+          usageForecastProvider.overrideWithValue(forecasts),
+          storesStreamProvider.overrideWith((ref) => Stream.value(stores)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           categoriesStreamProvider.overrideWith((ref) => Stream.value(categories)),
         ],

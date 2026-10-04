@@ -1,5 +1,7 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
+import 'package:einkaufstracker/domain/notifications/expiry_stages.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -131,6 +133,70 @@ void main() {
 
     await rescheduleExpiryReminders(ref);
     expect(scheduler.lastScheduled, isNull);
+  });
+
+  group('mehrstufige Erinnerungen (Ausbau 1.14)', () {
+    Future<(FakeNotificationScheduler, WidgetRef)> setup(WidgetTester tester) async {
+      final scheduler = FakeNotificationScheduler();
+      late WidgetRef ref;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          householdIdProvider.overrideWith((r) async => 'h1'),
+          settingsRepositoryProvider.overrideWithValue(
+            FakeSettingsRepository(const HouseholdSettings(notifyTime: '07:30', notifyLeadDays: 1, allowCloudOcr: false, keepReceiptImages: true)),
+          ),
+          inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
+          productRepositoryProvider.overrideWithValue(productRepo(db)),
+          householdPrefsRepositoryProvider.overrideWithValue(HouseholdPrefsRepository(db, householdId: () async => 'h1')),
+          notificationSchedulerProvider.overrideWithValue(scheduler),
+        ],
+        child: MaterialApp(home: Consumer(builder: (context, r, _) {
+          ref = r;
+          return const SizedBox();
+        })),
+      ));
+      await tester.pumpAndSettle();
+      return (scheduler, ref);
+    }
+
+    Future<Product> milkExpiring(DateTime bestBefore, {String name = 'Vollmilch'}) async {
+      final product = await productRepo(db).create(name: name, baseUnit: 'l');
+      await inventoryRepo(db).recordFromScan(productId: product.id, ean: name, bestBefore: bestBefore, now: DateTime.utc(2026, 9, 27));
+      return product;
+    }
+
+    testWidgets('gemeinsame Stufen: mehrere Erinnerungstage fuer einen Posten', (tester) async {
+      await milkExpiring(DateTime.utc(2026, 10, 3));
+      await HouseholdPrefsRepository(db, householdId: () async => 'h1').set(expiryStagesPref, [3, 0]);
+      final (scheduler, ref) = await setup(tester);
+      await rescheduleExpiryReminders(ref, now: DateTime.utc(2026, 9, 27));
+      expect(scheduler.lastScheduled!.map((r) => r.date), [DateTime.utc(2026, 9, 30), DateTime.utc(2026, 10, 3)]);
+    });
+
+    testWidgets('Stufen eines Produkts gehen den gemeinsamen vor, andere Produkte behalten die gemeinsamen', (tester) async {
+      final own = await milkExpiring(DateTime.utc(2026, 10, 3));
+      await milkExpiring(DateTime.utc(2026, 10, 3), name: 'Joghurt');
+      final prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
+      await prefs.set(expiryStagesPref, [1]);
+      await prefs.set(expiryStagesPrefFor(own.id), [5]);
+      final (scheduler, ref) = await setup(tester);
+      await rescheduleExpiryReminders(ref, now: DateTime.utc(2026, 9, 27));
+      final byDay = {for (final r in scheduler.lastScheduled!) r.date: r.productNames};
+      expect(byDay, {
+        DateTime.utc(2026, 9, 28): ['Vollmilch'],
+        DateTime.utc(2026, 10, 2): ['Joghurt'],
+      });
+    });
+
+    testWidgets('unlesbare oder leere Stufen: es gilt die einfache Vorlaufzeit der Einstellungen', (tester) async {
+      await milkExpiring(DateTime.utc(2026, 10, 3));
+      final prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
+      await prefs.set(expiryStagesPref, <int>[]);
+      final (scheduler, ref) = await setup(tester);
+      await rescheduleExpiryReminders(ref, now: DateTime.utc(2026, 9, 27));
+      expect(scheduler.lastScheduled!.single.date, DateTime.utc(2026, 10, 2));
+    });
   });
 }
 

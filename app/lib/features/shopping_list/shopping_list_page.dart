@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/inventory/usage_forecast.dart';
 import '../../domain/receipt/price_history.dart';
+import '../../domain/shopping_list/aisle_order.dart';
 import '../../domain/shopping_list/list_price_estimate.dart';
+import 'aisle_order_page.dart' show storeLabel;
+
+/// KV-Schluessel: Markt, nach dessen Regal-Reihenfolge die Einkaufsliste sortiert wird (leer = alphabetisch).
+const _sortStoreKey = 'shopping_sort_store';
 
 String _sourceLabel(String source) => switch (source) {
       'depleted' => 'Aufgebraucht',
@@ -40,6 +47,33 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   List<Product> _matches = const [];
   var _addQuantity = 1.0;
 
+  /// Markt, nach dessen Regal-Reihenfolge sortiert wird (Ausbau 1.14), `null` = alphabetisch. Nur auf diesem Geraet gemerkt.
+  String? _sortStoreId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSort();
+  }
+
+  Future<void> _loadSort() async {
+    try {
+      final id = await ref.read(databaseProvider).getKv(_sortStoreKey);
+      if (mounted && id != _sortStoreId) setState(() => _sortStoreId = id);
+    } catch (_) {
+      // ohne lesbare Ablage bleibt es alphabetisch
+    }
+  }
+
+  Future<void> _setSort(String? storeId) async {
+    setState(() => _sortStoreId = storeId);
+    try {
+      await ref.read(databaseProvider).setKv(_sortStoreKey, storeId ?? '');
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
+  }
+
   @override
   void dispose() {
     _input.dispose();
@@ -52,7 +86,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   }
 
   Future<void> _addProduct(Product product) async {
-    await ref.read(shoppingListRepositoryProvider).addManual(productId: product.id, quantity: _addQuantity, unit: product.baseUnit);
+    await ref.read(shoppingListRepositoryProvider).addManual(productId: product.id, quantity: _addQuantity, unit: product.baseUnit, listId: ref.read(selectedShoppingListProvider));
     _input.clear();
     if (mounted) {
       setState(() {
@@ -65,7 +99,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   Future<void> _addFreeText() async {
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    await ref.read(shoppingListRepositoryProvider).addManual(freeText: text, quantity: _addQuantity);
+    await ref.read(shoppingListRepositoryProvider).addManual(freeText: text, quantity: _addQuantity, listId: ref.read(selectedShoppingListProvider));
     _input.clear();
     if (mounted) {
       setState(() {
@@ -99,10 +133,166 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
     );
   }
 
+  /// Sortierung der Liste: alphabetisch oder nach der Regal-Reihenfolge eines Marktes (nur Maerkte, fuer die es eine gibt), dazu der Weg zur
+  /// Pflege der Reihenfolgen.
+  Widget _sortRow(ThemeData t, List<Store> orderedStores) {
+    return SizedBox(
+      height: 44,
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: IconButton(
+            key: const Key('aisle-settings'),
+            tooltip: 'Regal-Reihenfolge je Markt',
+            icon: const Icon(Icons.swap_vert),
+            onPressed: () async {
+              await context.push('/aisle-order', extra: _sortStoreId);
+              ref.invalidate(householdPrefsOnceProvider);
+            },
+          ),
+        ),
+        if (orderedStores.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(key: const Key('sort-alpha'), label: const Text('A–Z'), selected: _sortStoreId == null, onSelected: (_) => _setSort(null)),
+          ),
+          for (final s in orderedStores)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(key: Key('sort-store-${s.id}'), label: Text(storeLabel(s)), selected: _sortStoreId == s.id, onSelected: (_) => _setSort(s.id)),
+            ),
+        ] else
+          Padding(padding: const EdgeInsets.only(top: 12), child: Text('Reihenfolge je Markt festlegen', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline))),
+      ]),
+    );
+  }
+
+  /// Auswahl der Liste als Chip-Reihe. Langer Druck auf eine Liste: umbenennen oder (nicht die Standardliste) loeschen, die Eintraege
+  /// wandern dann auf die Standardliste.
+  Widget _listChips(ThemeData t, List<ShoppingList> lists, String? selectedId, List<ShoppingListItem> all) {
+    int open(String id) => all.where((i) => i.listId == id && !i.checked && !i.isSuggestion).length;
+    return SizedBox(
+      height: 52,
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), children: [
+        for (final l in lists)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onLongPress: () => _listMenu(l),
+              child: ChoiceChip(
+                key: Key('list-chip-${l.id}'),
+                label: Text(open(l.id) > 0 ? '${l.name} (${open(l.id)})' : l.name),
+                selected: l.id == selectedId,
+                onSelected: (_) => ref.read(selectedShoppingListProvider.notifier).select(l.isDefault ? null : l.id),
+              ),
+            ),
+          ),
+        ActionChip(key: const Key('list-add'), avatar: const Icon(Icons.add, size: 18), label: const Text('Neue Liste'), onPressed: _createList),
+      ]),
+    );
+  }
+
+  Future<String?> _askName(String title, {String initial = ''}) {
+    final ctrl = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(key: const Key('list-name-field'), controller: ctrl, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: const InputDecoration(labelText: 'Name')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(key: const Key('list-name-ok'), onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createList() async {
+    final name = await _askName('Neue Liste');
+    if (name == null || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    try {
+      final list = await ref.read(shoppingListRepositoryProvider).createList(name);
+      ref.read(selectedShoppingListProvider.notifier).select(list.id);
+    } on ArgumentError catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('${e.message}')));
+    }
+  }
+
+  Future<void> _listMenu(ShoppingList list) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(key: const Key('list-rename'), leading: const Icon(Icons.edit_outlined), title: const Text('Umbenennen'), onTap: () => Navigator.pop(ctx, 'rename')),
+          if (!list.isDefault)
+            ListTile(
+              key: const Key('list-delete'),
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Liste löschen'),
+              subtitle: const Text('Die Einträge wandern auf die Standardliste'),
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
+        ]),
+      ),
+    );
+    if (action == null || !mounted) return;
+    final repo = ref.read(shoppingListRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    if (action == 'rename') {
+      final name = await _askName('Liste umbenennen', initial: list.name);
+      if (name == null) return;
+      try {
+        await repo.renameList(list.id, name);
+      } on ArgumentError catch (e) {
+        messenger.showSnackBar(SnackBar(content: Text('${e.message}')));
+      }
+    } else {
+      if (ref.read(selectedShoppingListProvider) == list.id) ref.read(selectedShoppingListProvider.notifier).select(null);
+      await repo.deleteList(list.id);
+    }
+  }
+
+  /// "Bald aufgebraucht": Produkte, die nach dem bisherigen Verbrauch in hoechstens drei Tagen leer sind und noch nirgends auf einer Liste
+  /// stehen. Ein Tipp setzt sie auf die gewaehlte Liste. Nur ein Hinweis, nichts wird von selbst eingetragen.
+  Widget _forecastCard(ThemeData t, List<({Product product, UsageForecast forecast})> due, String? selectedId) {
+    return Card(
+      key: const Key('shopping-forecast'),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Bald aufgebraucht', style: t.textTheme.titleSmall),
+          Text('nach deinem Verbrauch der letzten Wochen, eine Schätzung', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          for (final d in due)
+            ListTile(
+              key: Key('forecast-${d.product.id}'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(d.product.name),
+              subtitle: Text(d.forecast.text ?? ''),
+              trailing: TextButton(
+                key: Key('forecast-add-${d.product.id}'),
+                onPressed: () => ref.read(shoppingListRepositoryProvider).addManual(productId: d.product.id, unit: d.product.baseUnit, listId: selectedId),
+                child: const Text('Auf die Liste'),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final items = ref.watch(shoppingListItemsStreamProvider).value ?? const <ShoppingListItem>[];
+    final allItems = ref.watch(shoppingListItemsStreamProvider).value ?? const <ShoppingListItem>[];
+    final lists = ref.watch(shoppingListsStreamProvider).value ?? const <ShoppingList>[];
+    final selectedState = ref.watch(selectedShoppingListProvider);
+    final defaultId = lists.where((l) => l.isDefault).map((l) => l.id).firstOrNull;
+    // Die Auswahl gilt nur, solange es die Liste gibt (sie kann auf einem anderen Geraet geloescht worden sein)
+    final selectedId = (selectedState != null && lists.any((l) => l.id == selectedState)) ? selectedState : defaultId;
+    // Solange es noch keine Standardliste gibt (vor dem ersten Eintrag), zeigt die Seite alle Eintraege wie bisher
+    final items = selectedId == null ? allItems : allItems.where((i) => i.listId == selectedId).toList();
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final categoryNames = {for (final c in ref.watch(categoriesStreamProvider).value ?? const <Category>[]) c.id: c.name};
     final receiptItems = ref.watch(allItemsStreamProvider).value ?? const <ReceiptItem>[];
@@ -141,12 +331,29 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
           lastUnitPriceNormCents: i.productId == null ? null : latestPrice[i.productId],
         ),
     ]);
-    final groupNames = grouped.keys.toList()
-      ..sort((a, b) {
-        if (a == 'Ohne Kategorie') return 1;
-        if (b == 'Ohne Kategorie') return -1;
-        return a.compareTo(b);
-      });
+    // Regal-Reihenfolge (Ausbau 1.14): Maerkte mit gespeicherter Reihenfolge, gewaehlter Markt, Kategorie-ID je Gruppe
+    final prefs = ref.watch(householdPrefsOnceProvider).value ?? const <String, Object?>{};
+    final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
+    final orderedStores = [
+      for (final s in stores)
+        if (s.deletedAt == null && parseAisleOrder(prefs[aislePrefFor(s.id)]) != null) s,
+    ]..sort((a, b) => storeLabel(a).toLowerCase().compareTo(storeLabel(b).toLowerCase()));
+    final activeStoreId = orderedStores.any((s) => s.id == _sortStoreId) ? _sortStoreId : null;
+    final aisle = activeStoreId == null ? const <String>[] : (parseAisleOrder(prefs[aislePrefFor(activeStoreId)]) ?? const <String>[]);
+    final idByName = {for (final e in categoryNames.entries) e.value: e.key};
+    final groupNames = sortGroupsByAisle(
+      grouped.keys,
+      order: aisle,
+      idOf: (name) => name == 'Ohne Kategorie' ? null : idByName[name],
+      nameOf: (name) => name,
+    );
+
+    // Vorhersage: bald leer (hoechstens 3 Tage) und noch auf keiner Liste (unabgehakt)
+    final listedProducts = {for (final i in allItems) if (!i.checked && i.productId != null) i.productId!};
+    final forecastDue = <({Product product, UsageForecast forecast})>[
+      for (final e in ref.watch(usageForecastProvider).entries)
+        if (e.value.daysLeft <= 3 && e.value.text != null && !listedProducts.contains(e.key) && products[e.key] != null) (product: products[e.key]!, forecast: e.value),
+    ]..sort((a, b) => a.forecast.daysLeft.compareTo(b.forecast.daysLeft));
 
     return Scaffold(
       body: Column(children: [
@@ -154,6 +361,9 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 8),
             children: [
+              _listChips(t, lists, selectedId, allItems),
+              _sortRow(t, orderedStores),
+              if (forecastDue.isNotEmpty) _forecastCard(t, forecastDue, selectedId),
               if (estimate.itemsWithPrice > 0) _estimateCard(t, estimate),
               if (suggestions.isNotEmpty) ...[
                 Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Vorschläge', style: t.textTheme.titleSmall)),
@@ -251,6 +461,23 @@ class _ItemTile extends ConsumerWidget {
   final String label;
   final Product? product;
 
+  /// Langer Druck: den Eintrag auf eine andere Liste verschieben (nur sinnvoll, wenn es mehrere gibt).
+  Future<void> _move(BuildContext context, WidgetRef ref) async {
+    final lists = ref.read(shoppingListsStreamProvider).value ?? const <ShoppingList>[];
+    final others = [for (final l in lists) if (l.id != item.listId) l];
+    if (others.isEmpty) return;
+    final target = await showModalBottomSheet<ShoppingList>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(padding: const EdgeInsets.all(16), child: Text('„$label“ verschieben nach', style: Theme.of(ctx).textTheme.titleSmall)),
+          for (final l in others) ListTile(key: Key('move-to-${l.id}'), leading: const Icon(Icons.drive_file_move_outline), title: Text(l.name), onTap: () => Navigator.pop(ctx, l)),
+        ]),
+      ),
+    );
+    if (target != null) await ref.read(shoppingListRepositoryProvider).moveItem(item.id, target.id);
+  }
+
   Future<void> _editQuantity(BuildContext context, WidgetRef ref) async {
     final ctrl = TextEditingController(text: formatQuantity(item.quantity));
     final value = await showDialog<double>(
@@ -291,7 +518,9 @@ class _ItemTile extends ConsumerWidget {
         child: const Icon(Icons.delete_outline),
       ),
       onDismissed: (_) => ref.read(shoppingListRepositoryProvider).delete(item.id),
-      child: CheckboxListTile(
+      child: GestureDetector(
+        onLongPress: () => _move(context, ref),
+        child: CheckboxListTile(
         key: Key('shopping-item-${item.id}'),
         controlAffinity: ListTileControlAffinity.leading,
         value: item.checked,
@@ -306,6 +535,7 @@ class _ItemTile extends ConsumerWidget {
             child: Text('${formatQuantity(item.quantity)} ${item.unit}', style: Theme.of(context).textTheme.bodyMedium),
           ),
         ),
+      ),
       ),
     );
   }

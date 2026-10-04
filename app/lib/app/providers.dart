@@ -9,7 +9,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_config/app_config_repository.dart';
+import '../domain/inventory/usage_forecast.dart';
+import '../domain/notifications/expiry_stages.dart';
 import '../data/files/meal_photo_service.dart';
+import '../data/ocr/label_text_reader.dart';
 import '../data/household/household_invites.dart';
 import '../domain/sync/sync_conflicts.dart';
 import '../domain/sync/sync_schedule.dart';
@@ -341,6 +344,34 @@ final balanceMovementsProvider = StreamProvider((ref) {
   return ref.watch(inventoryRepositoryProvider).watchMovementsSince(since);
 });
 
+/// Verbrauchsraten-Vorhersage je Produkt mit Bestand (Ausbau 1.14): wie lange der Bestand bei dem Verbrauch der letzten Wochen reicht.
+/// Produkte ohne ausreichende Daten fehlen (ehrlicher als eine geratene Zahl).
+final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
+  final movements = ref.watch(balanceMovementsProvider).value ?? const <InventoryMovement>[];
+  final items = ref.watch(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+  final stock = <String, UsageStock>{};
+  final mixed = <String>{};
+  for (final i in items) {
+    final have = stock[i.productId];
+    if (have == null) {
+      stock[i.productId] = (quantity: i.quantity, unit: i.unit);
+    } else if (have.unit == i.unit) {
+      stock[i.productId] = (quantity: have.quantity + i.quantity, unit: i.unit);
+    } else {
+      mixed.add(i.productId); // gemischte Einheiten ergeben keinen sinnvollen Bestand
+    }
+  }
+  stock.removeWhere((id, _) => mixed.contains(id));
+  return forecastUsage(
+    movements: [
+      for (final m in movements)
+        (productId: m.productId, occurredAtUtc: m.occurredAt, type: m.type, quantityDelta: m.quantityDelta, unit: m.unit, mealId: m.mealId),
+    ],
+    stock: stock,
+    now: DateTime.now().toUtc(),
+  );
+});
+
 /// Vom Nutzer gesetzte Richtwerte fuer die Naehrwerte (LH-MEAL-09).
 final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>((ref) {
   return NutritionTargetsRepository(
@@ -388,6 +419,9 @@ final householdPrefsRepositoryProvider = Provider<HouseholdPrefsRepository>((ref
 
 final householdPrefsProvider = StreamProvider((ref) => ref.watch(householdPrefsRepositoryProvider).watch());
 
+/// Die gemeinsamen Einstellungen einmal gelesen (ohne laufenden Stream), z.B. fuer Anzeigen in den Einstellungen. Mit `invalidate` neu lesen.
+final householdPrefsOnceProvider = FutureProvider.autoDispose((ref) => ref.watch(householdPrefsRepositoryProvider).load());
+
 /// Essensfotos zu Mahlzeiten: lokal ablegen, danach in den privaten Bucket `meals` hochladen.
 final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {
   return MealPhotoService(
@@ -400,6 +434,11 @@ final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {
 
 /// Foto aufnehmen oder aus der Galerie waehlen (in Tests ersetzbar).
 final mealPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto);
+
+/// Foto eines Etiketts aufnehmen (MHD-Foto, Ausbau 1.14; in Tests ersetzbar) und seinen Text auf dem Geraet lesen.
+final labelPhotoPickerProvider = Provider<MealPhotoPicker>((ref) => pickMealPhoto);
+
+final labelTextReaderProvider = Provider<LabelTextReader>((ref) => MlKitLabelTextReader());
 
 /// Online-Suche in der Lebensmitteldatenbank BLS (ADR-024) fuer generische Zutaten ohne Barcode.
 final blsFoodSearchProvider = Provider<BlsFoodSearch>((ref) => SupabaseBlsFoodSearch(ref.watch(supabaseClientProvider)));
@@ -430,6 +469,19 @@ final listComparisonProvider = FutureProvider.autoDispose.family<ListComparison?
 
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
 
+/// Alle Einkaufslisten des Haushalts, die Standardliste zuerst (Ausbau 1.14).
+final shoppingListsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchLists());
+
+/// Die auf der Einkaufslistenseite gewaehlte Liste, `null` = Standardliste (Auswahl nur fuer diese Sitzung).
+class SelectedShoppingList extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? id) => state = id;
+}
+
+final selectedShoppingListProvider = NotifierProvider<SelectedShoppingList, String?>(SelectedShoppingList.new);
+
 final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
   return FlutterLocalNotificationsScheduler(
     onAddToList: (productId) => ref.read(shoppingListRepositoryProvider).addFromExpiryReminder(productId),
@@ -459,11 +511,21 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
   now ??= DateTime.now();
+  // Mehrstufige Erinnerungen (Ausbau 1.14): gemeinsame Einstellungen des Haushalts; ohne sie oder bei einem Lesefehler gilt wie bisher
+  // die eine Vorlaufzeit der Einstellungen
+  Map<String, Object?> prefs = const {};
+  try {
+    prefs = await ref.read(householdPrefsRepositoryProvider).load();
+  } catch (e) {
+    debugPrint('[expiry-reminders] Stufen nicht lesbar, es gilt die einfache Vorlaufzeit: $e');
+  }
+  final globalStages = parseExpiryStages(prefs[expiryStagesPref]);
   final reminders = computeExpiryReminders(
     activeItems: items,
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
+    stagesFor: (item) => parseExpiryStages(prefs[expiryStagesPrefFor(item.productId)]) ?? globalStages,
   );
   // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): sichtbar machen, WAS
   // ueberhaupt berechnet wurde, bevor es an den Plugin-Scheduler geht -- ohne das war nicht zu
