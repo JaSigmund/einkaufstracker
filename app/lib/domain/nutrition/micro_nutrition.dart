@@ -18,13 +18,21 @@ typedef MicroMeal = ({String id, String title, DateTime eatenAtUtc, double servi
 /// Eine Zutat mit ihrem Mikronaehrstoff-Snapshot. `micros == null`: die Zutat hat keine Daten.
 typedef MicroIngredient = ({String mealId, String name, Micros? micros});
 
+/// Eine Einnahme von Nahrungsergaenzung (Phase N4, ADR-035) mit den absoluten Mengen fuer die genommenen Einheiten. Sie zaehlt **nicht**
+/// als Zutat: die Packung nennt, was drin ist, ein fehlender Wert heisst dort "nicht enthalten" und senkt die Abdeckung der
+/// Lebensmittel nicht. Eine Einnahme macht einen Tag auch nicht zum erfassten Essenstag (Wochen-Ø, Journal).
+typedef MicroIntake = ({String id, String name, DateTime takenAtUtc, Micros micros});
+
 /// Woher ein Teil des Tageswertes kommt ("Woher kommt das?").
 class MicroContribution {
-  const MicroContribution({required this.mealId, required this.mealTitle, required this.ingredient, required this.amount});
+  const MicroContribution({required this.mealId, required this.mealTitle, required this.ingredient, required this.amount, this.supplement = false});
 
   final String mealId;
   final String mealTitle;
   final String ingredient;
+
+  /// Der Beitrag stammt aus Nahrungsergaenzung, nicht aus einer Mahlzeit.
+  final bool supplement;
 
   /// Beitrag zum Tageswert in der Einheit des Naehrstoffs (nach Portionsanteil).
   final double amount;
@@ -32,10 +40,13 @@ class MicroContribution {
 
 /// Ein Naehrstoff an einem Tag oder in einer Woche (Durchschnitt je erfasstem Tag).
 class MicroValue {
-  const MicroValue({this.total = 0, this.withData = 0, this.ingredients = 0, this.contributions = const []});
+  const MicroValue({this.total = 0, this.withData = 0, this.ingredients = 0, this.contributions = const [], this.supplementTotal = 0});
 
-  /// Summe der bekannten Beitraege.
+  /// Summe der bekannten Beitraege (Mahlzeiten und Nahrungsergaenzung).
   final double total;
+
+  /// Davon aus Nahrungsergaenzung.
+  final double supplementTotal;
 
   /// Zutaten mit einem Wert fuer diesen Naehrstoff (auch einer echten 0) und alle Zutaten.
   final int withData;
@@ -51,7 +62,7 @@ class MicroValue {
   bool get complete => withData == ingredients;
 
   /// Gar keine Daten, obwohl es Zutaten gibt: die Anzeige sagt "unbekannt" statt "0".
-  bool get unknown => ingredients > 0 && withData == 0;
+  bool get unknown => ingredients > 0 && withData == 0 && supplementTotal == 0;
 }
 
 /// Die Mikronaehrstoffe eines Kalendertags (Wiener Zeit).
@@ -62,6 +73,9 @@ class DayMicros {
   final Map<String, MicroValue> byKey = {};
   int meals = 0;
   int ingredients = 0;
+
+  /// Einnahmen von Nahrungsergaenzung an diesem Tag.
+  int intakes = 0;
   bool hasEstimates = false;
 
   MicroValue valueOf(String key) => byKey[key] ?? MicroValue(ingredients: ingredients);
@@ -80,7 +94,12 @@ class WeekMicros {
 }
 
 /// Tageswerte, aeltester Tag zuerst. Tage ohne Mahlzeit kommen nicht vor. Zutaten ohne passende Mahlzeit werden ignoriert.
-List<DayMicros> buildDailyMicros(Iterable<MicroMeal> meals, Iterable<MicroIngredient> ingredients, {bool Function(String mealId)? isEstimate}) {
+List<DayMicros> buildDailyMicros(
+  Iterable<MicroMeal> meals,
+  Iterable<MicroIngredient> ingredients, {
+  bool Function(String mealId)? isEstimate,
+  Iterable<MicroIntake> intakes = const [],
+}) {
   final byMeal = <String, List<MicroIngredient>>{};
   for (final i in ingredients) {
     byMeal.putIfAbsent(i.mealId, () => []).add(i);
@@ -89,6 +108,7 @@ List<DayMicros> buildDailyMicros(Iterable<MicroMeal> meals, Iterable<MicroIngred
   final totals = <DateTime, Map<String, double>>{};
   final withData = <DateTime, Map<String, int>>{};
   final contribs = <DateTime, Map<String, List<MicroContribution>>>{};
+  final supplementTotals = <DateTime, Map<String, double>>{};
 
   for (final m in meals) {
     if (m.servingsMade <= 0) continue;
@@ -112,6 +132,19 @@ List<DayMicros> buildDailyMicros(Iterable<MicroMeal> meals, Iterable<MicroIngred
       }
     }
   }
+  for (final intake in intakes) {
+    final local = utcToViennaLocal(intake.takenAtUtc);
+    final day = DateTime(local.year, local.month, local.day);
+    final d = days.putIfAbsent(day, () => DayMicros(day));
+    d.intakes++;
+    for (final e in intake.micros.entries) {
+      totals.putIfAbsent(day, () => {}).update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
+      supplementTotals.putIfAbsent(day, () => {}).update(e.key, (v) => v + e.value, ifAbsent: () => e.value);
+      contribs.putIfAbsent(day, () => {}).putIfAbsent(e.key, () => []).add(
+            MicroContribution(mealId: 'supplement:${intake.id}', mealTitle: 'Nahrungsergänzung', ingredient: intake.name, amount: e.value, supplement: true),
+          );
+    }
+  }
   for (final e in days.entries) {
     final day = e.key;
     final d = e.value;
@@ -122,6 +155,7 @@ List<DayMicros> buildDailyMicros(Iterable<MicroMeal> meals, Iterable<MicroIngred
         withData: withData[day]?[key] ?? 0,
         ingredients: d.ingredients,
         contributions: list,
+        supplementTotal: supplementTotals[day]?[key] ?? 0,
       );
     }
   }
@@ -132,7 +166,8 @@ List<DayMicros> buildDailyMicros(Iterable<MicroMeal> meals, Iterable<MicroIngred
 /// erfassten Tage; die Abdeckung zaehlt alle Zutaten der Woche.
 List<WeekMicros> buildWeeklyMicros(List<DayMicros> days) {
   final weeks = <DateTime, List<DayMicros>>{};
-  for (final d in days) {
+  // Ein Tag nur mit Nahrungsergaenzung ist kein erfasster Essenstag und geht nicht in den Durchschnitt ein (FR-15)
+  for (final d in days.where((d) => d.meals > 0)) {
     final monday = DateTime(d.day.year, d.day.month, d.day.day - (d.day.weekday - 1));
     weeks.putIfAbsent(monday, () => []).add(d);
   }
@@ -143,9 +178,10 @@ List<WeekMicros> buildWeeklyMicros(List<DayMicros> days) {
     final ingredients = list.fold<int>(0, (s, d) => s + d.ingredients);
     for (final key in nutrientKeys) {
       final total = list.fold<double>(0, (s, d) => s + d.valueOf(key).total) / list.length;
+      final supplementTotal = list.fold<double>(0, (s, d) => s + d.valueOf(key).supplementTotal) / list.length;
       final withData = list.fold<int>(0, (s, d) => s + d.valueOf(key).withData);
       final all = [for (final d in list) ...d.valueOf(key).contributions]..sort((a, b) => b.amount.compareTo(a.amount));
-      byKey[key] = MicroValue(total: total, withData: withData, ingredients: ingredients, contributions: all.take(5).toList());
+      byKey[key] = MicroValue(total: total, withData: withData, ingredients: ingredients, contributions: all.take(5).toList(), supplementTotal: supplementTotal);
     }
     out.add(WeekMicros(e.key, list.length, byKey, ingredients));
   }

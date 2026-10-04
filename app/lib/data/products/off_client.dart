@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../domain/nutrition/off_micros.dart';
+
 /// Ergebnis eines Open-Food-Facts-Lookups: das Noetigste fuer die Produktanlage (Doku 06 §4).
 class OffProduct {
   const OffProduct({
@@ -19,7 +21,8 @@ class OffProduct {
   /// OFF-Kategorie-Tags (z.B. "en:milks"), fuer eine grobe Zuordnung zu eigenen Kategorien.
   final List<String> categoryTags;
 
-  /// {kcal, protein_g, fat_g, sat_fat_g, carbs_g, sugar_g, fiber_g, salt_g}, soweit von OFF bekannt.
+  /// {kcal, protein_g, fat_g, sat_fat_g, carbs_g, sugar_g, fiber_g, salt_g}, soweit von OFF bekannt, dazu die Mikronaehrstoffe mit den
+  /// Schluesseln des Registers (`vit_c_mg`, `iron_mg`, ...; Phase N4), soweit OFF sie kennt und sie plausibel sind.
   final Map<String, double>? nutrientsPer100;
 
   /// 'g' oder 'ml'.
@@ -78,6 +81,7 @@ class HttpOffClient implements OffClient {
       set('sugar_g', 'sugars_100g');
       set('fiber_g', 'fiber_100g');
       set('salt_g', 'salt_100g');
+      map.addAll(microsFromOffNutriments(nutriments) ?? const {});
       if (map.isNotEmpty) {
         nutrients = map;
         basis = 'g'; // OFF liefert je 100 g, auch fuer Fluessigkeiten (dort faktisch ml)

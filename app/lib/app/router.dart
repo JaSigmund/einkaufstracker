@@ -10,6 +10,8 @@ import '../features/diary/balance_page.dart';
 import '../features/diary/journal_page.dart';
 import '../features/diary/nutrients_page.dart';
 import '../features/diary/product_nutrients_page.dart';
+import '../features/diary/supplement_form_page.dart';
+import '../features/diary/supplements_page.dart';
 import '../features/diary/meal_form_page.dart';
 import '../features/diary/targets_page.dart';
 import '../features/home/home_shell.dart';
@@ -134,6 +136,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/journal', builder: (_, _) => const JournalPage()),
       GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
       GoRoute(path: '/nutrients', builder: (_, _) => const NutrientsPage()),
+      GoRoute(path: '/supplements', builder: (_, _) => const SupplementsPage()),
+      GoRoute(path: '/supplement-form', builder: (_, state) => SupplementFormPage(existing: state.extra as Supplement?)),
       GoRoute(
         path: '/stock-entry',
         builder: (_, state) {

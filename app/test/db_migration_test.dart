@@ -21,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -179,5 +179,33 @@ void main() {
 
     await (db.update(db.mealIngredients)..where((i) => i.id.equals('i1'))).write(const MealIngredientsCompanion(micros: Value('{"vit_c_mg":26}')));
     expect((await db.select(db.mealIngredients).getSingle()).micros, '{"vit_c_mg":26}');
+  });
+
+  test('Daten aus Version 19 bleiben beim Hochziehen erhalten, Ergaenzungen und Einstellungen sind neu, leer und nutzbar', () async {
+    final schema = await verifier.schemaAt(19);
+    schema.rawDatabase.execute(
+      "INSERT INTO meals (id, household_id, eaten_at, meal_type, title, servings_eaten, servings_made, source, is_estimate, updated_at) "
+      "VALUES ('m1', 'h1', '2026-10-03T10:00:00.000Z', 'lunch', 'Reis', 1.0, 1.0, 'manual', 0, '2026-10-03T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meal_ingredients (id, household_id, meal_id, quantity, unit, source, micros, updated_at) "
+      "VALUES ('i1', 'h1', 'm1', 100.0, 'g', 'manual', '{\"iron_mg\":1.5}', '2026-10-03T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    final ingredient = await db.select(db.mealIngredients).getSingle();
+    expect(ingredient.micros, '{"iron_mg":1.5}');
+    expect(await db.select(db.supplements).get(), isEmpty);
+    expect(await db.select(db.supplementIntakes).get(), isEmpty);
+    expect(await db.select(db.householdPrefs).get(), isEmpty);
+    await db.into(db.supplements).insert(SupplementsCompanion.insert(id: 's1', householdId: 'h1', name: 'D3', updatedAt: DateTime.utc(2026)));
+    await db.into(db.supplementIntakes).insert(SupplementIntakesCompanion.insert(id: 'e1', householdId: 'h1', name: 'D3', takenAt: DateTime.utc(2026), updatedAt: DateTime.utc(2026)));
+    await db.into(db.householdPrefs).insert(HouseholdPrefsCompanion.insert(householdId: 'h1', key: 'k', value: 'true', updatedAt: DateTime.utc(2026)));
+    expect((await db.select(db.supplements).getSingle()).servingLabel, 'Tablette', reason: 'Vorbelegung');
+    expect((await db.select(db.supplementIntakes).getSingle()).servings, 1.0);
+    expect(await db.select(db.householdPrefs).get(), hasLength(1));
   });
 }

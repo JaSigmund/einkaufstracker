@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/micros.dart';
@@ -18,13 +19,22 @@ import 'support/fakes.dart';
 /// Heute ist der 3. Oktober 2026 (Wiener Zeit).
 final _now = DateTime.utc(2026, 10, 3, 10);
 
+/// Die Seite haengt an echten Drift-Strömen (gemeinsame Einstellungen): am Testende wird sie ausgehaengt, damit keine Timer offen bleiben.
+void pageTest(String name, Future<void> Function(WidgetTester tester) body) => testWidgets(name, (tester) async {
+      await body(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
+
 void main() {
   late AppDatabase db;
   late MealRepository meals;
+  late HouseholdPrefsRepository prefs;
 
   setUp(() {
     db = memoryDb();
     meals = mealRepo(db);
+    prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
   });
   tearDown(() => db.close());
 
@@ -50,6 +60,8 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        householdPrefsRepositoryProvider.overrideWithValue(prefs),
+        supplementIntakesStreamProvider.overrideWith((ref) => Stream.value(const <SupplementIntake>[])),
         mealsStreamProvider.overrideWith((ref) => Stream.value(allMeals)),
         mealIngredientsStreamProvider.overrideWith((ref) => Stream.value(allIngredients)),
       ],
@@ -69,7 +81,7 @@ void main() {
     ]);
   }
 
-  testWidgets('Tag: Summe mit "mindestens", Abdeckung, unbekannt und echte Null', (tester) async {
+  pageTest('Tag: Summe mit "mindestens", Abdeckung, unbekannt und echte Null', (tester) async {
     await bananaDay();
     await open(tester);
 
@@ -82,14 +94,14 @@ void main() {
     expect(text(tester, 'nutrient-coverage-iodine_ug'), 'keine Daten in 2 Zutaten');
   });
 
-  testWidgets('vollstaendig: ohne "mindestens" und ohne Abdeckungszeile', (tester) async {
+  pageTest('vollstaendig: ohne "mindestens" und ohne Abdeckungszeile', (tester) async {
     await meal('Obst', today, [food('Banane', 100, const {'vit_c_mg': 11.0})]);
     await open(tester);
     expect(text(tester, 'nutrient-value-vit_c_mg'), '11 mg');
     expect(find.byKey(const Key('nutrient-coverage-vit_c_mg')), findsNothing);
   });
 
-  testWidgets('Vorauswahl der zwoelf, "Alle zeigen" blendet den Rest ein und wieder aus', (tester) async {
+  pageTest('Vorauswahl der zwoelf, "Alle zeigen" blendet den Rest ein und wieder aus', (tester) async {
     await bananaDay();
     await open(tester);
     expect(find.byKey(const Key('nutrient-row-vit_c_mg')), findsOneWidget);
@@ -109,7 +121,7 @@ void main() {
     expect(find.byKey(const Key('nutrient-row-vit_e_mg')), findsNothing);
   });
 
-  testWidgets('Referenzmengen sind standardmaessig aus; eingeschaltet zeigt die Seite "% der Referenzmenge" ohne Bewertung und merkt es sich', (tester) async {
+  pageTest('Referenzmengen sind standardmaessig aus; eingeschaltet zeigt die Seite "% der Referenzmenge" ohne Bewertung und merkt es sich', (tester) async {
     await bananaDay();
     await open(tester);
     expect(find.byKey(const Key('nutrient-reference-vit_c_mg')), findsNothing);
@@ -122,18 +134,38 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsWidgets);
     expect(find.byKey(const Key('nutrient-reference-omega3_g')), findsNothing, reason: 'fuer Fettsaeuren gibt es keine Kennzeichnungsmenge');
     expect(find.byKey(const Key('nutrient-reference-iodine_ug')), findsNothing, reason: 'unbekannt hat keinen Anteil');
-    expect(await db.getKv(microReferenceOnKey), 'true');
+    expect((await prefs.load())[microReferenceOnPref], true);
     expect(find.textContaining('Mangel'), findsNothing);
   });
 
-  testWidgets('die gemerkte Einstellung gilt beim naechsten Oeffnen', (tester) async {
+  pageTest('die gemerkte Einstellung gilt beim naechsten Oeffnen', (tester) async {
     await bananaDay();
-    await db.setKv(microReferenceOnKey, 'true');
+    await prefs.set(microReferenceOnPref, true);
     await open(tester);
     expect(text(tester, 'nutrient-reference-vit_c_mg'), '16 % der Referenzmenge');
   });
 
-  testWidgets('"Woher kommt das?": groesste Beitraege mit Zutat und Mahlzeit, Abdeckung und Referenzmenge', (tester) async {
+  pageTest('lokale Referenzmengen aus Version 1.12 werden einmal in die gemeinsamen Einstellungen uebernommen', (tester) async {
+    await bananaDay();
+    await db.setKv('micro_reference_on', 'true');
+    await db.setKv('micro_reference_overrides', jsonEncode({'vit_c_mg': 40}));
+    await open(tester);
+    expect(text(tester, 'nutrient-reference-vit_c_mg'), '32 % der Referenzmenge');
+    expect(await prefs.load(), {microReferenceOnPref: true, microReferenceOverridesPref: {'vit_c_mg': 40}});
+  });
+
+  pageTest('gemeinsame Werte gehen den alten lokalen vor und werden nicht ueberschrieben', (tester) async {
+    await bananaDay();
+    await prefs.set(microReferenceOnPref, true);
+    await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 160});
+    await db.setKv('micro_reference_on', 'true');
+    await db.setKv('micro_reference_overrides', jsonEncode({'vit_c_mg': 40}));
+    await open(tester);
+    expect(text(tester, 'nutrient-reference-vit_c_mg'), '8 % der Referenzmenge');
+    expect((await prefs.load())[microReferenceOverridesPref], {'vit_c_mg': 160});
+  });
+
+  pageTest('"Woher kommt das?": groesste Beitraege mit Zutat und Mahlzeit, Abdeckung und Referenzmenge', (tester) async {
     await meal('Frühstück', today, [food('Banane', 118, const {'vit_c_mg': 11.0}), food('Gewürz', 5, null)]);
     await meal('Mittag', today, [food('Paprika', 100, const {'vit_c_mg': 120.0})]);
     await open(tester);
@@ -150,7 +182,7 @@ void main() {
     expect(text(tester, 'nutrient-sheet-reference'), 'Kennzeichnungs-Referenzmenge: 80 mg pro Tag');
   });
 
-  testWidgets('Quelle ohne Daten: das Blatt sagt es ehrlich', (tester) async {
+  pageTest('Quelle ohne Daten: das Blatt sagt es ehrlich', (tester) async {
     await bananaDay();
     await open(tester);
     await tester.tap(find.byKey(const Key('nutrient-row-iodine_ug')));
@@ -160,9 +192,9 @@ void main() {
     expect(find.byKey(const Key('nutrient-contrib-0')), findsNothing);
   });
 
-  testWidgets('eigenen Referenzwert festlegen, gemerkt und zuruecksetzen', (tester) async {
+  pageTest('eigenen Referenzwert festlegen, gemerkt und zuruecksetzen', (tester) async {
     await bananaDay();
-    await db.setKv(microReferenceOnKey, 'true');
+    await prefs.set(microReferenceOnPref, true);
     await open(tester);
 
     await tester.tap(find.byKey(const Key('nutrient-row-vit_c_mg')));
@@ -174,7 +206,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nutrient-override-ok')));
     await tester.pumpAndSettle();
     expect(text(tester, 'nutrient-reference-vit_c_mg'), '32 % der Referenzmenge');
-    expect(jsonDecode((await db.getKv(microReferenceOverridesKey))!), {'vit_c_mg': 40});
+    expect((await prefs.load())[microReferenceOverridesPref], {'vit_c_mg': 40});
 
     await tester.tap(find.byKey(const Key('nutrient-row-vit_c_mg')));
     await tester.pumpAndSettle();
@@ -182,12 +214,12 @@ void main() {
     await tester.tap(find.byKey(const Key('nutrient-override-reset')));
     await tester.pumpAndSettle();
     expect(text(tester, 'nutrient-reference-vit_c_mg'), '16 % der Referenzmenge');
-    expect(jsonDecode((await db.getKv(microReferenceOverridesKey))!), isEmpty);
+    expect((await prefs.load())[microReferenceOverridesPref], isEmpty);
   });
 
-  testWidgets('eigener Referenzwert 0 entfernt ihn; ohne Referenzmenge (Omega-3) laesst sich einer festlegen', (tester) async {
+  pageTest('eigener Referenzwert 0 entfernt ihn; ohne Referenzmenge (Omega-3) laesst sich einer festlegen', (tester) async {
     await meal('Fisch', today, [food('Lachs', 100, const {'omega3_g': 2.6})]);
-    await db.setKv(microReferenceOnKey, 'true');
+    await prefs.set(microReferenceOnPref, true);
     await open(tester);
 
     await tester.tap(find.byKey(const Key('nutrient-row-omega3_g')));
@@ -210,7 +242,7 @@ void main() {
     expect(find.byKey(const Key('nutrient-reference-omega3_g')), findsNothing);
   });
 
-  testWidgets('Woche: Durchschnitt je erfasstem Tag und "x von 7 Tagen erfasst"', (tester) async {
+  pageTest('Woche: Durchschnitt je erfasstem Tag und "x von 7 Tagen erfasst"', (tester) async {
     await meal('A', DateTime.utc(2026, 9, 28, 10), [food('x', 100, const {'vit_c_mg': 30.0})]); // Montag
     await meal('B', DateTime.utc(2026, 9, 30, 10), [food('y', 100, const {'vit_c_mg': 60.0})]); // Mittwoch
     await open(tester);
@@ -222,7 +254,7 @@ void main() {
     expect(text(tester, 'nutrient-value-vit_c_mg'), '45 mg');
   });
 
-  testWidgets('Tage blaettern: ein Tag ohne Eintrag sagt "nichts erfasst" statt Nullen', (tester) async {
+  pageTest('Tage blaettern: ein Tag ohne Eintrag sagt "nichts erfasst" statt Nullen', (tester) async {
     await bananaDay();
     await open(tester);
     await tester.tap(find.byKey(const Key('nutrients-prev')));
@@ -235,7 +267,7 @@ void main() {
     expect(find.byKey(const Key('nutrient-row-vit_c_mg')), findsOneWidget);
   });
 
-  testWidgets('Woche ohne Eintrag und leere Datenbank', (tester) async {
+  pageTest('Woche ohne Eintrag und leere Datenbank', (tester) async {
     await open(tester);
     expect(find.byKey(const Key('nutrients-none')), findsOneWidget);
     await tester.tap(find.text('Woche'));
@@ -243,11 +275,11 @@ void main() {
     expect(text(tester, 'nutrients-none'), 'In dieser Woche ist nichts erfasst.');
   });
 
-  testWidgets('ehrliche Hinweise: Grenzen der Tabellenwerte unter den Zeilen und im Info-Dialog', (tester) async {
+  pageTest('ehrliche Hinweise: Grenzen der Tabellenwerte unter den Zeilen und im Info-Dialog', (tester) async {
     await bananaDay();
     await open(tester);
     expect(text(tester, 'nutrients-limits'), contains('Garverluste'));
-    expect(text(tester, 'nutrients-limits'), contains('Nahrungsergänzung ist nicht erfasst'));
+    expect(text(tester, 'nutrients-limits'), contains('Nahrungsergänzung zählt nur'));
     expect(text(tester, 'nutrients-limits'), contains('Selen und Koffein fehlen'));
     await tester.tap(find.byKey(const Key('nutrients-info')));
     await tester.pumpAndSettle();
@@ -255,14 +287,14 @@ void main() {
     expect(find.textContaining('keine Empfehlung für dich'), findsOneWidget);
   });
 
-  testWidgets('Schaetzwerte werden genannt', (tester) async {
+  pageTest('Schaetzwerte werden genannt', (tester) async {
     final m = await meal('Restaurant', today, [food('x', 100, const {'vit_c_mg': 5.0})]);
     await (db.update(db.meals)..where((t) => t.id.equals(m.id))).write(const MealsCompanion(isEstimate: Value(true)));
     await open(tester);
     expect(find.byKey(const Key('nutrients-estimates')), findsOneWidget);
   });
 
-  testWidgets('Portionsanteil: eine Portion von vier', (tester) async {
+  pageTest('Portionsanteil: eine Portion von vier', (tester) async {
     await meals.create(MealDraft(
       title: 'Suppe',
       eatenAt: today,

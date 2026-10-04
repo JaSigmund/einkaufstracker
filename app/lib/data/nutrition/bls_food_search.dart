@@ -52,6 +52,10 @@ abstract class BlsFoodSearch {
   /// Ordnet einen Namen zu: die besten [limit] Treffer, der erste mit Sicherheit ([BlsFood.confidence]). Leer, wenn nichts
   /// passt. Wirft [BlsSearchUnavailable] ohne Netz.
   Future<List<BlsFood>> resolve(String name, {int limit = 3});
+
+  /// Die Eintraege zu diesen BLS-Codes (zum Nachrechnen der Mikronaehrstoffe aelterer Mahlzeiten, Phase N4). Unbekannte Codes fehlen in
+  /// der Antwort. Wirft [BlsSearchUnavailable] ohne Netz.
+  Future<List<BlsFood>> byCodes(Iterable<String> codes);
 }
 
 const blsSearchMinChars = 2;
@@ -116,5 +120,22 @@ class SupabaseBlsFoodSearch implements BlsFoodSearch {
   Future<List<BlsFood>> resolve(String name, {int limit = 3}) async {
     if (name.trim().length < blsSearchMinChars) return const [];
     return _call(name, limit: limit, loose: false);
+  }
+
+  @override
+  Future<List<BlsFood>> byCodes(Iterable<String> codes) async {
+    final unique = codes.toSet().toList();
+    final out = <BlsFood>[];
+    try {
+      // in Stuecken, damit die Anfrage-Adresse kurz bleibt
+      for (var i = 0; i < unique.length; i += 80) {
+        final chunk = unique.sublist(i, i + 80 > unique.length ? unique.length : i + 80);
+        final rows = await _client.from('bls_foods').select().inFilter('bls_code', chunk).timeout(const Duration(seconds: 15));
+        out.addAll([for (final r in rows as List) blsFoodFromRow(Map<String, dynamic>.from(r as Map))]);
+      }
+    } catch (e) {
+      throw BlsSearchUnavailable(e.toString());
+    }
+    return out;
   }
 }

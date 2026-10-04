@@ -444,6 +444,17 @@ class FakeBlsFoodSearch implements BlsFoodSearch {
     return hits.take(blsSearchMaxResults).toList();
   }
 
+  /// Angefragte Code-Listen von [byCodes].
+  final codeQueries = <List<String>>[];
+
+  @override
+  Future<List<BlsFood>> byCodes(Iterable<String> codes) async {
+    codeQueries.add(codes.toList());
+    if (fail) throw const BlsSearchUnavailable();
+    final wanted = codes.toSet();
+    return [...foods, for (final l in resolved.values) ...l].where((f) => wanted.contains(f.code)).toList();
+  }
+
   @override
   Future<List<BlsFood>> resolve(String name, {int limit = 3}) async {
     resolveQueries.add(name);

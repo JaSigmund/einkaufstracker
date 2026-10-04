@@ -545,6 +545,57 @@ class HouseholdFoodLinks extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Nahrungsergaenzung des Haushalts (Spiegel von public.supplements, Phase N4, ADR-035): Name, was eine Einheit ist und die
+/// Mikronaehrstoffe je Einheit (absolute Mengen laut Packung, Schluessel des Registers).
+@DataClassName('Supplement')
+class Supplements extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get name => text()();
+  TextColumn get servingLabel => text().withDefault(const Constant('Tablette'))();
+
+  /// Mikronaehrstoffe je Einheit als JSON-Objekt (`jsonb` auf dem Server).
+  TextColumn get micros => text().withDefault(const Constant('{}'))();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Eine Einnahme als Snapshot (Spiegel von public.supplement_intakes): Name und absolute Mengen fuer die genommenen Einheiten, damit
+/// eine spaetere Aenderung der Ergaenzung die Vergangenheit nicht veraendert.
+@DataClassName('SupplementIntake')
+class SupplementIntakes extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get supplementId => text().nullable()();
+  TextColumn get name => text()();
+  DateTimeColumn get takenAt => dateTime()();
+  RealColumn get servings => real().withDefault(const Constant(1.0))();
+  TextColumn get micros => text().withDefault(const Constant('{}'))();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Gemeinsame Einstellungen des Haushalts als Schluessel-Wert-Zeilen (Spiegel von public.household_prefs, Phase N4, ADR-035).
+@DataClassName('HouseholdPref')
+class HouseholdPrefs extends Table {
+  TextColumn get householdId => text()();
+  TextColumn get key => text()();
+
+  /// JSON-Wert (`jsonb` auf dem Server).
+  TextColumn get value => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {householdId, key};
+}
+
 /// Kleine Schluessel-Wert-Ablage (z.B. zuletzt bekannte Haushalts-ID fuer den Offline-Start).
 @DataClassName('KeyValueEntry')
 class KeyValues extends Table {
@@ -558,7 +609,7 @@ class KeyValues extends Table {
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
   ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
-  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Outbox, SyncStates, KeyValues,
+  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Supplements, SupplementIntakes, HouseholdPrefs, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -577,7 +628,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -684,6 +735,12 @@ class AppDatabase extends _$AppDatabase {
           // Spalte an.
           if (from >= 14 && from < 19) {
             await m.addColumn(mealIngredients, mealIngredients.micros);
+          }
+          // 19 -> 20: Nahrungsergaenzung und gemeinsame Einstellungen des Haushalts (Phase N4)
+          if (from < 20) {
+            await m.createTable(supplements);
+            await m.createTable(supplementIntakes);
+            await m.createTable(householdPrefs);
           }
         },
       );

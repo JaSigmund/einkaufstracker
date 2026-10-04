@@ -830,23 +830,63 @@ def main():
             row["household_id"] = str(ha)
         cols = list(row)
         vals = [Jsonb(row[c]) if (table, c) in jsonb_cols and row[c] is not None else row[c] for c in cols]
-        key = "household_id" if table == "nutrition_targets" else "id"
-        updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c != key)
+        key_cols = {"nutrition_targets": ["household_id"], "household_prefs": ["household_id", "key"]}.get(table, ["id"])
+        updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c not in key_cols)
         sql = (f"insert into public.{table} ({', '.join(cols)}) values ({', '.join(['%s'] * len(cols))}) "
-               f"on conflict ({key}) do update set {updates}")
+               f"on conflict ({', '.join(key_cols)}) do update set {updates}")
         try:
             db(sql, vals)
         except psycopg.Error as ex:
             contract_failures.append(f"{table}: {str(ex).splitlines()[0]}")
     tables_in_fixture = {e["table"] for e in entries}
-    check("Vertrag: Fixture enthaelt Tagebuch, Ledger und Richtwerte",
-          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets"} <= tables_in_fixture, str(tables_in_fixture))
+    check("Vertrag: Fixture enthaelt Tagebuch, Ledger, Richtwerte, Ergaenzungen und Einstellungen",
+          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets", "supplements", "supplement_intakes", "household_prefs"} <= tables_in_fixture,
+          str(tables_in_fixture))
     check(f"Vertrag: alle {len(entries)} Zeilen der App werden vom echten Schema angenommen", not contract_failures, "; ".join(contract_failures[:3]))
     meal_ids = [e["payload"]["id"] for e in entries if e["table"] == "meals"]
     check("Vertrag: die eingespielten Mahlzeiten liegen in der Datenbank (Soft-Delete eingeschlossen)",
           one("select count(*) from meals where id = any(%s::uuid[])", (meal_ids,)) == len(set(meal_ids)))
     check("Vertrag: Gegenbuchung der geloeschten Mahlzeit ist mit meal_id verknuepft",
           one("select count(*) from inventory_movements where type='adjustment' and meal_id = any(%s::uuid[])", (meal_ids,)) >= 1)
+
+    # --- Nahrungsergaenzung und gemeinsame Einstellungen (Phase N4, Migration 0026) -----------------------------------
+    check("Ergaenzungen: Fixture-Zeilen sind da (angelegt, geaendert, geloescht)",
+          one("select count(*) from supplements where household_id = %s", (ha,)) >= 3 and
+          one("select count(*) from supplements where household_id = %s and deleted_at is not null", (ha,)) >= 1)
+    check("Ergaenzungen: Einnahmen tragen Name und absolute Mengen als jsonb",
+          one("select count(*) from supplement_intakes where household_id = %s and jsonb_typeof(micros) = 'object' and name <> ''", (ha,)) >= 2)
+    check("Einstellungen: je Schluessel eine Zeile, Werte sind jsonb",
+          one("select count(*) from household_prefs where household_id = %s and key in ('micro_reference_on','micro_reference_overrides')", (ha,)) == 2)
+    check("Ergaenzungen: B sieht nichts von Haushalt A",
+          one("select count(*) from supplements", user=B) == 0 and one("select count(*) from supplement_intakes", user=B) == 0 and
+          one("select count(*) from household_prefs", user=B) == 0)
+    check("Ergaenzungen: A sieht die eigenen Zeilen", one("select count(*) from supplements", user=A) >= 3)
+    ins_supp = "insert into supplements (household_id, name, serving_label, micros) values (%s,%s,%s,'{\"iron_mg\":14}')"
+    check("Ergaenzungen: A kann eine anlegen", not raises(ins_supp, (ha, "Eisen", "Tablette"), user=A))
+    check("Ergaenzungen: B kann nicht in Haushalt A schreiben", raises(ins_supp, (ha, "Fremd", "Tablette"), user=B))
+    check("Ergaenzungen: leerer Name wird abgelehnt", raises(ins_supp, (ha, "  ", "Tablette"), user=A))
+    check("Ergaenzungen: leere Einheit wird abgelehnt", raises(ins_supp, (ha, "X", " "), user=A))
+    supp_id = one("select id from supplements where household_id = %s and name = 'Eisen'", (ha,))
+    ins_intake = "insert into supplement_intakes (household_id, supplement_id, name, taken_at, servings, micros) values (%s,%s,'Eisen', now(), %s,'{\"iron_mg\":14}')"
+    check("Einnahmen: A kann eine eintragen", not raises(ins_intake, (ha, supp_id, 1), user=A))
+    check("Einnahmen: B kann nicht in Haushalt A schreiben", raises(ins_intake, (ha, supp_id, 1), user=B))
+    check("Einnahmen: Anzahl 0 wird abgelehnt", raises(ins_intake, (ha, supp_id, 0), user=A))
+    check("Einnahmen: negative Anzahl wird abgelehnt", raises(ins_intake, (ha, supp_id, -1), user=A))
+    db("delete from supplements where id = %s", (supp_id,))
+    check("Einnahmen: wird die Ergaenzung hart geloescht, bleibt die Einnahme (ohne Verweis, mit eigenem Snapshot)",
+          one("select count(*) from supplement_intakes where name = 'Eisen' and supplement_id is null") == 1)
+    ins_pref = "insert into household_prefs (household_id, key, value) values (%s,%s,%s::jsonb)"
+    check("Einstellungen: A kann einen Wert anlegen", not raises(ins_pref, (ha, "test_key", "true"), user=A))
+    check("Einstellungen: derselbe Schluessel zweimal wird abgelehnt (zusammengesetzter Schluessel)", raises(ins_pref, (ha, "test_key", "false"), user=A))
+    check("Einstellungen: derselbe Schluessel in einem anderen Haushalt ist erlaubt", not raises(ins_pref, (hb, "test_key", "1"), user=B))
+    check("Einstellungen: B kann nicht in Haushalt A schreiben", raises(ins_pref, (ha, "fremd", "1"), user=B))
+    check("Einstellungen: leerer Schluessel wird abgelehnt", raises(ins_pref, (ha, "", "1"), user=A))
+    check("Einstellungen: zu langer Schluessel wird abgelehnt", raises(ins_pref, (ha, "x" * 65, "1"), user=A))
+    before_pref = one("select updated_at from household_prefs where household_id = %s and key = 'test_key'", (ha,))
+    db("update household_prefs set value = '42'::jsonb where household_id = %s and key = 'test_key'", (ha,))
+    check("Einstellungen: updated_at wird beim Aendern gesetzt",
+          one("select updated_at > %s from household_prefs where household_id = %s and key = 'test_key'", (before_pref, ha)))
+    db("delete from household_prefs where key = 'test_key'")
 
 
     # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
