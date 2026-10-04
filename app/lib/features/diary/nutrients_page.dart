@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../data/nutrition/bls_food_search.dart';
+import '../../data/repositories/meal_repository.dart' show ingredientGrams;
 import '../../domain/nutrition/micro_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
+import '../../domain/nutrition/micros_backfill.dart';
 import '../../domain/nutrition/nutrient_registry.dart';
 import '../../domain/receipt/vienna_time.dart';
 
@@ -41,6 +44,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   var _week = false;
   var _showAll = false;
   var _referenceOn = false;
+  var _backfilling = false;
   Map<String, double> _overrides = {};
 
   DateTime get _today {
@@ -106,6 +110,74 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   /// Referenzmengen zeigt die Seite keine (auch keinen eigenen Wert): `null`.
   double? _referenceOf(NutrientDef def) => !_referenceOn ? null : (_overrides[def.key] ?? def.euReference);
 
+  /// Zutaten aus Mahlzeiten vor 1.11 haben einen BLS-Eintrag oder ein Produkt, aber keinen Mikronaehrstoff-Snapshot: aus dem Profil und der
+  /// gespeicherten Menge wird er nachgerechnet. Nur Ergaenzen, nie Ueberschreiben (ADR-035).
+  List<BackfillIngredient> _backfillInput(List<MealIngredient> ingredients) => [
+        for (final i in ingredients)
+          (id: i.id, productId: i.productId, blsCode: i.blsCode, grams: ingredientGrams(i), hasMicros: i.micros != null),
+      ];
+
+  Future<void> _backfill(List<MealIngredient> ingredients, Map<String, Micros> productMicros, Map<String, String> productCodes) async {
+    if (_backfilling) return;
+    setState(() => _backfilling = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final input = _backfillInput(ingredients);
+      final codes = backfillBlsCodes(input, productMicros100: productMicros, productBlsCodes: productCodes);
+      final foods = codes.isEmpty ? const <BlsFood>[] : await ref.read(blsFoodSearchProvider).byCodes(codes);
+      final plan = planMicrosBackfill(
+        input,
+        productMicros100: productMicros,
+        productBlsCodes: productCodes,
+        blsMicros100: {for (final f in foods) if (f.micros != null) f.code: f.micros!},
+      );
+      final done = await ref.read(mealRepositoryProvider).applyMicros(plan.updates);
+      final rest = [
+        if (plan.withoutAmount > 0) '${plan.withoutAmount} ohne bekannte Menge',
+        if (plan.withoutData > 0) '${plan.withoutData} ohne Werte in der Quelle',
+      ];
+      messenger.showSnackBar(SnackBar(
+        content: Text('${done == 1 ? '1 Zutat' : '$done Zutaten'} ergänzt${rest.isEmpty ? '' : ', ${rest.join(', ')}'}.'),
+      ));
+    } on BlsSearchUnavailable {
+      messenger.showSnackBar(const SnackBar(content: Text('Die Nährwert-Datenbank ist gerade nicht erreichbar. Versuch es später noch einmal.')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Nachrechnen nicht möglich.')));
+    } finally {
+      if (mounted) setState(() => _backfilling = false);
+    }
+  }
+
+  Widget _backfillCard(ThemeData t, int count, List<MealIngredient> ingredients, Map<String, Micros> productMicros, Map<String, String> productCodes) => Card(
+        key: const Key('nutrients-backfill'),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Ältere Mahlzeiten ergänzen', style: t.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              '${count == 1 ? 'Eine Zutat' : '$count Zutaten'} aus früheren Mahlzeiten ${count == 1 ? 'hat' : 'haben'} einen Nährwert-Eintrag, aber noch keine '
+              'Vitamine und Mineralstoffe (die gibt es erst seit Version 1.11). Die App kann sie aus dem Eintrag und der gespeicherten Menge nachrechnen. '
+              'Bestehende Werte bleiben unverändert.',
+              key: const Key('nutrients-backfill-text'),
+              style: t.textTheme.bodySmall,
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: const Key('nutrients-backfill-run'),
+                onPressed: _backfilling ? null : () => _backfill(ingredients, productMicros, productCodes),
+                icon: _backfilling
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.calculate_outlined),
+                label: Text(_backfilling ? 'Rechne nach …' : 'Jetzt nachrechnen'),
+              ),
+            ),
+          ]),
+        ),
+      );
+
   void _shift(int days) => setState(() => _day = _week ? _day.add(Duration(days: 7 * days)) : DateTime(_day.year, _day.month, _day.day + days));
 
   String _title() {
@@ -166,6 +238,16 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
     final MicroValue Function(String key) valueOf = _week ? (k) => week!.valueOf(k) : (k) => byDay[_day]!.valueOf(k);
     final estimates = _week ? false : (byDay[_day]?.hasEstimates ?? false);
 
+    // Produkte (Profil und BLS-Verknuepfung) fuer das Nachrechnen; ohne geladene Produkte gibt es nur die BLS-Zeilen
+    final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
+    final productMicros = <String, Micros>{};
+    for (final p in products) {
+      final m = parseMicros(p.nutrientsPer100);
+      if (m != null) productMicros[p.id] = m;
+    }
+    final productCodes = {for (final p in products) if (p.blsCode != null) p.id: p.blsCode!};
+    final backfillCount = backfillCandidateCount(_backfillInput(ingredients), productMicros100: productMicros, productBlsCodes: productCodes);
+
     return ListView(padding: const EdgeInsets.only(bottom: 32), children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -195,6 +277,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
             style: t.textTheme.bodySmall,
           ),
         ),
+      if (backfillCount > 0) _backfillCard(t, backfillCount, ingredients, productMicros, productCodes),
       SwitchListTile(
         key: const Key('nutrients-reference'),
         title: const Text('Referenzmengen anzeigen'),

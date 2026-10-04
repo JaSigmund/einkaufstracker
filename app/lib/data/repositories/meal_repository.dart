@@ -253,6 +253,27 @@ class MealRepository {
     onChanged?.call();
   }
 
+  /// Setzt den Mikronaehrstoff-Snapshot von Zutaten, die noch keinen haben (Nachrechnen aelterer Mahlzeiten, Phase N4). Ueberschreibt nie
+  /// einen vorhandenen Snapshot und aendert weder Menge noch Makros. Liefert die Zahl der ergaenzten Zutaten.
+  Future<int> applyMicros(Map<String, Micros> byIngredientId) async {
+    if (byIngredientId.isEmpty) return 0;
+    var changed = 0;
+    final now = DateTime.now().toUtc();
+    await _db.transaction(() async {
+      for (final e in byIngredientId.entries) {
+        final row = await (_db.select(_db.mealIngredients)..where((i) => i.id.equals(e.key))).getSingleOrNull();
+        final encoded = encodeMicros(e.value);
+        if (row == null || row.deletedAt != null || row.micros != null || encoded == null) continue;
+        final updated = row.copyWith(micros: Value(encoded), updatedAt: now);
+        await _put('meal_ingredients', row.id, mealIngredientToRemote(updated),
+            () => _db.into(_db.mealIngredients).insertOnConflictUpdate(updated.toCompanion(false)));
+        changed++;
+      }
+    });
+    if (changed > 0) onChanged?.call();
+    return changed;
+  }
+
   Future<void> _writeIngredients(Meal meal, List<IngredientDraft> drafts) async {
     final hid = meal.householdId;
     for (final d in drafts) {
