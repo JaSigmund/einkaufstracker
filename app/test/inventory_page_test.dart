@@ -56,6 +56,7 @@ void main() {
     List<InventoryItem> active = const [],
     List<InventoryItem> suggestions = const [],
     List<Product> products = const [],
+    List<InventoryMovement> movements = const [],
     FakeBarcodeScanner? scanner,
   }) =>
       ProviderScope(
@@ -66,6 +67,7 @@ void main() {
           inventorySuggestionsStreamProvider.overrideWith((ref) => Stream.value(suggestions)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           inventoryMovementsStreamProvider.overrideWith((ref, _) => Stream.value(const <InventoryMovement>[])),
+          balanceMovementsProvider.overrideWith((ref) => Stream.value(movements)),
           if (scanner != null) barcodeScannerProvider.overrideWithValue(scanner),
           productRepositoryProvider.overrideWithValue(productRepo(db)),
         ],
@@ -222,5 +224,34 @@ void main() {
     await tester.tap(find.byKey(const Key('filter-location-fridge'))); // aufheben
     await tester.pumpAndSettle();
     expect(find.text('B'), findsOneWidget);
+  });
+
+  group('Verbrauchsvorhersage (Ausbau 1.14)', () {
+    final now = DateTime.now().toUtc();
+
+    InventoryMovement move(String id, String type, double delta, int daysAgo) => InventoryMovement(
+          id: id, householdId: 'h1', productId: 'p1', occurredAt: now.subtract(Duration(days: daysAgo)), type: type, quantityDelta: delta, unit: 'piece', updatedAt: now,
+        );
+
+    /// Vor 20 Tagen gekauft, in 20 Tagen vier Mal eine Einheit verbraucht: rund 0,19 je Tag.
+    List<InventoryMovement> history() => [move('m0', 'purchase', 5, 20), move('m1', 'meal', -1, 16), move('m2', 'meal', -1, 12), move('m3', 'consumed', -1, 8), move('m4', 'meal', -1, 3)];
+
+    testWidgets('wird es bald knapp, steht die Reichweite in der Zeile', (tester) async {
+      await tester.pumpWidget(app(products: [_product('p1', 'Vollmilch')], active: [_item('a', 'p1')], movements: history()));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('reicht voraussichtlich noch etwa 5 Tage'), findsOneWidget);
+    });
+
+    testWidgets('reicht der Bestand noch lange, steht dort nichts', (tester) async {
+      await tester.pumpWidget(app(products: [_product('p1', 'Vollmilch')], active: [_item('a', 'p1', quantity: 20)], movements: history()));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('reicht voraussichtlich'), findsNothing);
+    });
+
+    testWidgets('ohne ausreichenden Verlauf keine Zahl', (tester) async {
+      await tester.pumpWidget(app(products: [_product('p1', 'Vollmilch')], active: [_item('a', 'p1')], movements: [move('m0', 'purchase', 5, 20), move('m1', 'meal', -1, 3)]));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('reicht voraussichtlich'), findsNothing);
+    });
   });
 }

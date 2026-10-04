@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_config/app_config_repository.dart';
+import '../domain/inventory/usage_forecast.dart';
 import '../data/files/meal_photo_service.dart';
 import '../data/household/household_invites.dart';
 import '../domain/sync/sync_conflicts.dart';
@@ -341,6 +342,34 @@ final balanceMovementsProvider = StreamProvider((ref) {
   return ref.watch(inventoryRepositoryProvider).watchMovementsSince(since);
 });
 
+/// Verbrauchsraten-Vorhersage je Produkt mit Bestand (Ausbau 1.14): wie lange der Bestand bei dem Verbrauch der letzten Wochen reicht.
+/// Produkte ohne ausreichende Daten fehlen (ehrlicher als eine geratene Zahl).
+final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
+  final movements = ref.watch(balanceMovementsProvider).value ?? const <InventoryMovement>[];
+  final items = ref.watch(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
+  final stock = <String, UsageStock>{};
+  final mixed = <String>{};
+  for (final i in items) {
+    final have = stock[i.productId];
+    if (have == null) {
+      stock[i.productId] = (quantity: i.quantity, unit: i.unit);
+    } else if (have.unit == i.unit) {
+      stock[i.productId] = (quantity: have.quantity + i.quantity, unit: i.unit);
+    } else {
+      mixed.add(i.productId); // gemischte Einheiten ergeben keinen sinnvollen Bestand
+    }
+  }
+  stock.removeWhere((id, _) => mixed.contains(id));
+  return forecastUsage(
+    movements: [
+      for (final m in movements)
+        (productId: m.productId, occurredAtUtc: m.occurredAt, type: m.type, quantityDelta: m.quantityDelta, unit: m.unit, mealId: m.mealId),
+    ],
+    stock: stock,
+    now: DateTime.now().toUtc(),
+  );
+});
+
 /// Vom Nutzer gesetzte Richtwerte fuer die Naehrwerte (LH-MEAL-09).
 final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>((ref) {
   return NutritionTargetsRepository(
@@ -429,6 +458,19 @@ final listComparisonProvider = FutureProvider.autoDispose.family<ListComparison?
 );
 
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
+
+/// Alle Einkaufslisten des Haushalts, die Standardliste zuerst (Ausbau 1.14).
+final shoppingListsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchLists());
+
+/// Die auf der Einkaufslistenseite gewaehlte Liste, `null` = Standardliste (Auswahl nur fuer diese Sitzung).
+class SelectedShoppingList extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? id) => state = id;
+}
+
+final selectedShoppingListProvider = NotifierProvider<SelectedShoppingList, String?>(SelectedShoppingList.new);
 
 final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
   return FlutterLocalNotificationsScheduler(

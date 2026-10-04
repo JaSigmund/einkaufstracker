@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
+import '../../domain/inventory/usage_forecast.dart';
 import '../products/barcode_flow.dart';
 import 'inventory_item_detail_page.dart';
 
@@ -62,6 +63,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final today = widget.now ?? DateTime.now();
     final t = Theme.of(context);
+    final forecasts = ref.watch(usageForecastProvider);
 
     return active.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -145,7 +147,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                         Text('${_groupTitles[level]} (${items.length})', style: t.textTheme.titleSmall),
                       ]),
                     ),
-                    for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level, today: today),
+                    for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level, today: today, forecast: forecasts[item.productId]),
                   ],
             ],
           ),
@@ -155,9 +157,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   }
 }
 
+/// Bis zu dieser Reichweite (Tage) zeigt die Bestandsliste die Vorhersage.
+const forecastShowDays = 14;
+
 class _InventoryTile extends ConsumerWidget {
-  const _InventoryTile({required this.item, required this.product, required this.level, required this.today});
+  const _InventoryTile({required this.item, required this.product, required this.level, required this.today, this.forecast});
   final InventoryItem item;
+
+  /// Vorhersage der Reichweite des Gesamtbestands dieses Produkts (Ausbau 1.14), `null` ohne ausreichende Daten.
+  final UsageForecast? forecast;
   final Product? product;
   final ExpiryLevel level;
   final DateTime today;
@@ -205,6 +213,8 @@ class _InventoryTile extends ConsumerWidget {
           _expiryText(item, level, today),
           if (item.status == 'opened') 'geöffnet',
           '${formatQuantity(item.quantity)} ${item.unit}',
+          // nur wenn es bald knapp wird: sonst waere die Zeile bei jedem Artikel voll von Prognosen
+          if (forecast != null && forecast!.daysLeft <= forecastShowDays && forecast!.text != null) forecast!.text!,
         ].join(' · ')),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.push('/inventory-item', extra: InventoryItemArgs(item: item, product: product)),

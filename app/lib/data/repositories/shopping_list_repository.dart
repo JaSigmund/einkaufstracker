@@ -7,10 +7,10 @@ import '../../domain/shopping_list/list_price_estimate.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
-/// Einkaufsliste (Doku 06 §6/§7, Lastenheft LH-SHO-01/02, Roadmap Phase 3). MVP: genau eine Standardliste
-/// je Haushalt, angelegt beim ersten Eintrag. Eintraege sind entweder an ein Produkt gebunden oder frei
-/// getippt; automatische Vorschlaege (`isSuggestion = true`) warten auf Bestaetigung, bevor sie wie ein
-/// normaler Eintrag zaehlen.
+/// Einkaufsliste (Doku 06 §6/§7, Lastenheft LH-SHO-01/02, Roadmap Phase 3). Jeder Haushalt hat eine Standardliste, angelegt beim ersten
+/// Eintrag, und seit 1.14 auf Wunsch weitere (z.B. Drogerie, Baumarkt). Vorschlaege und Erinnerungen landen immer auf der
+/// Standardliste. Eintraege sind entweder an ein Produkt gebunden oder frei getippt; automatische Vorschlaege (`isSuggestion = true`)
+/// warten auf Bestaetigung, bevor sie wie ein normaler Eintrag zaehlen.
 class ShoppingListRepository {
   ShoppingListRepository(this._db, {required this.householdId, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
@@ -25,6 +25,79 @@ class ShoppingListRepository {
 
   Future<String> _defaultListId() => _listIdFuture ??= _loadOrCreateDefaultList();
 
+  /// Die Standardliste (wird beim ersten Aufruf angelegt).
+  Future<String> defaultListId() => _defaultListId();
+
+  /// Alle nicht geloeschten Listen, die Standardliste zuerst, dann alphabetisch.
+  Stream<List<ShoppingList>> watchLists() => (_db.select(_db.shoppingLists)..where((l) => l.deletedAt.isNull())).watch().map((rows) {
+        final sorted = [...rows]..sort((a, b) {
+            if (a.isDefault != b.isDefault) return a.isDefault ? -1 : 1;
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          });
+        return sorted;
+      });
+
+  /// Legt eine weitere Liste an. Der Name darf nicht leer sein und nicht schon vergeben (ohne Gross-/Kleinschreibung): [ArgumentError].
+  Future<ShoppingList> createList(String name) async {
+    final label = _checkedName(name, await _lists());
+    final hid = await householdId();
+    await _defaultListId(); // die Standardliste gibt es immer vor weiteren
+    final list = ShoppingList(id: _uuid.v4(), householdId: hid, name: label, isDefault: false, updatedAt: DateTime.now().toUtc());
+    await _putList(list);
+    onChanged?.call();
+    return list;
+  }
+
+  /// Benennt eine Liste um (auch die Standardliste). Gleiche Regeln wie bei [createList]; der eigene Name zaehlt nicht als vergeben.
+  Future<void> renameList(String id, String name) async {
+    final all = await _lists();
+    final list = all.where((l) => l.id == id).firstOrNull;
+    if (list == null) return;
+    final label = _checkedName(name, [for (final l in all) if (l.id != id) l]);
+    if (label == list.name) return;
+    await _putList(list.copyWith(name: label, updatedAt: DateTime.now().toUtc()));
+    onChanged?.call();
+  }
+
+  /// Loescht eine weitere Liste (nicht die Standardliste). Ihre Eintraege gehen **nicht verloren**: sie wandern auf die Standardliste.
+  Future<void> deleteList(String id) async {
+    final all = await _lists();
+    final list = all.where((l) => l.id == id).firstOrNull;
+    if (list == null || list.isDefault) return;
+    final defaultId = await _defaultListId();
+    final now = DateTime.now().toUtc();
+    final items = await (_db.select(_db.shoppingListItems)..where((i) => i.listId.equals(id) & i.deletedAt.isNull())).get();
+    await _db.transaction(() async {
+      for (final i in items) {
+        await _putItem(i.copyWith(listId: defaultId, updatedAt: now));
+      }
+      await _putList(list.copyWith(deletedAt: Value(now), updatedAt: now));
+    });
+    onChanged?.call();
+  }
+
+  /// Verschiebt einen Eintrag auf eine andere Liste (die Ziel-Liste muss es geben).
+  Future<void> moveItem(String itemId, String listId) async {
+    final target = (await _lists()).where((l) => l.id == listId).firstOrNull;
+    if (target == null) throw ArgumentError('Die Liste gibt es nicht');
+    final item = await _get(itemId);
+    if (item.listId == listId) return;
+    await _putItem(item.copyWith(listId: listId, updatedAt: DateTime.now().toUtc()));
+    onChanged?.call();
+  }
+
+  Future<List<ShoppingList>> _lists() => (_db.select(_db.shoppingLists)..where((l) => l.deletedAt.isNull())).get();
+
+  static String _checkedName(String name, List<ShoppingList> others) {
+    final label = name.trim();
+    if (label.isEmpty) throw ArgumentError('Eine Liste braucht einen Namen');
+    if (label.length > 40) throw ArgumentError('Der Name ist zu lang');
+    if (others.any((l) => l.name.trim().toLowerCase() == label.toLowerCase())) throw ArgumentError('Eine Liste mit diesem Namen gibt es schon');
+    return label;
+  }
+
+  Future<void> _putList(ShoppingList list) => _put('shopping_lists', list.id, shoppingListToRemote(list), () => _db.into(_db.shoppingLists).insertOnConflictUpdate(list.toCompanion(false)));
+
   Future<String> _loadOrCreateDefaultList() async {
     final hid = await householdId();
     final existing = await (_db.select(_db.shoppingLists)
@@ -37,14 +110,16 @@ class ShoppingListRepository {
   }
 
   /// Legt einen Eintrag manuell an (LH-SHO-01): entweder an ein Produkt gebunden oder frei getippt.
-  Future<ShoppingListItem> addManual({String? productId, String? freeText, double quantity = 1, String unit = 'piece'}) async {
+  Future<ShoppingListItem> addManual({String? productId, String? freeText, double quantity = 1, String unit = 'piece', String? listId}) async {
     assert(productId != null || freeText != null, 'Entweder productId oder freeText angeben');
     final hid = await householdId();
-    final listId = await _defaultListId();
+    // eine unbekannte oder geloeschte Liste faellt auf die Standardliste zurueck, statt den Eintrag zu verlieren
+    final known = listId == null ? null : (await _lists()).where((l) => l.id == listId).firstOrNull;
+    final targetId = known?.id ?? await _defaultListId();
     final item = ShoppingListItem(
       id: _uuid.v4(),
       householdId: hid,
-      listId: listId,
+      listId: targetId,
       productId: productId,
       freeText: freeText,
       quantity: quantity,
