@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/micros.dart';
@@ -17,6 +18,13 @@ import 'support/fakes.dart';
 final _now = DateTime.utc(2026, 10, 3, 10);
 
 BlsFood _bls(String code, Micros micros) => BlsFood(code: code, nameDe: 'Eintrag $code', per100: const NutrientsPer100(kcal: 50), micros: micros);
+
+/// Die Seite haengt an echten Drift-Stroemen (gemeinsame Einstellungen): am Testende wird sie ausgehaengt, damit keine Timer offen bleiben.
+void pageTest(String name, Future<void> Function(WidgetTester tester) body) => testWidgets(name, (tester) async {
+      await body(tester);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 1));
+    });
 
 void main() {
   late AppDatabase db;
@@ -56,6 +64,8 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         databaseProvider.overrideWithValue(db),
+        householdPrefsRepositoryProvider.overrideWithValue(HouseholdPrefsRepository(db, householdId: () async => 'h1')),
+        supplementIntakesStreamProvider.overrideWith((ref) => Stream.value(const <SupplementIntake>[])),
         mealRepositoryProvider.overrideWithValue(meals),
         blsFoodSearchProvider.overrideWithValue(search),
         mealsStreamProvider.overrideWith((ref) => Stream.value(allMeals)),
@@ -73,20 +83,20 @@ void main() {
   }
 
   group('Karte auf der Seite', () {
-    testWidgets('sie erscheint mit der Zahl der Zutaten, die nachgerechnet werden koennen', (tester) async {
+    pageTest('sie erscheint mit der Zahl der Zutaten, die nachgerechnet werden koennen', (tester) async {
       await meal([food('Banane', 200, blsCode: 'F1'), food('Apfel', 100, blsCode: 'F1'), food('Eigenes', 50)]);
       await open(tester);
       expect(find.byKey(const Key('nutrients-backfill')), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('nutrients-backfill-text'))).data, startsWith('2 Zutaten aus früheren Mahlzeiten haben'));
     });
 
-    testWidgets('ohne Kandidaten keine Karte: Handwerte und Zutaten mit Snapshot zaehlen nicht', (tester) async {
+    pageTest('ohne Kandidaten keine Karte: Handwerte und Zutaten mit Snapshot zaehlen nicht', (tester) async {
       await meal([food('Eigenes', 50), food('Schon da', 100, blsCode: 'F1', micros: const {'vit_c_mg': 50.0})]);
       await open(tester);
       expect(find.byKey(const Key('nutrients-backfill')), findsNothing);
     });
 
-    testWidgets('Antippen rechnet die Menge ein, ergaenzt nur und meldet das Ergebnis', (tester) async {
+    pageTest('Antippen rechnet die Menge ein, ergaenzt nur und meldet das Ergebnis', (tester) async {
       await meal([food('Banane', 200, blsCode: 'F1'), food('Schon da', 100, blsCode: 'F1', micros: const {'vit_c_mg': 1.0})]);
       await open(tester);
       await run(tester);
@@ -101,7 +111,7 @@ void main() {
       expect(find.text('1 Zutat ergänzt.'), findsOneWidget);
     });
 
-    testWidgets('Zutaten ohne Werte in der Quelle werden genannt', (tester) async {
+    pageTest('Zutaten ohne Werte in der Quelle werden genannt', (tester) async {
       search = FakeBlsFoodSearch(foods: [_bls('F1', const {'vit_c_mg': 50.0}), BlsFood(code: 'F2', nameDe: 'ohne', per100: const NutrientsPer100(kcal: 10))]);
       await meal([food('Banane', 200, blsCode: 'F1'), food('Leer', 100, blsCode: 'F2')]);
       await open(tester);
@@ -110,7 +120,7 @@ void main() {
       expect((await ingredientNamed('Leer')).micros, isNull);
     });
 
-    testWidgets('ohne Netz bleibt alles wie es ist und die Meldung sagt es', (tester) async {
+    pageTest('ohne Netz bleibt alles wie es ist und die Meldung sagt es', (tester) async {
       search.fail = true;
       await meal([food('Banane', 200, blsCode: 'F1')]);
       await open(tester);
@@ -120,7 +130,7 @@ void main() {
       expect(tester.widget<TextButton>(find.byKey(const Key('nutrients-backfill-run'))).onPressed, isNotNull, reason: 'erneut versuchbar');
     });
 
-    testWidgets('ein Produkt mit Mikronaehrstoffen braucht keine Anfrage an den Server', (tester) async {
+    pageTest('ein Produkt mit Mikronaehrstoffen braucht keine Anfrage an den Server', (tester) async {
       final p = await productRepo(db).create(
         name: 'Orange',
         baseUnit: 'g',

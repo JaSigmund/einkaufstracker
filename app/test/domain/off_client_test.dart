@@ -30,6 +30,22 @@ void main() {
       expect(p.nutrientsPer100, {'kcal': 64.0, 'protein_g': 3.3, 'fat_g': 3.5, 'carbs_g': 4.8});
     });
 
+    test('Mikronaehrstoffe kommen in den Schluesseln des Registers mit, umgerechnet aus Gramm', () async {
+      final client = HttpOffClient(client: _mock(200, {
+        'status': 1,
+        'product': {
+          'product_name': 'Mineralwasser',
+          'nutriments': {'energy-kcal_100g': 0, 'calcium_100g': 0.0112, 'magnesium_100g': 0.0027, 'vitamin-c_100g': 'kaputt', 'iron_100g': -1},
+        },
+      }));
+      final p = await client.lookup('123');
+      expect(p!.nutrientsPer100!['kcal'], 0);
+      expect(p.nutrientsPer100!['calcium_mg'], closeTo(11.2, 1e-9));
+      expect(p.nutrientsPer100!['magnesium_mg'], closeTo(2.7, 1e-9));
+      expect(p.nutrientsPer100!.containsKey('vit_c_mg'), isFalse);
+      expect(p.nutrientsPer100!.containsKey('iron_mg'), isFalse);
+    });
+
     test('status 0 (nicht gefunden): null', () async {
       final client = HttpOffClient(client: _mock(200, {'status': 0}));
       expect(await client.lookup('0000000000000'), isNull);

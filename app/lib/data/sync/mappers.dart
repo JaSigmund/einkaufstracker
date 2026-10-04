@@ -554,3 +554,64 @@ NutritionTargetRowsCompanion nutritionTargetFromRemote(Map<String, dynamic> j) =
       targets: Value(jsonEncode(j['targets'] ?? const <String, dynamic>{})),
       updatedAt: Value(_dt(j['updated_at'])!),
     );
+
+Map<String, dynamic> supplementToRemote(Supplement s) => {
+      'id': s.id,
+      'household_id': s.householdId,
+      'name': s.name,
+      'serving_label': s.servingLabel,
+      // jsonb auf dem Server, lokal als Text
+      'micros': jsonDecode(s.micros),
+      'note': s.note,
+      'updated_at': s.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': s.deletedAt?.toUtc().toIso8601String(),
+    };
+
+SupplementsCompanion supplementFromRemote(Map<String, dynamic> j) => SupplementsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      name: Value(j['name'] as String),
+      servingLabel: Value(j['serving_label'] as String? ?? 'Tablette'),
+      micros: Value(jsonEncode(j['micros'] ?? const <String, dynamic>{})),
+      note: Value(j['note'] as String?),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> supplementIntakeToRemote(SupplementIntake i) => {
+      'id': i.id,
+      'household_id': i.householdId,
+      'supplement_id': i.supplementId,
+      'name': i.name,
+      'taken_at': i.takenAt.toUtc().toIso8601String(),
+      'servings': i.servings,
+      'micros': jsonDecode(i.micros),
+      'updated_at': i.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
+    };
+
+SupplementIntakesCompanion supplementIntakeFromRemote(Map<String, dynamic> j) => SupplementIntakesCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      supplementId: Value(j['supplement_id'] as String?),
+      name: Value(j['name'] as String),
+      takenAt: Value(_dt(j['taken_at'])!),
+      servings: Value((j['servings'] as num).toDouble()),
+      micros: Value(jsonEncode(j['micros'] ?? const <String, dynamic>{})),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
+Map<String, dynamic> householdPrefToRemote(HouseholdPref p) => {
+      'household_id': p.householdId,
+      'key': p.key,
+      'value': jsonDecode(p.value),
+      'updated_at': p.updatedAt.toUtc().toIso8601String(),
+    };
+
+HouseholdPrefsCompanion householdPrefFromRemote(Map<String, dynamic> j) => HouseholdPrefsCompanion(
+      householdId: Value(j['household_id'] as String),
+      key: Value(j['key'] as String),
+      value: Value(jsonEncode(j['value'])),
+      updatedAt: Value(_dt(j['updated_at'])!),
+    );

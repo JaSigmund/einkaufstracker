@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../data/nutrition/bls_food_search.dart';
+import '../../data/repositories/household_prefs_repository.dart' show microReferenceOnPref, microReferenceOverridesPref;
 import '../../data/repositories/meal_repository.dart' show ingredientGrams;
 import '../../domain/nutrition/micro_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
@@ -14,13 +16,14 @@ import '../../domain/nutrition/micros_backfill.dart';
 import '../../domain/nutrition/nutrient_registry.dart';
 import '../../domain/receipt/vienna_time.dart';
 
-/// KV-Schluessel: Referenzmengen anzeigen (`true`/`false`, Standard aus) und eigene Referenzwerte je Naehrstoff (JSON-Objekt).
+/// Frueherer lokaler KV-Speicher der Referenzmengen (bis 1.12). Seit 1.13 liegen sie als gemeinsame Einstellungen des Haushalts
+/// (`household_prefs`, ADR-035); die alten Werte werden beim ersten Oeffnen dorthin uebernommen.
 const microReferenceOnKey = 'micro_reference_on';
 const microReferenceOverridesKey = 'micro_reference_overrides';
 
 /// Hinweis zu den Tabellenwerten, im Info-Dialog der Seite und unter jeder Aufschluesselung ehrlich genannt (ADR-032).
 const nutrientsLimitsText = 'Die Werte stammen aus dem Bundeslebensmittelschlüssel: Durchschnittswerte, zu rund drei Vierteln berechnet. '
-    'Garverluste (besonders bei Vitamin C, B-Vitaminen und Folat) sind nicht berücksichtigt, Nahrungsergänzung ist nicht erfasst. '
+    'Garverluste (besonders bei Vitamin C, B-Vitaminen und Folat) sind nicht berücksichtigt. Nahrungsergänzung zählt nur, was du unter „Nahrungsergänzung“ einträgst, und steht getrennt. '
     'Selen und Koffein fehlen in der Quelle. Die Zahlen sind kein Maßstab für deinen eigenen Bedarf.';
 
 /// Hinweis zu den Referenzmengen: Kennzeichnungswerte, keine Empfehlung.
@@ -43,9 +46,24 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   late DateTime _day;
   var _week = false;
   var _showAll = false;
-  var _referenceOn = false;
   var _backfilling = false;
-  Map<String, double> _overrides = {};
+
+  /// Gemeinsame Einstellungen des Haushalts, in [build] aus dem Stream gelesen (die Handler lesen nur dieses Feld).
+  Map<String, Object?> _prefs = const {};
+
+  bool get _referenceOn => _prefs[microReferenceOnPref] == true;
+
+  Map<String, double> get _overrides {
+    final raw = _prefs[microReferenceOverridesPref];
+    final map = <String, double>{};
+    if (raw is Map) {
+      for (final e in raw.entries) {
+        final v = e.value;
+        if (e.key is String && v is num && v > 0 && nutrientDef(e.key as String) != null) map[e.key as String] = v.toDouble();
+      }
+    }
+    return map;
+  }
 
   DateTime get _today {
     final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
@@ -59,23 +77,20 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
     _loadSettings();
   }
 
+  /// Uebernimmt die lokal gespeicherten Referenzmengen aus Version 1.12 und frueher einmalig in die gemeinsamen Einstellungen, sofern
+  /// dort noch nichts steht. Scheitert still (ohne Haushalt oder Ablage zeigt die Seite einfach keine Referenzen).
   Future<void> _loadSettings() async {
     try {
+      final repo = ref.read(householdPrefsRepositoryProvider);
+      final prefs = await repo.load();
       final db = ref.read(databaseProvider);
-      final on = await db.getKv(microReferenceOnKey) == 'true';
-      final raw = await db.getKv(microReferenceOverridesKey);
-      final map = <String, double>{};
-      if (raw != null) {
-        for (final e in (jsonDecode(raw) as Map).entries) {
-          final v = e.value;
-          if (e.key is String && v is num && v > 0 && nutrientDef(e.key as String) != null) map[e.key as String] = v.toDouble();
-        }
+      if (!prefs.containsKey(microReferenceOnPref) && await db.getKv(microReferenceOnKey) == 'true') {
+        await repo.set(microReferenceOnPref, true);
       }
-      if (mounted) {
-        setState(() {
-          _referenceOn = on;
-          _overrides = map;
-        });
+      final raw = await db.getKv(microReferenceOverridesKey);
+      if (!prefs.containsKey(microReferenceOverridesPref) && raw != null) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map && decoded.isNotEmpty) await repo.set(microReferenceOverridesPref, decoded);
       }
     } catch (_) {
       // ohne lesbare Ablage zeigt die Seite einfach keine Referenzen
@@ -83,24 +98,22 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   }
 
   Future<void> _setReference(bool on) async {
-    setState(() => _referenceOn = on);
     try {
-      await ref.read(databaseProvider).setKv(microReferenceOnKey, on.toString());
+      await ref.read(householdPrefsRepositoryProvider).set(microReferenceOnPref, on);
     } catch (_) {
       // nur eine Komfortfunktion
     }
   }
 
   Future<void> _setOverride(String key, double? value) async {
-    setState(() {
-      if (value == null) {
-        _overrides = {..._overrides}..remove(key);
-      } else {
-        _overrides = {..._overrides, key: value};
-      }
-    });
+    final next = {..._overrides};
+    if (value == null) {
+      next.remove(key);
+    } else {
+      next[key] = value;
+    }
     try {
-      await ref.read(databaseProvider).setKv(microReferenceOverridesKey, jsonEncode(_overrides));
+      await ref.read(householdPrefsRepositoryProvider).set(microReferenceOverridesPref, next);
     } catch (_) {
       // nur eine Komfortfunktion
     }
@@ -193,6 +206,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
     final t = Theme.of(context);
     final meals = ref.watch(mealsStreamProvider);
     final ingredients = ref.watch(mealIngredientsStreamProvider);
+    _prefs = ref.watch(householdPrefsProvider).value ?? const {};
     final Widget body;
     if (meals.isLoading || ingredients.isLoading) {
       body = const Center(child: CircularProgressIndicator());
@@ -205,6 +219,12 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
       appBar: AppBar(
         title: const Text('Nährstoffe'),
         actions: [
+          IconButton(
+            key: const Key('nutrients-supplements'),
+            tooltip: 'Nahrungsergänzung',
+            icon: const Icon(Icons.medication_outlined),
+            onPressed: () => context.push('/supplements'),
+          ),
           IconButton(
             key: const Key('nutrients-info'),
             tooltip: 'Woher stammen die Werte?',
@@ -225,10 +245,15 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   }
 
   Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients) {
+    final intakes = ref.watch(supplementIntakesStreamProvider).value ?? const <SupplementIntake>[];
     final micros = buildDailyMicros(
       [for (final m in meals) (id: m.id, title: m.title, eatenAtUtc: m.eatenAt, servingsEaten: m.servingsEaten, servingsMade: m.servingsMade)],
       [for (final i in ingredients) (mealId: i.mealId, name: i.freeText ?? 'Zutat', micros: parseMicros(i.micros))],
       isEstimate: (id) => meals.where((m) => m.id == id).any((m) => m.isEstimate),
+      intakes: [
+        for (final i in intakes)
+          if (parseMicros(i.micros) case final m?) (id: i.id, name: i.name, takenAtUtc: i.takenAt, micros: m),
+      ],
     );
     final byDay = {for (final d in micros) d.day: d};
     final monday = DateTime(_day.year, _day.month, _day.day - (_day.weekday - 1));
@@ -344,6 +369,8 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
             key: Key('nutrient-coverage-${def.key}'),
             style: t.textTheme.bodySmall,
           ),
+        if (v.supplementTotal > 0)
+          Text('davon ${formatMicro(def, v.supplementTotal)} aus Nahrungsergänzung', key: Key('nutrient-supplement-${def.key}'), style: t.textTheme.bodySmall),
         if (fraction != null) ...[
           Text(referenceText(fraction), key: Key('nutrient-reference-${def.key}'), style: t.textTheme.bodySmall),
           Padding(

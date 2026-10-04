@@ -29,6 +29,7 @@ import '../data/nutrition/food_units_source.dart';
 import '../data/online_prices/online_price_remote.dart';
 import '../data/repositories/online_price_repository.dart';
 import '../data/repositories/food_link_repository.dart';
+import '../data/repositories/household_prefs_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/pdf/pdf_text_reader.dart';
 import '../data/products/off_client.dart';
@@ -41,6 +42,7 @@ import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/meal_repository.dart';
 import '../data/repositories/nutrition_targets_repository.dart';
+import '../data/repositories/supplement_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
@@ -353,6 +355,38 @@ final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>(
 });
 
 final nutritionTargetsProvider = StreamProvider((ref) => ref.watch(nutritionTargetsRepositoryProvider).watch());
+
+/// Nahrungsergaenzung des Haushalts und ihre Einnahmen (Phase N4, ADR-035).
+final supplementRepositoryProvider = Provider<SupplementRepository>((ref) {
+  return SupplementRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final supplementsStreamProvider = StreamProvider((ref) => ref.watch(supplementRepositoryProvider).watchSupplements());
+
+final supplementIntakesStreamProvider = StreamProvider((ref) => ref.watch(supplementRepositoryProvider).watchIntakes());
+
+/// Gemeinsame Einstellungen des Haushalts (heute: Referenzmengen der Seite Naehrstoffe, Phase N4, ADR-035).
+final householdPrefsRepositoryProvider = Provider<HouseholdPrefsRepository>((ref) {
+  return HouseholdPrefsRepository(
+    ref.watch(databaseProvider),
+    householdId: () async {
+      final id = await ref.read(householdIdProvider.future);
+      if (id == null) throw StateError('Kein Haushalt gefunden');
+      return id;
+    },
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final householdPrefsProvider = StreamProvider((ref) => ref.watch(householdPrefsRepositoryProvider).watch());
 
 /// Essensfotos zu Mahlzeiten: lokal ablegen, danach in den privaten Bucket `meals` hochladen.
 final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {

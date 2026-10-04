@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
+import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
@@ -137,6 +139,19 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await online.link(reis.id, onlineArticle(store: 'spar', externalId: '2020', name: 'A-zwei Vollmilch'));
   await online.unlink((await online.activeLinks()).firstWhere((l) => l.store == 'spar').id);
 
+  // Nahrungsergaenzung und gemeinsame Einstellungen (Phase N4): Ergaenzung anlegen, aendern, Einnahmen (eine zurueckgenommen), eine geloeschte
+  final supplements = SupplementRepository(db, householdId: () async => 'h1');
+  final d3 = await supplements.save(name: 'Vitamin D3', servingLabel: 'Tablette', micros: {'vit_d_ug': 20.0});
+  await supplements.save(id: d3.id, name: 'Vitamin D3', servingLabel: 'Tablette', micros: {'vit_d_ug': 25.0}, note: 'zum Frühstück');
+  final multi = await supplements.save(name: 'Multi', servingLabel: 'Kapsel', micros: {'vit_c_mg': 80.0, 'iron_mg': 14.0});
+  await supplements.take(d3, at: DateTime.utc(2026, 9, 22, 6, 30));
+  final twice = await supplements.take(multi, at: DateTime.utc(2026, 9, 22, 6, 31), servings: 2);
+  await supplements.deleteIntake(twice.id);
+  await supplements.delete((await supplements.save(name: 'Alt', servingLabel: 'Tropfen', micros: {'zinc_mg': 1.0})).id);
+  final prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
+  await prefs.set(microReferenceOnPref, true);
+  await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
+
   final outbox = await (db.select(db.outbox)..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
   return [for (final e in outbox) {'table': e.remoteTable, 'payload': jsonDecode(e.payload)}];
 }
@@ -174,7 +189,7 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
@@ -197,6 +212,14 @@ void main() {
     expect(rows('meal_ingredients').any((i) => i['micros'] is Map && (i['micros'] as Map)['iron_mg'] == 1.12), isTrue, reason: 'Mikronaehrstoffe der verzehrten Menge als Objekt');
     expect(rows('meal_ingredients').any((i) => i['micros'] == null), isTrue, reason: 'Zutaten ohne Daten schicken null');
     expect(rows('products').any((p) => (p['nutrients_per_100'] as Map?)?['calcium_mg'] == 117), isTrue, reason: 'Profil aus der BLS mit Mikronaehrstoffen');
+    expect(rows('supplements').any((s) => s['deleted_at'] != null), isTrue, reason: 'Ergaenzung geloescht (Soft-Delete)');
+    expect(rows('supplements').any((s) => s['note'] == 'zum Frühstück' && (s['micros'] as Map)['vit_d_ug'] == 25), isTrue, reason: 'geaenderte Ergaenzung, Mikros als Objekt');
+    expect(rows('supplement_intakes').any((i) => i['deleted_at'] != null), isTrue, reason: 'Einnahme zurueckgenommen');
+    expect(rows('supplement_intakes').any((i) => i['servings'] == 2 && (i['micros'] as Map)['iron_mg'] == 28), isTrue, reason: 'zwei Kapseln: absolute Mengen');
+    expect(rows('supplement_intakes').every((i) => i['name'] != null && i['taken_at'] != null), isTrue);
+    expect({for (final p in rows('household_prefs')) p['key']}, {'micro_reference_on', 'micro_reference_overrides'});
+    expect(rows('household_prefs').any((p) => p['value'] is Map && (p['value'] as Map)['vit_c_mg'] == 100), isTrue, reason: 'jsonb-Wert als Objekt');
+    expect(rows('household_prefs').any((p) => p['value'] == true), isTrue, reason: 'jsonb-Wert als Wahrheitswert');
     expect(rows('product_online_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Online-Zuordnung geloest (Soft-Delete)');
     expect({for (final l in rows('product_online_links')) l['store']}, {'billa', 'spar'});
     expect(

@@ -13694,6 +13694,1403 @@ class HouseholdFoodLinksCompanion extends UpdateCompanion<HouseholdFoodLink> {
   }
 }
 
+class $SupplementsTable extends Supplements
+    with TableInfo<$SupplementsTable, Supplement> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SupplementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _servingLabelMeta = const VerificationMeta(
+    'servingLabel',
+  );
+  @override
+  late final GeneratedColumn<String> servingLabel = GeneratedColumn<String>(
+    'serving_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Tablette'),
+  );
+  static const VerificationMeta _microsMeta = const VerificationMeta('micros');
+  @override
+  late final GeneratedColumn<String> micros = GeneratedColumn<String>(
+    'micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    name,
+    servingLabel,
+    micros,
+    note,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'supplements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Supplement> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('serving_label')) {
+      context.handle(
+        _servingLabelMeta,
+        servingLabel.isAcceptableOrUnknown(
+          data['serving_label']!,
+          _servingLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('micros')) {
+      context.handle(
+        _microsMeta,
+        micros.isAcceptableOrUnknown(data['micros']!, _microsMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Supplement map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Supplement(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      servingLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}serving_label'],
+      )!,
+      micros: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}micros'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $SupplementsTable createAlias(String alias) {
+    return $SupplementsTable(attachedDatabase, alias);
+  }
+}
+
+class Supplement extends DataClass implements Insertable<Supplement> {
+  final String id;
+  final String householdId;
+  final String name;
+  final String servingLabel;
+
+  /// Mikronaehrstoffe je Einheit als JSON-Objekt (`jsonb` auf dem Server).
+  final String micros;
+  final String? note;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const Supplement({
+    required this.id,
+    required this.householdId,
+    required this.name,
+    required this.servingLabel,
+    required this.micros,
+    this.note,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    map['name'] = Variable<String>(name);
+    map['serving_label'] = Variable<String>(servingLabel);
+    map['micros'] = Variable<String>(micros);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  SupplementsCompanion toCompanion(bool nullToAbsent) {
+    return SupplementsCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      name: Value(name),
+      servingLabel: Value(servingLabel),
+      micros: Value(micros),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory Supplement.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Supplement(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      name: serializer.fromJson<String>(json['name']),
+      servingLabel: serializer.fromJson<String>(json['servingLabel']),
+      micros: serializer.fromJson<String>(json['micros']),
+      note: serializer.fromJson<String?>(json['note']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'name': serializer.toJson<String>(name),
+      'servingLabel': serializer.toJson<String>(servingLabel),
+      'micros': serializer.toJson<String>(micros),
+      'note': serializer.toJson<String?>(note),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  Supplement copyWith({
+    String? id,
+    String? householdId,
+    String? name,
+    String? servingLabel,
+    String? micros,
+    Value<String?> note = const Value.absent(),
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => Supplement(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    name: name ?? this.name,
+    servingLabel: servingLabel ?? this.servingLabel,
+    micros: micros ?? this.micros,
+    note: note.present ? note.value : this.note,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  Supplement copyWithCompanion(SupplementsCompanion data) {
+    return Supplement(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      name: data.name.present ? data.name.value : this.name,
+      servingLabel: data.servingLabel.present
+          ? data.servingLabel.value
+          : this.servingLabel,
+      micros: data.micros.present ? data.micros.value : this.micros,
+      note: data.note.present ? data.note.value : this.note,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Supplement(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('name: $name, ')
+          ..write('servingLabel: $servingLabel, ')
+          ..write('micros: $micros, ')
+          ..write('note: $note, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    name,
+    servingLabel,
+    micros,
+    note,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Supplement &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.name == this.name &&
+          other.servingLabel == this.servingLabel &&
+          other.micros == this.micros &&
+          other.note == this.note &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class SupplementsCompanion extends UpdateCompanion<Supplement> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String> name;
+  final Value<String> servingLabel;
+  final Value<String> micros;
+  final Value<String?> note;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const SupplementsCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.servingLabel = const Value.absent(),
+    this.micros = const Value.absent(),
+    this.note = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SupplementsCompanion.insert({
+    required String id,
+    required String householdId,
+    required String name,
+    this.servingLabel = const Value.absent(),
+    this.micros = const Value.absent(),
+    this.note = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       name = Value(name),
+       updatedAt = Value(updatedAt);
+  static Insertable<Supplement> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? name,
+    Expression<String>? servingLabel,
+    Expression<String>? micros,
+    Expression<String>? note,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (name != null) 'name': name,
+      if (servingLabel != null) 'serving_label': servingLabel,
+      if (micros != null) 'micros': micros,
+      if (note != null) 'note': note,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SupplementsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String>? name,
+    Value<String>? servingLabel,
+    Value<String>? micros,
+    Value<String?>? note,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return SupplementsCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      name: name ?? this.name,
+      servingLabel: servingLabel ?? this.servingLabel,
+      micros: micros ?? this.micros,
+      note: note ?? this.note,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (servingLabel.present) {
+      map['serving_label'] = Variable<String>(servingLabel.value);
+    }
+    if (micros.present) {
+      map['micros'] = Variable<String>(micros.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SupplementsCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('name: $name, ')
+          ..write('servingLabel: $servingLabel, ')
+          ..write('micros: $micros, ')
+          ..write('note: $note, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SupplementIntakesTable extends SupplementIntakes
+    with TableInfo<$SupplementIntakesTable, SupplementIntake> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SupplementIntakesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _supplementIdMeta = const VerificationMeta(
+    'supplementId',
+  );
+  @override
+  late final GeneratedColumn<String> supplementId = GeneratedColumn<String>(
+    'supplement_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _takenAtMeta = const VerificationMeta(
+    'takenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> takenAt = GeneratedColumn<DateTime>(
+    'taken_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _servingsMeta = const VerificationMeta(
+    'servings',
+  );
+  @override
+  late final GeneratedColumn<double> servings = GeneratedColumn<double>(
+    'servings',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1.0),
+  );
+  static const VerificationMeta _microsMeta = const VerificationMeta('micros');
+  @override
+  late final GeneratedColumn<String> micros = GeneratedColumn<String>(
+    'micros',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    householdId,
+    supplementId,
+    name,
+    takenAt,
+    servings,
+    micros,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'supplement_intakes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SupplementIntake> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('supplement_id')) {
+      context.handle(
+        _supplementIdMeta,
+        supplementId.isAcceptableOrUnknown(
+          data['supplement_id']!,
+          _supplementIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('taken_at')) {
+      context.handle(
+        _takenAtMeta,
+        takenAt.isAcceptableOrUnknown(data['taken_at']!, _takenAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_takenAtMeta);
+    }
+    if (data.containsKey('servings')) {
+      context.handle(
+        _servingsMeta,
+        servings.isAcceptableOrUnknown(data['servings']!, _servingsMeta),
+      );
+    }
+    if (data.containsKey('micros')) {
+      context.handle(
+        _microsMeta,
+        micros.isAcceptableOrUnknown(data['micros']!, _microsMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SupplementIntake map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SupplementIntake(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      supplementId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplement_id'],
+      ),
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      takenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}taken_at'],
+      )!,
+      servings: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}servings'],
+      )!,
+      micros: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}micros'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $SupplementIntakesTable createAlias(String alias) {
+    return $SupplementIntakesTable(attachedDatabase, alias);
+  }
+}
+
+class SupplementIntake extends DataClass
+    implements Insertable<SupplementIntake> {
+  final String id;
+  final String householdId;
+  final String? supplementId;
+  final String name;
+  final DateTime takenAt;
+  final double servings;
+  final String micros;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const SupplementIntake({
+    required this.id,
+    required this.householdId,
+    this.supplementId,
+    required this.name,
+    required this.takenAt,
+    required this.servings,
+    required this.micros,
+    required this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['household_id'] = Variable<String>(householdId);
+    if (!nullToAbsent || supplementId != null) {
+      map['supplement_id'] = Variable<String>(supplementId);
+    }
+    map['name'] = Variable<String>(name);
+    map['taken_at'] = Variable<DateTime>(takenAt);
+    map['servings'] = Variable<double>(servings);
+    map['micros'] = Variable<String>(micros);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  SupplementIntakesCompanion toCompanion(bool nullToAbsent) {
+    return SupplementIntakesCompanion(
+      id: Value(id),
+      householdId: Value(householdId),
+      supplementId: supplementId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplementId),
+      name: Value(name),
+      takenAt: Value(takenAt),
+      servings: Value(servings),
+      micros: Value(micros),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory SupplementIntake.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SupplementIntake(
+      id: serializer.fromJson<String>(json['id']),
+      householdId: serializer.fromJson<String>(json['householdId']),
+      supplementId: serializer.fromJson<String?>(json['supplementId']),
+      name: serializer.fromJson<String>(json['name']),
+      takenAt: serializer.fromJson<DateTime>(json['takenAt']),
+      servings: serializer.fromJson<double>(json['servings']),
+      micros: serializer.fromJson<String>(json['micros']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'householdId': serializer.toJson<String>(householdId),
+      'supplementId': serializer.toJson<String?>(supplementId),
+      'name': serializer.toJson<String>(name),
+      'takenAt': serializer.toJson<DateTime>(takenAt),
+      'servings': serializer.toJson<double>(servings),
+      'micros': serializer.toJson<String>(micros),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  SupplementIntake copyWith({
+    String? id,
+    String? householdId,
+    Value<String?> supplementId = const Value.absent(),
+    String? name,
+    DateTime? takenAt,
+    double? servings,
+    String? micros,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => SupplementIntake(
+    id: id ?? this.id,
+    householdId: householdId ?? this.householdId,
+    supplementId: supplementId.present ? supplementId.value : this.supplementId,
+    name: name ?? this.name,
+    takenAt: takenAt ?? this.takenAt,
+    servings: servings ?? this.servings,
+    micros: micros ?? this.micros,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  SupplementIntake copyWithCompanion(SupplementIntakesCompanion data) {
+    return SupplementIntake(
+      id: data.id.present ? data.id.value : this.id,
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      supplementId: data.supplementId.present
+          ? data.supplementId.value
+          : this.supplementId,
+      name: data.name.present ? data.name.value : this.name,
+      takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      servings: data.servings.present ? data.servings.value : this.servings,
+      micros: data.micros.present ? data.micros.value : this.micros,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SupplementIntake(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('supplementId: $supplementId, ')
+          ..write('name: $name, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('servings: $servings, ')
+          ..write('micros: $micros, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    householdId,
+    supplementId,
+    name,
+    takenAt,
+    servings,
+    micros,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SupplementIntake &&
+          other.id == this.id &&
+          other.householdId == this.householdId &&
+          other.supplementId == this.supplementId &&
+          other.name == this.name &&
+          other.takenAt == this.takenAt &&
+          other.servings == this.servings &&
+          other.micros == this.micros &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class SupplementIntakesCompanion extends UpdateCompanion<SupplementIntake> {
+  final Value<String> id;
+  final Value<String> householdId;
+  final Value<String?> supplementId;
+  final Value<String> name;
+  final Value<DateTime> takenAt;
+  final Value<double> servings;
+  final Value<String> micros;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const SupplementIntakesCompanion({
+    this.id = const Value.absent(),
+    this.householdId = const Value.absent(),
+    this.supplementId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.takenAt = const Value.absent(),
+    this.servings = const Value.absent(),
+    this.micros = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SupplementIntakesCompanion.insert({
+    required String id,
+    required String householdId,
+    this.supplementId = const Value.absent(),
+    required String name,
+    required DateTime takenAt,
+    this.servings = const Value.absent(),
+    this.micros = const Value.absent(),
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       householdId = Value(householdId),
+       name = Value(name),
+       takenAt = Value(takenAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<SupplementIntake> custom({
+    Expression<String>? id,
+    Expression<String>? householdId,
+    Expression<String>? supplementId,
+    Expression<String>? name,
+    Expression<DateTime>? takenAt,
+    Expression<double>? servings,
+    Expression<String>? micros,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (householdId != null) 'household_id': householdId,
+      if (supplementId != null) 'supplement_id': supplementId,
+      if (name != null) 'name': name,
+      if (takenAt != null) 'taken_at': takenAt,
+      if (servings != null) 'servings': servings,
+      if (micros != null) 'micros': micros,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SupplementIntakesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? householdId,
+    Value<String?>? supplementId,
+    Value<String>? name,
+    Value<DateTime>? takenAt,
+    Value<double>? servings,
+    Value<String>? micros,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return SupplementIntakesCompanion(
+      id: id ?? this.id,
+      householdId: householdId ?? this.householdId,
+      supplementId: supplementId ?? this.supplementId,
+      name: name ?? this.name,
+      takenAt: takenAt ?? this.takenAt,
+      servings: servings ?? this.servings,
+      micros: micros ?? this.micros,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (supplementId.present) {
+      map['supplement_id'] = Variable<String>(supplementId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (takenAt.present) {
+      map['taken_at'] = Variable<DateTime>(takenAt.value);
+    }
+    if (servings.present) {
+      map['servings'] = Variable<double>(servings.value);
+    }
+    if (micros.present) {
+      map['micros'] = Variable<String>(micros.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SupplementIntakesCompanion(')
+          ..write('id: $id, ')
+          ..write('householdId: $householdId, ')
+          ..write('supplementId: $supplementId, ')
+          ..write('name: $name, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('servings: $servings, ')
+          ..write('micros: $micros, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $HouseholdPrefsTable extends HouseholdPrefs
+    with TableInfo<$HouseholdPrefsTable, HouseholdPref> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HouseholdPrefsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _householdIdMeta = const VerificationMeta(
+    'householdId',
+  );
+  @override
+  late final GeneratedColumn<String> householdId = GeneratedColumn<String>(
+    'household_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [householdId, key, value, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'household_prefs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HouseholdPref> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('household_id')) {
+      context.handle(
+        _householdIdMeta,
+        householdId.isAcceptableOrUnknown(
+          data['household_id']!,
+          _householdIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_householdIdMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {householdId, key};
+  @override
+  HouseholdPref map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HouseholdPref(
+      householdId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}household_id'],
+      )!,
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $HouseholdPrefsTable createAlias(String alias) {
+    return $HouseholdPrefsTable(attachedDatabase, alias);
+  }
+}
+
+class HouseholdPref extends DataClass implements Insertable<HouseholdPref> {
+  final String householdId;
+  final String key;
+
+  /// JSON-Wert (`jsonb` auf dem Server).
+  final String value;
+  final DateTime updatedAt;
+  const HouseholdPref({
+    required this.householdId,
+    required this.key,
+    required this.value,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['household_id'] = Variable<String>(householdId);
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  HouseholdPrefsCompanion toCompanion(bool nullToAbsent) {
+    return HouseholdPrefsCompanion(
+      householdId: Value(householdId),
+      key: Value(key),
+      value: Value(value),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory HouseholdPref.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HouseholdPref(
+      householdId: serializer.fromJson<String>(json['householdId']),
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'householdId': serializer.toJson<String>(householdId),
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  HouseholdPref copyWith({
+    String? householdId,
+    String? key,
+    String? value,
+    DateTime? updatedAt,
+  }) => HouseholdPref(
+    householdId: householdId ?? this.householdId,
+    key: key ?? this.key,
+    value: value ?? this.value,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  HouseholdPref copyWithCompanion(HouseholdPrefsCompanion data) {
+    return HouseholdPref(
+      householdId: data.householdId.present
+          ? data.householdId.value
+          : this.householdId,
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HouseholdPref(')
+          ..write('householdId: $householdId, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(householdId, key, value, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HouseholdPref &&
+          other.householdId == this.householdId &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.updatedAt == this.updatedAt);
+}
+
+class HouseholdPrefsCompanion extends UpdateCompanion<HouseholdPref> {
+  final Value<String> householdId;
+  final Value<String> key;
+  final Value<String> value;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const HouseholdPrefsCompanion({
+    this.householdId = const Value.absent(),
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HouseholdPrefsCompanion.insert({
+    required String householdId,
+    required String key,
+    required String value,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : householdId = Value(householdId),
+       key = Value(key),
+       value = Value(value),
+       updatedAt = Value(updatedAt);
+  static Insertable<HouseholdPref> custom({
+    Expression<String>? householdId,
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (householdId != null) 'household_id': householdId,
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HouseholdPrefsCompanion copyWith({
+    Value<String>? householdId,
+    Value<String>? key,
+    Value<String>? value,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return HouseholdPrefsCompanion(
+      householdId: householdId ?? this.householdId,
+      key: key ?? this.key,
+      value: value ?? this.value,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (householdId.present) {
+      map['household_id'] = Variable<String>(householdId.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HouseholdPrefsCompanion(')
+          ..write('householdId: $householdId, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxEntry> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -14628,6 +16025,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $HouseholdFoodLinksTable householdFoodLinks =
       $HouseholdFoodLinksTable(this);
+  late final $SupplementsTable supplements = $SupplementsTable(this);
+  late final $SupplementIntakesTable supplementIntakes =
+      $SupplementIntakesTable(this);
+  late final $HouseholdPrefsTable householdPrefs = $HouseholdPrefsTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
@@ -14656,6 +16057,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     productOnlineLinks,
     onlinePriceCache,
     householdFoodLinks,
+    supplements,
+    supplementIntakes,
+    householdPrefs,
     outbox,
     syncStates,
     keyValues,
@@ -21399,6 +22803,772 @@ typedef $$HouseholdFoodLinksTableProcessedTableManager =
       HouseholdFoodLink,
       PrefetchHooks Function()
     >;
+typedef $$SupplementsTableCreateCompanionBuilder =
+    SupplementsCompanion Function({
+      required String id,
+      required String householdId,
+      required String name,
+      Value<String> servingLabel,
+      Value<String> micros,
+      Value<String?> note,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$SupplementsTableUpdateCompanionBuilder =
+    SupplementsCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String> name,
+      Value<String> servingLabel,
+      Value<String> micros,
+      Value<String?> note,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$SupplementsTableFilterComposer
+    extends Composer<_$AppDatabase, $SupplementsTable> {
+  $$SupplementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get servingLabel => $composableBuilder(
+    column: $table.servingLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get micros => $composableBuilder(
+    column: $table.micros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SupplementsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SupplementsTable> {
+  $$SupplementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get servingLabel => $composableBuilder(
+    column: $table.servingLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get micros => $composableBuilder(
+    column: $table.micros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SupplementsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SupplementsTable> {
+  $$SupplementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get servingLabel => $composableBuilder(
+    column: $table.servingLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get micros =>
+      $composableBuilder(column: $table.micros, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$SupplementsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SupplementsTable,
+          Supplement,
+          $$SupplementsTableFilterComposer,
+          $$SupplementsTableOrderingComposer,
+          $$SupplementsTableAnnotationComposer,
+          $$SupplementsTableCreateCompanionBuilder,
+          $$SupplementsTableUpdateCompanionBuilder,
+          (
+            Supplement,
+            BaseReferences<_$AppDatabase, $SupplementsTable, Supplement>,
+          ),
+          Supplement,
+          PrefetchHooks Function()
+        > {
+  $$SupplementsTableTableManager(_$AppDatabase db, $SupplementsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SupplementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SupplementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SupplementsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> servingLabel = const Value.absent(),
+                Value<String> micros = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SupplementsCompanion(
+                id: id,
+                householdId: householdId,
+                name: name,
+                servingLabel: servingLabel,
+                micros: micros,
+                note: note,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                required String name,
+                Value<String> servingLabel = const Value.absent(),
+                Value<String> micros = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SupplementsCompanion.insert(
+                id: id,
+                householdId: householdId,
+                name: name,
+                servingLabel: servingLabel,
+                micros: micros,
+                note: note,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SupplementsTable, Supplement>(table),
+                  BaseReferences<_$AppDatabase, $SupplementsTable, Supplement>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SupplementsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SupplementsTable,
+      Supplement,
+      $$SupplementsTableFilterComposer,
+      $$SupplementsTableOrderingComposer,
+      $$SupplementsTableAnnotationComposer,
+      $$SupplementsTableCreateCompanionBuilder,
+      $$SupplementsTableUpdateCompanionBuilder,
+      (
+        Supplement,
+        BaseReferences<_$AppDatabase, $SupplementsTable, Supplement>,
+      ),
+      Supplement,
+      PrefetchHooks Function()
+    >;
+typedef $$SupplementIntakesTableCreateCompanionBuilder =
+    SupplementIntakesCompanion Function({
+      required String id,
+      required String householdId,
+      Value<String?> supplementId,
+      required String name,
+      required DateTime takenAt,
+      Value<double> servings,
+      Value<String> micros,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$SupplementIntakesTableUpdateCompanionBuilder =
+    SupplementIntakesCompanion Function({
+      Value<String> id,
+      Value<String> householdId,
+      Value<String?> supplementId,
+      Value<String> name,
+      Value<DateTime> takenAt,
+      Value<double> servings,
+      Value<String> micros,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$SupplementIntakesTableFilterComposer
+    extends Composer<_$AppDatabase, $SupplementIntakesTable> {
+  $$SupplementIntakesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get supplementId => $composableBuilder(
+    column: $table.supplementId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get servings => $composableBuilder(
+    column: $table.servings,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get micros => $composableBuilder(
+    column: $table.micros,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SupplementIntakesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SupplementIntakesTable> {
+  $$SupplementIntakesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get supplementId => $composableBuilder(
+    column: $table.supplementId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get servings => $composableBuilder(
+    column: $table.servings,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get micros => $composableBuilder(
+    column: $table.micros,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SupplementIntakesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SupplementIntakesTable> {
+  $$SupplementIntakesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get supplementId => $composableBuilder(
+    column: $table.supplementId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get takenAt =>
+      $composableBuilder(column: $table.takenAt, builder: (column) => column);
+
+  GeneratedColumn<double> get servings =>
+      $composableBuilder(column: $table.servings, builder: (column) => column);
+
+  GeneratedColumn<String> get micros =>
+      $composableBuilder(column: $table.micros, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$SupplementIntakesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SupplementIntakesTable,
+          SupplementIntake,
+          $$SupplementIntakesTableFilterComposer,
+          $$SupplementIntakesTableOrderingComposer,
+          $$SupplementIntakesTableAnnotationComposer,
+          $$SupplementIntakesTableCreateCompanionBuilder,
+          $$SupplementIntakesTableUpdateCompanionBuilder,
+          (
+            SupplementIntake,
+            BaseReferences<
+              _$AppDatabase,
+              $SupplementIntakesTable,
+              SupplementIntake
+            >,
+          ),
+          SupplementIntake,
+          PrefetchHooks Function()
+        > {
+  $$SupplementIntakesTableTableManager(
+    _$AppDatabase db,
+    $SupplementIntakesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SupplementIntakesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SupplementIntakesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SupplementIntakesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> householdId = const Value.absent(),
+                Value<String?> supplementId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> takenAt = const Value.absent(),
+                Value<double> servings = const Value.absent(),
+                Value<String> micros = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SupplementIntakesCompanion(
+                id: id,
+                householdId: householdId,
+                supplementId: supplementId,
+                name: name,
+                takenAt: takenAt,
+                servings: servings,
+                micros: micros,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String householdId,
+                Value<String?> supplementId = const Value.absent(),
+                required String name,
+                required DateTime takenAt,
+                Value<double> servings = const Value.absent(),
+                Value<String> micros = const Value.absent(),
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SupplementIntakesCompanion.insert(
+                id: id,
+                householdId: householdId,
+                supplementId: supplementId,
+                name: name,
+                takenAt: takenAt,
+                servings: servings,
+                micros: micros,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SupplementIntakesTable, SupplementIntake>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $SupplementIntakesTable,
+                    SupplementIntake
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SupplementIntakesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SupplementIntakesTable,
+      SupplementIntake,
+      $$SupplementIntakesTableFilterComposer,
+      $$SupplementIntakesTableOrderingComposer,
+      $$SupplementIntakesTableAnnotationComposer,
+      $$SupplementIntakesTableCreateCompanionBuilder,
+      $$SupplementIntakesTableUpdateCompanionBuilder,
+      (
+        SupplementIntake,
+        BaseReferences<
+          _$AppDatabase,
+          $SupplementIntakesTable,
+          SupplementIntake
+        >,
+      ),
+      SupplementIntake,
+      PrefetchHooks Function()
+    >;
+typedef $$HouseholdPrefsTableCreateCompanionBuilder =
+    HouseholdPrefsCompanion Function({
+      required String householdId,
+      required String key,
+      required String value,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$HouseholdPrefsTableUpdateCompanionBuilder =
+    HouseholdPrefsCompanion Function({
+      Value<String> householdId,
+      Value<String> key,
+      Value<String> value,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$HouseholdPrefsTableFilterComposer
+    extends Composer<_$AppDatabase, $HouseholdPrefsTable> {
+  $$HouseholdPrefsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HouseholdPrefsTableOrderingComposer
+    extends Composer<_$AppDatabase, $HouseholdPrefsTable> {
+  $$HouseholdPrefsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HouseholdPrefsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HouseholdPrefsTable> {
+  $$HouseholdPrefsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get householdId => $composableBuilder(
+    column: $table.householdId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$HouseholdPrefsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HouseholdPrefsTable,
+          HouseholdPref,
+          $$HouseholdPrefsTableFilterComposer,
+          $$HouseholdPrefsTableOrderingComposer,
+          $$HouseholdPrefsTableAnnotationComposer,
+          $$HouseholdPrefsTableCreateCompanionBuilder,
+          $$HouseholdPrefsTableUpdateCompanionBuilder,
+          (
+            HouseholdPref,
+            BaseReferences<_$AppDatabase, $HouseholdPrefsTable, HouseholdPref>,
+          ),
+          HouseholdPref,
+          PrefetchHooks Function()
+        > {
+  $$HouseholdPrefsTableTableManager(
+    _$AppDatabase db,
+    $HouseholdPrefsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HouseholdPrefsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HouseholdPrefsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HouseholdPrefsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> householdId = const Value.absent(),
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HouseholdPrefsCompanion(
+                householdId: householdId,
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String householdId,
+                required String key,
+                required String value,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => HouseholdPrefsCompanion.insert(
+                householdId: householdId,
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$HouseholdPrefsTable, HouseholdPref>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $HouseholdPrefsTable,
+                    HouseholdPref
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HouseholdPrefsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HouseholdPrefsTable,
+      HouseholdPref,
+      $$HouseholdPrefsTableFilterComposer,
+      $$HouseholdPrefsTableOrderingComposer,
+      $$HouseholdPrefsTableAnnotationComposer,
+      $$HouseholdPrefsTableCreateCompanionBuilder,
+      $$HouseholdPrefsTableUpdateCompanionBuilder,
+      (
+        HouseholdPref,
+        BaseReferences<_$AppDatabase, $HouseholdPrefsTable, HouseholdPref>,
+      ),
+      HouseholdPref,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder = OutboxCompanion Function({
   Value<int> id,
   required String remoteTable,
@@ -21975,6 +24145,12 @@ class $AppDatabaseManager {
       $$OnlinePriceCacheTableTableManager(_db, _db.onlinePriceCache);
   $$HouseholdFoodLinksTableTableManager get householdFoodLinks =>
       $$HouseholdFoodLinksTableTableManager(_db, _db.householdFoodLinks);
+  $$SupplementsTableTableManager get supplements =>
+      $$SupplementsTableTableManager(_db, _db.supplements);
+  $$SupplementIntakesTableTableManager get supplementIntakes =>
+      $$SupplementIntakesTableTableManager(_db, _db.supplementIntakes);
+  $$HouseholdPrefsTableTableManager get householdPrefs =>
+      $$HouseholdPrefsTableTableManager(_db, _db.householdPrefs);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncStatesTableTableManager get syncStates =>

@@ -11,6 +11,8 @@ String conflictAreaLabel(String table) => switch (table) {
       'categories' || 'category_aliases' => 'Kategorien',
       'meals' || 'meal_ingredients' || 'household_food_links' => 'Tagebuch',
       'nutrition_targets' => 'Richtwerte',
+      'supplements' || 'supplement_intakes' => 'Nahrungsergänzung',
+      'household_prefs' => 'Einstellungen',
       'bug_reports' => 'Rückmeldungen',
       _ => 'Daten',
     };
