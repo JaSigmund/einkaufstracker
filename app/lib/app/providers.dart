@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/app_config/app_config_repository.dart';
 import '../domain/inventory/usage_forecast.dart';
+import '../domain/notifications/expiry_stages.dart';
 import '../data/files/meal_photo_service.dart';
 import '../data/household/household_invites.dart';
 import '../domain/sync/sync_conflicts.dart';
@@ -417,6 +418,9 @@ final householdPrefsRepositoryProvider = Provider<HouseholdPrefsRepository>((ref
 
 final householdPrefsProvider = StreamProvider((ref) => ref.watch(householdPrefsRepositoryProvider).watch());
 
+/// Die gemeinsamen Einstellungen einmal gelesen (ohne laufenden Stream), z.B. fuer Anzeigen in den Einstellungen. Mit `invalidate` neu lesen.
+final householdPrefsOnceProvider = FutureProvider.autoDispose((ref) => ref.watch(householdPrefsRepositoryProvider).load());
+
 /// Essensfotos zu Mahlzeiten: lokal ablegen, danach in den privaten Bucket `meals` hochladen.
 final mealPhotoServiceProvider = Provider<MealPhotoService>((ref) {
   return MealPhotoService(
@@ -501,11 +505,21 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
   now ??= DateTime.now();
+  // Mehrstufige Erinnerungen (Ausbau 1.14): gemeinsame Einstellungen des Haushalts; ohne sie oder bei einem Lesefehler gilt wie bisher
+  // die eine Vorlaufzeit der Einstellungen
+  Map<String, Object?> prefs = const {};
+  try {
+    prefs = await ref.read(householdPrefsRepositoryProvider).load();
+  } catch (e) {
+    debugPrint('[expiry-reminders] Stufen nicht lesbar, es gilt die einfache Vorlaufzeit: $e');
+  }
+  final globalStages = parseExpiryStages(prefs[expiryStagesPref]);
   final reminders = computeExpiryReminders(
     activeItems: items,
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
+    stagesFor: (item) => parseExpiryStages(prefs[expiryStagesPrefFor(item.productId)]) ?? globalStages,
   );
   // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): sichtbar machen, WAS
   // ueberhaupt berechnet wurde, bevor es an den Plugin-Scheduler geht -- ohne das war nicht zu

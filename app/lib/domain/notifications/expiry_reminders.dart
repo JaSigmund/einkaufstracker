@@ -1,5 +1,6 @@
 import '../../data/local/database.dart';
 import '../inventory/expiry.dart';
+import 'expiry_stages.dart';
 
 /// Eine gebuendelte Ablauf-Erinnerung fuer einen Tag (Doku 06 §5): alle Produkte, deren
 /// `expires_on - notify_lead_days` auf diesen Tag faellt, werden zu einer Benachrichtigung zusammengefasst.
@@ -38,12 +39,18 @@ class ExpiryReminderDay {
 /// aufgebraucht/weggeworfen) im Inventar steht. Jetzt wird ein verpasster Tag auf [today] nachgeholt,
 /// solange er nicht laenger als [horizonDays] zurueckliegt (sonst waere ein uralter Posten, der nie
 /// bearbeitet wurde, jeden Tag aufs Neue dabei).
+///
+/// **Mehrere Stufen** (Ausbau 1.14): [stagesFor] liefert je Posten die gewuenschten Vorlaufzeiten (z.B. 3 und 0 Tage); ohne Angabe ist
+/// [leadDays] die einzige Stufe, das Verhalten bleibt wie vorher. Eine Stufe, deren Tag schon vorbei ist, wird **nicht** nachgeholt,
+/// solange noch eine spaetere Stufe bevorsteht (die kommt ja noch). Nachgeholt wird nur, wenn der Posten gar keine bevorstehende Stufe
+/// mehr hat, und dann einmal fuer die letzte Stufe.
 List<ExpiryReminderDay> computeExpiryReminders({
   required List<InventoryItem> activeItems,
   required Map<String, String> productNameById,
   required int leadDays,
   required DateTime today,
   int horizonDays = 14,
+  List<int>? Function(InventoryItem item)? stagesFor,
 }) {
   final byDay = <DateTime, Map<String, String>>{};
   final overdueDays = <DateTime>{};
@@ -56,17 +63,24 @@ List<ExpiryReminderDay> computeExpiryReminders({
     // Codereview-Fund 2026-10-01: dieselbe Sonderregel wie die UI-Ampel (expiry.dart) -- sonst kam die
     // Benachrichtigung bei einem Verbrauchsdatum schon Tage vor der eingestellten Vorlaufzeit, obwohl die
     // App den Eintrag selbst noch gar nicht als "bald faellig" zeigte.
-    final lead = effectiveLeadDays(item.dateKind, leadDays);
-    final reminderDate = DateTime.utc(expiresOn.year, expiresOn.month, expiresOn.day).subtract(Duration(days: lead));
-    final offset = reminderDate.difference(today).inDays;
-    if (offset >= horizonDays || offset < -horizonDays) continue;
-    final effectiveDate = offset < 0 ? today : reminderDate;
-    if (offset < 0) overdueDays.add(effectiveDate);
-    byDay.putIfAbsent(effectiveDate, () => {})[item.productId] = name;
-    // Bei einer Mischung aus Verbrauchs- und Mindesthaltbarkeitsdatum am selben Tag gilt die kleinere
-    // (dringlichere) Vorlaufzeit fuer den Nachrichtentext, siehe ExpiryReminderDay.leadDays.
-    final existingLead = leadByDay[effectiveDate];
-    leadByDay[effectiveDate] = existingLead == null ? lead : (lead < existingLead ? lead : existingLead);
+    final custom = stagesFor?.call(item);
+    final leads = custom == null || custom.isEmpty ? [effectiveLeadDays(item.dateKind, leadDays)] : effectiveExpiryStages(item.dateKind, custom);
+    final expiryDay = DateTime.utc(expiresOn.year, expiresOn.month, expiresOn.day);
+    // (Erinnerungstag, Vorlaufzeit) je Stufe, spaeteste Stufe (kleinste Vorlaufzeit) zuletzt
+    final stages = [for (final lead in leads) (date: expiryDay.subtract(Duration(days: lead)), lead: lead)];
+    final upcoming = [for (final st in stages) if (st.date.difference(today).inDays >= 0) st];
+    final planned = upcoming.isNotEmpty ? upcoming : [stages.last];
+    for (final st in planned) {
+      final offset = st.date.difference(today).inDays;
+      if (offset >= horizonDays || offset < -horizonDays) continue;
+      final effectiveDate = offset < 0 ? today : st.date;
+      if (offset < 0) overdueDays.add(effectiveDate);
+      byDay.putIfAbsent(effectiveDate, () => {})[item.productId] = name;
+      // Bei einer Mischung aus Verbrauchs- und Mindesthaltbarkeitsdatum am selben Tag gilt die kleinere
+      // (dringlichere) Vorlaufzeit fuer den Nachrichtentext, siehe ExpiryReminderDay.leadDays.
+      final existingLead = leadByDay[effectiveDate];
+      leadByDay[effectiveDate] = existingLead == null ? st.lead : (st.lead < existingLead ? st.lead : existingLead);
+    }
   }
   final sortedDays = byDay.keys.toList()..sort();
   return [
