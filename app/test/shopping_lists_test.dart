@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/shopping_list_repository.dart';
+import 'package:einkaufstracker/domain/shopping_list/aisle_order.dart';
 import 'package:einkaufstracker/domain/inventory/usage_forecast.dart';
 import 'package:einkaufstracker/features/shopping_list/shopping_list_page.dart';
 import 'package:flutter/material.dart';
@@ -118,6 +120,9 @@ void main() {
   group('Seite', () {
     var forecasts = <String, UsageForecast>{};
 
+    var stores = <Store>[];
+    var categories = <Category>[];
+
     Future<void> open(WidgetTester tester, {List<Product> products = const []}) async {
       tester.view.physicalSize = const Size(900, 3000);
       tester.view.devicePixelRatio = 1;
@@ -130,7 +135,8 @@ void main() {
           allItemsStreamProvider.overrideWith((ref) => Stream.value(const <ReceiptItem>[])),
           receiptsStreamProvider.overrideWith((ref) => Stream.value(const <Receipt>[])),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
-          categoriesStreamProvider.overrideWith((ref) => Stream.value(const <Category>[])),
+          categoriesStreamProvider.overrideWith((ref) => Stream.value(categories)),
+          storesStreamProvider.overrideWith((ref) => Stream.value(stores)),
           usageForecastProvider.overrideWithValue(forecasts),
         ],
         child: const MaterialApp(home: ShoppingListPage()),
@@ -138,7 +144,11 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    setUp(() => forecasts = {});
+    setUp(() {
+      forecasts = {};
+      stores = [];
+      categories = [];
+    });
 
     Future<void> createViaUi(WidgetTester tester, String name) async {
       await tester.tap(find.byKey(const Key('list-add')));
@@ -250,6 +260,77 @@ void main() {
       await tester.longPress(find.byKey(Key('shopping-item-${item.id}')));
       await tester.pumpAndSettle();
       expect(find.textContaining('verschieben nach'), findsNothing);
+    });
+
+    group('Regal-Reihenfolge', () {
+      Category cat(String id, String name) => Category(id: id, householdId: 'h1', name: name, sortOrder: 0, isStorable: true, updatedAt: DateTime.utc(2026));
+      Store store(String id, String chain, {String? branch}) => Store(id: id, householdId: 'h1', chain: chain, branch: branch, updatedAt: DateTime.utc(2026));
+      Product prod(String id, String name, String? categoryId) => Product(
+            id: id, householdId: 'h1', name: name, baseUnit: 'piece', categoryId: categoryId, defaultDateKind: 'best_before', defaultLocation: 'pantry', restock: false, updatedAt: DateTime.utc(2026),
+          );
+
+      /// Reihenfolge der Kategorie-Ueberschriften auf der Seite (von oben nach unten)
+      List<String> headings(WidgetTester tester) {
+        final all = ['Backwaren', 'Gemüse', 'Milch', 'Ohne Kategorie'];
+        final found = <MapEntry<double, String>>[
+          for (final h in all)
+            if (find.text(h).evaluate().isNotEmpty) MapEntry(tester.getTopLeft(find.text(h).first).dy, h),
+        ]..sort((a, b) => a.key.compareTo(b.key));
+        return [for (final e in found) e.value];
+      }
+
+      Future<void> fill() async {
+        categories = [cat('c-brot', 'Backwaren'), cat('c-gemuese', 'Gemüse'), cat('c-milch', 'Milch')];
+        stores = [store('s1', 'Billa', branch: '0643'), store('s2', 'Spar')];
+        await repo.addManual(productId: 'p-brot', unit: 'piece');
+        await repo.addManual(productId: 'p-gemuese', unit: 'piece');
+        await repo.addManual(productId: 'p-milch', unit: 'piece');
+        await repo.addManual(freeText: 'Batterien');
+      }
+
+      final products = [prod('p-brot', 'Brot', 'c-brot'), prod('p-gemuese', 'Karotten', 'c-gemuese'), prod('p-milch', 'Joghurt', 'c-milch')];
+
+      pageTest('ohne gespeicherte Reihenfolge bleibt es alphabetisch, es gibt nur den Weg zur Pflege', (tester) async {
+        await fill();
+        await open(tester, products: products);
+        expect(headings(tester), ['Backwaren', 'Gemüse', 'Milch', 'Ohne Kategorie']);
+        expect(find.byKey(const Key('aisle-settings')), findsOneWidget);
+        expect(find.byKey(const Key('sort-alpha')), findsNothing);
+      });
+
+      pageTest('mit Reihenfolge fuer einen Markt: Chips erscheinen, die Auswahl sortiert nach Regal und wird gemerkt', (tester) async {
+        await fill();
+        await HouseholdPrefsRepository(db, householdId: () async => 'h1').set(aislePrefFor('s1'), ['c-gemuese', 'c-milch', 'c-brot']);
+        await open(tester, products: products);
+        expect(find.byKey(const Key('sort-store-s1')), findsOneWidget, reason: 'Billa 0643 hat eine Reihenfolge');
+        expect(find.byKey(const Key('sort-store-s2')), findsNothing, reason: 'Spar hat keine');
+        expect(find.text('Billa 0643'), findsOneWidget);
+        expect(headings(tester), ['Backwaren', 'Gemüse', 'Milch', 'Ohne Kategorie'], reason: 'anfangs alphabetisch');
+
+        await tester.tap(find.byKey(const Key('sort-store-s1')));
+        await tester.pumpAndSettle();
+        expect(headings(tester), ['Gemüse', 'Milch', 'Backwaren', 'Ohne Kategorie']);
+        expect(await db.getKv('shopping_sort_store'), 's1');
+
+        await tester.tap(find.byKey(const Key('sort-alpha')));
+        await tester.pumpAndSettle();
+        expect(headings(tester), ['Backwaren', 'Gemüse', 'Milch', 'Ohne Kategorie']);
+      });
+
+      pageTest('die gemerkte Auswahl gilt beim naechsten Oeffnen', (tester) async {
+        await fill();
+        await HouseholdPrefsRepository(db, householdId: () async => 'h1').set(aislePrefFor('s1'), ['c-milch', 'c-brot']);
+        await db.setKv('shopping_sort_store', 's1');
+        await open(tester, products: products);
+        expect(headings(tester), ['Milch', 'Backwaren', 'Gemüse', 'Ohne Kategorie'], reason: 'Milch und Brot nach Regal, Gemüse (nicht in der Reihenfolge) danach');
+      });
+
+      pageTest('eine gemerkte Auswahl ohne Reihenfolge (zurueckgesetzt) faellt auf alphabetisch zurueck', (tester) async {
+        await fill();
+        await db.setKv('shopping_sort_store', 's2');
+        await open(tester, products: products);
+        expect(headings(tester), ['Backwaren', 'Gemüse', 'Milch', 'Ohne Kategorie']);
+      });
     });
 
     group('Bald aufgebraucht', () {

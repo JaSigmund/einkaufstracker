@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/usage_forecast.dart';
 import '../../domain/receipt/price_history.dart';
+import '../../domain/shopping_list/aisle_order.dart';
 import '../../domain/shopping_list/list_price_estimate.dart';
+import 'aisle_order_page.dart' show storeLabel;
+
+/// KV-Schluessel: Markt, nach dessen Regal-Reihenfolge die Einkaufsliste sortiert wird (leer = alphabetisch).
+const _sortStoreKey = 'shopping_sort_store';
 
 String _sourceLabel(String source) => switch (source) {
       'depleted' => 'Aufgebraucht',
@@ -40,6 +46,33 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   final _input = TextEditingController();
   List<Product> _matches = const [];
   var _addQuantity = 1.0;
+
+  /// Markt, nach dessen Regal-Reihenfolge sortiert wird (Ausbau 1.14), `null` = alphabetisch. Nur auf diesem Geraet gemerkt.
+  String? _sortStoreId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSort();
+  }
+
+  Future<void> _loadSort() async {
+    try {
+      final id = await ref.read(databaseProvider).getKv(_sortStoreKey);
+      if (mounted && id != _sortStoreId) setState(() => _sortStoreId = id);
+    } catch (_) {
+      // ohne lesbare Ablage bleibt es alphabetisch
+    }
+  }
+
+  Future<void> _setSort(String? storeId) async {
+    setState(() => _sortStoreId = storeId);
+    try {
+      await ref.read(databaseProvider).setKv(_sortStoreKey, storeId ?? '');
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
+  }
 
   @override
   void dispose() {
@@ -97,6 +130,40 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
             ),
         ]),
       ),
+    );
+  }
+
+  /// Sortierung der Liste: alphabetisch oder nach der Regal-Reihenfolge eines Marktes (nur Maerkte, fuer die es eine gibt), dazu der Weg zur
+  /// Pflege der Reihenfolgen.
+  Widget _sortRow(ThemeData t, List<Store> orderedStores) {
+    return SizedBox(
+      height: 44,
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: IconButton(
+            key: const Key('aisle-settings'),
+            tooltip: 'Regal-Reihenfolge je Markt',
+            icon: const Icon(Icons.swap_vert),
+            onPressed: () async {
+              await context.push('/aisle-order', extra: _sortStoreId);
+              ref.invalidate(householdPrefsOnceProvider);
+            },
+          ),
+        ),
+        if (orderedStores.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(key: const Key('sort-alpha'), label: const Text('A–Z'), selected: _sortStoreId == null, onSelected: (_) => _setSort(null)),
+          ),
+          for (final s in orderedStores)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(key: Key('sort-store-${s.id}'), label: Text(storeLabel(s)), selected: _sortStoreId == s.id, onSelected: (_) => _setSort(s.id)),
+            ),
+        ] else
+          Padding(padding: const EdgeInsets.only(top: 12), child: Text('Reihenfolge je Markt festlegen', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline))),
+      ]),
     );
   }
 
@@ -264,12 +331,22 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
           lastUnitPriceNormCents: i.productId == null ? null : latestPrice[i.productId],
         ),
     ]);
-    final groupNames = grouped.keys.toList()
-      ..sort((a, b) {
-        if (a == 'Ohne Kategorie') return 1;
-        if (b == 'Ohne Kategorie') return -1;
-        return a.compareTo(b);
-      });
+    // Regal-Reihenfolge (Ausbau 1.14): Maerkte mit gespeicherter Reihenfolge, gewaehlter Markt, Kategorie-ID je Gruppe
+    final prefs = ref.watch(householdPrefsOnceProvider).value ?? const <String, Object?>{};
+    final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
+    final orderedStores = [
+      for (final s in stores)
+        if (s.deletedAt == null && parseAisleOrder(prefs[aislePrefFor(s.id)]) != null) s,
+    ]..sort((a, b) => storeLabel(a).toLowerCase().compareTo(storeLabel(b).toLowerCase()));
+    final activeStoreId = orderedStores.any((s) => s.id == _sortStoreId) ? _sortStoreId : null;
+    final aisle = activeStoreId == null ? const <String>[] : (parseAisleOrder(prefs[aislePrefFor(activeStoreId)]) ?? const <String>[]);
+    final idByName = {for (final e in categoryNames.entries) e.value: e.key};
+    final groupNames = sortGroupsByAisle(
+      grouped.keys,
+      order: aisle,
+      idOf: (name) => name == 'Ohne Kategorie' ? null : idByName[name],
+      nameOf: (name) => name,
+    );
 
     // Vorhersage: bald leer (hoechstens 3 Tage) und noch auf keiner Liste (unabgehakt)
     final listedProducts = {for (final i in allItems) if (!i.checked && i.productId != null) i.productId!};
@@ -285,6 +362,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
             padding: const EdgeInsets.only(bottom: 8),
             children: [
               _listChips(t, lists, selectedId, allItems),
+              _sortRow(t, orderedStores),
               if (forecastDue.isNotEmpty) _forecastCard(t, forecastDue, selectedId),
               if (estimate.itemsWithPrice > 0) _estimateCard(t, estimate),
               if (suggestions.isNotEmpty) ...[

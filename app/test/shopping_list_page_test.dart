@@ -25,6 +25,7 @@ void main() {
     List<Receipt> receipts = const [],
     List<ShoppingList> lists = const [],
     Map<String, UsageForecast> forecasts = const {},
+    List<Store> stores = const [],
   }) =>
       ProviderScope(
         overrides: [
@@ -36,6 +37,7 @@ void main() {
           shoppingListItemsStreamProvider.overrideWith((ref) => Stream.value(items)),
           shoppingListsStreamProvider.overrideWith((ref) => Stream.value(lists)),
           usageForecastProvider.overrideWithValue(forecasts),
+          storesStreamProvider.overrideWith((ref) => Stream.value(stores)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           categoriesStreamProvider.overrideWith((ref) => Stream.value(categories)),
         ],
