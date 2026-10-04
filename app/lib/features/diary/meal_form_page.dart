@@ -17,6 +17,7 @@ import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_analysis.dart';
 import '../../domain/nutrition/micros.dart';
+import '../../domain/nutrition/retention.dart';
 import '../../domain/nutrition/usual_ingredients.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../domain/receipt/vienna_time.dart';
@@ -58,6 +59,7 @@ class _Row {
     this.unitWeightG,
     this.learnWeight = false,
     this.microsPer100,
+    this.preparation,
   });
 
   Product? product;
@@ -90,6 +92,20 @@ class _Row {
   /// das Profil des Produkts.
   Micros? microsPer100;
 
+  /// Zubereitung fuer die Garfaktoren (Phase N4, ADR-037): `kategorie:zubereitung`, `null` = roh. [microsPer100] bleibt das rohe Profil,
+  /// das Repository mindert beim Speichern.
+  String? preparation;
+
+  /// Kategorie fuer die Garfaktoren, wenn es sie fuer diese Zeile gibt: nur ein roher BLS-Eintrag ohne Produkt und ohne Handwerte, dessen Name
+  /// bekannt ist (oder eine schon gespeicherte Zubereitung). `null`: keine Auswahl anbieten.
+  String? get retentionCategoryOfRow {
+    if (product != null || manual != null || blsCode == null || microsPer100 == null) return null;
+    final stored = retentionFromStorage(preparation)?.category;
+    if (stored != null) return stored;
+    final name = matchName;
+    return name == null ? null : retentionCategory(blsCode: blsCode!, name: name, fatPer100: per100?.fatG);
+  }
+
   String get label => product?.name ?? freeText ?? 'Zutat';
 
   /// Naehrwertprofil des Produkts, falls es eines hat (Produkte vom Bon haben meist keines).
@@ -119,6 +135,7 @@ class _Row {
         nutrientBasis: manual != null ? 'manual' : (_productProfile != null ? 'product' : (blsCode != null && per100 != null ? trust.basis : null)),
         unitWeightG: unit == EntryUnit.piece ? unitWeightG : null,
         microsPer100: microsPer100,
+        preparation: retentionCategoryOfRow == null ? null : preparation,
       );
 
   /// Das Naehrwertprofil, mit dem diese Zeile rechnet (Produkt vor BLS-Eintrag).
@@ -277,10 +294,30 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
         // Bei Stueckmengen steht das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl)
         unitWeightG: unit == EntryUnit.piece && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null,
-        microsPer100: product == null ? micros100From(parseMicros(i.micros), i.amountG) : null,
+        microsPer100: product == null ? undoRetention(micros100From(parseMicros(i.micros), i.amountG), retentionFromStorage(i.preparation)) : null,
+        preparation: product == null && retentionFromStorage(i.preparation) != null ? i.preparation : null,
       ));
     }
     if (mounted) setState(() => _rows..clear()..addAll(rows));
+    _resolveBlsNames();
+  }
+
+  /// Zeilen aus frueheren Mahlzeiten kennen nur den BLS-Code, nicht den Namen des Eintrags. Fuer die Garfaktoren braucht die Zeile ihn: aus
+  /// der Datenbank holen. Ohne Netz oder bei einem Fehler bleibt es ohne Auswahl der Zubereitung, alles andere funktioniert.
+  Future<void> _resolveBlsNames() async {
+    final codes = {for (final r in _rows) if (r.product == null && r.blsCode != null && r.matchName == null && r.microsPer100 != null) r.blsCode!};
+    if (codes.isEmpty) return;
+    try {
+      final foods = {for (final f in await ref.read(blsFoodSearchProvider).byCodes(codes)) f.code: f.nameDe};
+      if (!mounted) return;
+      setState(() {
+        for (final r in _rows) {
+          if (r.matchName == null && r.blsCode != null && foods.containsKey(r.blsCode)) r.matchName = foods[r.blsCode];
+        }
+      });
+    } catch (_) {
+      // die Zubereitung ist eine Zugabe
+    }
   }
 
   bool get _hasPhoto => _newPhoto != null || (_isEdit && widget.existing!.photoPath != null && !_photoRemoved);
@@ -461,7 +498,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
                     sugarG: i.sugarG,
                     fiberG: i.fiberG,
                     saltG: i.saltG,
-                    micros: parseMicros(i.micros),
+                    micros: undoRetention(parseMicros(i.micros), retentionFromStorage(i.preparation)),
                   ),
             ],
           ),
@@ -561,6 +598,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..blsCode = null
           ..matchName = null
           ..microsPer100 = null
+          ..preparation = null
           ..learn = false
           ..deduct = active.any((i) => i.productId == product.id);
         if (product.baseUnit == 'l' && row.unit == EntryUnit.g) row.unit = EntryUnit.ml;
@@ -575,6 +613,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..blsCode = bls.code
           ..matchName = bls.nameDe
           ..microsPer100 = bls.micros
+          ..preparation = null
           ..matchTrust = MatchTrust.sure
           ..learn = true
           ..deduct = false;
@@ -1069,6 +1108,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (matched) Text('Nährwerte: ${r.matchName}', key: Key('ingredient-match-$i')),
         Text(parts.join(' · ')),
+        if (r.retentionCategoryOfRow case final category?) _preparationChips(i, r, category, t),
       ]),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
         _trustMark(i, r, t),
@@ -1078,6 +1118,50 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         IconButton(key: Key('ingredient-remove-$i'), tooltip: 'Entfernen', icon: const Icon(Icons.close), onPressed: () => setState(() => _rows.removeAt(i))),
       ]),
       onTap: () => _editIngredient(i),
+    );
+  }
+
+  /// Zubereitung der Zutat (Garfaktoren, ADR-037): "roh" oder eine der Zubereitungen, fuer die es USDA-Faktoren gibt. Die Menge gilt dann als
+  /// Rohgewicht, Vitamine und Mineralstoffe werden um die typischen Verluste gemindert (Energie und Makros bleiben).
+  Widget _preparationChips(int i, _Row r, String category, ThemeData t) {
+    final selected = retentionFromStorage(r.preparation);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 6, children: [
+          ChoiceChip(
+            key: Key('prep-$i-raw'),
+            label: const Text('roh'),
+            visualDensity: VisualDensity.compact,
+            selected: selected == null,
+            onSelected: (_) => setState(() => r.preparation = null),
+          ),
+          for (final m in cookMethodsFor(category))
+            ChoiceChip(
+              key: Key('prep-$i-${m.key}'),
+              label: Text(m.label),
+              visualDensity: VisualDensity.compact,
+              selected: selected?.method == m,
+              onSelected: (_) => setState(() => r.preparation = '$category:${m.key}'),
+            ),
+        ]),
+        if (selected != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              [
+                'Menge als Rohgewicht',
+                () {
+                  final loss = lossSummary(selected, present: r.microsPer100?.keys);
+                  return loss.isEmpty ? 'für die bekannten Werte keine Verluste' : loss;
+                }(),
+                'USDA-Durchschnitt',
+              ].join(' · '),
+              key: Key('prep-info-$i'),
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+            ),
+          ),
+      ]),
     );
   }
 

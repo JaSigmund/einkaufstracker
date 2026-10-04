@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
+import '../../domain/nutrition/retention.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 import 'inventory_repository.dart';
@@ -55,6 +56,7 @@ class IngredientDraft {
     this.nutrientBasis,
     this.unitWeightG,
     this.microsPer100,
+    this.preparation,
   }) : assert(productId != null || freeText != null, 'Eine Zutat braucht ein Produkt oder einen Text');
 
   final String? productId;
@@ -91,6 +93,11 @@ class IngredientDraft {
 
   /// Mikronaehrstoffe je 100 g des zugeordneten BLS-Eintrags (Phase N3). Bei einem Produkt mit eigenem Profil gilt dessen Profil.
   final Micros? microsPer100;
+
+  /// Zubereitung fuer die Garfaktoren (Phase N4, ADR-037), `kategorie:zubereitung` wie in [RetentionFactors.storageKey]. Die Mikronaehrstoffe
+  /// der Zeile werden dann um die Verluste gemindert; [microsPer100] bleibt das rohe Profil. Nur mit einem BLS-Profil ohne Produkt
+  /// sinnvoll; bei einem unbekannten Wert wird nichts gemindert und nichts gespeichert.
+  final String? preparation;
 }
 
 /// Eine Mahlzeit samt Zutaten, wie sie gespeichert werden soll.
@@ -297,7 +304,9 @@ class MealRepository {
         unitWeightG: d.unitWeightG ?? product?.unitWeightG,
       );
       final nutrients = d.manualNutrients ?? ingredientNutrients(per100, amount);
-      final micros = d.manualNutrients != null ? null : scaleMicros(microsPer100, amount.nutrientBasisAmount);
+      // Garfaktoren: nur fuer ein BLS-Profil der Zeile (kein Produkt, keine Handwerte) und nur mit bekannter Kategorie und Zubereitung
+      final retention = (productProfile == null && d.manualNutrients == null) ? retentionFromStorage(d.preparation) : null;
+      final micros = d.manualNutrients != null ? null : applyRetention(scaleMicros(microsPer100, amount.nutrientBasisAmount), retention);
 
       String? inventoryItemId;
       var deducted = false;
@@ -329,6 +338,7 @@ class MealRepository {
         blsCode: productProfile != null || d.manualNutrients != null ? null : d.blsCode,
         nutrientBasis: nutrientBasis,
         micros: encodeMicros(micros),
+        preparation: retention?.storageKey,
         kcal: nutrients?.kcal,
         proteinG: nutrients?.proteinG,
         fatG: nutrients?.fatG,

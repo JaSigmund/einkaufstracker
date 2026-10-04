@@ -23,7 +23,7 @@ const microReferenceOverridesKey = 'micro_reference_overrides';
 
 /// Hinweis zu den Tabellenwerten, im Info-Dialog der Seite und unter jeder Aufschluesselung ehrlich genannt (ADR-032).
 const nutrientsLimitsText = 'Die Werte stammen aus dem Bundeslebensmittelschlüssel: Durchschnittswerte, zu rund drei Vierteln berechnet. '
-    'Garverluste (besonders bei Vitamin C, B-Vitaminen und Folat) sind nicht berücksichtigt. Nahrungsergänzung zählt nur, was du unter „Nahrungsergänzung“ einträgst, und steht getrennt. '
+    'Garverluste (besonders bei Vitamin C, B-Vitaminen und Folat) sind nur berücksichtigt, wenn du bei einer rohen Zutat die Zubereitung wählst (USDA-Durchschnittswerte für 15 Nährstoffe). Nahrungsergänzung zählt nur, was du unter „Nahrungsergänzung“ einträgst, und steht getrennt. '
     'Selen und Koffein fehlen in der Quelle. Die Zahlen sind kein Maßstab für deinen eigenen Bedarf.';
 
 /// Hinweis zu den Referenzmengen: Kennzeichnungswerte, keine Empfehlung.

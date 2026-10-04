@@ -45,6 +45,7 @@ jobs:
       - run: python tools/build_food_units.py --check
       # Register der Mikronaehrstoffe (JSON) -> Dart-Datei und SQL-Import muessen zusammenpassen
       - run: python tools/build_bls_nutrients.py --check
+      - run: python tools/build_retention.py --check
 
   function:
     name: Edge Function (Typpruefung)
