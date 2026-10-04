@@ -21,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0, 20 ab 1.13.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -207,5 +207,28 @@ void main() {
     expect((await db.select(db.supplements).getSingle()).servingLabel, 'Tablette', reason: 'Vorbelegung');
     expect((await db.select(db.supplementIntakes).getSingle()).servings, 1.0);
     expect(await db.select(db.householdPrefs).get(), hasLength(1));
+  });
+
+  test('Daten aus Version 20 bleiben beim Hochziehen erhalten, die Zubereitung der Zutaten ist neu und leer', () async {
+    final schema = await verifier.schemaAt(20);
+    schema.rawDatabase.execute(
+      "INSERT INTO meals (id, household_id, eaten_at, meal_type, title, servings_eaten, servings_made, source, is_estimate, updated_at) "
+      "VALUES ('m1', 'h1', '2026-10-04T10:00:00.000Z', 'lunch', 'Paprika', 1.0, 1.0, 'manual', 0, '2026-10-04T10:00:00.000Z')",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO meal_ingredients (id, household_id, meal_id, quantity, unit, source, bls_code, micros, updated_at) "
+      "VALUES ('i1', 'h1', 'm1', 100.0, 'g', 'manual', 'G543100', '{\"vit_c_mg\":100.0}', '2026-10-04T10:00:00.000Z')",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, db.schemaVersion);
+
+    final ingredient = await db.select(db.mealIngredients).getSingle();
+    expect(ingredient.micros, '{"vit_c_mg":100.0}');
+    expect(ingredient.blsCode, 'G543100');
+    expect(ingredient.preparation, isNull, reason: 'bestehende Zutaten sind roh bzw. ohne Angabe');
+    await (db.update(db.mealIngredients)..where((i) => i.id.equals('i1'))).write(const MealIngredientsCompanion(preparation: Value('veg_other:boiled')));
+    expect((await db.select(db.mealIngredients).getSingle()).preparation, 'veg_other:boiled');
   });
 }

@@ -889,6 +889,17 @@ def main():
     db("delete from household_prefs where key = 'test_key'")
 
 
+    # --- Garfaktoren (Phase N4, Migration 0027): Zubereitung je Zutat ----------------------------------------------------
+    check("Zubereitung: die Zeile aus der App (gekochtes Gemuese) ist in der Datenbank",
+          one("select count(*) from meal_ingredients where preparation = 'veg_other:boiled' and household_id = %s", (ha,)) >= 1)
+    meal_for_prep = one("select id from meals where household_id = %s and deleted_at is null limit 1", (ha,))
+    ins_prep = "insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit, preparation) values (%s,%s,'x',1,'piece',%s)"
+    for ok in ("beef:grilled", "fish_lean:steamed", "veg_other:boiled", "tomato:baked"):
+        check(f"Zubereitung: {ok} wird angenommen", not raises(ins_prep, (ha, meal_for_prep, ok), user=A))
+    for bad in ("beef", "beef:smoked", "Beef:grilled", "beef:grilled:x", ":boiled", "1:boiled", "beef: grilled"):
+        check(f"Zubereitung: '{bad}' wird abgelehnt", raises(ins_prep, (ha, meal_for_prep, bad), user=A))
+    check("Zubereitung: leer (NULL) ist erlaubt", not raises("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit) values (%s,%s,'y',1,'piece')", (ha, meal_for_prep), user=A))
+
     # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
     planned_ok = True
     try:

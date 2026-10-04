@@ -330,6 +330,10 @@ class MealIngredients extends Table {
   /// Mikronaehrstoffe der verzehrten Menge als JSON-Objekt mit Registerschluesseln (Phase N3, ADR-032), `null` ohne Daten.
   /// Ein fehlender Schluessel heisst unbekannt, 0 ist eine echte Null.
   TextColumn get micros => text().nullable()();
+
+  /// Zubereitung der Zutat, auf die sich die Garfaktoren stuetzen (Phase N4, ADR-037): `kategorie:zubereitung`, z.B. `veg_other:boiled`.
+  /// `null` = roh oder nicht angegeben. Die gespeicherten [micros] sind dann schon um die Verluste gemindert.
+  TextColumn get preparation => text().nullable()();
   RealColumn get kcal => real().nullable()();
   RealColumn get proteinG => real().nullable()();
   RealColumn get fatG => real().nullable()();
@@ -628,7 +632,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -741,6 +745,11 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(supplements);
             await m.createTable(supplementIntakes);
             await m.createTable(householdPrefs);
+          }
+          // 20 -> 21: Zubereitung je Zutat fuer die Garfaktoren (Phase N4). Installationen vor 14 legen die Zutaten-Tabelle oben schon mit
+          // der Spalte an.
+          if (from >= 14 && from < 21) {
+            await m.addColumn(mealIngredients, mealIngredients.preparation);
           }
         },
       );

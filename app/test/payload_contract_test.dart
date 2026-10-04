@@ -139,6 +139,25 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await online.link(reis.id, onlineArticle(store: 'spar', externalId: '2020', name: 'A-zwei Vollmilch'));
   await online.unlink((await online.activeLinks()).firstWhere((l) => l.store == 'spar').id);
 
+  // Garfaktoren (Phase N4, ADR-037): gekochtes Gemuese, Mikronaehrstoffe um die Verluste gemindert, Zubereitung festgehalten
+  await meals.create(MealDraft(
+    title: 'Paprikagemuese',
+    eatenAt: DateTime.utc(2026, 9, 24, 12),
+    ingredients: const [
+      IngredientDraft(
+        freeText: 'Gemüsepaprika rot, roh',
+        quantity: 150,
+        entryUnit: EntryUnit.g,
+        per100: NutrientsPer100(kcal: 36, proteinG: 1.0, fatG: 0.2),
+        per100Basis: 'g',
+        blsCode: 'G543100',
+        nutrientBasis: 'bls_exact',
+        microsPer100: {'vit_c_mg': 100.0, 'folate_ug': 50.0},
+        preparation: 'veg_other:boiled',
+      ),
+    ],
+  ));
+
   // Nahrungsergaenzung und gemeinsame Einstellungen (Phase N4): Ergaenzung anlegen, aendern, Einnahmen (eine zurueckgenommen), eine geloeschte
   final supplements = SupplementRepository(db, householdId: () async => 'h1');
   final d3 = await supplements.save(name: 'Vitamin D3', servingLabel: 'Tablette', micros: {'vit_d_ug': 20.0});
@@ -212,6 +231,12 @@ void main() {
     expect(rows('meal_ingredients').any((i) => i['micros'] is Map && (i['micros'] as Map)['iron_mg'] == 1.12), isTrue, reason: 'Mikronaehrstoffe der verzehrten Menge als Objekt');
     expect(rows('meal_ingredients').any((i) => i['micros'] == null), isTrue, reason: 'Zutaten ohne Daten schicken null');
     expect(rows('products').any((p) => (p['nutrients_per_100'] as Map?)?['calcium_mg'] == 117), isTrue, reason: 'Profil aus der BLS mit Mikronaehrstoffen');
+    expect(
+      rows('meal_ingredients').any((i) => i['preparation'] == 'veg_other:boiled' && (i['micros'] as Map)['vit_c_mg'] == 112.5),
+      isTrue,
+      reason: 'Zubereitung festgehalten, Vitamin C 100 mg je 100 g, 150 g, mal 0,75',
+    );
+    expect(rows('meal_ingredients').any((i) => i['preparation'] == null), isTrue, reason: 'ohne Zubereitung schicken die uebrigen null');
     expect(rows('supplements').any((s) => s['deleted_at'] != null), isTrue, reason: 'Ergaenzung geloescht (Soft-Delete)');
     expect(rows('supplements').any((s) => s['note'] == 'zum Frühstück' && (s['micros'] as Map)['vit_d_ug'] == 25), isTrue, reason: 'geaenderte Ergaenzung, Mikros als Objekt');
     expect(rows('supplement_intakes').any((i) => i['deleted_at'] != null), isTrue, reason: 'Einnahme zurueckgenommen');
