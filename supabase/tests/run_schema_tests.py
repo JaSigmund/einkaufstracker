@@ -900,6 +900,84 @@ def main():
         check(f"Zubereitung: '{bad}' wird abgelehnt", raises(ins_prep, (ha, meal_for_prep, bad), user=A))
     check("Zubereitung: leer (NULL) ist erlaubt", not raises("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit) values (%s,%s,'y',1,'piece')", (ha, meal_for_prep), user=A))
 
+    # --- Sicherheits-Invarianten ueber den Katalog (Codereview 2026-10-16) --------------------------------------------
+    # Die Tests oben pruefen einzelne Tabellen; diese hier gelten fuer ALLE, auch fuer kuenftige Migrationen. Eine neue
+    # Tabelle ohne RLS oder eine neue SECURITY-DEFINER-Funktion ohne festen search_path faellt so sofort auf.
+    no_rls = [r[0] for r in db("""
+        select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1""")[0]]
+    check("Invariante: jede Tabelle in public hat Row Level Security", not no_rls, f"ohne RLS: {no_rls}")
+
+    hh_tables = [r[0] for r in db("""
+        select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        join pg_attribute a on a.attrelid = c.oid and a.attname = 'household_id' and not a.attisdropped
+        where n.nspname = 'public' and c.relkind in ('r', 'p') order by 1""")[0]]
+    unguarded = [r[0] for r in db("""
+        select t from unnest(%s::text[]) t
+        where not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = t
+                          and p.qual like '%%is_household_member(household_id)%%')
+        order by 1""", (hh_tables,))[0]]
+    # llm_usage und household_invites haben eigene, engere Policies (nur lesen bzw. nur offene zurueckziehen), pruefen aber
+    # ebenfalls die Mitgliedschaft; bug_reports usw. laufen ueber die Standard-Policy.
+    check("Invariante: jede Tabelle mit household_id hat eine Policy, die die Mitgliedschaft prueft", not unguarded, f"ohne: {unguarded}")
+
+    loose_writes = [f"{r[0]}.{r[1]}" for r in db("""
+        select tablename, policyname from pg_policies
+        where schemaname = 'public' and cmd in ('INSERT', 'UPDATE', 'ALL')
+          and tablename = any(%s::text[])
+          and coalesce(with_check, qual, '') not like '%%is_household_member(household_id)%%'
+        order by 1, 2""", (hh_tables,))[0]]
+    check("Invariante: schreibende Policies auf Haushaltstabellen pruefen die Mitgliedschaft auch beim Schreiben",
+          not loose_writes, f"{loose_writes}")
+
+    definer_no_path = [r[0] for r in db("""
+        select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosecdef
+          and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%%')
+        order by 1""")[0]]
+    check("Invariante: jede SECURITY-DEFINER-Funktion hat einen festen search_path (Schutz vor Objekt-Unterschiebung)",
+          not definer_no_path, f"ohne search_path: {definer_no_path}")
+
+    definer_for_clients = [r[0] for r in db("""
+        select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosecdef and p.proname in ('peek_invite', 'redeem_invite')
+          and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'))
+        order by 1""")[0]]
+    check("Invariante: Einladungen pruefen/einloesen darf nur die service_role (kein Client)", not definer_for_clients,
+          f"fuer Clients ausfuehrbar: {definer_for_clients}")
+
+    invoker_missing = [r[0] for r in db("""
+        select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind = 'v'
+          and not coalesce('security_invoker=true' = any(c.reloptions), false)
+        order by 1""")[0]]
+    check("Invariante: jede View laeuft mit den Rechten des Aufrufers (security_invoker), sonst umginge sie RLS",
+          not invoker_missing, f"ohne security_invoker: {invoker_missing}")
+
+    public_buckets = [r[0] for r in db("select id from storage.buckets where public order by 1")[0]]
+    check("Invariante: alle Storage-Buckets sind privat (Bon-Fotos, Essensfotos)", not public_buckets, f"oeffentlich: {public_buckets}")
+
+    anon_storage = [r[0] for r in db("""
+        select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects'
+          and not (roles = '{authenticated}'::name[]) order by 1""")[0]]
+    check("Invariante: Storage-Policies gelten nur fuer angemeldete Nutzer", not anon_storage, f"{anon_storage}")
+
+    # In echtem Supabase hat die Rolle anon (Aufruf nur mit dem oeffentlichen Client-Schluessel, ohne Anmeldung) Lese-
+    # rechte auf alle Tabellen; geschuetzt wird allein durch RLS. Hier nachgebildet und fuer jede Haushaltstabelle geprueft.
+    db("grant select on all tables in schema public to anon")
+
+    def anon_count(table):
+        with psycopg.connect(uri, autocommit=True) as c:
+            with c.cursor() as cur:
+                cur.execute("set role anon")
+                cur.execute(f"select count(*) from public.{table}")
+                return cur.fetchone()[0]
+
+    total_rows = {t: one(f"select count(*) from public.{t}") for t in hh_tables}
+    visible_to_anon = {t: n for t in hh_tables if (n := anon_count(t)) > 0}
+    check("Invariante: ohne Anmeldung (anon) ist keine Haushaltszeile sichtbar", not visible_to_anon, f"{visible_to_anon}")
+    check("Invariante: die anon-Pruefung ist aussagekraeftig (es gibt Haushaltszeilen)", sum(total_rows.values()) > 0)
+
     # --- Geplante Migrationen (z.B. kuenftige Phase-6-Vorbereitung) muessen sauber einspielbar sein
     planned_ok = True
     try:
