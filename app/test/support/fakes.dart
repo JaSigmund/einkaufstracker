@@ -257,6 +257,23 @@ Future<Map<String, String>> seedCategories(AppDatabase db, {String household = '
 }
 
 /// Storage-Attrappe: Dateien im Speicher. [offline] laesst jeden Zugriff mit einem Netzfehler scheitern.
+/// Beleg-Dienst ohne Dateizugriff, zaehlt nur, ob die lokalen Kopien geloescht wurden (Abmelden, Konto loeschen).
+class FakeReceiptFileService extends ReceiptFileService {
+  FakeReceiptFileService(AppDatabase db)
+      : super(
+          db: db,
+          repo: receiptRepo(db),
+          remote: FakeRemoteFileStore(),
+          baseDir: () async => throw UnimplementedError('Datei-Zugriff im Widget-Test'),
+          keepFiles: () async => true,
+        );
+
+  var deleteAllLocalCalls = 0;
+
+  @override
+  Future<void> deleteAllLocal() async => deleteAllLocalCalls++;
+}
+
 class FakeRemoteFileStore implements RemoteFileStore {
   final Map<String, Uint8List> files = {};
   final Map<String, String> contentTypes = {};
@@ -336,6 +353,14 @@ class FakeMealPhotoService extends MealPhotoService {
   /// Wenn gesetzt, wirft [attach] diesen Fehler.
   Object? attachError;
 
+  var deleteAllLocalCalls = 0;
+
+  @override
+  Future<void> deleteAllLocal() async {
+    deleteAllLocalCalls++;
+    photos.clear();
+  }
+
   @override
   Future<void> attach(Meal meal, Uint8List photo, {bool prepared = false}) async {
     if (attachError != null) throw attachError!;
@@ -399,9 +424,16 @@ class FakeNotificationScheduler implements NotificationScheduler {
   String? lastNotifyTime;
   int? lastLeadDays;
   var initializeCalls = 0;
+  var cancelCalls = 0;
 
   @override
   Future<void> initialize() async => initializeCalls++;
+
+  @override
+  Future<void> cancelExpiryReminders() async {
+    cancelCalls++;
+    lastScheduled = const [];
+  }
 
   @override
   Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays}) async {

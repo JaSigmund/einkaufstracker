@@ -46,6 +46,16 @@ void main() {
     expect(outbox.where((o) => o.remoteTable == 'meals' && o.payload.contains('${meal.id}.jpg')), isNotEmpty, reason: 'Pfad wird synchronisiert');
   });
 
+  test('deleteAllLocal (Abmelden): alle lokalen Fotos weg, Server-Dateien bleiben, ohne Ordner kein Fehler', () async {
+    final meal = await newMeal();
+    await service.attach(meal, photo);
+    await service.uploadPending();
+    await service.deleteAllLocal();
+    expect(Directory('${dir.path}/meal_photos').existsSync(), isFalse);
+    expect(remote.files, isNotEmpty);
+    await service.deleteAllLocal(); // zweimal ist kein Fehler
+  });
+
   test('uploadPending: laedt in den Bucket-Pfad der Mahlzeit, JPEG, danach ist die Warteschlange leer', () async {
     final meal = await newMeal();
     await service.attach(meal, photo);
