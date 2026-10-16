@@ -17,6 +17,7 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { ingredientLines, parseRequest } from "./validate.ts";
 
 // Gleiche Preistabelle wie parse-receipt (Stand 2026-09; vor Produktivbetrieb gegen die offizielle
 // Preisliste pruefen).
@@ -25,12 +26,7 @@ const PRICES: Record<string, { in: number; out: number }> = {
   "claude-sonnet-5": { in: 2, out: 10 },
 };
 const DEFAULT_MODEL = Deno.env.get("RECIPE_MODEL") ?? "claude-haiku-4-5-20251001";
-const MAX_INGREDIENTS = 40;
-// Codereview-Fund 2026-10-01: Anzahl der Zutaten war schon begrenzt, die Laenge jedes einzelnen Namens/
-// jeder Einheit nicht -- ein direkter API-Aufruf (nicht der normale Client) haette darueber beliebig
-// grosse Prompts und damit Kosten erzeugen koennen, ohne dass `llm_usage` das vorher verhindert haette
-// (die Tabelle protokolliert Kosten nur im Nachhinein).
-const MAX_LABEL_CHARS = 200;
+// Anzahl und Laenge der Zutaten (Name, Menge, Einheit) begrenzt validate.ts (Codereview-Funde 2026-10-01 und 2026-10-16).
 
 // Tageslimit je Haushalt ueber alle KI-Funktionen (siehe Block 3b). Grosszuegig fuer normale Nutzung (ein
 // Kochabend mit Chat sind ein paar Dutzend Nachrichten), aber eine harte Obergrenze fuer die Kosten.
@@ -82,25 +78,16 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "unauthorized" }, 401);
 
-  // 2) Eingabe
-  let body: { household_id: string; ingredients: { name: string; quantity?: number; unit?: string }[]; model?: string };
+  // 2) Eingabe (validate.ts)
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
-  if (!body.household_id || !Array.isArray(body.ingredients) || body.ingredients.length < 1) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  if (body.ingredients.length > MAX_INGREDIENTS) return json({ error: "too_many_ingredients" }, 400);
-  if (
-    body.ingredients.some((i) =>
-      typeof i.name !== "string" || i.name.trim().length === 0 || i.name.length > MAX_LABEL_CHARS ||
-      (i.unit != null && (typeof i.unit !== "string" || i.unit.length > MAX_LABEL_CHARS))
-    )
-  ) {
-    return json({ error: "invalid_input" }, 400);
-  }
+  const parsed = parseRequest(raw);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const body = parsed.value;
   const model = body.model ?? DEFAULT_MODEL;
   if (!(model in PRICES)) return json({ error: "model_not_allowed", allowed: Object.keys(PRICES) }, 400);
 
@@ -128,10 +115,10 @@ Deno.serve(async (req) => {
   if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
 
   // 4) Claude
-  const ingredientLines = body.ingredients
-    .map((i) => `- ${i.name}${i.quantity ? ` (${i.quantity}${i.unit ? " " + i.unit : ""})` : ""}`)
-    .join("\n");
-  const messages = [{ role: "user", content: `Zutaten im Haus (dringlichste zuerst):\n${ingredientLines}\n\nRufe submit_suggestions auf.` }];
+  const messages = [{
+    role: "user",
+    content: `Zutaten im Haus (dringlichste zuerst):\n${ingredientLines(body.ingredients)}\n\nRufe submit_suggestions auf.`,
+  }];
 
   const started = Date.now();
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
