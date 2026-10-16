@@ -61,11 +61,31 @@ class FakeRemoteStore implements RemoteStore {
   Map<String, Map<String, dynamic>> table(String name) => tables.putIfAbsent(name, () => {});
 
   @override
-  Future<List<Map<String, dynamic>>> fetchChanges(String tableName, {String? since, int limit = 500}) async {
+  Future<List<Map<String, dynamic>>> fetchChanges(String tableName,
+      {String? since, int limit = 500, int offset = 0, List<String> orderKeys = const ['id']}) async {
     if (offline || failFetch) throw const SocketException('offline');
     final rows = table(tableName).values.where((r) => since == null || (r['updated_at'] as String).compareTo(since) >= 0).toList()
-      ..sort((a, b) => (a['updated_at'] as String).compareTo(b['updated_at'] as String));
-    return rows.take(limit).map((r) => Map<String, dynamic>.from(r)).toList();
+      ..sort((a, b) {
+        final byTime = (a['updated_at'] as String).compareTo(b['updated_at'] as String);
+        if (byTime != 0) return byTime;
+        // wie ORDER BY updated_at, <Primaerschluessel> beim Server: stabile Reihenfolge bei gleichem Zeitstempel
+        for (final k in orderKeys) {
+          final c = '${a[k]}'.compareTo('${b[k]}');
+          if (c != 0) return c;
+        }
+        return 0;
+      });
+    return rows.skip(offset).take(limit).map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  /// Simuliert eine Server-Transaktion, die viele Zeilen auf einmal schreibt (z.B. eine Daten-Migration): alle Zeilen
+  /// bekommen denselben `updated_at`, wie bei Postgres, wo now() innerhalb einer Transaktion konstant ist.
+  String insertInOneTransaction(String tableName, List<Map<String, dynamic>> rows) {
+    final stamp = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
+    for (final r in rows) {
+      table(tableName)[r['id'] as String] = {...r, 'updated_at': stamp};
+    }
+    return stamp;
   }
 
   /// Wie oft [fetchUpdatedAt] gerufen wurde (Konflikterkennung beim Senden, ADR-018).

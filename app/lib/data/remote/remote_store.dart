@@ -7,8 +7,10 @@ const _networkTimeout = Duration(seconds: 20);
 
 /// Abstraktion des Servers fuer den Sync (damit der Sync-Code ohne Netz getestet werden kann).
 abstract class RemoteStore {
-  /// Zeilen mit updated_at >= [since] (Server-Format), aufsteigend nach updated_at, hoechstens [limit].
-  Future<List<Map<String, dynamic>>> fetchChanges(String table, {String? since, int limit = 500});
+  /// Zeilen mit updated_at >= [since] (Server-Format), aufsteigend nach updated_at und bei gleichem Zeitstempel nach
+  /// [orderKeys] (Primaerschluessel, damit die Reihenfolge stabil ist), ab der [offset]-ten Zeile, hoechstens [limit].
+  Future<List<Map<String, dynamic>>> fetchChanges(String table,
+      {String? since, int limit = 500, int offset = 0, List<String> orderKeys = const ['id']});
 
   /// Legt eine Zeile an oder aktualisiert sie (Primaerschluessel id). Liefert den `updated_at` der geschriebenen Zeile
   /// (Server-Zeit, vom Trigger gesetzt), `null` wenn der Server ihn nicht mitgibt.
@@ -33,10 +35,15 @@ class SupabaseRemoteStore implements RemoteStore {
   final SupabaseClient _client;
 
   @override
-  Future<List<Map<String, dynamic>>> fetchChanges(String table, {String? since, int limit = 500}) async {
+  Future<List<Map<String, dynamic>>> fetchChanges(String table,
+      {String? since, int limit = 500, int offset = 0, List<String> orderKeys = const ['id']}) async {
     final base = _client.from(table).select();
     final filtered = since == null ? base : base.gte('updated_at', since);
-    final rows = await filtered.order('updated_at', ascending: true).limit(limit).timeout(_networkTimeout);
+    var ordered = filtered.order('updated_at', ascending: true);
+    for (final key in orderKeys) {
+      ordered = ordered.order(key, ascending: true);
+    }
+    final rows = await ordered.range(offset, offset + limit - 1).timeout(_networkTimeout);
     return List<Map<String, dynamic>>.from(rows);
   }
 
