@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Der Workflow liest nur (Codereview 2026-10-16): kein Job braucht Schreibrechte am Repo.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -13,6 +17,7 @@ jobs:
   app:
     name: App (analyze und test)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: app
@@ -25,17 +30,54 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter test
+      # Alle Tests, darunter seit dem Codereview 2026-10-16 auch die Querschnittstests:
+      #   test/architecture_test.dart      Schichten, keine Geheimnisse im Code, Tooltips an allen IconButtons
+      #   test/ui_accessibility_test.dart  Flutter-Richtlinien: beschriftete und grosse Tippflaechen, Kontrast
+      #   test/ui_layout_test.dart         kein Ueberlauf auf kleinem Handy, bei 200 % Schrift und auf dem Tablet
+      - run: flutter test --coverage
+      # Sperrklinke: knapp unter dem Stand vom 2026-10-16, nur anheben, nie senken (siehe tools/check_coverage.py)
+      - name: Testabdeckung (Untergrenze)
+        run: python3 ../tools/check_coverage.py coverage/lcov.info --min 86 --min-domain 97
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-coverage
+          path: app/coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 14
+
+  web:
+    # Die PWA (tools/deploy_web.sh) wurde bisher nur lokal gebaut: ein Import, den es im Browser nicht gibt, fiel erst
+    # beim Veroeffentlichen auf. Ohne dart_defines startet der Build mit dem Hinweis "Konfiguration fehlt", das genuegt fuer
+    # die Pruefung, dass sich alles fuer das Web uebersetzen laesst.
+    name: Web-Build (PWA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release --base-href "/einkaufstracker-web/"
 
   db:
     name: Datenbank (Schema- und RLS-Tests)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install pgserver "psycopg[binary]" tzdata
+      # enthaelt seit 2026-10-16 auch Sicherheits-Invarianten ueber den Katalog (RLS auf jeder Tabelle, search_path bei
+      # SECURITY DEFINER, security_invoker bei Views, private Buckets, nichts fuer anon sichtbar)
       - run: python supabase/tests/run_schema_tests.py
       # Die Synonymliste (CSV) ist die Quelle, die SQL-Datei wird daraus erzeugt: beide muessen zusammenpassen
       - run: |
@@ -50,6 +92,7 @@ jobs:
   function:
     name: Edge Function (Typpruefung)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
@@ -69,3 +112,24 @@ jobs:
               (cd "/tmp/fncheck/$fn" && deno test)
             fi
           done
+      # Lint ueber alle Functions (u.a. kein unbegruendetes `any`, prefer-const)
+      - run: cd /tmp/fncheck && deno lint
+
+  hygiene:
+    # README-Regel "Geheimnisse gehoeren nie ins Repo" automatisch pruefen, dazu die Tests der Werkzeuge in tools/
+    name: Repo-Hygiene und Werkzeuge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Keine Geheimnisse und keine verbotenen Dateien im Repo
+        run: python tools/check_repo_hygiene.py
+      - run: pip install pandas openpyxl
+      - name: Tests der Werkzeuge
+        run: |
+          python tools/test_check_repo_hygiene.py
+          python tools/test_check_coverage.py
+          python tools/test_import_bls_foods.py
