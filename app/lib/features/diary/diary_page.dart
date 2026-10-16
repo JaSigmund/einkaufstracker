@@ -240,7 +240,7 @@ class DiaryPage extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             '${w.daysLogged == 1 ? '1 Tag' : '${w.daysLogged} Tage'} erfasst${w.hasEstimates ? ', enthält Schätzwerte' : ''}',
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
         ]),
       ),
@@ -267,7 +267,7 @@ class DiaryPage extends ConsumerWidget {
                 if (info.hasEstimates) 'enthält Schätzwerte',
               ].join(' · '),
               key: Key('day-quality-${day.year}-${day.month}-${day.day}'),
-              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
         ],
       ]),

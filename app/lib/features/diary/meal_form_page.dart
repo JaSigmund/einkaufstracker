@@ -1158,7 +1158,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
                 'USDA-Durchschnitt',
               ].join(' · '),
               key: Key('prep-info-$i'),
-              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
           ),
       ]),
@@ -1229,7 +1229,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             Text(
               totals.unknown == 1 ? 'Für 1 Zutat sind keine Nährwerte bekannt.' : 'Für ${totals.unknown} Zutaten sind keine Nährwerte bekannt.',
               key: const Key('meal-totals-unknown'),
-              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
             ),
         ]),
       ),

@@ -225,7 +225,7 @@ class _ProductRow extends StatelessWidget {
                     ),
                   ]),
                 if (top != null && top.trust == MatchTrust.unknown)
-                  Text('Unsicher: bitte prüfen oder einen anderen Eintrag wählen.', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+                  Text('Unsicher: bitte prüfen oder einen anderen Eintrag wählen.', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                 Wrap(spacing: 4, children: [
                   if (top != null) TextButton(key: Key('nutrients-apply-${product.id}'), onPressed: () => onApply(top), child: const Text('Übernehmen')),
                   TextButton(key: Key('nutrients-change-${product.id}'), onPressed: onChange, child: const Text('Anderen wählen')),

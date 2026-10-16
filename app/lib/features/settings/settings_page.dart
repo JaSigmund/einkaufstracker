@@ -365,7 +365,7 @@ class SettingsPage extends ConsumerWidget {
                         error: (_, _) => 'Einkaufstracker',
                       ),
                   key: const Key('app-version'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),

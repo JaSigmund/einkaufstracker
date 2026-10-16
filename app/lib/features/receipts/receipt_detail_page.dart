@@ -165,7 +165,7 @@ class ReceiptDetailPage extends ConsumerWidget {
     );
   }
 
-  TextStyle _excludedStyle(ThemeData t) => TextStyle(decoration: TextDecoration.lineThrough, color: t.colorScheme.outline);
+  TextStyle _excludedStyle(ThemeData t) => TextStyle(decoration: TextDecoration.lineThrough, color: t.colorScheme.onSurfaceVariant);
 
   /// Schalter "Von jemand anderem bezahlt" (ADR-020): wirkt nur auf diese Position (und bei einem Artikel auf
   /// die Rabatte direkt darunter), nicht auf gleiche Artikel anderer Bons.

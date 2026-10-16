@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -119,7 +120,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Noch zu kaufen: ca. ${formatEuro(estimate.totalCents)}', key: const Key('shopping-estimate-total'), style: t.textTheme.titleMedium),
-          Text('nach dem zuletzt bezahlten Preis', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          Text('nach dem zuletzt bezahlten Preis', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           if (!estimate.isComplete)
             Text(
               estimate.itemsWithoutPrice == 1
@@ -162,7 +163,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
               child: ChoiceChip(key: Key('sort-store-${s.id}'), label: Text(storeLabel(s)), selected: _sortStoreId == s.id, onSelected: (_) => _setSort(s.id)),
             ),
         ] else
-          Padding(padding: const EdgeInsets.only(top: 12), child: Text('Reihenfolge je Markt festlegen', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline))),
+          Padding(padding: const EdgeInsets.only(top: 12), child: Text('Reihenfolge je Markt festlegen', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant))),
       ]),
     );
   }
@@ -172,18 +173,26 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   Widget _listChips(ThemeData t, List<ShoppingList> lists, String? selectedId, List<ShoppingListItem> all) {
     int open(String id) => all.where((i) => i.listId == id && !i.checked && !i.isSuggestion).length;
     return SizedBox(
-      height: 52,
-      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), children: [
+      // 48 dp Tippflaeche je Chip plus 4 dp Rand oben und unten (Codereview-Fund 2026-10-16: vorher 52 mit 8 dp Rand, das
+      // stauchte die Chips auf 36 dp, unter das Android-Minimum von 48 dp).
+      height: 56,
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), children: [
         for (final l in lists)
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onLongPress: () => _listMenu(l),
-              child: ChoiceChip(
-                key: Key('list-chip-${l.id}'),
-                label: Text(open(l.id) > 0 ? '${l.name} (${open(l.id)})' : l.name),
-                selected: l.id == selectedId,
-                onSelected: (_) => ref.read(selectedShoppingListProvider.notifier).select(l.isDefault ? null : l.id),
+            // Langes Druecken oeffnet das Listenmenue; fuer Screenreader als benannte Aktion statt als namenlose Geste
+            // (Codereview-Fund 2026-10-16, labeledTapTargetGuideline in test/ui_accessibility_test.dart).
+            child: Semantics(
+              customSemanticsActions: {const CustomSemanticsAction(label: 'Liste bearbeiten'): () => _listMenu(l)},
+              child: GestureDetector(
+                excludeFromSemantics: true,
+                onLongPress: () => _listMenu(l),
+                child: ChoiceChip(
+                  key: Key('list-chip-${l.id}'),
+                  label: Text(open(l.id) > 0 ? '${l.name} (${open(l.id)})' : l.name),
+                  selected: l.id == selectedId,
+                  onSelected: (_) => ref.read(selectedShoppingListProvider.notifier).select(l.isDefault ? null : l.id),
+                ),
               ),
             ),
           ),
@@ -263,7 +272,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Bald aufgebraucht', style: t.textTheme.titleSmall),
-          Text('nach deinem Verbrauch der letzten Wochen, eine Schätzung', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          Text('nach deinem Verbrauch der letzten Wochen, eine Schätzung', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           for (final d in due)
             ListTile(
               key: Key('forecast-${d.product.id}'),
@@ -426,12 +435,14 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                 // (Wunsch "auch die Menge angeben koennen", 2026-09-28).
                 IconButton(
                   key: const Key('add-quantity-minus'),
+                  tooltip: 'Anzahl verringern',
                   onPressed: _addQuantity > 1 ? () => setState(() => _addQuantity -= 1) : null,
                   icon: const Icon(Icons.remove_circle_outline),
                 ),
                 SizedBox(width: 28, child: Text(formatQuantity(_addQuantity), textAlign: TextAlign.center, key: const Key('add-quantity-value'))),
                 IconButton(
                   key: const Key('add-quantity-plus'),
+                  tooltip: 'Anzahl erhöhen',
                   onPressed: () => setState(() => _addQuantity += 1),
                   icon: const Icon(Icons.add_circle_outline),
                 ),
@@ -445,7 +456,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                     onSubmitted: (_) => _addFreeText(),
                   ),
                 ),
-                IconButton(key: const Key('shopping-list-add'), icon: const Icon(Icons.add), onPressed: _addFreeText),
+                IconButton(key: const Key('shopping-list-add'), tooltip: 'Hinzufügen', icon: const Icon(Icons.add), onPressed: _addFreeText),
               ]),
             ]),
           ),
@@ -518,7 +529,15 @@ class _ItemTile extends ConsumerWidget {
         child: const Icon(Icons.delete_outline),
       ),
       onDismissed: (_) => ref.read(shoppingListRepositoryProvider).delete(item.id),
-      child: GestureDetector(
+      // Wischen (Loeschen) und langes Druecken (Verschieben) sind fuer Screenreader zusaetzlich benannte Aktionen
+      // (Codereview-Fund 2026-10-16).
+      child: Semantics(
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'In andere Liste verschieben'): () => _move(context, ref),
+          const CustomSemanticsAction(label: 'Löschen'): () => ref.read(shoppingListRepositoryProvider).delete(item.id),
+        },
+        child: GestureDetector(
+        excludeFromSemantics: true,
         onLongPress: () => _move(context, ref),
         child: CheckboxListTile(
         key: Key('shopping-item-${item.id}'),
@@ -535,6 +554,7 @@ class _ItemTile extends ConsumerWidget {
             child: Text('${formatQuantity(item.quantity)} ${item.unit}', style: Theme.of(context).textTheme.bodyMedium),
           ),
         ),
+      ),
       ),
       ),
     );

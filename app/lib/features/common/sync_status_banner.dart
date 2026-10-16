@@ -37,7 +37,7 @@ class SyncStatusBanner extends ConsumerWidget {
       icon = Icons.cloud_done_outlined;
       final last = status.lastSync;
       text = last == null ? 'Noch nicht synchronisiert' : 'Synchronisiert um ${last.hour.toString().padLeft(2, '0')}:${last.minute.toString().padLeft(2, '0')} Uhr';
-      color = t.colorScheme.outline;
+      color = t.colorScheme.onSurfaceVariant;
     }
 
     final conflict = !status.running && status.error == null && status.conflicts.isNotEmpty;
@@ -51,7 +51,7 @@ class SyncStatusBanner extends ConsumerWidget {
           Icon(icon, size: 18, color: color),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: t.textTheme.bodySmall?.copyWith(color: color))),
-          Text(conflict ? 'Tippen zum Bestätigen' : 'Tippen zum Aktualisieren', style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.outline)),
+          Text(conflict ? 'Tippen zum Bestätigen' : 'Tippen zum Aktualisieren', style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
     );

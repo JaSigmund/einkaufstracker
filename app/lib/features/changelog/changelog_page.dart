@@ -43,7 +43,7 @@ class ChangelogPage extends ConsumerWidget {
                             Expanded(child: Text(e.title, style: t.textTheme.titleMedium)),
                           ]),
                           const SizedBox(height: 4),
-                          Text(formatViennaDateTime(e.releasedAt).split(',').first, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+                          Text(formatViennaDateTime(e.releasedAt).split(',').first, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                           const SizedBox(height: 8),
                           for (final h in e.highlights)
                             Padding(

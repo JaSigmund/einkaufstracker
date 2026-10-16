@@ -78,7 +78,7 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
         const SizedBox(height: 4),
         Text(
           'Regalpreise aus dem Webshop (heisse-preise.io), getrennt von deinen Käufen. Ordne alle Artikel zu, die für dich dasselbe Produkt sind.',
-          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         Card(
@@ -149,7 +149,7 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
         ? OnlinePriceFreshness.stale
         : onlinePriceFreshness(available: cached.available, feedUpdatedAt: cached.feedUpdatedAt?.toUtc(), now: now);
     final dim = freshness != OnlinePriceFreshness.fresh;
-    final muted = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline);
+    final muted = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant);
     final name = cached?.name ?? link.linkedName;
     final isCheapest = cheapest != null && cheapest.store == link.store && cheapest.externalId == link.externalId;
 
@@ -190,7 +190,7 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
         Text(
           cached?.priceCents == null ? '–' : formatEuro(cached!.priceCents!),
           key: Key('online-price-$k'),
-          style: t.textTheme.titleSmall?.copyWith(color: dim ? t.colorScheme.outline : null),
+          style: t.textTheme.titleSmall?.copyWith(color: dim ? t.colorScheme.onSurfaceVariant : null),
         ),
         PopupMenuButton<String>(
           key: Key('online-menu-$k'),

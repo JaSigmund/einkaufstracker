@@ -147,6 +147,7 @@ class _CookingChatPanelState extends State<CookingChatPanel> {
               const SizedBox(width: 8),
               IconButton(
                 key: const Key('chat-send'),
+                tooltip: 'Senden',
                 icon: _sending
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.send),
