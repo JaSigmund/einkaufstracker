@@ -130,6 +130,20 @@ void main() {
     });
   });
 
+  group('Zeit', () {
+    // Codereview 2026-10-16 (B1): nur ueber appClock laesst sich die Uhr in Tests verstellen (withClock, FakeAsync und
+    // der Zeitreise-Lauf in der CI). Ausgenommen ist nur die App-Uhr selbst.
+    test('App und Tests lesen die Zeit ueber appClock, nie direkt von der Systemuhr', () {
+      final hits = [
+        for (final f in [..._dartFiles('lib'), ..._dartFiles('test')])
+          if (!_rel(f).endsWith('lib/core/clock.dart'))
+            for (final m in RegExp(r'DateTime\.(now|timestamp)\(\)|(?<![A-Za-z_])clock\.now\(\)').allMatches(f.readAsStringSync()))
+              '${_rel(f)}:${f.readAsStringSync().substring(0, m.start).split('\n').length}',
+      ];
+      expect(hits, isEmpty);
+    });
+  });
+
   group('Barrierefreiheit im Quelltext', () {
     test('jeder IconButton hat einen tooltip (Screenreader lesen ihn vor, sonst nur "Schaltflaeche")', () {
       final missing = <String>[];

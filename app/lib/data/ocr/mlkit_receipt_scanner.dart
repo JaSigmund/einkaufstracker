@@ -5,6 +5,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/clock.dart';
 import '../../domain/ocr/row_cluster.dart';
 import 'receipt_scanner.dart';
 
@@ -32,7 +33,7 @@ class MlKitReceiptScanner implements ReceiptScanner {
       final pages = <ScannedPage>[];
       for (var i = 0; i < images.length; i++) {
         final src = images[i].replaceFirst('file://', '');
-        final dst = p.join(dir.path, 'bon-${DateTime.now().microsecondsSinceEpoch}-p${i + 1}.jpg');
+        final dst = p.join(dir.path, 'bon-${appClock.now().microsecondsSinceEpoch}-p${i + 1}.jpg');
         await File(src).copy(dst);
         final text = await recognizer.processImage(InputImage.fromFilePath(dst));
         pages.add(ScannedPage(dst, [

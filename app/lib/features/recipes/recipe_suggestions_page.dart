@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
 import '../../domain/app_update/app_update_gate.dart';
@@ -54,7 +55,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
               dateKind: item.dateKind,
             ),
       ],
-      today: DateTime.now(),
+      today: appClock.now(),
     );
 
     if (ingredients.isEmpty) {
@@ -134,7 +135,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
           title: s.title,
           sourceUrl: buildRecipeSearchUrl(s.title),
           ingredients: ingredients,
-          savedAt: DateTime.now().toUtc(),
+          savedAt: appClock.now().toUtc(),
         ));
     if (!mounted) return;
     setState(() => _savedTitles.add(s.title));

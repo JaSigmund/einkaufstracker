@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/shopping_list/list_price_estimate.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
@@ -42,7 +43,7 @@ class ShoppingListRepository {
     final label = _checkedName(name, await _lists());
     final hid = await householdId();
     await _defaultListId(); // die Standardliste gibt es immer vor weiteren
-    final list = ShoppingList(id: _uuid.v4(), householdId: hid, name: label, isDefault: false, updatedAt: DateTime.now().toUtc());
+    final list = ShoppingList(id: _uuid.v4(), householdId: hid, name: label, isDefault: false, updatedAt: appClock.now().toUtc());
     await _putList(list);
     onChanged?.call();
     return list;
@@ -55,7 +56,7 @@ class ShoppingListRepository {
     if (list == null) return;
     final label = _checkedName(name, [for (final l in all) if (l.id != id) l]);
     if (label == list.name) return;
-    await _putList(list.copyWith(name: label, updatedAt: DateTime.now().toUtc()));
+    await _putList(list.copyWith(name: label, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -65,7 +66,7 @@ class ShoppingListRepository {
     final list = all.where((l) => l.id == id).firstOrNull;
     if (list == null || list.isDefault) return;
     final defaultId = await _defaultListId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final items = await (_db.select(_db.shoppingListItems)..where((i) => i.listId.equals(id) & i.deletedAt.isNull())).get();
     await _db.transaction(() async {
       for (final i in items) {
@@ -82,7 +83,7 @@ class ShoppingListRepository {
     if (target == null) throw ArgumentError('Die Liste gibt es nicht');
     final item = await _get(itemId);
     if (item.listId == listId) return;
-    await _putItem(item.copyWith(listId: listId, updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(listId: listId, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -104,7 +105,7 @@ class ShoppingListRepository {
           ..where((l) => l.householdId.equals(hid) & l.isDefault.equals(true) & l.deletedAt.isNull()))
         .getSingleOrNull();
     if (existing != null) return existing.id;
-    final list = ShoppingList(id: _uuid.v4(), householdId: hid, name: 'Einkaufsliste', isDefault: true, updatedAt: DateTime.now().toUtc());
+    final list = ShoppingList(id: _uuid.v4(), householdId: hid, name: 'Einkaufsliste', isDefault: true, updatedAt: appClock.now().toUtc());
     await _put('shopping_lists', list.id, shoppingListToRemote(list), () => _db.into(_db.shoppingLists).insertOnConflictUpdate(list.toCompanion(false)));
     return list.id;
   }
@@ -127,7 +128,7 @@ class ShoppingListRepository {
       checked: false,
       source: 'manual',
       isSuggestion: false,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(item);
     onChanged?.call();
@@ -164,7 +165,7 @@ class ShoppingListRepository {
         checked: false,
         source: 'manual',
         isSuggestion: false,
-        updatedAt: DateTime.now().toUtc(),
+        updatedAt: appClock.now().toUtc(),
       ));
       added++;
     }
@@ -175,7 +176,7 @@ class ShoppingListRepository {
   /// Abhaken/wieder aktivieren (LH-SHO-01).
   Future<void> setChecked(String id, bool checked) async {
     final item = await _get(id);
-    await _putItem(item.copyWith(checked: checked, updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(checked: checked, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -183,7 +184,7 @@ class ShoppingListRepository {
   /// zusammen mit dem Inhalt des Produkts (`products.pack_size`), siehe `shopping_list_page.dart`.
   Future<void> setQuantity(String id, double quantity) async {
     final item = await _get(id);
-    await _putItem(item.copyWith(quantity: quantity, updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(quantity: quantity, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -199,7 +200,7 @@ class ShoppingListRepository {
           ..where((i) => i.productId.equals(productId) & i.deletedAt.isNull() & i.checked.equals(false) & i.isSuggestion.equals(false)))
         .get();
     if (open.isEmpty) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     for (final item in open) {
       await _putItem(item.copyWith(checked: true, updatedAt: now));
     }
@@ -264,7 +265,7 @@ class ShoppingListRepository {
   /// Loeschen (LH-SHO-01), auch fuer das Verwerfen eines Vorschlags.
   Future<void> delete(String id) async {
     final item = await _get(id);
-    await _putItem(item.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(deletedAt: Value(appClock.now().toUtc()), updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -272,14 +273,14 @@ class ShoppingListRepository {
   Future<void> restore(String id) async {
     final item = await _get(id);
     if (item.deletedAt == null) return;
-    await _putItem(item.copyWith(deletedAt: const Value(null), updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(deletedAt: const Value(null), updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
   /// Bestaetigt einen automatischen Vorschlag: zaehlt danach wie ein normaler Eintrag (Doku 06 §6).
   Future<void> confirmSuggestion(String id) async {
     final item = await _get(id);
-    await _putItem(item.copyWith(isSuggestion: false, updatedAt: DateTime.now().toUtc()));
+    await _putItem(item.copyWith(isSuggestion: false, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -304,7 +305,7 @@ class ShoppingListRepository {
       checked: false,
       source: 'depleted',
       isSuggestion: true,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(item);
     onChanged?.call();
@@ -332,7 +333,7 @@ class ShoppingListRepository {
       checked: false,
       source: 'expiring',
       isSuggestion: false,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(item);
     onChanged?.call();
@@ -353,7 +354,7 @@ class ShoppingListRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 }

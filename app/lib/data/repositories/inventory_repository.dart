@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/nutrition/fefo_deduction.dart';
 import '../local/database.dart';
@@ -170,7 +171,7 @@ class InventoryRepository {
   /// stuende die Ware doppelt im Bestand und im Ledger. Vorschlaege anderer Bon-Positionen bleiben unberuehrt.
   Future<void> setReceiptLink(String inventoryItemId, String? receiptItemId) async {
     final item = await _get(inventoryItemId);
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     if (receiptItemId != null) {
       final absorbed = await (_db.select(_db.inventoryItems)
             ..where((i) =>
@@ -241,7 +242,7 @@ class InventoryRepository {
       status: 'sealed',
       isSuggestion: true,
       expiresOn: estimatedExpiry,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(item);
     if (existing == null) {
@@ -297,7 +298,7 @@ class InventoryRepository {
         openShelfLifeDays: Value(openShelfLifeDays ?? refine.openShelfLifeDays),
         isSuggestion: false,
         expiresOn: Value(computeExpiresOn(bestBefore: bestBefore, openShelfLifeDays: openShelfLifeDays ?? refine.openShelfLifeDays)),
-        updatedAt: DateTime.now().toUtc(),
+        updatedAt: appClock.now().toUtc(),
       );
       await _putItem(updated);
       final delta = quantity - refine.quantity;
@@ -323,7 +324,7 @@ class InventoryRepository {
       status: 'sealed',
       isSuggestion: false,
       expiresOn: expiresOn,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(item);
     await _addMovement(inventoryItemId: item.id, productId: productId, type: 'purchase', delta: quantity, unit: unit, now: now);
@@ -343,7 +344,7 @@ class InventoryRepository {
       openedOn: Value(today),
       openShelfLifeDays: Value(openDays),
       expiresOn: Value(computeExpiresOn(bestBefore: item.bestBefore, openedOn: today, openShelfLifeDays: openDays)),
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(updated);
     onChanged?.call();
@@ -355,7 +356,7 @@ class InventoryRepository {
   Future<void> _close(String id, String status, {DateTime? now}) async {
     final item = await _get(id);
     if (item.status == 'consumed' || item.status == 'discarded') return;
-    final nowUtc = DateTime.now().toUtc();
+    final nowUtc = appClock.now().toUtc();
     final updated = item.copyWith(status: status, closedAt: Value(nowUtc), updatedAt: nowUtc);
     await _putItem(updated);
     if (item.quantity != 0) {
@@ -384,7 +385,7 @@ class InventoryRepository {
   Future<void> reopen(String id) async {
     final item = await _get(id);
     if (item.status != 'consumed' && item.status != 'discarded') return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final updated = item.copyWith(status: item.openedOn != null ? 'opened' : 'sealed', closedAt: const Value(null), updatedAt: now);
     await _putItem(updated);
     final movement = await (_db.select(_db.inventoryMovements)
@@ -416,7 +417,7 @@ class InventoryRepository {
       dateKind: dateKind ?? item.dateKind,
       location: location ?? item.location,
       expiresOn: Value(computeExpiresOn(bestBefore: newBestBefore, openedOn: item.openedOn, openShelfLifeDays: item.openShelfLifeDays)),
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _putItem(updated);
     onChanged?.call();
@@ -426,7 +427,7 @@ class InventoryRepository {
   Future<void> adjustQuantity(String id, double newQuantity, {DateTime? now}) async {
     final item = await _get(id);
     final delta = newQuantity - item.quantity;
-    final updated = item.copyWith(quantity: newQuantity, updatedAt: DateTime.now().toUtc());
+    final updated = item.copyWith(quantity: newQuantity, updatedAt: appClock.now().toUtc());
     await _putItem(updated);
     if (delta != 0) {
       await _addMovement(inventoryItemId: item.id, productId: item.productId, type: 'adjustment', delta: delta, unit: item.unit, now: now);
@@ -445,7 +446,7 @@ class InventoryRepository {
   /// als Bonvorschlag auftauchen").
   Future<void> deleteItem(String id) async {
     final item = await _get(id);
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     if (item.receiptItemId != null) {
       final reverted = item.copyWith(
         isSuggestion: true,
@@ -474,7 +475,7 @@ class InventoryRepository {
   Future<void> discardSuggestion(String id) async {
     final item = await _get(id);
     if (!item.isSuggestion) return;
-    final updated = item.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
+    final updated = item.copyWith(deletedAt: Value(appClock.now().toUtc()), updatedAt: appClock.now().toUtc());
     await _putItem(updated);
     onChanged?.call();
   }
@@ -490,7 +491,7 @@ class InventoryRepository {
           ..where((i) => i.receiptItemId.isIn(ids) & i.isSuggestion.equals(true) & i.deletedAt.isNull()))
         .get();
     if (items.isEmpty) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     for (final item in items) {
       await _putItem(item.copyWith(deletedAt: Value(now), updatedAt: now));
     }
@@ -552,7 +553,7 @@ class InventoryRepository {
       quantity,
     );
 
-    final nowUtc = DateTime.now().toUtc();
+    final nowUtc = appClock.now().toUtc();
     for (final a in result.allocations) {
       final item = byId[a.inventoryItemId]!;
       // Wie die Datenbank (numeric(10,3)): ohne Runden stuende lokal z.B. -0.30000000000000004 im Ledger, am Server -0.3
@@ -613,7 +614,7 @@ class InventoryRepository {
       sample[m.inventoryItemId!] = m;
     }
 
-    final nowUtc = now ?? DateTime.now().toUtc();
+    final nowUtc = now ?? appClock.now().toUtc();
     var restored = 0;
     for (final entry in outstanding.entries) {
       final amount = _round3(entry.value);
@@ -631,7 +632,7 @@ class InventoryRepository {
         closedAt: wasEmptied ? const Value(null) : Value(item.closedAt),
         openedOn: reseal ? const Value(null) : Value(item.openedOn),
         expiresOn: reseal ? Value(computeExpiresOn(bestBefore: item.bestBefore)) : Value(item.expiresOn),
-        updatedAt: DateTime.now().toUtc(),
+        updatedAt: appClock.now().toUtc(),
       ));
       await _addMovement(
         inventoryItemId: item.id,
@@ -690,13 +691,13 @@ class InventoryRepository {
       householdId: hid,
       inventoryItemId: inventoryItemId,
       productId: productId,
-      occurredAt: now ?? DateTime.now().toUtc(),
+      occurredAt: now ?? appClock.now().toUtc(),
       type: type,
       quantityDelta: delta,
       unit: unit,
       note: note,
       mealId: mealId,
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _put('inventory_movements', m.id, inventoryMovementToRemote(m),
         () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(m.toCompanion(false)));
@@ -708,13 +709,13 @@ class InventoryRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 
   /// Heutiges Kalenderdatum in Wiener Ortszeit (Doku FR-07), als UTC-Mitternacht dieses Tages gespeichert.
   DateTime _today(DateTime? now) {
-    final local = utcToViennaLocal(now ?? DateTime.now().toUtc());
+    final local = utcToViennaLocal(now ?? appClock.now().toUtc());
     return DateTime.utc(local.year, local.month, local.day);
   }
 }

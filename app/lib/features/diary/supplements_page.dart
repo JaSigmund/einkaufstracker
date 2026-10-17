@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/micros.dart';
@@ -19,7 +20,7 @@ class SupplementsPage extends ConsumerWidget {
   final DateTime? now;
 
   DateTime _today() {
-    final l = utcToViennaLocal(now ?? DateTime.now().toUtc());
+    final l = utcToViennaLocal(now ?? appClock.now().toUtc());
     return DateTime(l.year, l.month, l.day);
   }
 

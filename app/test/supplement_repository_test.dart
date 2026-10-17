@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
@@ -80,7 +81,7 @@ void main() {
 
     test('ohne Angaben: eine Einheit, jetzt', () async {
       final s = await d3();
-      final before = DateTime.now().toUtc();
+      final before = appClock.now().toUtc();
       final i = await repo.take(s);
       expect(i.servings, 1);
       expect(i.takenAt.isBefore(before), isFalse);

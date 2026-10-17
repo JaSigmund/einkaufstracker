@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/nutrition/micros.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
@@ -45,7 +46,7 @@ class SupplementRepository {
     final cleaned = parseMicros(micros);
     if (cleaned == null) throw ArgumentError('Eine Ergänzung braucht mindestens einen Wert');
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final existing = id == null ? null : await get(id);
     final row = Supplement(
       id: existing?.id ?? _uuid.v4(),
@@ -69,7 +70,7 @@ class SupplementRepository {
   Future<void> delete(String id) async {
     final existing = await get(id);
     if (existing == null || existing.deletedAt != null) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final row = existing.copyWith(deletedAt: Value(now), updatedAt: now);
     await _db.transaction(() async {
       await _db.into(_db.supplements).insertOnConflictUpdate(row.toCompanion(false));
@@ -84,7 +85,7 @@ class SupplementRepository {
     if (!(servings > 0) || !servings.isFinite) throw ArgumentError('Die Anzahl muss größer als 0 sein');
     final perServing = parseMicros(supplement.micros);
     if (perServing == null) throw StateError('Die Ergänzung hat keine Werte');
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final row = SupplementIntake(
       id: _uuid.v4(),
       householdId: supplement.householdId,
@@ -108,7 +109,7 @@ class SupplementRepository {
   Future<void> deleteIntake(String id) async {
     final existing = await (_db.select(_db.supplementIntakes)..where((i) => i.id.equals(id))).getSingleOrNull();
     if (existing == null || existing.deletedAt != null) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final row = existing.copyWith(deletedAt: Value(now), updatedAt: now);
     await _db.transaction(() async {
       await _db.into(_db.supplementIntakes).insertOnConflictUpdate(row.toCompanion(false));
@@ -121,13 +122,13 @@ class SupplementRepository {
         remoteTable: 'supplements',
         rowId: row.id,
         payload: jsonEncode(supplementToRemote(row)),
-        createdAt: DateTime.now().toUtc(),
+        createdAt: appClock.now().toUtc(),
       ));
 
   Future<void> _enqueueIntake(SupplementIntake row) => _db.into(_db.outbox).insert(OutboxCompanion.insert(
         remoteTable: 'supplement_intakes',
         rowId: row.id,
         payload: jsonEncode(supplementIntakeToRemote(row)),
-        createdAt: DateTime.now().toUtc(),
+        createdAt: appClock.now().toUtc(),
       ));
 }

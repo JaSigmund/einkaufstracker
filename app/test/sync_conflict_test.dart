@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/sync/sync_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -187,12 +188,12 @@ void main() {
     await engineB.sync();
     final onA = (await a.select(a.products).get()).single;
     await categoryRepo(a).rename(id, 'Früchte');
-    await productRepo(a).update(onA.copyWith(name: 'Basmati', updatedAt: DateTime.now().toUtc()));
+    await productRepo(a).update(onA.copyWith(name: 'Basmati', updatedAt: appClock.now().toUtc()));
     await engineA.sync();
 
     await categoryRepo(b).rename(id, 'Fruits');
     final onB = (await b.select(b.products).get()).single;
-    await productRepo(b).update(onB.copyWith(name: 'Langkorn', updatedAt: DateTime.now().toUtc()));
+    await productRepo(b).update(onB.copyWith(name: 'Langkorn', updatedAt: appClock.now().toUtc()));
     remote.failLookupFor.add('products');
     final r = await engineB.sync();
 

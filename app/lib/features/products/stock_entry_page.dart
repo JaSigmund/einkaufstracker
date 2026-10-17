@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/label_dates.dart';
@@ -57,7 +58,7 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
       final bytes = await ref.read(labelPhotoPickerProvider)(camera: true);
       if (bytes == null) return;
       final text = await ref.read(labelTextReaderProvider).read(bytes);
-      final found = extractLabelDates(text ?? '', today: DateTime.now());
+      final found = extractLabelDates(text ?? '', today: appClock.now());
       // das Lesen ist fertig: der Fortschrittskreis darf nicht weiterlaufen, waehrend der Dialog auf die Auswahl wartet
       if (mounted) setState(() => _scanning = false);
       if (found.isEmpty) {
@@ -81,14 +82,14 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
 
   Future<void> _pickDate({int? addDays}) async {
     if (addDays != null) {
-      setState(() => _date = DateTime.now().add(Duration(days: addDays)));
+      setState(() => _date = appClock.now().add(Duration(days: addDays)));
       return;
     }
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 3650)),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDate: _date ?? appClock.now(),
+      firstDate: appClock.now().subtract(const Duration(days: 3650)),
+      lastDate: appClock.now().add(const Duration(days: 3650)),
     );
     if (picked != null) setState(() => _date = picked);
   }

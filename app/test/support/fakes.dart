@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:flutter/widgets.dart' show BuildContext;
 
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
@@ -698,8 +699,8 @@ class FakeHouseholdInviteRepository implements HouseholdInviteRepository {
       id: 'inv$_n',
       email: email,
       token: 'ABCDEFGHJKM${'NPQRSTUVWXYZ'[_n % 12]}',
-      expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
-      createdAt: DateTime.now().toUtc(),
+      expiresAt: appClock.now().toUtc().add(const Duration(days: 7)),
+      createdAt: appClock.now().toUtc(),
     );
     invites.insert(0, invite);
     return invite;

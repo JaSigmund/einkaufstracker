@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../data/household/household_invites.dart';
 import '../../domain/household/invite_code.dart';
 
@@ -90,7 +91,7 @@ class HouseholdPage extends ConsumerWidget {
     final invites = ref.watch(householdInvitesProvider);
     final members = ref.watch(householdMemberCountProvider);
     final t = Theme.of(context);
-    final current = now ?? DateTime.now().toUtc();
+    final current = now ?? appClock.now().toUtc();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Haushalt')),

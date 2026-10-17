@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../core/vienna_time.dart';
@@ -34,7 +35,7 @@ class ReceiptsOverview extends ConsumerStatefulWidget {
 }
 
 class _ReceiptsOverviewState extends ConsumerState<ReceiptsOverview> {
-  late int _month = _monthKey(widget.now ?? DateTime.now().toUtc());
+  late int _month = _monthKey(widget.now ?? appClock.now().toUtc());
   String? _chain; // null = alle Maerkte
 
   @override
@@ -51,7 +52,7 @@ class _ReceiptsOverviewState extends ConsumerState<ReceiptsOverview> {
         String chainOf(Receipt r) => storeById[r.storeId]?.chain ?? 'Unbekannt';
 
         // Auswahl: alle Monate mit Bons plus der aktuelle; alle Maerkte mit Bons
-        final currentKey = _monthKey(widget.now ?? DateTime.now().toUtc());
+        final currentKey = _monthKey(widget.now ?? appClock.now().toUtc());
         final monthKeys = {currentKey, _month, for (final r in list) _monthKey(r.purchasedAt)}..remove(allMonths);
         final months = monthKeys.toList()..sort((a, b) => b.compareTo(a));
         final chains = {for (final r in list) chainOf(r)}.toList()..sort();

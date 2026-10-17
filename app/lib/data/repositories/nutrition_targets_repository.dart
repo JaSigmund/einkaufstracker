@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../core/clock.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
@@ -23,14 +24,14 @@ class NutritionTargetsRepository {
   /// loeschen), damit der Sync die Aenderung auch auf andere Geraete bringt.
   Future<void> save(NutritionTargets targets) async {
     final hid = await householdId();
-    final row = NutritionTargetRow(householdId: hid, targets: jsonEncode(targets.toJson()), updatedAt: DateTime.now().toUtc());
+    final row = NutritionTargetRow(householdId: hid, targets: jsonEncode(targets.toJson()), updatedAt: appClock.now().toUtc());
     await _db.transaction(() async {
       await _db.into(_db.nutritionTargetRows).insertOnConflictUpdate(row.toCompanion(false));
       await _db.into(_db.outbox).insert(OutboxCompanion.insert(
             remoteTable: 'nutrition_targets',
             rowId: hid,
             payload: jsonEncode(nutritionTargetToRemote(row)),
-            createdAt: DateTime.now().toUtc(),
+            createdAt: appClock.now().toUtc(),
           ));
     });
     onChanged?.call();

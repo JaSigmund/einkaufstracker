@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/categorization/categorizer.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/receipt/parsed_receipt.dart';
@@ -196,7 +197,7 @@ class ReceiptRepository {
       throw ArgumentError('Der Bon wurde nicht gelesen und kann nicht gespeichert werden.');
     }
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final categorizer = await _buildCategorizer(hid);
     final storableIds = productRepo != null && inventoryRepo != null ? await _storableCategoryIds(hid) : const <String>{};
     final purchasedOn = _viennaDate(r.purchasedAtUtc!);
@@ -342,7 +343,7 @@ class ReceiptRepository {
   /// Rueckgabe: Anzahl der geaenderten Positionen.
   Future<int> setItemCategory(String itemId, String categoryId) async {
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     var changed = 0;
     await _db.transaction(() async {
       final item = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(itemId))).getSingle();
@@ -394,7 +395,7 @@ class ReceiptRepository {
   /// die eigene Ausgabe senken. Rabatte auf den ganzen Bon (`bill_discount`) bleiben unberuehrt, siehe ADR-020.
   /// Rueckgabe: Anzahl der geaenderten Positionen (Artikel plus mitgenommene Rabatte).
   Future<int> setItemExcluded(String itemId, bool excluded) async {
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     var changed = 0;
     await _db.transaction(() async {
       final item = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(itemId))).getSingle();
@@ -427,7 +428,7 @@ class ReceiptRepository {
   /// Rueckgabe: Anzahl der geaenderten Positionen.
   Future<int> categorizeMissing() async {
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final categorizer = await _buildCategorizer(hid);
     var changed = await _repairBillDiscounts(hid);
     await _db.transaction(() async {
@@ -478,7 +479,7 @@ class ReceiptRepository {
           ..where((i) =>
               i.receiptId.isIn(pdfReceipts.map((r) => r.id)) & i.kind.equals('discount') & i.taxCode.isNull() & i.deletedAt.isNull()))
         .get();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     for (final i in legacy) {
       final fixed = i.copyWith(kind: billDiscountKind, categoryId: const Value(null), needsReview: false, updatedAt: now);
       await _put('receipt_items', i.id, receiptItemToRemote(fixed),
@@ -489,7 +490,7 @@ class ReceiptRepository {
 
   /// Loescht einen Bon samt Positionen (Soft-Delete, wird mit dem Server synchronisiert).
   Future<void> softDelete(String receiptId) async {
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     await _db.transaction(() async {
       final r = await (_db.select(_db.receipts)..where((x) => x.id.equals(receiptId))).getSingleOrNull();
       if (r == null || r.deletedAt != null) return;
@@ -521,7 +522,7 @@ class ReceiptRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 }

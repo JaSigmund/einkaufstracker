@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
@@ -42,7 +43,7 @@ class BugReportRepository {
     final t = title.trim();
     if (t.isEmpty) throw ArgumentError('Titel darf nicht leer sein');
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final report = BugReport(
       id: _uuid.v4(),
       householdId: hid,
@@ -66,7 +67,7 @@ class BugReportRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 }

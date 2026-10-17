@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/clock.dart';
 import '../data/app_config/app_config_repository.dart';
 import '../domain/inventory/usage_forecast.dart';
 import '../domain/notifications/expiry_stages.dart';
@@ -210,7 +211,7 @@ class SyncController extends Notifier<SyncStatus> {
     state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts, rejected: state.rejected);
     try {
       final result = await engine.sync();
-      state = SyncStatus(lastSync: DateTime.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts), rejected: result.rejected);
+      state = SyncStatus(lastSync: appClock.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts), rejected: result.rejected);
       // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
       // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
       await ref.read(receiptRepositoryProvider).categorizeMissing();
@@ -276,11 +277,11 @@ class HouseholdSize extends Notifier<int> {
 
   /// Fragt den Server, hoechstens alle [householdSizeMaxAge]. Ein Fehler (offline) laesst den bisherigen Wert stehen.
   Future<void> refreshIfStale() async {
-    if (!isHouseholdSizeStale(fetchedAt: _fetchedAt, now: DateTime.now())) return;
+    if (!isHouseholdSizeStale(fetchedAt: _fetchedAt, now: appClock.now())) return;
     try {
       final n = await ref.read(householdInviteRepositoryProvider).memberCount();
       if (!ref.mounted) return;
-      _fetchedAt = DateTime.now();
+      _fetchedAt = appClock.now();
       state = n < 1 ? 1 : n;
       await ref.read(databaseProvider).setKv(_kv, state.toString());
     } catch (_) {
@@ -373,7 +374,7 @@ final mealIngredientsStreamProvider = StreamProvider((ref) => ref.watch(mealRepo
 
 /// Ledger-Bewegungen der letzten 12 Wochen fuer die Verbrauchsbilanz (LH-MEAL-10).
 final balanceMovementsProvider = StreamProvider((ref) {
-  final since = DateTime.now().toUtc().subtract(const Duration(days: 7 * 12));
+  final since = appClock.now().toUtc().subtract(const Duration(days: 7 * 12));
   return ref.watch(inventoryRepositoryProvider).watchMovementsSince(since);
 });
 
@@ -401,7 +402,7 @@ final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
         (productId: m.productId, occurredAtUtc: m.occurredAt, type: m.type, quantityDelta: m.quantityDelta, unit: m.unit, mealId: m.mealId),
     ],
     stock: stock,
-    now: DateTime.now().toUtc(),
+    now: appClock.now().toUtc(),
   );
 });
 
@@ -527,7 +528,7 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final items = [...await inventoryRepo.activeSnapshot(), ...await inventoryRepo.suggestionsSnapshot()];
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
-  now ??= DateTime.now();
+  now ??= appClock.now();
   // Mehrstufige Erinnerungen (Ausbau 1.14): gemeinsame Einstellungen des Haushalts; ohne sie oder bei einem Lesefehler gilt wie bisher
   // die eine Vorlaufzeit der Einstellungen
   Map<String, Object?> prefs = const {};

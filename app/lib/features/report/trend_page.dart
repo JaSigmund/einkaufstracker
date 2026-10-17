@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/receipt/month_report.dart';
@@ -36,7 +37,7 @@ class _TrendPageState extends ConsumerState<TrendPage> {
     if (receipts.isLoading || items.isLoading) return const Center(child: CircularProgressIndicator());
     if (receipts.hasError || items.hasError) return Center(child: Text('Fehler: ${receipts.error ?? items.error}'));
 
-    final local = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final local = utcToViennaLocal(widget.now ?? appClock.now().toUtc());
     final trend = buildTrend(
       [for (final r in receipts.value!) (id: r.id, purchasedAtUtc: r.purchasedAt)],
       reportItemsOf(items.value!).own, // von jemand anderem bezahlte Positionen zaehlen nicht (ADR-020)

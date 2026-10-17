@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/consumption_balance.dart';
@@ -50,7 +51,7 @@ class BalanceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final weeks = weeklyBalanceOf(ref);
     if (weeks == null) return const SizedBox.shrink();
-    final today = utcToViennaLocal(now ?? DateTime.now().toUtc());
+    final today = utcToViennaLocal(now ?? appClock.now().toUtc());
     final monday = DateTime(today.year, today.month, today.day - (today.weekday - 1));
     final week = weeks.where((w) => w.weekStart == monday).firstOrNull;
     final t = Theme.of(context);

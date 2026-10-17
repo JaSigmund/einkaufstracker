@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../../core/clock.dart';
+
 /// Technischer Stand zum Zeitpunkt eines Fehlerberichts (siehe `bug_reports.app_info`).
 ///
 /// Bewusst ohne zusaetzliches Paket (package_info_plus): die App-Version wird bisher nicht pro Release
@@ -12,7 +14,7 @@ Map<String, dynamic> collectAppInfo({
   String? lastSyncError,
   DateTime? lastSyncAt,
 }) {
-  final now = DateTime.now().toUtc();
+  final now = appClock.now().toUtc();
   return {
     'platform': Platform.operatingSystem,
     'os_version': Platform.operatingSystemVersion,

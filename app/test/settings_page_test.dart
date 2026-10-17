@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
 import 'package:einkaufstracker/features/settings/settings_page.dart';
@@ -124,7 +125,7 @@ void main() {
       final auth = FakeAuth(failSignOutWith: 'Netzwerkfehler');
       final db = memoryDb();
       addTearDown(db.close);
-      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: DateTime.now().toUtc()));
+      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: appClock.now().toUtc()));
 
       await tester.pumpWidget(deleteHost(auth, db: db));
       await tester.pumpAndSettle();
@@ -204,7 +205,7 @@ void main() {
       final auth = FakeAuth();
       final db = memoryDb();
       addTearDown(db.close);
-      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: DateTime.now().toUtc()));
+      await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Milch', updatedAt: appClock.now().toUtc()));
 
       await tester.pumpWidget(signOutHost(auth, db: db));
       await tester.pumpAndSettle();

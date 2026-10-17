@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/online_prices/online_price.dart';
 import '../local/database.dart';
 import '../online_prices/online_price_remote.dart';
@@ -153,6 +154,6 @@ class OnlinePriceRepository {
         remoteTable: 'product_online_links',
         rowId: row.id,
         payload: jsonEncode(productOnlineLinkToRemote(row)),
-        createdAt: DateTime.now().toUtc(),
+        createdAt: appClock.now().toUtc(),
       ));
 }

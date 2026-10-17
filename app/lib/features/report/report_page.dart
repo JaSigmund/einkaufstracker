@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/receipt/month_report.dart';
@@ -33,7 +34,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
   @override
   void initState() {
     super.initState();
-    final local = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final local = utcToViennaLocal(widget.now ?? appClock.now().toUtc());
     _year = local.year;
     _month = local.month;
   }
@@ -86,7 +87,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
     final settings = ref.watch(householdSettingsProvider).value;
     final t = Theme.of(context);
-    final currentLocal = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final currentLocal = utcToViennaLocal(widget.now ?? appClock.now().toUtc());
     final isCurrentMonth = _year == currentLocal.year && _month == currentLocal.month;
 
     if (receipts.isLoading || items.isLoading) return const Center(child: CircularProgressIndicator());

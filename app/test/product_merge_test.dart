@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,7 +32,7 @@ void main() {
           rawText: 'Vollmilch Alt',
           lineTotalCents: 99,
           productId: Value(source.id),
-          updatedAt: DateTime.now().toUtc(),
+          updatedAt: appClock.now().toUtc(),
         ));
 
     await products.mergeInto(source.id, target.id);
@@ -59,10 +60,10 @@ void main() {
     // Simuliert zwei unabhaengig gelernte Alias-Zeilen mit demselben normalisierten Text (kann durch
     // parallele Geraete/Sync entstehen, auch wenn findOrCreateForReceiptItem das normalerweise verhindert).
     await db.into(db.productAliases).insert(ProductAliasesCompanion.insert(
-          id: 'a-source', householdId: 'h1', aliasText: 'bergkaese', productId: source.id, updatedAt: DateTime.now().toUtc()),
+          id: 'a-source', householdId: 'h1', aliasText: 'bergkaese', productId: source.id, updatedAt: appClock.now().toUtc()),
         );
     await db.into(db.productAliases).insert(ProductAliasesCompanion.insert(
-          id: 'a-target', householdId: 'h1', aliasText: 'bergkaese', productId: target.id, updatedAt: DateTime.now().toUtc()),
+          id: 'a-target', householdId: 'h1', aliasText: 'bergkaese', productId: target.id, updatedAt: appClock.now().toUtc()),
         );
 
     await products.mergeInto(source.id, target.id);

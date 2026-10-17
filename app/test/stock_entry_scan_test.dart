@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/ocr/label_text_reader.dart';
 import 'package:einkaufstracker/features/products/stock_entry_page.dart';
@@ -31,7 +32,7 @@ void main() {
   setUp(() => db = memoryDb());
   tearDown(() => db.close());
 
-  final year = DateTime.now().year + 1;
+  final year = appClock.now().year + 1;
   Product product({String dateKind = 'best_before'}) => Product(
         id: 'p1', householdId: 'h1', name: 'Joghurt', baseUnit: 'piece', defaultDateKind: dateKind, defaultLocation: 'fridge', restock: false, updatedAt: DateTime.utc(2026),
       );

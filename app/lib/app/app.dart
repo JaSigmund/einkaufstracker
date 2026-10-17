@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/clock.dart';
 import '../domain/sync/sync_schedule.dart';
 import '../features/receipt_import/shared_pdf_importer.dart';
 import 'providers.dart';
@@ -50,7 +51,7 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
 
   void _syncIfDue() {
     final last = ref.read(syncControllerProvider).lastSync;
-    final since = last == null ? null : DateTime.now().difference(last);
+    final since = last == null ? null : appClock.now().difference(last);
     if (isSyncDue(members: ref.read(householdSizeProvider), sinceLastSync: since)) _sync();
   }
 

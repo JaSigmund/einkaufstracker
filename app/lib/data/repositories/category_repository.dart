@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
@@ -45,7 +46,7 @@ class CategoryRepository {
         .getSingleOrNull();
     if (existing != null && existing.deletedAt == null) throw DuplicateCategoryException(n);
 
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     if (existing != null) {
       // Geloeschte Kategorie gleichen Namens wieder aktivieren (der Server haelt den Namen reserviert)
       await _write(existing.copyWith(deletedAt: const Value(null), isStorable: isStorable, updatedAt: now));
@@ -76,17 +77,17 @@ class CategoryRepository {
           ..where((c) => c.householdId.equals(row.householdId) & c.name.equals(n) & c.id.equals(id).not() & c.deletedAt.isNull()))
         .getSingleOrNull();
     if (clash != null) throw DuplicateCategoryException(n);
-    await _write(row.copyWith(name: n, updatedAt: DateTime.now().toUtc()));
+    await _write(row.copyWith(name: n, updatedAt: appClock.now().toUtc()));
   }
 
   Future<void> setStorable(String id, bool value) async {
     final row = await (_db.select(_db.categories)..where((c) => c.id.equals(id))).getSingle();
-    await _write(row.copyWith(isStorable: value, updatedAt: DateTime.now().toUtc()));
+    await _write(row.copyWith(isStorable: value, updatedAt: appClock.now().toUtc()));
   }
 
   Future<void> softDelete(String id) async {
     final row = await (_db.select(_db.categories)..where((c) => c.id.equals(id))).getSingle();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     await _write(row.copyWith(deletedAt: Value(now), updatedAt: now));
   }
 
@@ -98,7 +99,7 @@ class CategoryRepository {
             remoteTable: 'categories',
             rowId: row.id,
             payload: jsonEncode(categoryToRemote(row)),
-            createdAt: DateTime.now().toUtc(),
+            createdAt: appClock.now().toUtc(),
           ));
     });
     onChanged?.call();

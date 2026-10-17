@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/categorization/name_similarity.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
@@ -54,7 +55,7 @@ class ProductRepository {
   /// vorgeschlagen, statt automatisch an dieses Produkt gehaengt zu werden.
   Future<void> removeAlias(String aliasId) async {
     final alias = await (_db.select(_db.productAliases)..where((a) => a.id.equals(aliasId))).getSingle();
-    final updated = alias.copyWith(deletedAt: Value(DateTime.now().toUtc()), updatedAt: DateTime.now().toUtc());
+    final updated = alias.copyWith(deletedAt: Value(appClock.now().toUtc()), updatedAt: appClock.now().toUtc());
     await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
   }
@@ -197,7 +198,7 @@ class ProductRepository {
       .get();
 
   Future<void> _learnAlias(String key, String productId, String householdId) async {
-    final a = ProductAlias(id: _uuid.v4(), householdId: householdId, aliasText: key, productId: productId, hits: 1, updatedAt: DateTime.now().toUtc());
+    final a = ProductAlias(id: _uuid.v4(), householdId: householdId, aliasText: key, productId: productId, hits: 1, updatedAt: appClock.now().toUtc());
     await _put('product_aliases', a.id, productAliasToRemote(a), () => _db.into(_db.productAliases).insertOnConflictUpdate(a.toCompanion(false)));
   }
 
@@ -230,7 +231,7 @@ class ProductRepository {
       throw ArgumentError('nutrientsSource muss gesetzt sein, wenn nutrientsPer100 angegeben wird');
     }
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final product = Product(
       id: _uuid.v4(),
       householdId: hid,
@@ -258,7 +259,7 @@ class ProductRepository {
   }
 
   Future<void> update(Product product) async {
-    final updated = product.copyWith(updatedAt: DateTime.now().toUtc());
+    final updated = product.copyWith(updatedAt: appClock.now().toUtc());
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
   }
@@ -270,7 +271,7 @@ class ProductRepository {
     final product = await byId(productId);
     if (product == null || product.deletedAt != null) return null;
     if (product.unitWeightG == grams) return product;
-    final updated = product.copyWith(unitWeightG: Value(grams), updatedAt: DateTime.now().toUtc());
+    final updated = product.copyWith(unitWeightG: Value(grams), updatedAt: appClock.now().toUtc());
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
     return updated;
@@ -303,7 +304,7 @@ class ProductRepository {
       nutrientsBasis: const Value('g'),
       nutrientsSource: const Value('bls'),
       blsCode: Value(food.code),
-      updatedAt: DateTime.now().toUtc(),
+      updatedAt: appClock.now().toUtc(),
     );
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
@@ -322,7 +323,7 @@ class ProductRepository {
   Future<void> softDelete(String id) async {
     final product = await byId(id);
     if (product == null) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     // Codereview-Fund 2026-10-01: in einer Transaktion, damit ein Abbruch mittendrin (z.B. App-Kill) nicht
     // einen Teil der Aliase geloescht und den Rest (oder das Produkt selbst) aktiv zuruecklaesst.
     await _db.transaction(() async {
@@ -345,7 +346,7 @@ class ProductRepository {
   /// Doku 07 §3) unter einem einzigen Produkt vereint, statt auf zwei Eintraege verstreut zu sein.
   Future<void> mergeInto(String sourceId, String targetId) async {
     if (sourceId == targetId) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
 
     // Codereview-Fund 2026-10-01: eine einzige Transaktion ueber alle umgehaengten Tabellen plus das
     // abschliessende softDelete -- sonst koennte ein Abbruch mittendrin (z.B. App-Kill) manche Zeilen schon
@@ -402,7 +403,7 @@ class ProductRepository {
   /// Verknuepft einen EAN dauerhaft mit einem Produkt (Doku 06 §4: "bleibt danach dauerhaft erhalten").
   Future<void> linkBarcode(String ean, String productId) async {
     final hid = await householdId();
-    final b = ProductBarcode(householdId: hid, ean: ean, productId: productId, updatedAt: DateTime.now().toUtc());
+    final b = ProductBarcode(householdId: hid, ean: ean, productId: productId, updatedAt: appClock.now().toUtc());
     await _put('product_barcodes', '$hid:$ean', productBarcodeToRemote(b),
         () => _db.into(_db.productBarcodes).insertOnConflictUpdate(b.toCompanion(false)));
     onChanged?.call();
@@ -414,7 +415,7 @@ class ProductRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 }

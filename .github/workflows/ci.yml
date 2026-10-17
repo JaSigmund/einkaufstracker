@@ -46,6 +46,30 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Zeitreise (Codereview 2026-10-16, B1): dieselben Tests, als waere heute 200 bzw. 400 Tage spaeter. Faellt hier etwas um,
+  # prueft ein Test ein festes Datum gegen die echte Uhr und wird nach dieser Zeit auch auf main rot. Abhilfe: dem Test
+  # einen festen Stichtag geben (meist `now:`). App und Tests lesen die Zeit dafuer ueber appClock (lib/core/clock.dart).
+  time-travel:
+    name: App-Tests in der Zukunft (+${{ matrix.days }} Tage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [200, 400]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --dart-define=TEST_CLOCK_OFFSET_DAYS=${{ matrix.days }}
+
   web:
     # Die PWA (tools/deploy_web.sh) wurde bisher nur lokal gebaut: ein Import, den es im Browser nicht gibt, fiel erst
     # beim Veroeffentlichen auf. Ohne dart_defines startet der Build mit dem Hinweis "Konfiguration fehlt", das genuegt fuer
