@@ -59,6 +59,7 @@ void main() {
       child: MaterialApp.router(
         routerConfig: GoRouter(initialLocation: '/stock', routes: [
           GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('START'))),
+          GoRoute(path: '/inventory', builder: (_, _) => const Scaffold(body: Text('INVENTAR'))),
           GoRoute(path: '/stock', builder: (_, _) => StockEntryPage(product: product(), ean: '9001', labelScanAvailable: available)),
         ]),
       ),
@@ -97,6 +98,8 @@ void main() {
     final item = await db.select(db.inventoryItems).getSingle();
     expect(item.bestBefore, DateTime.utc(year, 3, 12));
     expect(item.dateKind, 'best_before');
+    // zurueck ins Inventar, wo der neue Posten steht (nicht auf die Uebersicht)
+    expect(find.text('INVENTAR'), findsOneWidget);
   });
 
   testWidgets('"zu verbrauchen bis" stellt die Art des Datums um', (tester) async {

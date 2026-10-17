@@ -112,7 +112,7 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bestand gespeichert')));
-        context.go('/');
+        context.go('/inventory');
       }
     } catch (e) {
       if (mounted) {
@@ -126,7 +126,7 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     await action(item.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erledigt')));
-      context.go('/');
+      context.go('/inventory');
     }
   }
 

@@ -42,7 +42,7 @@ String _expiryText(InventoryItem item, ExpiryLevel level, DateTime today) {
 
 /// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand nach Dringlichkeit gruppiert (abgelaufen/
 /// bald faellig zuerst, wie auf der Uebersicht), Filter nach Lagerort, Vorschlaege aus Bons einklappbar oben.
-/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber den Scan-Tab.
+/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber die Seite "Scannen".
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key, this.now});
 

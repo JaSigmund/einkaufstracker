@@ -71,19 +71,28 @@ class DiaryPage extends ConsumerWidget {
 
   Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients, NutritionTargets targets) {
     if (meals.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.restaurant_menu_outlined, size: 48, color: t.colorScheme.outline),
-            const SizedBox(height: 12),
-            Text('Noch keine Mahlzeit', style: t.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            const Text(
-              'Halte fest, was du gekocht oder gegessen hast. Die Zutaten werden vom Inventar abgezogen, die Nährwerte pro Tag berechnet.',
-              textAlign: TextAlign.center,
+      // Scrollbar: auf kleinen Handys mit grosser Schrift passt der Hinweis sonst nicht in die Hoehe
+      return LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: c.maxHeight),
+            child: Center(
+              child: Padding(
+                // unten Platz fuer den FAB
+                padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.restaurant_menu_outlined, size: 48, color: t.colorScheme.outline),
+                  const SizedBox(height: 12),
+                  Text('Noch keine Mahlzeit', style: t.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Halte fest, was du gekocht oder gegessen hast. Die Zutaten werden vom Inventar abgezogen, die Nährwerte pro Tag berechnet.',
+                    textAlign: TextAlign.center,
+                  ),
+                ]),
+              ),
             ),
-          ]),
+          ),
         ),
       );
     }

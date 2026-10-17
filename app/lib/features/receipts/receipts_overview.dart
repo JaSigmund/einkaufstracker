@@ -124,7 +124,7 @@ class _ReceiptsOverviewState extends ConsumerState<ReceiptsOverview> {
                   const SizedBox(height: 12),
                   Text('Noch keine Bons', style: t.textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  const Text('Importiere im Tab „Scan“ deinen ersten digitalen Bon.', textAlign: TextAlign.center),
+                  const Text('Erfasse über „Scannen“ deinen ersten Bon.', textAlign: TextAlign.center),
                 ]),
               )
             else if (shown.isEmpty)
