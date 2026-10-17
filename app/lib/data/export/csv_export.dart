@@ -1,5 +1,5 @@
 import '../../core/format.dart';
-import '../../data/local/database.dart';
+import '../local/database.dart';
 
 const _csvHeader = ['Datum', 'Händler', 'Bon-ID', 'Name', 'Produkt', 'Kategorie', 'Menge', 'Einheit', 'Preis', 'Grundpreis'];
 

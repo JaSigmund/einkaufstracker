@@ -8,7 +8,7 @@
 /// - Wochenwerte sind der Durchschnitt ueber die **erfassten** Tage (FR-15), mit der Zahl der erfassten Tage.
 library;
 
-import '../receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'micros.dart';
 import 'nutrient_registry.dart';
 

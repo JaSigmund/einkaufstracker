@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/recipes/recipe_suggestion.dart';
-import '../../features/recipes/cooking_chat_panel.dart';
+import '../../domain/recipes/cooking_chat.dart';
 import 'cooking_cloud.dart';
 
 /// Ordnet die Antwort einer Edge Function (HTTP-Status und JSON-Fehlerdetails) der passenden Ausnahme zu:

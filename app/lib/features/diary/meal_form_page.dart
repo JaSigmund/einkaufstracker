@@ -20,7 +20,7 @@ import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/retention.dart';
 import '../../domain/nutrition/usual_ingredients.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'ingredient_picker.dart';
 import 'manual_nutrients_dialog.dart';
 import 'meal_labels.dart';

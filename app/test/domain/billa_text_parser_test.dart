@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:einkaufstracker/domain/receipt/billa_text_parser.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
-import 'package:einkaufstracker/domain/receipt/vienna_time.dart';
+import 'package:einkaufstracker/core/vienna_time.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _parser = BillaTextParser();

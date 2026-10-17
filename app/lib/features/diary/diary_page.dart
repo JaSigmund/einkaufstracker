@@ -8,7 +8,7 @@ import '../../data/local/database.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/frequent_meals.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';

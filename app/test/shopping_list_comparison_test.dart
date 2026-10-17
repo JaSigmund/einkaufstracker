@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 
 import 'package:einkaufstracker/app/providers.dart';
-import 'package:einkaufstracker/core/format.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/shopping_list_repository.dart';
 import 'package:einkaufstracker/domain/receipt/billa_text_parser.dart';
@@ -16,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';
+import 'package:einkaufstracker/features/common/domain_format.dart';
 
 /// Ist-Soll-Abgleich (Wettbewerbsanalyse, ADR-030): was die per Bon abgehakten Listeneintraege vor dem Einkauf gekostet
 /// haetten, gegen das, was auf dem Bon dafuer bezahlt wurde.

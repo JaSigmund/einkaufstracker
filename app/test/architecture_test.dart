@@ -58,14 +58,6 @@ void _expectRatchet(Set<String> actual, Set<String> allowed, String rule) {
 void main() {
   group('Schichten', () {
     test('domain/ haengt nicht von Oberflaeche, App-Rahmen, Flutter oder Supabase ab', () {
-      // Bekannte Ausnahmen: die Fachlogik arbeitet hier noch direkt mit den von drift erzeugten Zeilenklassen. Sauberer
-      // waeren eigene Fachtypen; bis dahin bleibt es bei diesen drei Dateien.
-      const allowed = {
-        'lib/domain/diagnostics/data_snapshot.dart -> package:drift/drift.dart',
-        'lib/domain/diagnostics/data_snapshot.dart -> lib/data/local/database.dart',
-        'lib/domain/notifications/expiry_reminders.dart -> lib/data/local/database.dart',
-        'lib/domain/receipt/csv_export.dart -> lib/data/local/database.dart',
-      };
       final actual = _violations('lib/domain', (t) =>
           t.startsWith('lib/features/') ||
           t.startsWith('lib/app/') ||
@@ -74,20 +66,12 @@ void main() {
           t.startsWith('package:flutter_riverpod/') ||
           t.startsWith('package:supabase_flutter/') ||
           t.startsWith('package:drift/'));
-      _expectRatchet(actual, allowed, 'domain ist rein');
+      _expectRatchet(actual, const {}, 'domain ist rein');
     });
 
     test('data/ haengt nicht von der Oberflaeche (features/) oder dem App-Rahmen (app/) ab', () {
-      // Bekannte Ausnahmen: Schnittstellen bzw. Datentypen, die in Seiten-Dateien definiert sind und in die Datenschicht
-      // (oder domain/) gehoeren: CookingChatContext/ChatMessage (cooking_chat_panel.dart) und ReceiptScanner/ScannedPage
-      // (photo_receipt_service.dart).
-      const allowed = {
-        'lib/data/cloud/cooking_cloud.dart -> lib/features/recipes/cooking_chat_panel.dart',
-        'lib/data/cloud/supabase_cooking_cloud.dart -> lib/features/recipes/cooking_chat_panel.dart',
-        'lib/data/ocr/mlkit_receipt_scanner.dart -> lib/features/receipt_import/photo_receipt_service.dart',
-      };
       final actual = _violations('lib/data', (t) => t.startsWith('lib/features/') || t.startsWith('lib/app/'));
-      _expectRatchet(actual, allowed, 'data kennt keine Oberflaeche');
+      _expectRatchet(actual, const {}, 'data kennt keine Oberflaeche');
     });
 
     test('features/ sprechen nie direkt mit Supabase (nur ueber Repositories in data/)', () {
@@ -96,15 +80,8 @@ void main() {
     });
 
     test('core/ ist die unterste Schicht', () {
-      // Bekannte Ausnahme: format.dart formatiert Fachtypen und bildet mit domain/receipt/csv_export.dart einen Kreis
-      // (core -> domain -> core). Die Formatierer gehoeren eigentlich neben die Fachtypen oder in die Oberflaeche.
-      const allowed = {
-        'lib/core/format.dart -> lib/domain/nutrition/nutrition_targets.dart',
-        'lib/core/format.dart -> lib/domain/receipt/vienna_time.dart',
-        'lib/core/format.dart -> lib/domain/shopping_list/list_price_estimate.dart',
-      };
       final actual = _violations('lib/core', (t) => t.startsWith('lib/') && !t.startsWith('lib/core/'));
-      _expectRatchet(actual, allowed, 'core haengt von nichts ab');
+      _expectRatchet(actual, const {}, 'core haengt von nichts ab');
     });
   });
 

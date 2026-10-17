@@ -13,7 +13,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../domain/notifications/expiry_stages.dart';
-import '../../domain/receipt/csv_export.dart';
+import '../../data/export/csv_export.dart';
 import '../common/sync_status_banner.dart';
 import 'expiry_stages_dialog.dart';
 

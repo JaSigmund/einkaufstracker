@@ -1,5 +1,5 @@
 import '../../domain/recipes/recipe_suggestion.dart';
-import '../../features/recipes/cooking_chat_panel.dart';
+import '../../domain/recipes/cooking_chat.dart';
 
 /// Die Cloud ist nicht erreichbar oder hat nicht geantwortet (offline, Fehler, Zeitueberschreitung).
 class CookingCloudUnavailable implements Exception {

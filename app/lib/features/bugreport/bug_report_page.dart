@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../domain/diagnostics/app_info.dart';
-import '../../domain/diagnostics/data_snapshot.dart';
+import '../../data/diagnostics/data_snapshot.dart';
 
 const _areas = ['Übersicht', 'Inventar', 'Scan', 'Liste', 'Auswertung', 'Einstellungen', 'Sonstiges'];
 

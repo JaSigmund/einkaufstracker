@@ -14,7 +14,7 @@ import '../../domain/nutrition/micro_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/micros_backfill.dart';
 import '../../domain/nutrition/nutrient_registry.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Frueherer lokaler KV-Speicher der Referenzmengen (bis 1.12). Seit 1.13 liegen sie als gemeinsame Einstellungen des Haushalts
 /// (`household_prefs`, ADR-035); die alten Werte werden beim ersten Oeffnen dorthin uebernommen.

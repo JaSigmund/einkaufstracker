@@ -6,7 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/nutrition/fefo_deduction.dart';
 import '../local/database.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import '../sync/mappers.dart';
 
 /// Kein aktiver Bestand mehr fuer dieses Produkt (fuer die Einkaufsliste-Vorschlaege in einer spaeteren PR).

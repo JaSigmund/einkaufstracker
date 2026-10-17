@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
 import '../../domain/receipt/parsed_receipt.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'receipt_import_service.dart';
 
 enum EditKind { article, discount, deposit, billDiscount }

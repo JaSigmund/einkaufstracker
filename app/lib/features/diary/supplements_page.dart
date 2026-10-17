@@ -7,7 +7,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/supplements.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Nahrungsergaenzung (Phase N4, ADR-035): was der Haushalt nimmt, "Genommen" mit einem Tipp, und was heute schon eingetragen ist.
 /// Die Werte erscheinen auf der Seite Naehrstoffe als eigene Quelle, getrennt von den Mahlzeiten. Die App bewertet nicht, ob eine

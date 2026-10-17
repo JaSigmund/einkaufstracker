@@ -142,6 +142,14 @@ final householdIdProvider = FutureProvider<String?>((ref) async {
   }
 });
 
+/// Haushalt des angemeldeten Nutzers fuer die Repositories; wirft, solange es keinen gibt. Codereview 2026-10-16: stand
+/// vorher als wortgleiche Closure in jedem Repository-Provider.
+Future<String> requireHouseholdId(Ref ref) async {
+  final id = await ref.read(householdIdProvider.future);
+  if (id == null) throw StateError('Kein Haushalt gefunden');
+  return id;
+}
+
 final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(ref.watch(supabaseClientProvider)));
 
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
@@ -290,11 +298,7 @@ final pendingChangesProvider =
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -306,11 +310,7 @@ final offClientProvider = Provider<OffClient>((ref) => HttpOffClient());
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
   return ProductRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     off: ref.watch(offClientProvider),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
@@ -322,11 +322,7 @@ final productsStreamProvider = StreamProvider((ref) => ref.watch(productReposito
 final foodLinkRepositoryProvider = Provider<FoodLinkRepository>((ref) {
   return FoodLinkRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -338,11 +334,7 @@ final onlinePriceRepositoryProvider = Provider<OnlinePriceRepository>((ref) {
   return OnlinePriceRepository(
     ref.watch(databaseProvider),
     ref.watch(onlinePriceRemoteProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -357,11 +349,7 @@ final barcodeScannerProvider = Provider<BarcodeScanner>((ref) => MobileBarcodeSc
 final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
   return InventoryRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     onDepleted: (productId) => ref.read(shoppingListRepositoryProvider).suggestDepleted(productId),
   );
@@ -373,11 +361,7 @@ final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventor
 final mealRepositoryProvider = Provider<MealRepository>((ref) {
   return MealRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     inventory: ref.watch(inventoryRepositoryProvider),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
@@ -425,11 +409,7 @@ final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
 final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>((ref) {
   return NutritionTargetsRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -440,11 +420,7 @@ final nutritionTargetsProvider = StreamProvider((ref) => ref.watch(nutritionTarg
 final supplementRepositoryProvider = Provider<SupplementRepository>((ref) {
   return SupplementRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -457,11 +433,7 @@ final supplementIntakesStreamProvider = StreamProvider((ref) => ref.watch(supple
 final householdPrefsRepositoryProvider = Provider<HouseholdPrefsRepository>((ref) {
   return HouseholdPrefsRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -498,11 +470,7 @@ final foodUnitsSourceProvider = Provider<FoodUnitsSource>((ref) => SupabaseFoodU
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   return ShoppingListRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -570,7 +538,7 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   }
   final globalStages = parseExpiryStages(prefs[expiryStagesPref]);
   final reminders = computeExpiryReminders(
-    activeItems: items,
+    activeItems: [for (final i in items) (productId: i.productId, expiresOn: i.expiresOn, dateKind: i.dateKind)],
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
@@ -624,11 +592,7 @@ final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inv
 final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
   return BugReportRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -702,11 +666,7 @@ final productAliasesStreamProvider =
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     productRepo: ref.watch(productRepositoryProvider),
     inventoryRepo: ref.watch(inventoryRepositoryProvider),

@@ -9,10 +9,10 @@ import '../../domain/receipt/parsed_receipt.dart';
 import '../../domain/receipt/unit_price.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
-import '../repositories/inventory_repository.dart';
-import '../repositories/product_repository.dart';
-import '../repositories/shopping_list_repository.dart';
-import '../../domain/receipt/vienna_time.dart' show utcToViennaLocal;
+import 'inventory_repository.dart';
+import 'product_repository.dart';
+import 'shopping_list_repository.dart';
+import '../../core/vienna_time.dart' show utcToViennaLocal;
 
 enum ReceiptSaveOutcome { saved, duplicate }
 

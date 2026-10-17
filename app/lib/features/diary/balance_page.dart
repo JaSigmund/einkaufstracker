@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'balance_card.dart';
 
 /// Verlauf der Verbrauchsbilanz, eine Karte je Woche (LH-MEAL-10).

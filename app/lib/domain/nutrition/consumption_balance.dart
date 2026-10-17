@@ -15,7 +15,7 @@
 /// Reine Funktionen ohne Datenbankzugriff.
 library;
 
-import '../receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Eine Ledger-Buchung fuer die Bilanz (unabhaengig von der Datenbank-Klasse).
 typedef BalanceMovement = ({String productId, DateTime occurredAtUtc, String type, double quantityDelta, String unit, String? mealId});

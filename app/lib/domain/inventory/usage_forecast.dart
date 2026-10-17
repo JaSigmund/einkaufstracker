@@ -10,7 +10,7 @@
 /// - Es zaehlen nur Buchungen in der Einheit des Bestands; alles andere bleibt aussen vor statt umgerechnet zu werden.
 library;
 
-import '../receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Eine Ledger-Buchung fuer die Vorhersage (unabhaengig von der Datenbank-Klasse).
 typedef UsageMovement = ({String productId, DateTime occurredAtUtc, String type, double quantityDelta, String unit, String? mealId});

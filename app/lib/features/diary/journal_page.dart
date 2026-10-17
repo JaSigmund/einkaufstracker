@@ -14,7 +14,7 @@ import '../../domain/nutrition/journal.dart';
 import '../../domain/nutrition/journal_report.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
 import '../../domain/nutrition/unrecorded_estimate.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'journal_pdf.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';

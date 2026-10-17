@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/ocr/row_cluster.dart';
-import '../../features/receipt_import/photo_receipt_service.dart';
+import 'receipt_scanner.dart';
 
 /// Google-Dokumentenscanner (zuschneiden und entzerren) und ML-Kit-Texterkennung, beides auf dem Geraet.
 /// Der Scanner braucht keine Kamera-Berechtigung, die Oberflaeche kommt von den Play-Diensten.

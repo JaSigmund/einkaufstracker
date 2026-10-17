@@ -2,7 +2,7 @@
 /// Reine Funktionen ohne Datenbankzugriff, gleiches Muster wie `buildMonthReport`.
 library;
 
-import '../receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Eine Mahlzeit fuer die Auswertung (unabhaengig von der Datenbank-Klasse).
 typedef NutritionMeal = ({String id, DateTime eatenAtUtc, double servingsEaten, double servingsMade, bool isEstimate});
