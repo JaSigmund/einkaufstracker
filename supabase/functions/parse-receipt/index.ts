@@ -16,20 +16,24 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { json } from "../_shared/http.ts";
+import {
+  callAnthropic,
+  costMicroUsd,
+  firstToolUse,
+  PRICES,
+  recordExtraCall,
+  recordUsage,
+  releaseCall,
+  reserveCall,
+  type ToolUse,
+  type Usage,
+} from "../_shared/llm.ts";
 import { parseRequest } from "./validate.ts";
 
-// Preise in Mikro-USD je Token (= USD je Million Tokens). Quelle: Preisvergleichsseiten, Stand 2026-09;
-// vor Produktivbetrieb gegen die offizielle Preisliste pruefen.
-const PRICES: Record<string, { in: number; out: number }> = {
-  "claude-haiku-4-5-20251001": { in: 1, out: 5 },
-  "claude-sonnet-5": { in: 2, out: 10 },
-};
+// Preise und Tageslimit stehen in _shared/llm.ts (gemeinsam fuer alle KI-Functions). Codereview-Fund 2026-10-16: die
+// Bon-Erkennung zaehlte zwar in llm_usage mit, pruefte das Limit aber selbst nicht.
 const DEFAULT_MODEL = Deno.env.get("RECEIPT_MODEL") ?? "claude-haiku-4-5-20251001";
-
-// Tageslimit je Haushalt ueber alle KI-Funktionen (wie suggest-recipes, cooking-chat, analyze-meal). Codereview-Fund
-// 2026-10-16: die Bon-Erkennung zaehlte zwar in llm_usage mit, pruefte das Limit aber selbst nicht -- gerade sie hat mit
-// bis zu vier Bildern je Aufruf die groessten Prompts.
-const DAILY_CALL_LIMIT = 40;
 
 // ---------------------------------------------------------------------------
 // v1 (Vergleichswert)
@@ -164,34 +168,17 @@ function normalize(variant: string, input: any): Receipt {
 
 const sumCents = (r: Receipt) => r.items.reduce((s, i) => s + (Number.isInteger(i.line_total_cents) ? i.line_total_cents! : 0), 0);
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-
-async function callClaude(model: string, system: string, tool: unknown, messages: unknown[]) {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system,
-      tools: [tool],
-      tool_choice: { type: "tool", name: "submit_receipt" },
-      messages,
-    }),
+async function callClaude(model: string, system: string, tool: unknown, messages: unknown[]): Promise<{ toolUse: ToolUse; usage: Usage } | null> {
+  const reply = await callAnthropic({
+    model,
+    max_tokens: 4096,
+    system,
+    tools: [tool],
+    tool_choice: { type: "tool", name: "submit_receipt" },
+    messages,
   });
-  if (!resp.ok) {
-    console.error("anthropic_error", resp.status, await resp.text());
-    return null;
-  }
-  const result = await resp.json();
-  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
-  if (!toolUse) return null;
-  return { toolUse, usage: result.usage ?? { input_tokens: 0, output_tokens: 0 } };
+  const toolUse = reply ? firstToolUse(reply) : null;
+  return reply && toolUse ? { toolUse, usage: reply.usage } : null;
 }
 
 Deno.serve(async (req) => {
@@ -228,16 +215,11 @@ Deno.serve(async (req) => {
   if (setErr || !settings) return json({ error: "forbidden" }, 403);
   if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
 
-  // 4) Tageslimit je Haushalt: zaehlt alle KI-Aufrufe der letzten 24 Stunden. Schlaegt die Zaehlung selbst fehl, wird
-  //    abgelehnt statt blind zugelassen (wie in den anderen KI-Functions).
+  // 4) Tageslimit je Haushalt: alle KI-Aufrufe der letzten 24 Stunden, atomar reserviert (_shared/llm.ts, Migration 0030).
+  //    Schlaegt die Pruefung selbst fehl, wird abgelehnt statt blind zugelassen.
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { count: usedToday, error: countErr } = await admin
-    .from("llm_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("household_id", body.household_id)
-    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  if (countErr) return json({ error: "usage_check_failed" }, 500);
-  if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
+  const reservation = await reserveCall(admin, body.household_id, model);
+  if (!reservation.ok) return json({ error: reservation.error }, reservation.status);
 
   // 5) Claude Vision
   const system = variant === "v1" ? SYSTEM_V1 : SYSTEM_V2;
@@ -256,42 +238,24 @@ Deno.serve(async (req) => {
 
   const started = Date.now();
   let totalIn = 0, totalOut = 0, attempts = 0;
-  const price = PRICES[model];
-
-  const logUsage = async (usage: { input_tokens: number; output_tokens: number }, ms: number) => {
-    const row = {
-      household_id: body.household_id,
-      receipt_id: body.receipt_id,
-      model,
-      input_tokens: usage.input_tokens,
-      output_tokens: usage.output_tokens,
-      cost_micro_usd: usage.input_tokens * price.in + usage.output_tokens * price.out,
-      duration_ms: ms,
-    };
-    const { error } = await admin.from("llm_usage").insert(row);
-    // Eine unbekannte receipt_id (Fremdschluessel) darf den Aufruf nicht aus dem Tageslimit herausfallen lassen: dann
-    // ohne Verweis protokollieren.
-    if (error && row.receipt_id !== null) {
-      const { error: retryErr } = await admin.from("llm_usage").insert({ ...row, receipt_id: null });
-      if (retryErr) console.error("llm_usage_insert_failed", retryErr.message);
-    } else if (error) {
-      console.error("llm_usage_insert_failed", error.message);
-    }
-  };
 
   let t0 = Date.now();
   const r = await callClaude(model, system, tool, messages);
   attempts++;
-  if (!r) return json({ error: "llm_failed" }, 502);
+  if (!r) {
+    await releaseCall(admin, reservation.id);
+    return json({ error: "llm_failed" }, 502);
+  }
   totalIn += r.usage.input_tokens; totalOut += r.usage.output_tokens;
-  await logUsage(r.usage, Date.now() - t0);
+  // Eine unbekannte oder fremde receipt_id laesst den Aufruf nicht aus dem Protokoll fallen (recordUsage: dann ohne Verweis)
+  await recordUsage(admin, reservation.id, { model, usage: r.usage, durationMs: Date.now() - t0, receiptId: body.receipt_id });
   let receipt = normalize(variant, r.toolUse.input);
   let sum = sumCents(receipt);
 
   // v3: eine Nachfrage, wenn die Summe nicht passt
   if (variant === "v3" && receipt.total_cents != null && receipt.total_cents !== sum) {
     const diff = receipt.total_cents - sum;
-    messages.push({ role: "assistant", content: [r.toolUse] });
+    messages.push({ role: "assistant", content: [{ type: "tool_use", ...r.toolUse }] });
     messages.push({
       role: "user",
       content: [{
@@ -308,7 +272,7 @@ Deno.serve(async (req) => {
     attempts++;
     if (r2) {
       totalIn += r2.usage.input_tokens; totalOut += r2.usage.output_tokens;
-      await logUsage(r2.usage, Date.now() - t0);
+      await recordExtraCall(admin, { householdId: body.household_id, model, usage: r2.usage, durationMs: Date.now() - t0, receiptId: body.receipt_id });
       const receipt2 = normalize(variant, r2.toolUse.input);
       const sum2 = sumCents(receipt2);
       // Nur uebernehmen, wenn es nicht schlechter wird
@@ -327,7 +291,7 @@ Deno.serve(async (req) => {
     model,
     variant,
     attempts,
-    usage: { input_tokens: totalIn, output_tokens: totalOut, cost_micro_usd: totalIn * price.in + totalOut * price.out },
+    usage: { input_tokens: totalIn, output_tokens: totalOut, cost_micro_usd: costMicroUsd(model, { input_tokens: totalIn, output_tokens: totalOut }) },
     duration_ms: Date.now() - started,
   });
 });

@@ -20,6 +20,7 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Keine eigenen Secrets noetig.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { json } from "../_shared/http.ts";
 import {
   extractSlice,
   FEED_URL,
@@ -40,9 +41,6 @@ const RUN_TIMEOUT_MINUTES = 20; // ein steckengebliebener Lauf blockiert nicht l
 const UPSERT_BATCH = 500;
 const CONCURRENCY = 3;
 const USER_AGENT = "Einkaufstracker/1.0 (privates Projekt; taeglicher Abruf von latest-canonical.json)";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 function admin(): SupabaseClient {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

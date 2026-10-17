@@ -954,6 +954,37 @@ def main():
     check("Einladung: kann nicht als schon angenommen angelegt werden", accepted is None)
     db("delete from household_invites where email = 'selbstgemacht@test.at'")
 
+    # --- Tageslimit der KI-Functions: atomare Reservierung (0030, Fund S9) ----------------------------------------------
+    db("delete from llm_usage where household_id = %s", (hb,))
+    first = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    second = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    third = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    check("Reservierung: bis zum Limit gibt es eine Zeilen-ID, danach null", first and second and third is None, f"{first} {second} {third}")
+    check("Reservierung: die reservierten Zeilen zaehlen sofort (2 Zeilen mit 0 Tokens)",
+          one("select count(*) from llm_usage where household_id = %s and input_tokens = 0", (hb,)) == 2)
+    db("update llm_usage set created_at = now() - interval '25 hours' where id = %s", (first,))
+    check("Reservierung: Aufrufe aelter als 24 Stunden zaehlen nicht mehr", one("select reserve_llm_call(%s, 'm', 2)", (hb,)) is not None)
+    check("Reservierung: Clients duerfen nicht reservieren (nur service_role)",
+          raises("select reserve_llm_call(%s, 'm', 100)", (hb,), user=B)
+          and one("select has_function_privilege('service_role', 'public.reserve_llm_call(uuid,text,integer)', 'execute')"))
+    # Zwei gleichzeitige Transaktionen: die zweite wartet auf die Sperre der ersten und sieht deren Zeile
+    db("delete from llm_usage where household_id = %s", (hb,))
+    with psycopg.connect(uri) as c1, psycopg.connect(uri) as c2:
+        r1 = c1.execute("select reserve_llm_call(%s, 'm', 1)", (hb,)).fetchone()[0]
+        import threading
+        out = {}
+        t = threading.Thread(target=lambda: out.update(r2=c2.execute("select reserve_llm_call(%s, 'm', 1)", (hb,)).fetchone()[0]))
+        t.start()
+        t.join(timeout=1)
+        waited = t.is_alive()
+        c1.commit()
+        t.join(timeout=10)
+        c2.commit()
+    check("Reservierung: parallele Aufrufe desselben Haushalts warten aufeinander (Advisory-Sperre)", waited)
+    check("Reservierung: von zwei gleichzeitigen Aufrufen bei Limit 1 bekommt nur einer eine Zeile",
+          r1 is not None and out.get("r2", "fehlt") is None, f"{r1} {out}")
+    db("delete from llm_usage where household_id = %s", (hb,))
+
     # --- Sicherheits-Invarianten ueber den Katalog (Codereview 2026-10-16) --------------------------------------------
     # Die Tests oben pruefen einzelne Tabellen; diese hier gelten fuer ALLE, auch fuer kuenftige Migrationen. Eine neue
     # Tabelle ohne RLS oder eine neue SECURITY-DEFINER-Funktion ohne festen search_path faellt so sofort auf.

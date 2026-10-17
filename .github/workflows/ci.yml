@@ -98,18 +98,20 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert
+      # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert. Der ganze Ordner
+      # supabase/functions wird kopiert, weil die Functions gemeinsamen Code aus ../_shared importieren.
       - run: |
-          # alle Edge Functions, nicht nur eine: neue Funktionen sind damit automatisch abgedeckt
-          for dir in supabase/functions/*/; do
-            fn=$(basename "$dir")
-            mkdir -p "/tmp/fncheck/$fn"
-            # ganzer Ordner: eine Function darf aus mehreren Dateien bestehen (z.B. sanitize.ts neben index.ts)
-            cp "$dir"*.ts "/tmp/fncheck/$fn/"
-            (cd "/tmp/fncheck/$fn" && deno check index.ts)
+          mkdir -p /tmp/fncheck
+          cp -r supabase/functions/. /tmp/fncheck/
+          # alle Edge Functions, nicht nur eine: neue Funktionen sind damit automatisch abgedeckt. Ordner ohne index.ts
+          # (z.B. _shared) sind keine Function, ihre Tests laufen trotzdem mit.
+          for dir in /tmp/fncheck/*/; do
+            if [ -f "$dir/index.ts" ]; then
+              (cd "$dir" && deno check index.ts)
+            fi
             # vorhandene Deno-Tests (*_test.ts) mit ausfuehren
-            if ls "/tmp/fncheck/$fn"/*_test.ts >/dev/null 2>&1; then
-              (cd "/tmp/fncheck/$fn" && deno test)
+            if ls "$dir"*_test.ts >/dev/null 2>&1; then
+              (cd "$dir" && deno test)
             fi
           done
       # Lint ueber alle Functions (u.a. kein unbegruendetes `any`, prefer-const)

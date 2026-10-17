@@ -14,20 +14,24 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { json } from "../_shared/http.ts";
+import {
+  callAnthropic,
+  costMicroUsd,
+  firstToolUse,
+  PRICES,
+  recordExtraCall,
+  recordUsage,
+  releaseCall,
+  reserveCall,
+} from "../_shared/llm.ts";
 import { COUNT_UNITS, MEAL_TYPES, parseRequest, sanitizeAnalysis } from "./sanitize.ts";
 import { totalGrams, type UnitInfo, unitInfoFor, type UnitRow } from "./units.ts";
 import { resolveIngredients, type Usage } from "./analyze.ts";
 import { buildChoosePrompt, CHOOSE_SYSTEM, CHOOSE_TOOL, type ChooseItem, type FoodRow, parseFoodRow } from "./resolve.ts";
 
-// Gleiche Preistabelle wie parse-receipt (Stand 2026-09; vor Produktivbetrieb gegen die offizielle Preisliste pruefen).
-const PRICES: Record<string, { in: number; out: number }> = {
-  "claude-haiku-4-5-20251001": { in: 1, out: 5 },
-  "claude-sonnet-5": { in: 2, out: 10 },
-};
+// Preise und Tageslimit stehen in _shared/llm.ts (gemeinsam fuer alle KI-Functions). Ein Foto zaehlt als ein Aufruf.
 const DEFAULT_MODEL = Deno.env.get("MEAL_MODEL") ?? "claude-haiku-4-5-20251001";
-
-// Tageslimit je Haushalt ueber alle KI-Funktionen (wie suggest-recipes/cooking-chat). Ein Foto zaehlt als ein Aufruf.
-const DAILY_CALL_LIMIT = 40;
 
 const SYSTEM = `Du erkennst auf dem Foto einer Mahlzeit, was gegessen wird, und schaetzt die Zutaten fuer ein Ernaehrungstagebuch.
 
@@ -79,37 +83,20 @@ const TOOL = {
   },
 };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-
 /// Zweiter, kurzer KI-Aufruf ohne Bild: waehlt je Zutat einen der vorgelegten Kandidaten der Lebensmitteldatenbank (resolve.ts).
 /// Ein Fehler hier ist kein Fehler der Analyse: `null`, und die Zutaten bleiben "unbekannt".
 async function chooseFoods(model: string, items: ChooseItem[]): Promise<{ choices: unknown; usage: Usage } | null> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 800,
-      system: CHOOSE_SYSTEM,
-      tools: [CHOOSE_TOOL],
-      tool_choice: { type: "tool", name: "submit_choices" },
-      messages: [{ role: "user", content: buildChoosePrompt(items) }],
-    }),
+  const reply = await callAnthropic({
+    model,
+    max_tokens: 800,
+    system: CHOOSE_SYSTEM,
+    tools: [CHOOSE_TOOL],
+    tool_choice: { type: "tool", name: "submit_choices" },
+    messages: [{ role: "user", content: buildChoosePrompt(items) }],
   });
-  if (!resp.ok) {
-    console.error("choose_anthropic_error", resp.status, await resp.text());
-    return null;
-  }
-  const result = await resp.json();
-  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
-  if (!toolUse) return null;
-  const u = result.usage ?? { input_tokens: 0, output_tokens: 0 };
-  return { choices: toolUse.input, usage: { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0 } };
+  const toolUse = reply ? firstToolUse(reply) : null;
+  if (!reply || !toolUse) return null;
+  return { choices: toolUse.input, usage: reply.usage };
 }
 
 Deno.serve(async (req) => {
@@ -145,16 +132,11 @@ Deno.serve(async (req) => {
   if (setErr || !settings) return json({ error: "forbidden" }, 403);
   if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
 
-  // 3b) Tageslimit je Haushalt (siehe suggest-recipes): zaehlt alle KI-Aufrufe der letzten 24 Stunden. Schlaegt die
-  //     Zaehlung selbst fehl, wird abgelehnt statt blind zugelassen.
+  // 3b) Tageslimit je Haushalt: alle KI-Aufrufe der letzten 24 Stunden, atomar reserviert (_shared/llm.ts, Migration 0030).
+  //     Schlaegt die Pruefung selbst fehl, wird abgelehnt statt blind zugelassen.
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { count: usedToday, error: countErr } = await admin
-    .from("llm_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("household_id", body.household_id)
-    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  if (countErr) return json({ error: "usage_check_failed" }, 500);
-  if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
+  const reservation = await reserveCall(admin, body.household_id, model);
+  if (!reservation.ok) return json({ error: reservation.error }, reservation.status);
 
   // 4) Claude mit Bildeingabe
   const productLines = body.products.length === 0
@@ -169,43 +151,24 @@ Deno.serve(async (req) => {
   }];
 
   const started = Date.now();
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1500,
-      system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_meal" },
-      messages,
-    }),
+  const reply = await callAnthropic({
+    model,
+    max_tokens: 1500,
+    system: SYSTEM,
+    tools: [TOOL],
+    tool_choice: { type: "tool", name: "submit_meal" },
+    messages,
   });
-  if (!resp.ok) {
-    console.error("anthropic_error", resp.status, await resp.text());
+  const toolUse = reply ? firstToolUse(reply) : null;
+  if (!reply || !toolUse) {
+    await releaseCall(admin, reservation.id);
     return json({ error: "llm_failed" }, 502);
   }
-  const result = await resp.json();
-  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
-  if (!toolUse) return json({ error: "llm_failed" }, 502);
-  const usage = result.usage ?? { input_tokens: 0, output_tokens: 0 };
+  const usage = reply.usage;
 
-  // 5) Nutzung protokollieren (service role, gleiche Tabelle wie bei parse-receipt)
-  const price = PRICES[model];
-  const cost = usage.input_tokens * price.in + usage.output_tokens * price.out;
-  await admin.from("llm_usage").insert({
-    household_id: body.household_id,
-    receipt_id: null,
-    model,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    cost_micro_usd: cost,
-    duration_ms: Date.now() - started,
-  });
+  // 5) Nutzung in die reservierte Zeile eintragen
+  const cost = costMicroUsd(model, usage);
+  await recordUsage(admin, reservation.id, { model, usage, durationMs: Date.now() - started });
 
   const analysis = sanitizeAnalysis(toolUse.input, new Set(body.products.map((p) => p.id)));
 
@@ -221,16 +184,8 @@ Deno.serve(async (req) => {
   let total: Usage = { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens };
   let totalCost = cost;
   if (resolution.usage) {
-    const chooseCost = resolution.usage.input_tokens * price.in + resolution.usage.output_tokens * price.out;
-    await admin.from("llm_usage").insert({
-      household_id: body.household_id,
-      receipt_id: null,
-      model,
-      input_tokens: resolution.usage.input_tokens,
-      output_tokens: resolution.usage.output_tokens,
-      cost_micro_usd: chooseCost,
-      duration_ms: Date.now() - started,
-    });
+    const chooseCost = costMicroUsd(model, resolution.usage);
+    await recordExtraCall(admin, { householdId: body.household_id, model, usage: resolution.usage, durationMs: Date.now() - started });
     total = { input_tokens: total.input_tokens + resolution.usage.input_tokens, output_tokens: total.output_tokens + resolution.usage.output_tokens };
     totalCost += chooseCost;
   }
