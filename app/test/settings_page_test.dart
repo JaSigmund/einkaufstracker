@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
@@ -22,7 +23,7 @@ void main() {
       );
 
   group('Konto löschen (Play-Store-Pflicht "Account Deletion")', () {
-    Widget deleteHost(FakeAuth auth, {required AppDatabase db}) => ProviderScope(
+    Widget deleteHost(FakeAuth auth, {required AppDatabase db, FakeNotificationScheduler? scheduler}) => ProviderScope(
           overrides: [
             householdIdProvider.overrideWith((r) async => 'h1'),
             settingsRepositoryProvider.overrideWithValue(FakeSettingsRepository(_settings)),
@@ -31,6 +32,9 @@ void main() {
             // Der echte Drift-Stream (SyncStatusBanner) hinterlaesst beim Dispose einen Timer, den
             // flutter_test als "still pending" meldet -- hier nicht relevant, deshalb ein Stub.
             pendingChangesProvider.overrideWith((ref) => Stream.value(0)),
+            notificationSchedulerProvider.overrideWithValue(scheduler ?? FakeNotificationScheduler()),
+            receiptFileServiceProvider.overrideWithValue(FakeReceiptFileService(db)),
+            mealPhotoServiceProvider.overrideWithValue(FakeMealPhotoService(db, mealRepo(db))),
           ],
           child: MaterialApp.router(routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SettingsPage())])),
         );
@@ -137,16 +141,57 @@ void main() {
       final remaining = await db.select(db.products).get();
       expect(remaining, isEmpty); // wipe() lief trotzdem
     });
+
+    testWidgets('Codereview-Fund 2026-10-16: scheitert das Leeren der Datenbank, werden Erinnerungen trotzdem storniert', (tester) async {
+      useTallViewport(tester);
+      final db = _FailingWipeDb();
+      addTearDown(db.close);
+      final scheduler = FakeNotificationScheduler();
+      final auth = FakeAuth();
+      await tester.pumpWidget(deleteHost(auth, db: db, scheduler: scheduler));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings-delete-account')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'LÖSCHEN');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Endgültig löschen'));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.cancelCalls, 1);
+      expect(auth.signOutCalls, 1);
+    });
+
+    testWidgets('Codereview-Fund 2026-10-16: nach der Loeschung keine Erinnerungen des alten Kontos mehr', (tester) async {
+      useTallViewport(tester);
+      final db = memoryDb();
+      addTearDown(db.close);
+      final scheduler = FakeNotificationScheduler();
+      await tester.pumpWidget(deleteHost(FakeAuth(), db: db, scheduler: scheduler));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings-delete-account')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'LÖSCHEN');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Endgültig löschen'));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.cancelCalls, 1);
+    });
   });
 
   group('Abmelden', () {
-    Widget signOutHost(FakeAuth auth, {required AppDatabase db}) => ProviderScope(
+    Widget signOutHost(FakeAuth auth, {required AppDatabase db, FakeNotificationScheduler? scheduler, FakeReceiptFileService? files, FakeMealPhotoService? photos}) => ProviderScope(
           overrides: [
             householdIdProvider.overrideWith((r) async => 'h1'),
             settingsRepositoryProvider.overrideWithValue(FakeSettingsRepository(_settings)),
             authRepositoryProvider.overrideWithValue(auth),
             databaseProvider.overrideWithValue(db),
             pendingChangesProvider.overrideWith((ref) => Stream.value(0)),
+            notificationSchedulerProvider.overrideWithValue(scheduler ?? FakeNotificationScheduler()),
+            receiptFileServiceProvider.overrideWithValue(files ?? FakeReceiptFileService(db)),
+            mealPhotoServiceProvider.overrideWithValue(photos ?? FakeMealPhotoService(db, mealRepo(db))),
           ],
           child: MaterialApp.router(routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SettingsPage())])),
         );
@@ -172,6 +217,29 @@ void main() {
       expect(auth.signOutCalls, 1);
       final remaining = await db.select(db.products).get();
       expect(remaining, isEmpty);
+    });
+
+    testWidgets('Codereview-Fund 2026-10-16: storniert die Erinnerungen und loescht lokale Belege und Essensfotos', (tester) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final db = memoryDb();
+      addTearDown(db.close);
+      final scheduler = FakeNotificationScheduler();
+      final files = FakeReceiptFileService(db);
+      final photos = FakeMealPhotoService(db, mealRepo(db));
+
+      await tester.pumpWidget(signOutHost(FakeAuth(), db: db, scheduler: scheduler, files: files, photos: photos));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('settings-sign-out')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Abmelden'));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.cancelCalls, 1);
+      expect(files.deleteAllLocalCalls, 1);
+      expect(photos.deleteAllLocalCalls, 1);
     });
   });
 
@@ -251,4 +319,12 @@ void main() {
   // beim Dispose). Die eigentliche Logik (`rescheduleExpiryReminders`) ist bereits in
   // expiry_reminder_scheduling_test.dart abgedeckt; der Fix selbst ist eine einzelne, bedingte
   // Zeile in `_update`.
+}
+
+/// Datenbank, deren Leeren scheitert (z.B. Speicher voll), fuer die Fehlerpfade beim Abmelden und Loeschen.
+class _FailingWipeDb extends AppDatabase {
+  _FailingWipeDb() : super(NativeDatabase.memory());
+
+  @override
+  Future<void> wipe() async => throw StateError('Datenbank nicht beschreibbar');
 }

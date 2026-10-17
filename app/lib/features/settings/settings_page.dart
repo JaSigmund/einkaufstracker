@@ -143,7 +143,7 @@ class SettingsPage extends ConsumerWidget {
     // Daten zurueckschreiben, bevor signOut() sie ungueltig macht (Privacy-Risiko bei Geraete-Weitergabe).
     ref.read(authTransitionInProgressProvider.notifier).start();
     try {
-      await ref.read(databaseProvider).wipe();
+      await clearLocalAccountData(ref);
       await ref.read(authRepositoryProvider).signOut();
     } catch (e) {
       if (context.mounted) {
@@ -204,7 +204,7 @@ class SettingsPage extends ConsumerWidget {
     // mit den Daten des geloeschten Kontos auf dem Geraet stehen, ohne Weg zurueck ueber die UI (ein
     // erneuter Loeschversuch scheitert, das Konto existiert ja schon nicht mehr).
     try {
-      await ref.read(databaseProvider).wipe();
+      await clearLocalAccountData(ref, continueOnDatabaseError: true);
     } catch (_) {
       // best effort, siehe oben
     }
@@ -365,7 +365,7 @@ class SettingsPage extends ConsumerWidget {
                         error: (_, _) => 'Einkaufstracker',
                       ),
                   key: const Key('app-version'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),

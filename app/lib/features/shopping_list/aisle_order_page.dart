@@ -80,7 +80,7 @@ class _AisleOrderPageState extends ConsumerState<AisleOrderPage> {
           child: Text(
             'Zieh die Kategorien in die Reihenfolge, in der du sie im Markt abgehst. Die Einkaufsliste lässt sich danach für diesen Markt sortieren.',
             key: const Key('aisle-hint'),
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
         ),
         if (stores.isEmpty)

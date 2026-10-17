@@ -13,6 +13,10 @@ abstract class NotificationScheduler {
 
   /// Verwirft alle geplanten Ablauf-Erinnerungen und plant sie aus [reminders] neu (Doku 06 §5, Schritt 1).
   Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays});
+
+  /// Verwirft alle geplanten Ablauf-Erinnerungen, ohne neue zu planen (Abmelden, Konto loeschen): sonst kaeme nach dem
+  /// Abmelden noch eine Erinnerung mit den Produktnamen des alten Kontos (Codereview-Fund 2026-10-16).
+  Future<void> cancelExpiryReminders();
 }
 
 /// Reservierter ID-Bereich, damit `cancel`/`schedule` nur die eigenen Ablauf-Erinnerungen betreffen
@@ -42,15 +46,24 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   /// so ein Aufruf wird hier uebersprungen, statt den laufenden Alarm grundlos neu aufzusetzen.
   String? _lastSignature;
 
-  @override
-  Future<void> initialize() async {
-    if (_initialized || kIsWeb) return;
+  var _pluginReady = false;
+
+  /// Plugin und Zeitzone, ohne nach der Berechtigung zu fragen (das Stornieren braucht keine).
+  Future<void> _initializePlugin() async {
+    if (_pluginReady) return;
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Europe/Vienna'));
     await _plugin.initialize(
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
       onDidReceiveNotificationResponse: _onResponse,
     );
+    _pluginReady = true;
+  }
+
+  @override
+  Future<void> initialize() async {
+    if (_initialized || kIsWeb) return;
+    await _initializePlugin();
     // Codereview-Fund 2026-10-01 (Fehlerbericht "Ablauf-Erinnerung kommt nicht an"): das Ergebnis bisher
     // nirgends sichtbar gemacht -- verweigerte Benachrichtigungs-Berechtigung (Android 13+) ist ein sehr
     // naheliegender Grund dafuer, dass GEPLANTE Erinnerungen trotzdem nie als Benachrichtigung erscheinen,
@@ -125,6 +138,17 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
         payload: r.productIds.join(','),
       );
       debugPrint('[expiry-reminders] id ${_idBase + i} geplant fuer $scheduled (jetzt: $now)');
+    }
+  }
+
+  @override
+  Future<void> cancelExpiryReminders() async {
+    if (kIsWeb) return;
+    // Auch nach einem App-Neustart: die Alarme eines frueheren Prozesses liegen beim Betriebssystem.
+    await _initializePlugin();
+    _lastSignature = null;
+    for (var i = 0; i < _horizonDays; i++) {
+      await _plugin.cancel(_idBase + i);
     }
   }
 }

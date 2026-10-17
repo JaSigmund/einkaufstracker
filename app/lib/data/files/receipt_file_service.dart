@@ -186,6 +186,13 @@ class ReceiptFileService {
     }
   }
 
+  /// Entfernt ALLE lokalen Kopien (Abmelden, Konto loeschen), die Server-Dateien bleiben unberuehrt. Ohne das blieben
+  /// Bon-Fotos (u.U. mit Kartenendziffern) nach dem Abmelden auf dem Geraet liegen (Codereview-Fund 2026-10-16).
+  Future<void> deleteAllLocal() async {
+    final dir = Directory('${(await baseDir()).path}/receipt_files');
+    if (await dir.exists()) await dir.delete(recursive: true);
+  }
+
   /// Entfernt lokale Kopien und (soweit moeglich) die Server-Dateien geloeschter Bons.
   Future<void> purge(List<ReceiptFile> files) async {
     if (files.isEmpty) return;

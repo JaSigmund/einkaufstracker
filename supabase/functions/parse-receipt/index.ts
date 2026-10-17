@@ -1,7 +1,8 @@
 // Edge Function: parse-receipt
 // STATUS: deployt und in Phase 0 gegen echte Bons getestet (siehe Doku 05 Bon-Erkennung §8).
 //
-// Ablauf: JWT pruefen -> Einwilligung pruefen -> Bild an Claude Vision mit erzwungenem Tool-Schema
+// Ablauf: JWT pruefen -> Eingabe pruefen (validate.ts) -> Einwilligung pruefen -> Tageslimit ueber llm_usage
+//         -> Bild an Claude Vision mit erzwungenem Tool-Schema
 //         -> Ergebnis serverseitig validieren (Summencheck) -> optional Nachfrage bei Abweichung (v3)
 //         -> Nutzung in llm_usage protokollieren -> JSON zurueck.
 //
@@ -15,6 +16,7 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { parseRequest } from "./validate.ts";
 
 // Preise in Mikro-USD je Token (= USD je Million Tokens). Quelle: Preisvergleichsseiten, Stand 2026-09;
 // vor Produktivbetrieb gegen die offizielle Preisliste pruefen.
@@ -23,7 +25,11 @@ const PRICES: Record<string, { in: number; out: number }> = {
   "claude-sonnet-5": { in: 2, out: 10 },
 };
 const DEFAULT_MODEL = Deno.env.get("RECEIPT_MODEL") ?? "claude-haiku-4-5-20251001";
-const MAX_IMAGE_BYTES = 1_500_000; // ~1,5 MB je Bild nach base64-Decode
+
+// Tageslimit je Haushalt ueber alle KI-Funktionen (wie suggest-recipes, cooking-chat, analyze-meal). Codereview-Fund
+// 2026-10-16: die Bon-Erkennung zaehlte zwar in llm_usage mit, pruefte das Limit aber selbst nicht -- gerade sie hat mit
+// bis zu vier Bildern je Aufruf die groessten Prompts.
+const DAILY_CALL_LIMIT = 40;
 
 // ---------------------------------------------------------------------------
 // v1 (Vergleichswert)
@@ -128,7 +134,9 @@ type Item = {
 };
 type Receipt = { store_name: string | null; purchased_at: string | null; total_cents: number | null; items: Item[] };
 
-// v2-Ausgabe auf das gemeinsame Format abbilden
+// v2-Ausgabe auf das gemeinsame Format abbilden. `input` ist die Tool-Ausgabe des Modells, deren Form erst hier
+// hergestellt wird; deshalb bewusst ohne genauen Typ.
+// deno-lint-ignore no-explicit-any
 function normalize(variant: string, input: any): Receipt {
   if (variant === "v1") {
     return {
@@ -142,6 +150,7 @@ function normalize(variant: string, input: any): Receipt {
     store_name: input.store ?? null,
     purchased_at: input.purchased_at ?? null,
     total_cents: input.total_cents ?? null,
+    // deno-lint-ignore no-explicit-any
     items: (input.items ?? []).map((i: any): Item => ({
       raw_text: i.text,
       kind: i.kind,
@@ -196,26 +205,17 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "unauthorized" }, 401);
 
-  // 2) Eingabe
-  let body: {
-    household_id: string;
-    images: string[];
-    categories?: string[];
-    store_hint?: string;
-    receipt_id?: string;
-    variant?: string;
-    model?: string;
-  };
+  // 2) Eingabe (validate.ts: Typen, Laengen, nur JPEG in Base64)
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
-  if (!body.household_id || !Array.isArray(body.images) || body.images.length < 1 || body.images.length > 4) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  const variant = body.variant ?? "v3";
-  if (!["v1", "v2", "v3"].includes(variant)) return json({ error: "invalid_variant" }, 400);
+  const parsed = parseRequest(raw);
+  if (!parsed.ok) return json({ error: parsed.error }, parsed.status);
+  const body = parsed.value;
+  const variant = body.variant;
   const model = body.model ?? DEFAULT_MODEL;
   if (!(model in PRICES)) return json({ error: "model_not_allowed", allowed: Object.keys(PRICES) }, 400);
 
@@ -228,10 +228,16 @@ Deno.serve(async (req) => {
   if (setErr || !settings) return json({ error: "forbidden" }, 403);
   if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
 
-  // 4) Groessenlimit
-  for (const img of body.images) {
-    if (img.length * 0.75 > MAX_IMAGE_BYTES) return json({ error: "image_too_large" }, 413);
-  }
+  // 4) Tageslimit je Haushalt: zaehlt alle KI-Aufrufe der letzten 24 Stunden. Schlaegt die Zaehlung selbst fehl, wird
+  //    abgelehnt statt blind zugelassen (wie in den anderen KI-Functions).
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { count: usedToday, error: countErr } = await admin
+    .from("llm_usage")
+    .select("id", { count: "exact", head: true })
+    .eq("household_id", body.household_id)
+    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  if (countErr) return json({ error: "usage_check_failed" }, 500);
+  if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
 
   // 5) Claude Vision
   const system = variant === "v1" ? SYSTEM_V1 : SYSTEM_V2;
@@ -243,30 +249,38 @@ Deno.serve(async (req) => {
   content.push({
     type: "text",
     text: variant === "v1"
-      ? `Kategorieliste: ${JSON.stringify(body.categories ?? [])}\nHaendler-Hinweis: ${body.store_hint ?? "unbekannt"}\nLies den Bon (ggf. mehrere Fotos in Lesereihenfolge) und rufe submit_receipt auf.`
+      ? `Kategorieliste: ${JSON.stringify(body.categories)}\nHaendler-Hinweis: ${body.store_hint ?? "unbekannt"}\nLies den Bon (ggf. mehrere Fotos in Lesereihenfolge) und rufe submit_receipt auf.`
       : `Haendler-Hinweis: ${body.store_hint ?? "unbekannt"}. Lies den Bon (ggf. mehrere Fotos in Lesereihenfolge) und rufe submit_receipt auf.`,
   });
   const messages: unknown[] = [{ role: "user", content }];
 
   const started = Date.now();
   let totalIn = 0, totalOut = 0, attempts = 0;
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const price = PRICES[model];
 
   const logUsage = async (usage: { input_tokens: number; output_tokens: number }, ms: number) => {
-    await admin.from("llm_usage").insert({
+    const row = {
       household_id: body.household_id,
-      receipt_id: body.receipt_id ?? null,
+      receipt_id: body.receipt_id,
       model,
       input_tokens: usage.input_tokens,
       output_tokens: usage.output_tokens,
       cost_micro_usd: usage.input_tokens * price.in + usage.output_tokens * price.out,
       duration_ms: ms,
-    });
+    };
+    const { error } = await admin.from("llm_usage").insert(row);
+    // Eine unbekannte receipt_id (Fremdschluessel) darf den Aufruf nicht aus dem Tageslimit herausfallen lassen: dann
+    // ohne Verweis protokollieren.
+    if (error && row.receipt_id !== null) {
+      const { error: retryErr } = await admin.from("llm_usage").insert({ ...row, receipt_id: null });
+      if (retryErr) console.error("llm_usage_insert_failed", retryErr.message);
+    } else if (error) {
+      console.error("llm_usage_insert_failed", error.message);
+    }
   };
 
   let t0 = Date.now();
-  let r = await callClaude(model, system, tool, messages);
+  const r = await callClaude(model, system, tool, messages);
   attempts++;
   if (!r) return json({ error: "llm_failed" }, 502);
   totalIn += r.usage.input_tokens; totalOut += r.usage.output_tokens;

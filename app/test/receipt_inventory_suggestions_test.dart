@@ -173,8 +173,9 @@ void main() {
       final saved = await repo.saveParsed(photoReceipt());
       final product = await (db.select(db.products)..where((p) => p.name.equals('Clever Vollmilch'))).getSingle();
       final suggestion = await (db.select(db.inventoryItems)..where((i) => i.productId.equals(product.id))).getSingle();
-      // Nutzer bestaetigt den Vorschlag per Barcode-Scan
-      final confirmed = await inventory.recordFromScan(productId: product.id, ean: '9001234567890');
+      // Nutzer bestaetigt den Vorschlag per Barcode-Scan, am Kauftag: verfeinert werden nur Vorschlaege der letzten 7 Tage.
+      // Codereview-Fund 2026-10-16: ohne festes `now` haengt der Test an der echten Uhr und schlug ab 2026-10-05 fehl.
+      final confirmed = await inventory.recordFromScan(productId: product.id, ean: '9001234567890', now: DateTime.utc(2026, 9, 28, 12));
       expect(confirmed.id, suggestion.id);
       expect(confirmed.isSuggestion, isFalse);
 

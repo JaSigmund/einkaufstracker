@@ -8,6 +8,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/receipt/parsed_receipt.dart';
 import 'cloud_receipt.dart';
 
+/// Ordnet die Fehlerantwort von `parse-receipt` (HTTP-Status und JSON-Fehlerdetails) der passenden Ausnahme zu, wie
+/// `cookingCloudExceptionFor` bei den Rezept-Functions. Reine Funktion, damit sie ohne Netzwerk testbar ist.
+Exception cloudReceiptExceptionFor(int status, Object? details) {
+  final error = details is Map ? details['error'] : null;
+  if (status == 403 && error == 'cloud_ocr_not_allowed') return const CloudNotAllowed();
+  // Tageslimit aller KI-Funktionen des Haushalts (Codereview-Fund 2026-10-16: gilt jetzt auch fuer die Bon-Erkennung)
+  if (status == 429 && error == 'daily_limit_reached') return const CloudUnavailable('Tageslimit erreicht, morgen wieder möglich');
+  return CloudUnavailable('Fehler $status');
+}
+
 /// Ruft die Edge Function `parse-receipt` auf (Claude Vision, Variante v3 mit einer Nachfrage bei Summenabweichung).
 class SupabaseCloudReceiptReader implements CloudReceiptReader {
   SupabaseCloudReceiptReader(this._client, this._householdId);
@@ -29,9 +39,7 @@ class SupabaseCloudReceiptReader implements CloudReceiptReader {
       if (data is! Map<String, dynamic>) throw const CloudUnavailable('unerwartete Antwort');
       return parsedReceiptFromCloud(data);
     } on FunctionException catch (e) {
-      final details = e.details;
-      if (e.status == 403 && details is Map && details['error'] == 'cloud_ocr_not_allowed') throw const CloudNotAllowed();
-      throw CloudUnavailable('Fehler ${e.status}');
+      throw cloudReceiptExceptionFor(e.status, e.details);
     } on TimeoutException {
       throw const CloudUnavailable('Zeitüberschreitung');
     } on CloudUnavailable {

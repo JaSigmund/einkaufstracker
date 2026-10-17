@@ -162,7 +162,7 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
         if (p.note != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(p.note!, key: const Key('review-note'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+            child: Text(p.note!, key: const Key('review-note'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ),
         _CheckBanner(checks: c),
         const Divider(height: 1),

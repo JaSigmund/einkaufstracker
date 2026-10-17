@@ -70,9 +70,9 @@ class _ExpiryStagesDialogState extends State<_ExpiryStagesDialog> {
           Text(
             _chosen.isEmpty ? 'Wähle mindestens einen Zeitpunkt.' : describeExpiryStages(_chosen.toList()),
             key: const Key('stage-summary'),
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
-          Text('Höchstens $maxExpiryStages Zeitpunkte. Bei einem Verbrauchsdatum kommt die Erinnerung nie früher als einen Tag vorher.', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          Text('Höchstens $maxExpiryStages Zeitpunkte. Bei einem Verbrauchsdatum kommt die Erinnerung nie früher als einen Tag vorher.', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
       actions: [

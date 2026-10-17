@@ -55,7 +55,7 @@ class SupplementsPage extends ConsumerWidget {
         'Trag ein, was auf der Packung steht (Inhalt je Tablette, Kapsel oder Messlöffel). Ein Tipp auf „Genommen“ rechnet es für heute ein. '
         'Die Werte stehen auf der Seite Nährstoffe als eigene Quelle, getrennt von den Mahlzeiten. Die App bewertet nicht, ob die Menge passt.',
         key: const Key('supplements-hint'),
-        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
       ),
       const SizedBox(height: 8),
       if (supplements.isEmpty)

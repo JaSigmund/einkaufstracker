@@ -539,6 +539,38 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   await ref.read(notificationSchedulerProvider).scheduleExpiryReminders(reminders, notifyTime: settings.notifyTime, leadDays: settings.notifyLeadDays);
 }
 
+/// Entfernt beim Abmelden und nach dem Loeschen des Kontos alles, was auf diesem Geraet vom Konto uebrig bliebe: lokale
+/// Datenbank (samt Outbox und Upload-Warteschlangen), lokale Kopien von Bon-Belegen und Essensfotos und die geplanten
+/// Ablauf-Erinnerungen. Codereview-Fund 2026-10-16: bisher wurde nur die Datenbank geleert, Fotos blieben im App-Ordner
+/// und eine schon geplante Erinnerung nannte nach dem Abmelden noch die Produkte des alten Kontos.
+///
+/// Wirft nur, wenn die Datenbank nicht geleert werden kann; Dateien und Erinnerungen sind best effort (z.B. gibt es im
+/// Browser keinen App-Ordner). Die Datenbank zuerst: scheitert sie beim Abmelden, bleibt der Nutzer angemeldet, und noch
+/// nicht hochgeladene Belege muessen dann noch lokal liegen. Nach "Konto loeschen" gibt es nichts mehr hochzuladen, dort
+/// raeumt [continueOnDatabaseError] den Rest trotzdem weg und wirft erst danach.
+Future<void> clearLocalAccountData(WidgetRef ref, {bool continueOnDatabaseError = false}) async {
+  (Object, StackTrace)? dbError;
+  try {
+    await ref.read(databaseProvider).wipe();
+  } catch (e, st) {
+    if (!continueOnDatabaseError) rethrow;
+    dbError = (e, st);
+  }
+  final steps = <String, Future<void> Function()>{
+    'Erinnerungen': () => ref.read(notificationSchedulerProvider).cancelExpiryReminders(),
+    'Bon-Belege': () => ref.read(receiptFileServiceProvider).deleteAllLocal(),
+    'Essensfotos': () => ref.read(mealPhotoServiceProvider).deleteAllLocal(),
+  };
+  for (final MapEntry(key: what, value: step) in steps.entries) {
+    try {
+      await step();
+    } catch (e) {
+      debugPrint('[abmelden] $what nicht entfernt: $e');
+    }
+  }
+  if (dbError case (final e, final st)) Error.throwWithStackTrace(e, st);
+}
+
 final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inventoryRepositoryProvider).watchSuggestions());
 final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
   return BugReportRepository(

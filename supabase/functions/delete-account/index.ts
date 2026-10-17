@@ -3,7 +3,8 @@
 // Loescht das Konto des aufrufenden Nutzers unwiderruflich (Play-Store-Pflicht "Account Deletion",
 // siehe Datenschutzerklaerung: "Konto samt aller Daten loeschen").
 //
-// Ablauf: JWT pruefen -> Haushalte des Nutzers ermitteln -> ist er das einzige Mitglied eines
+// Ablauf: JWT pruefen -> Haushalte des Nutzers und ihre Mitgliederzahl ermitteln (plan.ts: ist eine Zahl unbekannt,
+// wird abgebrochen, bevor etwas geloescht ist) -> ist er das einzige Mitglied eines
 // Haushalts, wird der ganze Haushalt geloescht (cascade loescht Bons, Inventar, Kategorien etc.,
 // siehe Migration 0001) und dessen Dateien in den Storage-Buckets "receipts" (Bon-Fotos, PDFs) und
 // "meals" (Essensfotos, Phase 7) entfernt; ist er nicht
@@ -13,6 +14,7 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { type Membership, planDeletion } from "./plan.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -74,19 +76,31 @@ Deno.serve(async (req) => {
     .eq("user_id", userId);
   if (memErr) return json({ error: "lookup_failed" }, 500);
 
+  // Erst alle Mitgliederzahlen lesen, dann entscheiden: ein Lesefehler darf nie als "einziges Mitglied" gelten.
+  const counted: Membership[] = [];
   for (const { household_id } of memberships ?? []) {
-    const { count } = await admin
+    const { count, error } = await admin
       .from("household_members")
       .select("user_id", { count: "exact", head: true })
       .eq("household_id", household_id);
+    counted.push({ household_id, members: error ? null : count });
+  }
+  const plan = planDeletion(counted);
+  if (!plan.ok) return json({ error: plan.error }, 500);
 
-    if ((count ?? 0) <= 1) {
-      await purgeReceiptFiles(admin.storage.from("receipts"), household_id);
-      await purgeMealPhotos(admin.storage.from("meals"), household_id);
-      await admin.from("households").delete().eq("id", household_id); // cascade: alle Fachdaten
-    } else {
-      await admin.from("household_members").delete().eq("household_id", household_id).eq("user_id", userId);
-    }
+  for (const household_id of plan.leaveHouseholds) {
+    const { error } = await admin.from("household_members").delete().eq("household_id", household_id).eq("user_id", userId);
+    if (error) return json({ error: "leave_failed" }, 500);
+  }
+  for (const household_id of plan.deleteHouseholds) {
+    // Dateien zuerst: nach dem Loeschen des Haushalts gaebe es keinen Verweis mehr auf sie. Best effort, ein
+    // Rest im privaten Bucket ist ohne Haushalt nicht mehr erreichbar.
+    await purgeReceiptFiles(admin.storage.from("receipts"), household_id);
+    await purgeMealPhotos(admin.storage.from("meals"), household_id);
+    const { error } = await admin.from("households").delete().eq("id", household_id); // cascade: alle Fachdaten
+    // Ohne geloeschten Haushalt auch das Konto nicht loeschen: sonst blieben die Daten ohne Besitzer zurueck, und ein
+    // neuer Versuch waere nicht mehr moeglich.
+    if (error) return json({ error: "household_delete_failed" }, 500);
   }
 
   const { error: delErr } = await admin.auth.admin.deleteUser(userId);

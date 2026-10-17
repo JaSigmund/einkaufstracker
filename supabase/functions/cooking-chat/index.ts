@@ -13,20 +13,15 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { parseRequest } from "./validate.ts";
 
 const PRICES: Record<string, { in: number; out: number }> = {
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
   "claude-sonnet-5": { in: 2, out: 10 },
 };
 const DEFAULT_MODEL = Deno.env.get("RECIPE_MODEL") ?? "claude-haiku-4-5-20251001";
-const MAX_MESSAGE_CHARS = 2000;
-const MAX_HISTORY = 6;
-const MAX_INGREDIENTS = 40;
-// Codereview-Fund 2026-10-01: recipe_title hatte gar keine Laengenpruefung, ingredients/history waren nur
-// in der Anzahl begrenzt, nicht in der Laenge jedes einzelnen Eintrags -- ein direkter API-Aufruf (nicht
-// der normale Client) haette darueber beliebig grosse Prompts und damit Kosten pro Nachricht erzeugen
-// koennen.
-const MAX_LABEL_CHARS = 200;
+// Laengen und Anzahl von Nachricht, Rezepttitel, Zutaten und Verlauf begrenzt validate.ts (Codereview-Funde 2026-10-01
+// und 2026-10-16).
 
 // Tageslimit je Haushalt ueber alle KI-Funktionen (siehe Block 3b). Grosszuegig fuer normale Nutzung (ein
 // Kochabend mit Chat sind ein paar Dutzend Nachrichten), aber eine harte Obergrenze fuer die Kosten.
@@ -34,8 +29,6 @@ const DAILY_CALL_LIMIT = 40;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-
-type HistoryEntry = { text: string; from_user: boolean };
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -48,36 +41,17 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "unauthorized" }, 401);
 
-  // 2) Eingabe
-  let body: {
-    household_id: string;
-    message: string;
-    history?: HistoryEntry[];
-    recipe_title?: string;
-    ingredients?: string[];
-    model?: string;
-  };
+  // 2) Eingabe (validate.ts; kappt Zutaten und Verlauf serverseitig, Q-22)
+  let raw: unknown;
   try {
-    body = await req.json();
+    raw = await req.json();
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
-  if (!body.household_id || typeof body.message !== "string" || body.message.trim().length === 0) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  if (body.message.length > MAX_MESSAGE_CHARS) return json({ error: "message_too_long" }, 400);
-  if (body.recipe_title != null && (typeof body.recipe_title !== "string" || body.recipe_title.length > MAX_LABEL_CHARS)) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  if ((body.ingredients ?? []).some((i) => typeof i !== "string" || i.length > MAX_LABEL_CHARS)) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  if ((body.history ?? []).some((h) => typeof h.text !== "string" || h.text.length > MAX_MESSAGE_CHARS)) {
-    return json({ error: "invalid_input" }, 400);
-  }
-  const ingredients = (body.ingredients ?? []).slice(0, MAX_INGREDIENTS);
-  // Serverseitig zusaetzlich kappen, unabhaengig davon, was der Client schickt (Q-22).
-  const history = (body.history ?? []).slice(-MAX_HISTORY);
+  const parsed = parseRequest(raw);
+  if (!parsed.ok) return json({ error: parsed.error }, 400);
+  const body = parsed.value;
+  const { ingredients, history } = body;
   const model = body.model ?? DEFAULT_MODEL;
   if (!(model in PRICES)) return json({ error: "model_not_allowed", allowed: Object.keys(PRICES) }, 400);
 

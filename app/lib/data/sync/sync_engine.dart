@@ -8,7 +8,8 @@ import 'mappers.dart';
 
 /// Beschreibt, wie eine Serverzeile einer Tabelle lokal gespeichert wird.
 class SyncTableDef {
-  const SyncTableDef(this.remoteName, this.applyRemote, {String Function(Map<String, dynamic> json)? idOf})
+  const SyncTableDef(this.remoteName, this.applyRemote,
+      {String Function(Map<String, dynamic> json)? idOf, this.orderKeys = const ['id']})
       : idOf = idOf ?? _defaultId,
         hasPlainId = idOf == null;
   final String remoteName;
@@ -23,6 +24,9 @@ class SyncTableDef {
   /// Konflikterkennung die Zeile ueber `id` beim Server nachschlagen.
   final bool hasPlainId;
 
+  /// Spalten des Primaerschluessels: stabile Reihenfolge beim Holen fuer Zeilen mit gleichem `updated_at`.
+  final List<String> orderKeys;
+
   static String _defaultId(Map<String, dynamic> j) => j['id'] as String;
 }
 
@@ -31,7 +35,7 @@ final syncTables = <SyncTableDef>[
   SyncTableDef('category_aliases', (db, j) => db.into(db.categoryAliases).insertOnConflictUpdate(categoryAliasFromRemote(j))),
   SyncTableDef('products', (db, j) => db.into(db.products).insertOnConflictUpdate(productFromRemote(j))),
   SyncTableDef('product_barcodes', (db, j) => db.into(db.productBarcodes).insertOnConflictUpdate(productBarcodeFromRemote(j)),
-      idOf: (j) => '${j['household_id']}:${j['ean']}'),
+      idOf: (j) => '${j['household_id']}:${j['ean']}', orderKeys: const ['household_id', 'ean']),
   SyncTableDef('product_aliases', (db, j) => db.into(db.productAliases).insertOnConflictUpdate(productAliasFromRemote(j))),
   // Online-Preise (ADR-019): zeigt auf Produkte, deshalb nach den Produkten
   SyncTableDef('product_online_links', (db, j) => db.into(db.productOnlineLinks).insertOnConflictUpdate(productOnlineLinkFromRemote(j))),
@@ -50,12 +54,12 @@ final syncTables = <SyncTableDef>[
   SyncTableDef('meals', (db, j) => db.into(db.meals).insertOnConflictUpdate(mealFromRemote(j))),
   SyncTableDef('meal_ingredients', (db, j) => db.into(db.mealIngredients).insertOnConflictUpdate(mealIngredientFromRemote(j))),
   SyncTableDef('nutrition_targets', (db, j) => db.into(db.nutritionTargetRows).insertOnConflictUpdate(nutritionTargetFromRemote(j)),
-      idOf: (j) => j['household_id'] as String),
+      idOf: (j) => j['household_id'] as String, orderKeys: const ['household_id']),
   // Nahrungsergaenzung (Phase N4): Einnahmen zeigen auf ihre Ergaenzung, deshalb zuerst die Ergaenzungen; Einstellungen je Schluessel
   SyncTableDef('supplements', (db, j) => db.into(db.supplements).insertOnConflictUpdate(supplementFromRemote(j))),
   SyncTableDef('supplement_intakes', (db, j) => db.into(db.supplementIntakes).insertOnConflictUpdate(supplementIntakeFromRemote(j))),
   SyncTableDef('household_prefs', (db, j) => db.into(db.householdPrefs).insertOnConflictUpdate(householdPrefFromRemote(j)),
-      idOf: (j) => '${j['household_id']}:${j['key']}'),
+      idOf: (j) => '${j['household_id']}:${j['key']}', orderKeys: const ['household_id', 'key']),
   // Fremdschluessel: shopping_list_items -> shopping_lists, deshalb zuerst die Liste
   SyncTableDef('shopping_lists', (db, j) => db.into(db.shoppingLists).insertOnConflictUpdate(shoppingListFromRemote(j))),
   SyncTableDef('shopping_list_items', (db, j) => db.into(db.shoppingListItems).insertOnConflictUpdate(shoppingListItemFromRemote(j))),
@@ -174,8 +178,13 @@ class SyncEngine {
     for (final def in syncTables) {
       final state = await (_db.select(_db.syncStates)..where((t) => t.remoteTable.equals(def.remoteName))).getSingleOrNull();
       var since = state?.lastPulledAt;
+      // Zeilen mit genau dem Zeitstempel [since], die schon geholt sind. Codereview-Fund 2026-10-16: ohne diesen Versatz
+      // blieb das Holen fuer immer haengen, sobald mehr als eine Seite (500) Zeilen denselben `updated_at` hat (alle
+      // Zeilen einer Transaktion bekommen dasselbe now(), z.B. bei einer Daten-Migration): jede Seite lieferte wieder
+      // dieselben 500 Zeilen, [since] kam nie weiter, und spaetere Aenderungen der Tabelle wurden nie mehr geholt.
+      var skip = 0;
       for (var page = 0; page < 20; page++) {
-        final rows = await _remote.fetchChanges(def.remoteName, since: since);
+        final rows = await _remote.fetchChanges(def.remoteName, since: since, offset: skip, orderKeys: def.orderKeys);
         if (rows.isEmpty) break;
 
         final ids = rows.map(def.idOf).toList();
@@ -199,7 +208,10 @@ class SyncEngine {
           }
         });
 
-        since = rows.last['updated_at'] as String;
+        final last = rows.last['updated_at'] as String;
+        final tied = rows.reversed.takeWhile((r) => r['updated_at'] == last).length;
+        skip = last == since ? skip + tied : tied;
+        since = last;
         await _db.into(_db.syncStates).insertOnConflictUpdate(
               SyncStatesCompanion.insert(remoteTable: def.remoteName, lastPulledAt: Value(since)),
             );

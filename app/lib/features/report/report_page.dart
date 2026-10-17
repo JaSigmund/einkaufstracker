@@ -136,7 +136,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             Center(
               child: Text(
                 report.receiptCount == 1 ? '1 Einkauf' : '${report.receiptCount} Einkäufe',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
             ),
           ]),
@@ -148,7 +148,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
               child: Text(
                 'Ohne ${formatEuro(excludedCents)}, die jemand anderes bezahlt hat',
                 key: const Key('report-excluded'),
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
             ),
           ),
@@ -304,7 +304,7 @@ class _ExplanationSheet extends StatelessWidget {
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Aus diesen Bons', style: t.textTheme.labelLarge?.copyWith(color: t.colorScheme.outline)),
+            child: Text('Aus diesen Bons', style: t.textTheme.labelLarge?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ),
           for (final e in byReceipt.entries) ...[
             ListTile(

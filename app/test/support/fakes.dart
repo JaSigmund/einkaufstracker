@@ -61,11 +61,31 @@ class FakeRemoteStore implements RemoteStore {
   Map<String, Map<String, dynamic>> table(String name) => tables.putIfAbsent(name, () => {});
 
   @override
-  Future<List<Map<String, dynamic>>> fetchChanges(String tableName, {String? since, int limit = 500}) async {
+  Future<List<Map<String, dynamic>>> fetchChanges(String tableName,
+      {String? since, int limit = 500, int offset = 0, List<String> orderKeys = const ['id']}) async {
     if (offline || failFetch) throw const SocketException('offline');
     final rows = table(tableName).values.where((r) => since == null || (r['updated_at'] as String).compareTo(since) >= 0).toList()
-      ..sort((a, b) => (a['updated_at'] as String).compareTo(b['updated_at'] as String));
-    return rows.take(limit).map((r) => Map<String, dynamic>.from(r)).toList();
+      ..sort((a, b) {
+        final byTime = (a['updated_at'] as String).compareTo(b['updated_at'] as String);
+        if (byTime != 0) return byTime;
+        // wie ORDER BY updated_at, <Primaerschluessel> beim Server: stabile Reihenfolge bei gleichem Zeitstempel
+        for (final k in orderKeys) {
+          final c = '${a[k]}'.compareTo('${b[k]}');
+          if (c != 0) return c;
+        }
+        return 0;
+      });
+    return rows.skip(offset).take(limit).map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  /// Simuliert eine Server-Transaktion, die viele Zeilen auf einmal schreibt (z.B. eine Daten-Migration): alle Zeilen
+  /// bekommen denselben `updated_at`, wie bei Postgres, wo now() innerhalb einer Transaktion konstant ist.
+  String insertInOneTransaction(String tableName, List<Map<String, dynamic>> rows) {
+    final stamp = DateTime.utc(2026, 9, 26, 12).add(Duration(seconds: ++_tick)).toIso8601String();
+    for (final r in rows) {
+      table(tableName)[r['id'] as String] = {...r, 'updated_at': stamp};
+    }
+    return stamp;
   }
 
   /// Wie oft [fetchUpdatedAt] gerufen wurde (Konflikterkennung beim Senden, ADR-018).
@@ -237,6 +257,23 @@ Future<Map<String, String>> seedCategories(AppDatabase db, {String household = '
 }
 
 /// Storage-Attrappe: Dateien im Speicher. [offline] laesst jeden Zugriff mit einem Netzfehler scheitern.
+/// Beleg-Dienst ohne Dateizugriff, zaehlt nur, ob die lokalen Kopien geloescht wurden (Abmelden, Konto loeschen).
+class FakeReceiptFileService extends ReceiptFileService {
+  FakeReceiptFileService(AppDatabase db)
+      : super(
+          db: db,
+          repo: receiptRepo(db),
+          remote: FakeRemoteFileStore(),
+          baseDir: () async => throw UnimplementedError('Datei-Zugriff im Widget-Test'),
+          keepFiles: () async => true,
+        );
+
+  var deleteAllLocalCalls = 0;
+
+  @override
+  Future<void> deleteAllLocal() async => deleteAllLocalCalls++;
+}
+
 class FakeRemoteFileStore implements RemoteFileStore {
   final Map<String, Uint8List> files = {};
   final Map<String, String> contentTypes = {};
@@ -316,6 +353,14 @@ class FakeMealPhotoService extends MealPhotoService {
   /// Wenn gesetzt, wirft [attach] diesen Fehler.
   Object? attachError;
 
+  var deleteAllLocalCalls = 0;
+
+  @override
+  Future<void> deleteAllLocal() async {
+    deleteAllLocalCalls++;
+    photos.clear();
+  }
+
   @override
   Future<void> attach(Meal meal, Uint8List photo, {bool prepared = false}) async {
     if (attachError != null) throw attachError!;
@@ -379,9 +424,16 @@ class FakeNotificationScheduler implements NotificationScheduler {
   String? lastNotifyTime;
   int? lastLeadDays;
   var initializeCalls = 0;
+  var cancelCalls = 0;
 
   @override
   Future<void> initialize() async => initializeCalls++;
+
+  @override
+  Future<void> cancelExpiryReminders() async {
+    cancelCalls++;
+    lastScheduled = const [];
+  }
 
   @override
   Future<void> scheduleExpiryReminders(List<ExpiryReminderDay> reminders, {required String notifyTime, required int leadDays}) async {

@@ -119,6 +119,41 @@ void main() {
     });
   });
 
+  group('Pull: viele Zeilen mit demselben Zeitstempel (Codereview-Fund 2026-10-16)', () {
+    // Eine Server-Transaktion (z.B. Daten-Migration) gibt allen Zeilen dasselbe updated_at. Vorher kam das Holen ueber
+    // die erste Seite (500 Zeilen) nicht hinaus und blieb fuer diese Tabelle fuer immer stehen.
+    List<Map<String, dynamic>> categories(int n, {String prefix = 'K'}) => [
+          for (var i = 0; i < n; i++)
+            {'id': '$prefix-${i.toString().padLeft(5, '0')}', 'household_id': 'h1', 'name': '$prefix $i', 'sort_order': i, 'is_storable': true, 'deleted_at': null},
+        ];
+
+    test('mehr als eine Seite mit gleichem updated_at wird vollstaendig geholt', () async {
+      remote.insertInOneTransaction('categories', categories(1200));
+      final result = await engine.sync();
+      expect(result.pulled, 1200);
+      expect(await db.select(db.categories).get(), hasLength(1200));
+    });
+
+    test('spaetere Aenderungen derselben Tabelle kommen danach weiter an', () async {
+      remote.insertInOneTransaction('categories', categories(1200));
+      await engine.sync();
+      remote.insertInOneTransaction('categories', categories(3, prefix: 'Neu'));
+      await engine.sync();
+      final names = (await db.select(db.categories).get()).map((c) => c.name).toSet();
+      expect(names, containsAll(['Neu 0', 'Neu 1', 'Neu 2']));
+      expect(names, hasLength(1203));
+    });
+
+    test('Zeitstempel-Gleichstand genau an der Seitengrenze: nichts doppelt, nichts verloren', () async {
+      remote.insertInOneTransaction('categories', categories(499, prefix: 'A'));
+      remote.insertInOneTransaction('categories', categories(2, prefix: 'B')); // 500. und 501. Zeile teilen sich den Zeitstempel
+      remote.insertInOneTransaction('categories', categories(1, prefix: 'C'));
+      final result = await engine.sync();
+      expect(result.pulled, 502);
+      expect(await db.select(db.categories).get(), hasLength(502));
+    });
+  });
+
   group('Pull', () {
     test('Zweites Geraet (Neuinstallation) findet die Daten des ersten wieder', () async {
       final repo = categoryRepo(db);

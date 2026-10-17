@@ -229,7 +229,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             const SizedBox(height: 4),
             Text(
               'Ein Bon kann ein Produkt schon angelegt haben, bevor du es gescannt hast. Dann hier verknüpfen, statt neu anzulegen.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -250,7 +250,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               ),
             if (_search.text.trim().isEmpty && _unlinked.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text('Zuletzt aus Bons, noch ohne Barcode', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.outline)),
+              Text('Zuletzt aus Bons, noch ohne Barcode', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               for (final m in _unlinked)
                 Card(
                   child: ListTile(
@@ -375,7 +375,7 @@ class _AliasSection extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Diese Bon-Texte werden automatisch diesem Produkt zugeordnet.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           for (final a in aliases)
             ListTile(

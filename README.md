@@ -19,7 +19,7 @@ Handy-App (Flutter, Android zuerst) zum Scannen von Einkaufsbons, Tracken der Au
 | `tools/parse_digital_billa.py` | Prototyp-Parser für digitale Billa-Bons (PDF-Textebene), 6 von 6 Bons exakt (Summe und Steuerblock) |
 | Flutter-Umgebung | installiert unter `C:\Users\jakob\dev`, laden mit `. C:\Users\jakob\dev\env.ps1` |
 | Flutter-App (`app/`) | Phase 2 bis 5 fertig (Abnahme nach Lastenheft §6 bestanden), dazu Phase 7 (Essenstagebuch: Mahlzeiten mit FEFO-Bestandsabzug und Rückbuchung, BLS-Suche, Foto und Foto-KI, Richtwerte, Verbrauchsbilanz, Schnelleinträge) und Phase 6 (Haushalts-Einladungen, kürzerer Sync-Takt, Konflikt-Hinweis). Außerdem Bon-Import (PDF, Teilen, Foto + Cloud-Fallback), Monatsauswertung mit Grundpreis, Trend, Barcode-Inventar mit Haltbarkeit, Einkaufsliste, Rezeptvorschläge, Web-Version (PWA). 1138 Tests. Debug-Build: `flutter build apk --debug --dart-define-from-file=dart_defines.local.json`, Release siehe unten |
-| CI | GitHub Actions: App (analyze, test inkl. Migrationstest der lokalen Datenbank), Datenbank (Schema- und RLS-Tests), Edge Functions (deno check und deno test), alle auf Linux grün |
+| CI | GitHub Actions: App (analyze, test inkl. Migrationstest der lokalen Datenbank, Architektur-, Barrierefreiheits- und Layout-Tests, Untergrenze der Testabdeckung), Web-Build (PWA), Datenbank (Schema-, RLS-Tests und Sicherheits-Invarianten), Edge Functions (deno check, deno test, deno lint), Repo-Hygiene (keine Geheimnisse, keine verbotenen Dateien). Befunde und Begründung: [`docs/code-review-2026-10-16.md`](docs/code-review-2026-10-16.md) |
 
 ## Struktur
 
@@ -52,6 +52,12 @@ Phase 0 bis 5 sind abgeschlossen, Phase 7 (Essenstagebuch) und große Teile von 
 - Online-Preisquellen (ADR-019) und die offenen Fragen dazu
 
 **Migrationen anwenden:** `npx supabase db push --dry-run`, dann `npx supabase db push --yes` (gegen das Live-Projekt, verknüpft per `supabase link`). Neue Migrationen müssen live sein, **bevor** die App-Version mit dem neuen Schema installiert wird.
+
+## Vor dem Commit
+
+```bash
+python tools/check_repo_hygiene.py   # keine Schluessel, Tokens, Bon-Fotos oder lokalen Konfigurationen im Repo
+```
 
 ## Schema testen (ohne Docker)
 

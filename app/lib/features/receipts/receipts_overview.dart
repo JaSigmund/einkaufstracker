@@ -80,7 +80,7 @@ class _ReceiptsOverviewState extends ConsumerState<ReceiptsOverview> {
                   const SizedBox(height: 2),
                   Text(
                     shown.length == 1 ? '1 Einkauf' : '${shown.length} Einkäufe',
-                    style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+                    style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
                   ),
                 ]),
               ),

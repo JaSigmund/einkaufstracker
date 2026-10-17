@@ -110,7 +110,7 @@ class WeekBalanceSummary {
     out.add(Text(
       'Eingekauft ${formatMassG(week.purchasedG)} · weggeworfen ${formatMassG(week.discardedG)}',
       key: Key('balance-flow-${_id(week)}'),
-      style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+      style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
     ));
     if (week.skipped > 0) {
       out.add(Text(
@@ -118,7 +118,7 @@ class WeekBalanceSummary {
             ? '1 Buchung in Stück ohne bekanntes Gewicht ist nicht eingerechnet.'
             : '${week.skipped} Buchungen in Stück ohne bekanntes Gewicht sind nicht eingerechnet.',
         key: Key('balance-skipped-${_id(week)}'),
-        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
       ));
     }
     return out;

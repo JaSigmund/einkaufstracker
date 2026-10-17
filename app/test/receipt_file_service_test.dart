@@ -51,6 +51,16 @@ void main() {
     expect(await svc.uploadPending(), 0); // Warteschlange leer
   });
 
+  test('deleteAllLocal (Abmelden): alle lokalen Kopien weg, Server-Dateien bleiben, ohne Ordner kein Fehler', () async {
+    final svc = fileService(db, remote, dir);
+    await svc.attach(receiptId, [ReceiptAttachment(kind: 'image', bytes: _bytes([7, 7]))]);
+    await svc.uploadPending();
+    await svc.deleteAllLocal();
+    expect(Directory('${dir.path}/receipt_files').existsSync(), isFalse);
+    expect(remote.files, isNotEmpty);
+    await svc.deleteAllLocal(); // zweimal ist kein Fehler
+  });
+
   test('Einstellung "Bon-Fotos speichern" aus: nichts wird abgelegt', () async {
     final svc = fileService(db, remote, dir, keep: false);
     expect(await svc.attach(receiptId, [ReceiptAttachment(kind: 'image', bytes: _bytes([9]))]), 0);

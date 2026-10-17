@@ -50,7 +50,7 @@ class ProductPricePage extends ConsumerWidget {
               child: Text(
                 'Zu wenig Daten für einen Vergleich (mindestens 2 Käufe je Händler in den letzten 180 Tagen nötig)',
                 key: const Key('comparison-insufficient'),
-                style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.outline),
+                style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
               ),
             )
           else

@@ -248,7 +248,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       const SizedBox(height: 4),
       _grid(t, days, byId, kcalRef, monthMaxKcal),
       const SizedBox(height: 4),
-      Text('Leere Tage sind nicht erfasst, das ist nicht dasselbe wie 0 kcal.', key: const Key('journal-hint'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+      Text('Leere Tage sind nicht erfasst, das ist nicht dasselbe wie 0 kcal.', key: const Key('journal-hint'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
       if (days.any((d) => d.logged))
         Align(
           alignment: Alignment.centerLeft,
@@ -289,7 +289,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
 
   Widget _weekdayRow(ThemeData t) => Row(children: [
         for (final d in const ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'])
-          Expanded(child: Center(child: Text(d, style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.outline)))),
+          Expanded(child: Center(child: Text(d, style: t.textTheme.labelSmall?.copyWith(color: t.colorScheme.onSurfaceVariant)))),
       ]);
 
   Widget _grid(ThemeData t, List<JournalDay> days, Map<String, Meal> byId, double? kcalRef, double monthMaxKcal) {
@@ -315,7 +315,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       '${d.day.day}',
       style: t.textTheme.labelMedium?.copyWith(
         fontWeight: isToday ? FontWeight.bold : null,
-        color: photoMeal != null ? Colors.white : (d.logged ? t.colorScheme.onPrimaryContainer : t.colorScheme.outline),
+        color: photoMeal != null ? Colors.white : (d.logged ? t.colorScheme.onPrimaryContainer : t.colorScheme.onSurfaceVariant),
         shadows: photoMeal != null ? const [Shadow(blurRadius: 3)] : null,
       ),
     );
@@ -447,7 +447,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
                 Text(
                   _estimateText(estimate),
                   key: const Key('journal-estimate-text'),
-                  style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+                  style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
                 ),
             ],
             for (final id in d.mealIds)

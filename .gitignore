@@ -15,6 +15,7 @@ supabase/.temp/
 # Flutter / Dart
 app/.dart_tool/
 app/build/
+app/coverage/
 app/.flutter-plugins*
 app/.packages
 

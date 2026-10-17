@@ -280,7 +280,7 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
       ExpiryLevel.expired => t.colorScheme.error,
       ExpiryLevel.soon => Colors.amber.shade800,
       ExpiryLevel.ok => Colors.green.shade700,
-      ExpiryLevel.unknown => t.colorScheme.outline,
+      ExpiryLevel.unknown => t.colorScheme.onSurfaceVariant,
     };
     final movements = ref.watch(inventoryMovementsStreamProvider(_item.productId)).value ?? const <InventoryMovement>[];
     final ownMovements = movements.where((m) => m.inventoryItemId == _item.id).toList();
@@ -316,18 +316,18 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                IconButton(key: const Key('quantity-minus'), iconSize: 32, onPressed: () => _changeQuantity(-1), icon: const Icon(Icons.remove_circle_outline)),
+                IconButton(key: const Key('quantity-minus'), tooltip: 'Menge verringern', iconSize: 32, onPressed: () => _changeQuantity(-1), icon: const Icon(Icons.remove_circle_outline)),
                 Expanded(
                   child: InkWell(
                     key: const Key('quantity-tap'),
                     onTap: _enterQuantity,
                     child: Column(children: [
                       Text('${formatQuantity(_item.quantity)} ${_item.unit}', style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
-                      Text('Menge antippen zum Eingeben', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+                      Text('Menge antippen zum Eingeben', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
                     ]),
                   ),
                 ),
-                IconButton(key: const Key('quantity-plus'), iconSize: 32, onPressed: () => _changeQuantity(1), icon: const Icon(Icons.add_circle_outline)),
+                IconButton(key: const Key('quantity-plus'), tooltip: 'Menge erhöhen', iconSize: 32, onPressed: () => _changeQuantity(1), icon: const Icon(Icons.add_circle_outline)),
               ]),
             ),
           ),
@@ -360,7 +360,7 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
               leading: Icon(Icons.event_outlined, color: color),
               title: Text(_item.bestBefore == null ? 'Kein Datum hinterlegt' : _formatDate(_item.bestBefore!), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
               subtitle: Text(_dateKindLabels[_item.dateKind]!),
-              trailing: _item.bestBefore == null ? null : IconButton(key: const Key('date-clear'), icon: const Icon(Icons.close), onPressed: _clearDate),
+              trailing: _item.bestBefore == null ? null : IconButton(key: const Key('date-clear'), tooltip: 'Datum entfernen', icon: const Icon(Icons.close), onPressed: _clearDate),
               onTap: _changeDate,
             ),
           ),

@@ -288,9 +288,9 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
         ),
       ),
       Row(children: [
-        IconButton(key: const Key('nutrients-prev'), icon: const Icon(Icons.chevron_left), onPressed: () => _shift(-1)),
+        IconButton(key: const Key('nutrients-prev'), tooltip: 'Vorheriger Zeitraum', icon: const Icon(Icons.chevron_left), onPressed: () => _shift(-1)),
         Expanded(child: Text(_title(), key: const Key('nutrients-title'), textAlign: TextAlign.center, style: t.textTheme.titleMedium)),
-        IconButton(key: const Key('nutrients-next'), icon: const Icon(Icons.chevron_right), onPressed: () => _shift(1)),
+        IconButton(key: const Key('nutrients-next'), tooltip: 'Nächster Zeitraum', icon: const Icon(Icons.chevron_right), onPressed: () => _shift(1)),
       ]),
       if (_week && week != null)
         Padding(
@@ -323,7 +323,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
         if (estimates)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Enthält Schätzwerte', key: const Key('nutrients-estimates'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+            child: Text('Enthält Schätzwerte', key: const Key('nutrients-estimates'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ),
         for (final g in NutrientGroup.values) ..._group(context, t, g, valueOf),
         Align(
@@ -339,7 +339,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: Text(nutrientsLimitsText, key: const Key('nutrients-limits'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+          child: Text(nutrientsLimitsText, key: const Key('nutrients-limits'), style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ),
       ],
     ]);
@@ -526,7 +526,7 @@ Future<void> showMealMicros(BuildContext context, Meal meal, List<MealIngredient
                 ),
             ],
             const SizedBox(height: 8),
-            Text(nutrientsLimitsText, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+            Text(nutrientsLimitsText, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ]),
         ),
       );

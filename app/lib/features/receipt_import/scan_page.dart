@@ -205,7 +205,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         const SizedBox(height: 8),
         Text(
           'Tipp: Speichere den digitalen Bon in der jö-App als PDF und wähle ihn hier aus. Derselbe Einkauf wird nie doppelt gespeichert.',
-          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
+          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         ),
       ],
     );

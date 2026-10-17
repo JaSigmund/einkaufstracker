@@ -126,6 +126,13 @@ class MealPhotoService {
     }
   }
 
+  /// Entfernt ALLE lokalen Essensfotos (Abmelden, Konto loeschen), die Server-Dateien bleiben unberuehrt
+  /// (Codereview-Fund 2026-10-16, wie [ReceiptFileService.deleteAllLocal]).
+  Future<void> deleteAllLocal() async {
+    final dir = Directory('${(await baseDir()).path}/meal_photos');
+    if (await dir.exists()) await dir.delete(recursive: true);
+  }
+
   /// Entfernt das Foto einer Mahlzeit: lokale Kopie, Warteschlange und (soweit moeglich) die Server-Datei. Mit
   /// [clearPath] wird zusaetzlich der Pfad an der Mahlzeit geloescht (Foto entfernt, Mahlzeit bleibt).
   Future<void> purge(Meal meal, {bool clearPath = false}) async {
