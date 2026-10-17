@@ -164,7 +164,7 @@ class FakeRemoteStore implements RemoteStore {
 
 class FakeAuth implements AuthRepository {
   FakeAuth({this.failWith, this.failSignOutWith});
-  final String? failWith;
+  String? failWith;
 
   /// Laesst nur `signOut()` scheitern (unabhaengig von [failWith], das signIn/deleteAccount betrifft) --
   /// fuer Tests, die pruefen, dass eine bereits erfolgreiche Konto-Loeschung trotzdem versucht, lokal

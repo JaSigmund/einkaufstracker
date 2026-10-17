@@ -268,6 +268,14 @@ class ShoppingListRepository {
     onChanged?.call();
   }
 
+  /// Nimmt [delete] zurueck ("Rückgängig" nach dem Wischen, Codereview 2026-10-16, X2).
+  Future<void> restore(String id) async {
+    final item = await _get(id);
+    if (item.deletedAt == null) return;
+    await _putItem(item.copyWith(deletedAt: const Value(null), updatedAt: DateTime.now().toUtc()));
+    onChanged?.call();
+  }
+
   /// Bestaetigt einen automatischen Vorschlag: zaehlt danach wie ein normaler Eintrag (Doku 06 §6).
   Future<void> confirmSuggestion(String id) async {
     final item = await _get(id);

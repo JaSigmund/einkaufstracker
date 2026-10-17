@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInput;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,6 +38,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
     try {
       await ref.read(authRepositoryProvider).signIn(_email.text, _password.text);
+      // Passwortmanager bieten das Speichern erst nach gelungener Anmeldung an (Codereview 2026-10-16, X5)
+      TextInput.finishAutofillContext();
       // Weiterleitung erledigt der Router, sobald die Sitzung da ist
     } on SignInFailure catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -63,26 +66,35 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 12),
                   Text('Einkaufstracker', textAlign: TextAlign.center, style: t.textTheme.headlineMedium),
                   const SizedBox(height: 32),
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'E-Mail'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _password,
-                    obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: 'Passwort',
-                      suffixIcon: IconButton(
-                        tooltip: _obscure ? 'Passwort anzeigen' : 'Passwort verbergen',
-                        icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
+                  // Eine Gruppe: Passwortmanager erkennen E-Mail und Passwort als zusammengehoerige Zugangsdaten
+                  AutofillGroup(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.username, AutofillHints.email],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(labelText: 'E-Mail'),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _password,
+                          obscureText: _obscure,
+                          autofillHints: const [AutofillHints.password],
+                          onSubmitted: (_) => _submit(),
+                          decoration: InputDecoration(
+                            labelText: 'Passwort',
+                            suffixIcon: IconButton(
+                              tooltip: _obscure ? 'Passwort anzeigen' : 'Passwort verbergen',
+                              icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                              onPressed: () => setState(() => _obscure = !_obscure),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   if (_error != null) ...[

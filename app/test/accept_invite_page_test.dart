@@ -63,6 +63,19 @@ void main() {
     expect(error(tester), isNull);
   });
 
+  testWidgets('Adresse und neues Passwort bilden eine Autofill-Gruppe, gespeichert wird, sobald das Konto angelegt ist', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+    for (final key in ['accept-email', 'accept-password', 'accept-repeat']) {
+      expect(find.ancestor(of: find.byKey(Key(key)), matching: find.byType(AutofillGroup)), findsOneWidget, reason: key);
+    }
+    expect(find.ancestor(of: find.byKey(const Key('accept-code')), matching: find.byType(AutofillGroup)), findsNothing);
+    await fill(tester);
+    tester.testTextInput.log.clear();
+    await submit(tester);
+    expect(tester.testTextInput.log.map((c) => c.method), contains('TextInput.finishAutofillContext'));
+  });
+
   group('Pruefung vor dem Senden: nichts geht ans Netz', () {
     for (final (name, args, expected) in <(String, Map<String, String>, String)>[
       ('Code zu kurz', {'code': 'ABCD'}, 'Der Code hat 12 Zeichen'),

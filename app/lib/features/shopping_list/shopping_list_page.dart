@@ -51,10 +51,34 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   /// Markt, nach dessen Regal-Reihenfolge sortiert wird (Ausbau 1.14), `null` = alphabetisch. Nur auf diesem Geraet gemerkt.
   String? _sortStoreId;
 
+  /// Hinweis auf Wischen und langes Druecken, bis er einmal weggeklickt wurde (Codereview 2026-10-16, X4). Bis die
+  /// Ablage gelesen ist gilt er als gesehen, damit er nicht kurz aufblitzt.
+  var _gestureHintSeen = true;
+  static const _gestureHintKey = 'shopping_gesture_hint_seen';
+
   @override
   void initState() {
     super.initState();
     _loadSort();
+    _loadGestureHint();
+  }
+
+  Future<void> _loadGestureHint() async {
+    try {
+      final seen = await ref.read(databaseProvider).getKv(_gestureHintKey) != null;
+      if (mounted && !seen) setState(() => _gestureHintSeen = false);
+    } catch (_) {
+      // ohne lesbare Ablage kein Hinweis
+    }
+  }
+
+  Future<void> _dismissGestureHint() async {
+    setState(() => _gestureHintSeen = true);
+    try {
+      await ref.read(databaseProvider).setKv(_gestureHintKey, '1');
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
   }
 
   Future<void> _loadSort() async {
@@ -194,6 +218,17 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                   onSelected: (_) => ref.read(selectedShoppingListProvider.notifier).select(l.isDefault ? null : l.id),
                 ),
               ),
+            ),
+          ),
+        // Sichtbarer Weg zum Listenmenue, das sonst nur langes Druecken oeffnet (Codereview 2026-10-16, X4)
+        if (lists.where((l) => l.id == selectedId).firstOrNull case final selected?)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              key: const Key('list-edit'),
+              tooltip: 'Liste „${selected.name}“ bearbeiten',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => _listMenu(selected),
             ),
           ),
         ActionChip(key: const Key('list-add'), avatar: const Icon(Icons.add, size: 18), label: const Text('Neue Liste'), onPressed: _createList),
@@ -399,6 +434,23 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                   ),
                 const Divider(height: 24),
               ],
+              if (!_gestureHintSeen && active.isNotEmpty)
+                Card(
+                  key: const Key('shopping-gesture-hint'),
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: ListTile(
+                    leading: const Icon(Icons.swipe_left_outlined),
+                    title: Text(lists.length > 1
+                        ? 'Nach links wischen löscht einen Eintrag, langes Drücken verschiebt ihn in eine andere Liste.'
+                        : 'Nach links wischen löscht einen Eintrag.'),
+                    trailing: IconButton(
+                      key: const Key('shopping-gesture-hint-ok'),
+                      tooltip: 'Hinweis ausblenden',
+                      icon: const Icon(Icons.close),
+                      onPressed: _dismissGestureHint,
+                    ),
+                  ),
+                ),
               if (active.isEmpty && done.isEmpty && suggestions.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(32),
@@ -489,6 +541,23 @@ class _ItemTile extends ConsumerWidget {
     if (target != null) await ref.read(shoppingListRepositoryProvider).moveItem(item.id, target.id);
   }
 
+  /// Loeschen mit "Rückgängig" (Codereview 2026-10-16, X2). Messenger und Repository vorher holen: nach dem Wischen ist
+  /// die Zeile schon aus dem Baum.
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(shoppingListRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    await repo.delete(item.id);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        key: const Key('shopping-item-deleted'),
+        content: Text('„$label“ gelöscht'),
+        // mit Aktion bliebe die SnackBar sonst stehen, bis man sie wegwischt
+        persist: false,
+        action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.restore(item.id)),
+      ));
+  }
+
   Future<void> _editQuantity(BuildContext context, WidgetRef ref) async {
     final ctrl = TextEditingController(text: formatQuantity(item.quantity));
     final value = await showDialog<double>(
@@ -528,13 +597,13 @@ class _ItemTile extends ConsumerWidget {
         padding: const EdgeInsets.only(right: 20),
         child: const Icon(Icons.delete_outline),
       ),
-      onDismissed: (_) => ref.read(shoppingListRepositoryProvider).delete(item.id),
+      onDismissed: (_) => _delete(context, ref),
       // Wischen (Loeschen) und langes Druecken (Verschieben) sind fuer Screenreader zusaetzlich benannte Aktionen
       // (Codereview-Fund 2026-10-16).
       child: Semantics(
         customSemanticsActions: {
           const CustomSemanticsAction(label: 'In andere Liste verschieben'): () => _move(context, ref),
-          const CustomSemanticsAction(label: 'Löschen'): () => ref.read(shoppingListRepositoryProvider).delete(item.id),
+          const CustomSemanticsAction(label: 'Löschen'): () => _delete(context, ref),
         },
         child: GestureDetector(
         excludeFromSemantics: true,
