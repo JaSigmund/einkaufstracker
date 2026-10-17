@@ -408,8 +408,14 @@ class FakeSettingsRepository implements SettingsRepository {
   HouseholdSettings settings;
   Map<String, dynamic>? lastUpdate;
 
+  /// Wenn gesetzt, wirft [load] diesen Fehler (kein Netz).
+  Object? loadError;
+
   @override
-  Future<HouseholdSettings> load(String householdId) async => settings;
+  Future<HouseholdSettings> load(String householdId) async {
+    if (loadError != null) throw loadError!;
+    return settings;
+  }
 
   @override
   Future<void> update(String householdId, Map<String, dynamic> changes) async {

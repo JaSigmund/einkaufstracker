@@ -219,6 +219,49 @@ void main() {
       expect(remaining, isEmpty);
     });
 
+    testWidgets('Codereview-Fund 2026-10-16: mit wartenden Aenderungen gibt es "Jetzt synchronisieren" statt nur Abmelden', (tester) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final auth = FakeAuth();
+      final db = memoryDb();
+      addTearDown(db.close);
+      _syncCalls = 0;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          householdIdProvider.overrideWith((r) async => 'h1'),
+          settingsRepositoryProvider.overrideWithValue(FakeSettingsRepository(_settings)),
+          authRepositoryProvider.overrideWithValue(auth),
+          databaseProvider.overrideWithValue(db),
+          pendingChangesProvider.overrideWith((ref) => Stream.value(2)),
+          syncControllerProvider.overrideWith(_RecordingSync.new),
+          notificationSchedulerProvider.overrideWithValue(FakeNotificationScheduler()),
+          receiptFileServiceProvider.overrideWithValue(FakeReceiptFileService(db)),
+          mealPhotoServiceProvider.overrideWithValue(FakeMealPhotoService(db, mealRepo(db))),
+        ],
+        child: MaterialApp.router(routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SettingsPage())])),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings-sign-out')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('2 Änderung(en) sind noch nicht übertragen'), findsOneWidget);
+      expect(find.byKey(const Key('sign-out-anyway')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('sign-out-sync-first')));
+      await tester.pumpAndSettle();
+      expect(_syncCalls, 1);
+      expect(auth.signOutCalls, 0, reason: 'erst synchronisieren, nicht abmelden');
+      expect(find.textContaining('Alles übertragen'), findsOneWidget, reason: 'die Outbox ist in diesem Test leer');
+
+      await tester.tap(find.byKey(const Key('settings-sign-out')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sign-out-anyway')));
+      await tester.pumpAndSettle();
+      expect(auth.signOutCalls, 1);
+    });
+
     testWidgets('Codereview-Fund 2026-10-16: storniert die Erinnerungen und loescht lokale Belege und Essensfotos', (tester) async {
       tester.view.physicalSize = const Size(800, 2000);
       tester.view.devicePixelRatio = 1;
@@ -241,6 +284,31 @@ void main() {
       expect(files.deleteAllLocalCalls, 1);
       expect(photos.deleteAllLocalCalls, 1);
     });
+  });
+
+  testWidgets('Codereview-Fund 2026-10-16: ohne Netz zuletzt bekannte Einstellungen, Aendern gesperrt', (tester) async {
+    final db = memoryDb();
+    addTearDown(db.close);
+    await db.setKv('household_settings_cache', '{"household_id":"h1","notify_time":"06:45","notify_lead_days":2,'
+        '"allow_cloud_ocr":true,"keep_receipt_images":false,"monthly_budget_cents":null}');
+    final repo = FakeSettingsRepository(_settings)..loadError = Exception('offline');
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        householdIdProvider.overrideWith((r) async => 'h1'),
+        settingsRepositoryProvider.overrideWithValue(repo),
+        authRepositoryProvider.overrideWithValue(FakeAuth()),
+        databaseProvider.overrideWithValue(db),
+        pendingChangesProvider.overrideWith((ref) => Stream.value(0)),
+      ],
+      child: MaterialApp.router(routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, _) => const SettingsPage())])),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('settings-offline')), findsOneWidget);
+    expect(find.textContaining('06:45 Uhr, 2 Tag(e) vorher'), findsOneWidget);
+    final cloud = tester.widget<SwitchListTile>(find.widgetWithText(SwitchListTile, 'Cloud-Auswertung erlauben'));
+    expect(cloud.value, isTrue);
+    expect(cloud.onChanged, isNull, reason: 'Aendern braucht Netz');
   });
 
   testWidgets('kein Budget gesetzt: Hinweistext', (tester) async {
@@ -327,4 +395,12 @@ class _FailingWipeDb extends AppDatabase {
 
   @override
   Future<void> wipe() async => throw StateError('Datenbank nicht beschreibbar');
+}
+
+var _syncCalls = 0;
+
+/// Sync-Steuerung, die nur mitzaehlt (kein Server in Widget-Tests).
+class _RecordingSync extends SyncController {
+  @override
+  Future<void> sync() async => _syncCalls++;
 }

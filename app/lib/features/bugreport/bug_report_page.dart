@@ -54,7 +54,7 @@ class _BugReportPageState extends ConsumerState<BugReportPage> {
       final appInfo = collectAppInfo(
         route: _area,
         pendingChanges: pending,
-        lastSyncError: sync.error,
+        lastSyncError: sync.errorDetail ?? sync.error,
         lastSyncAt: sync.lastSync,
       );
       final snapshot = _includeSnapshot ? await buildDataSnapshot(ref.read(databaseProvider)) : null;

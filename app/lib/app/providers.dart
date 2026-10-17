@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -73,10 +74,34 @@ final settingsRepositoryProvider =
 
 /// Einstellungen des Haushalts (in Phase 1 online, Cache folgt bei Bedarf). Geteilt zwischen der
 /// Einstellungsseite und der Monatsauswertung (Budget-Fortschritt, Doku 07 §2).
+///
+/// Ohne Netz gelten die zuletzt geladenen Werte (Codereview-Fund 2026-10-16: vorher war die ganze Einstellungsseite offline
+/// leer); [HouseholdSettings.fromCache] sagt der Oberflaeche, dass Aendern erst wieder mit Netz geht.
 final householdSettingsProvider = FutureProvider.autoDispose<HouseholdSettings>((ref) async {
   final hid = await ref.watch(householdIdProvider.future);
   if (hid == null) throw StateError('Kein Haushalt gefunden');
-  return ref.watch(settingsRepositoryProvider).load(hid);
+  const cacheKey = 'household_settings_cache';
+  try {
+    final settings = await ref.watch(settingsRepositoryProvider).load(hid);
+    try {
+      await ref.read(databaseProvider).setKv(cacheKey, jsonEncode({'household_id': hid, ...settings.toJson()}));
+    } catch (_) {
+      // ohne lokalen Speicher (z.B. in Tests) eben ohne Zwischenspeicher
+    }
+    return settings;
+  } catch (_) {
+    String? cached;
+    try {
+      cached = await ref.read(databaseProvider).getKv(cacheKey);
+    } catch (_) {
+      // kein lokaler Speicher: dann bleibt es beim Fehler
+    }
+    if (cached != null) {
+      final json = jsonDecode(cached) as Map<String, dynamic>;
+      if (json['household_id'] == hid) return HouseholdSettings.fromJson(json, fromCache: true);
+    }
+    rethrow;
+  }
 });
 
 /// Aktuelle Sitzung (null = nicht angemeldet). Die Sitzung liegt lokal, der Start klappt auch offline.
@@ -122,9 +147,15 @@ final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(r
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false, this.conflicts = const []});
+  const SyncStatus({this.lastSync, this.error, this.errorDetail, this.running = false, this.updateRequired = false, this.conflicts = const []});
   final DateTime? lastSync;
+
+  /// Verstaendlicher Text fuer die Oberflaeche.
   final String? error;
+
+  /// Technische Fehlermeldung (Ausnahme als Text) fuer den Fehlerbericht; die Oberflaeche zeigt sie nicht (Codereview-Fund
+  /// 2026-10-16: vorher stand bei unbekannten Fehlern die rohe Ausnahme im Sync-Banner).
+  final String? errorDetail;
   final bool running;
 
   /// Aenderungen dieses Geraets, die beim Senden eine neuere fremde Aenderung ueberschrieben haben (ADR-018) und die der
@@ -170,7 +201,7 @@ class SyncController extends Notifier<SyncStatus> {
       // Mitgliederzahl fuer den Takt (ADR-018), im Hintergrund und ohne den Sync zu verzoegern
       unawaited(ref.read(householdSizeProvider.notifier).refreshIfStale());
     } catch (e) {
-      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), conflicts: state.conflicts);
+      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), errorDetail: '$e', conflicts: state.conflicts);
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
       _retry?.cancel();
       _retry = Timer(const Duration(seconds: 15), sync);
@@ -180,7 +211,7 @@ class SyncController extends Notifier<SyncStatus> {
   /// Der Nutzer hat den Hinweis auf ueberschriebene fremde Aenderungen gesehen.
   void dismissConflicts() {
     if (state.conflicts.isEmpty) return;
-    state = SyncStatus(lastSync: state.lastSync, error: state.error, running: state.running, updateRequired: state.updateRequired);
+    state = SyncStatus(lastSync: state.lastSync, error: state.error, errorDetail: state.errorDetail, running: state.running, updateRequired: state.updateRequired);
   }
 
   String _friendly(Object e) {
@@ -189,7 +220,7 @@ class SyncController extends Notifier<SyncStatus> {
     }
     if (e is TimeoutException) return 'Verbindung hängt, wird erneut versucht.';
     if (e is AuthException) return 'Anmeldung abgelaufen, bitte neu anmelden.';
-    return e.toString();
+    return 'Synchronisierung fehlgeschlagen, wird erneut versucht. Details stehen im Fehlerbericht.';
   }
 }
 
