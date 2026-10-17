@@ -555,12 +555,16 @@ class InventoryRepository {
     final nowUtc = DateTime.now().toUtc();
     for (final a in result.allocations) {
       final item = byId[a.inventoryItemId]!;
-      final remaining = _round3(item.quantity - a.quantity);
+      // Wie die Datenbank (numeric(10,3)): ohne Runden stuende lokal z.B. -0.30000000000000004 im Ledger, am Server -0.3
+      // (Codereview-Fund 2026-10-16).
+      final taken = _round3(a.quantity);
+      final remaining = _round3(item.quantity - taken);
+      final opensItem = remaining > 0 && item.status == 'sealed';
       if (remaining <= 0) {
         await _putItem(item.copyWith(quantity: 0, status: 'consumed', closedAt: Value(nowUtc), updatedAt: nowUtc));
       } else {
         await _putItem(item.copyWith(quantity: remaining, updatedAt: nowUtc));
-        if (item.status == 'sealed') {
+        if (opensItem) {
           await open(item.id, productDefaultOpenShelfLifeDays: openedShelfLifeDays, now: eatenAt);
         }
       }
@@ -568,10 +572,12 @@ class InventoryRepository {
         inventoryItemId: item.id,
         productId: productId,
         type: 'meal',
-        delta: -a.quantity,
+        delta: -taken,
         unit: unit,
         now: eatenAt,
         mealId: mealId,
+        // Merkt sich, dass erst diese Mahlzeit den Posten geoeffnet hat, damit die Rueckbuchung das zuruecknehmen kann
+        note: opensItem ? openedByMealNote : null,
       );
     }
 
@@ -592,7 +598,9 @@ class InventoryRepository {
   /// netto noch abgezogen ist.
   ///
   /// Ein inzwischen geloeschter Posten kann nicht wiederhergestellt werden und wird uebersprungen. Ein durch den
-  /// Abzug geleerter Posten ist danach wieder aktiv (`opened`, falls er je geoeffnet wurde, sonst `sealed`).
+  /// Abzug geleerter Posten ist danach wieder aktiv (`opened`, falls er je geoeffnet wurde, sonst `sealed`). Hat erst
+  /// diese Mahlzeit den Posten geoeffnet und wurde er seitdem nicht anders verbraucht, ist er danach wieder ungeoeffnet,
+  /// mit der Haltbarkeit von vorher (Codereview-Fund 2026-10-16: vorher blieb er "geoeffnet" mit verkuerzter Haltbarkeit).
   /// Rueckgabe: Anzahl der zurueckgebuchten Posten.
   Future<int> restoreForMeal(String mealId, {DateTime? now}) async {
     final movements = await (_db.select(_db.inventoryMovements)
@@ -613,11 +621,16 @@ class InventoryRepository {
       final item = await (_db.select(_db.inventoryItems)..where((i) => i.id.equals(entry.key))).getSingleOrNull();
       if (item == null || item.deletedAt != null) continue;
       final wasEmptied = item.status == 'consumed';
-      final status = wasEmptied ? (item.openedOn != null ? 'opened' : 'sealed') : item.status;
+      final reseal = item.status == 'opened' &&
+          movements.any((m) => m.inventoryItemId == item.id && m.type == 'meal' && m.note == openedByMealNote) &&
+          !await _usedOtherwise(item.id, mealId);
+      final status = reseal ? 'sealed' : wasEmptied ? (item.openedOn != null ? 'opened' : 'sealed') : item.status;
       await _putItem(item.copyWith(
         quantity: _round3(item.quantity + amount),
         status: status,
         closedAt: wasEmptied ? const Value(null) : Value(item.closedAt),
+        openedOn: reseal ? const Value(null) : Value(item.openedOn),
+        expiresOn: reseal ? Value(computeExpiresOn(bestBefore: item.bestBefore)) : Value(item.expiresOn),
         updatedAt: DateTime.now().toUtc(),
       ));
       await _addMovement(
@@ -634,6 +647,22 @@ class InventoryRepository {
     }
     if (restored > 0) onChanged?.call();
     return restored;
+  }
+
+  /// Notiz an der `meal`-Bewegung, die einen bis dahin ungeoeffneten Posten angebrochen hat (siehe [restoreForMeal]).
+  static const openedByMealNote = 'Durch die Mahlzeit geoeffnet';
+
+  /// Wurde der Posten ausser durch [mealId] noch anders verbraucht oder korrigiert (andere Mahlzeit, Aufgebraucht,
+  /// Inventur)? Dann bleibt er bei der Rueckbuchung geoeffnet.
+  Future<bool> _usedOtherwise(String itemId, String mealId) async {
+    final others = await (_db.select(_db.inventoryMovements)
+          ..where((m) =>
+              m.inventoryItemId.equals(itemId) &
+              m.deletedAt.isNull() &
+              m.type.equals('purchase').not() &
+              (m.mealId.isNull() | m.mealId.equals(mealId).not())))
+        .get();
+    return others.isNotEmpty;
   }
 
   /// Rundet auf drei Nachkommastellen, wie `quantity_delta` in der Datenbank (numeric(10,3)): ohne das bliebe nach
