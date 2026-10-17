@@ -147,7 +147,15 @@ final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(r
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.errorDetail, this.running = false, this.updateRequired = false, this.conflicts = const []});
+  const SyncStatus({
+    this.lastSync,
+    this.error,
+    this.errorDetail,
+    this.running = false,
+    this.updateRequired = false,
+    this.conflicts = const [],
+    this.rejected = 0,
+  });
   final DateTime? lastSync;
 
   /// Verstaendlicher Text fuer die Oberflaeche.
@@ -161,6 +169,9 @@ class SyncStatus {
   /// Aenderungen dieses Geraets, die beim Senden eine neuere fremde Aenderung ueberschrieben haben (ADR-018) und die der
   /// Nutzer noch nicht bestaetigt hat. Last-write-wins bleibt, es geschieht nur nicht mehr unbemerkt.
   final List<SyncConflict> conflicts;
+
+  /// Wartende Aenderungen, die der Server dauerhaft ablehnt (siehe [SyncResult.rejected]), Stand des letzten Syncs.
+  final int rejected;
 
   /// Die installierte Version ist zu alt fuer den aktuellen Server-Stand (ADR-022) -- Synchronisierung
   /// bleibt bewusst aus, bis aktualisiert wurde, statt mit moeglicherweise inkompatiblen Daten weiterzumachen.
@@ -188,10 +199,10 @@ class SyncController extends Notifier<SyncStatus> {
       state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true, conflicts: state.conflicts);
       return;
     }
-    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts);
+    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts, rejected: state.rejected);
     try {
       final result = await engine.sync();
-      state = SyncStatus(lastSync: DateTime.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts));
+      state = SyncStatus(lastSync: DateTime.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts), rejected: result.rejected);
       // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
       // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
       await ref.read(receiptRepositoryProvider).categorizeMissing();
@@ -201,7 +212,7 @@ class SyncController extends Notifier<SyncStatus> {
       // Mitgliederzahl fuer den Takt (ADR-018), im Hintergrund und ohne den Sync zu verzoegern
       unawaited(ref.read(householdSizeProvider.notifier).refreshIfStale());
     } catch (e) {
-      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), errorDetail: '$e', conflicts: state.conflicts);
+      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), errorDetail: '$e', conflicts: state.conflicts, rejected: state.rejected);
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
       _retry?.cancel();
       _retry = Timer(const Duration(seconds: 15), sync);
@@ -211,7 +222,14 @@ class SyncController extends Notifier<SyncStatus> {
   /// Der Nutzer hat den Hinweis auf ueberschriebene fremde Aenderungen gesehen.
   void dismissConflicts() {
     if (state.conflicts.isEmpty) return;
-    state = SyncStatus(lastSync: state.lastSync, error: state.error, errorDetail: state.errorDetail, running: state.running, updateRequired: state.updateRequired);
+    state = SyncStatus(
+      lastSync: state.lastSync,
+      error: state.error,
+      errorDetail: state.errorDetail,
+      running: state.running,
+      updateRequired: state.updateRequired,
+      rejected: state.rejected,
+    );
   }
 
   String _friendly(Object e) {

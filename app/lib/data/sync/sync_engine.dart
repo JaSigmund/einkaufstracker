@@ -70,12 +70,24 @@ final syncTables = <SyncTableDef>[
 typedef SyncConflict = ({String table, String rowId});
 
 class SyncResult {
-  const SyncResult({this.pushed = 0, this.skipped = 0, this.pulled = 0, this.conflicts = const []});
+  const SyncResult({this.pushed = 0, this.skipped = 0, this.pulled = 0, this.rejected = 0, this.conflicts = const []});
   final int pushed;
   final int skipped;
   final int pulled;
+
+  /// Wartende Aenderungen, die der Server schon mindestens [rejectedAfterAttempts]-mal wegen der Daten abgelehnt hat und
+  /// die von selbst nicht mehr durchgehen werden (Codereview-Fund 2026-10-16: vorher nur als "wartend" mitgezaehlt).
+  final int rejected;
   final List<SyncConflict> conflicts;
 }
+
+/// Ab so vielen Ablehnungen gilt eine wartende Aenderung als abgelehnt (siehe [SyncResult.rejected]).
+const rejectedAfterAttempts = 3;
+
+/// Ueberlappung beim Holen: `updated_at` ist der Beginn der schreibenden Transaktion, nicht ihr Ende. Eine Zeile, deren
+/// Transaktion vor dem letzten Holen begann, aber erst danach sichtbar wurde, laege sonst hinter dem gemerkten Stand und
+/// wuerde nie geholt (Codereview-Fund 2026-10-16). Doppelt geholte Zeilen sind harmlos, das Anwenden ist idempotent.
+const pullOverlap = Duration(seconds: 10);
 
 /// Offline-first-Sync nach Doku 03 §2.3: erst die Outbox nach oben schicken, dann Aenderungen holen.
 /// Konfliktregel: Last-write-wins. Eine Zeile mit noch nicht gesendeter lokaler Aenderung wird beim
@@ -100,7 +112,8 @@ class SyncEngine {
     try {
       final push = await _push();
       final pulled = await _pull();
-      return SyncResult(pushed: push.pushed, skipped: push.skipped, pulled: pulled, conflicts: push.conflicts);
+      final rejected = await (_db.select(_db.outbox)..where((t) => t.attempts.isBiggerOrEqualValue(rejectedAfterAttempts))).get();
+      return SyncResult(pushed: push.pushed, skipped: push.skipped, pulled: pulled, rejected: rejected.length, conflicts: push.conflicts);
     } finally {
       _running = false;
     }
@@ -177,7 +190,8 @@ class SyncEngine {
     var total = 0;
     for (final def in syncTables) {
       final state = await (_db.select(_db.syncStates)..where((t) => t.remoteTable.equals(def.remoteName))).getSingleOrNull();
-      var since = state?.lastPulledAt;
+      final stored = state?.lastPulledAt == null ? null : DateTime.tryParse(state!.lastPulledAt!);
+      var since = stored == null ? state?.lastPulledAt : stored.toUtc().subtract(pullOverlap).toIso8601String();
       // Zeilen mit genau dem Zeitstempel [since], die schon geholt sind. Codereview-Fund 2026-10-16: ohne diesen Versatz
       // blieb das Holen fuer immer haengen, sobald mehr als eine Seite (500) Zeilen denselben `updated_at` hat (alle
       // Zeilen einer Transaktion bekommen dasselbe now(), z.B. bei einer Daten-Migration): jede Seite lieferte wieder

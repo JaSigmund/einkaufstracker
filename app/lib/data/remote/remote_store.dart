@@ -21,6 +21,22 @@ abstract class RemoteStore {
   Future<Map<String, String>> fetchUpdatedAt(String table, List<String> ids);
 }
 
+/// Ist ein Fehler des Servers (PostgREST- bzw. Postgres-Code oder HTTP-Status) ein Fehler der Daten selbst, den ein
+/// erneuter Versuch nicht behebt? Datenfehler werden in der Outbox markiert und uebersprungen, alles andere bricht den
+/// Sync ab und wird spaeter wiederholt.
+///
+/// Codereview-Fund 2026-10-16: `PGRST3xx` (JWT abgelaufen oder ungueltig) galt bisher als Datenfehler, weil alle
+/// `PGRST`-Codes so eingestuft wurden. Eine abgelaufene Sitzung markierte so jede wartende Aenderung als fehlerhaft, statt
+/// den Sync abzubrechen, bis die Sitzung erneuert ist. Ausserdem passte der HTTP-Status 429 (Drosselung) auf das Muster
+/// `^42` fuer Postgres-Rechtefehler; SQLSTATE-Codes haben aber immer genau fuenf Zeichen.
+bool isRemoteDataError(String? code) {
+  if (code == null) return false;
+  if (code.startsWith('PGRST3')) return false;
+  if (code.startsWith('PGRST') || RegExp(r'^(22|23|42)[0-9A-Z]{3}$').hasMatch(code)) return true;
+  final status = int.tryParse(code);
+  return status != null && status >= 400 && status < 500 && status != 401 && status != 403 && status != 408 && status != 429;
+}
+
 /// Ein Fehler des Servers wegen der Daten selbst (z.B. Unique-Verletzung), nicht wegen des Netzes.
 /// Solche Eintraege werden in der Outbox markiert und uebersprungen, damit sie die Queue nicht blockieren.
 class RemoteDataException implements Exception {
@@ -61,10 +77,7 @@ class SupabaseRemoteStore implements RemoteStore {
       return written.isEmpty ? null : written.first['updated_at'] as String?;
     } on PostgrestException catch (e) {
       // 4xx/Constraint-Fehler sind Datenfehler, alles andere (Netz, Auth) bleibt eine normale Exception
-      final code = int.tryParse(e.code ?? '');
-      final isDataError = (e.code != null && RegExp(r'^(23|22|42|PGRST)').hasMatch(e.code!)) ||
-          (code != null && code >= 400 && code < 500 && code != 401 && code != 408 && code != 429);
-      if (isDataError) throw RemoteDataException('${e.code}: ${e.message}');
+      if (isRemoteDataError(e.code)) throw RemoteDataException('${e.code}: ${e.message}');
       rethrow;
     }
   }

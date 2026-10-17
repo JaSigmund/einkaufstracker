@@ -25,6 +25,11 @@ class SyncStatusBanner extends ConsumerWidget {
       icon = Icons.cloud_off;
       text = pending > 0 ? '${status.error} ($pending wartend)' : status.error!;
       color = t.colorScheme.error;
+    } else if (status.rejected > 0) {
+      // Codereview-Fund 2026-10-16: dauerhaft abgelehnte Aenderungen waren nur als "wartend" sichtbar
+      icon = Icons.report_problem_outlined;
+      text = '${status.rejected} Änderung(en) lehnt der Server ab. Bitte über „Fehler melden“ in den Einstellungen melden.';
+      color = t.colorScheme.error;
     } else if (status.conflicts.isNotEmpty) {
       icon = Icons.merge_type;
       text = conflictSummary(status.conflicts)!;

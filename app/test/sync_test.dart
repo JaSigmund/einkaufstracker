@@ -105,6 +105,17 @@ void main() {
       expect(remote.table('categories').values.any((r) => r['name'] == 'Gemüse'), isTrue);
     });
 
+    test('Codereview-Fund 2026-10-16: ab der dritten Ablehnung zaehlt eine Aenderung als abgelehnt', () async {
+      await remote.upsert('categories', {
+        'id': 'fremd', 'household_id': 'h1', 'name': 'Obst', 'sort_order': 0, 'is_storable': true,
+        'updated_at': '2026-01-01T00:00:00Z', 'deleted_at': null, 'parent_id': null, 'icon': null,
+      });
+      await categoryRepo(db).add('Obst');
+      expect((await engine.sync()).rejected, 0);
+      expect((await engine.sync()).rejected, 0);
+      expect((await engine.sync()).rejected, 1, reason: 'drei Versuche, der Server lehnt die Zeile jedes Mal ab');
+    });
+
     test('Umbenennen und Loeschen kommen als Aenderung beim Server an', () async {
       final repo = categoryRepo(db);
       await repo.add('Obst');
@@ -151,6 +162,24 @@ void main() {
       final result = await engine.sync();
       expect(result.pulled, 502);
       expect(await db.select(db.categories).get(), hasLength(502));
+    });
+  });
+
+  group('Pull: spaet sichtbare Zeilen (Codereview-Fund 2026-10-16)', () {
+    test('eine Zeile mit aelterem updated_at als dem letzten Holen wird beim naechsten Sync noch geholt', () async {
+      await categoryRepo(db).add('Obst');
+      await engine.sync();
+      final state = await (db.select(db.syncStates)..where((t) => t.remoteTable.equals('categories'))).getSingle();
+      // Eine Transaktion, die vor dem letzten Holen begann, wird erst jetzt sichtbar: ihr updated_at liegt 3 s davor
+      final late = DateTime.parse(state.lastPulledAt!).subtract(const Duration(seconds: 3)).toIso8601String();
+      remote.table('categories')['spaet'] = {
+        'id': 'spaet', 'household_id': 'h1', 'name': 'Spät', 'sort_order': 1, 'is_storable': true,
+        'updated_at': late, 'deleted_at': null, 'parent_id': null, 'icon': null,
+      };
+
+      await engine.sync();
+
+      expect((await db.select(db.categories).get()).map((c) => c.name), contains('Spät'));
     });
   });
 
