@@ -480,6 +480,22 @@ Lokal unter Linux mit denselben Versionen wie die CI (Flutter 3.47.5, Deno 2, Py
 | Repo-Hygiene | – | 561 Dateien, 0 Funde |
 | `flutter build web --release` | – (nicht in der CI) | erfolgreich |
 
+Stand 2026-10-17, nach der Umsetzung der offenen Empfehlungen (gleiche Umgebung):
+
+| Suite | Ergebnis |
+|---|---|
+| `flutter analyze` | keine Funde |
+| `flutter test` | **1 881 bestanden** |
+| Zeitreise (`--dart-define=TEST_CLOCK_OFFSET_DAYS=…`) | +60, +200, +400 und +1 200 Tage: je 1 881 bestanden (vor dem Fix in `product_price_page_test.dart` bei +200: 3 fehlgeschlagen) |
+| Testabdeckung App | 88,6 % gesamt, `domain` 98,7 %, `features` 94,1 %, `data` 75,3 %, `app` 69,0 %, `core` 100 % |
+| Schema- und RLS-Tests | **332 bestanden** |
+| Deno (`deno check` aller 7 Functions, `deno test`) | **103 bestanden** |
+| `deno lint` | keine Funde |
+| Werkzeuge (`tools/test_*.py`) | 57 bestanden |
+| Repo-Hygiene | 593 Dateien, 0 Funde |
+| `flutter build web --release` | erfolgreich |
+| Android-Build | lokal nicht möglich (kein Android-SDK in der Umgebung), läuft im neuen CI-Job |
+
 Hinweis zur Abdeckung: `flutter test --coverage` erfasst nur Dateien, die mindestens ein Test lädt; reine
 Plattform-Adapter ohne Test (z.B. ML-Kit, Benachrichtigungs-Plugin) fehlen in der Rechnung ganz.
 
