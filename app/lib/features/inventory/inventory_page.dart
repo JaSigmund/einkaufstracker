@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
@@ -42,7 +43,7 @@ String _expiryText(InventoryItem item, ExpiryLevel level, DateTime today) {
 
 /// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand nach Dringlichkeit gruppiert (abgelaufen/
 /// bald faellig zuerst, wie auf der Uebersicht), Filter nach Lagerort, Vorschlaege aus Bons einklappbar oben.
-/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber den Scan-Tab.
+/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber die Seite "Scannen".
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key, this.now});
 
@@ -61,7 +62,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final active = ref.watch(activeInventoryStreamProvider);
     final suggestions = ref.watch(inventorySuggestionsStreamProvider).value ?? const <InventoryItem>[];
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
-    final today = widget.now ?? DateTime.now();
+    final today = widget.now ?? appClock.now();
     final t = Theme.of(context);
     final forecasts = ref.watch(usageForecastProvider);
 

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import '../../domain/receipt/parsed_receipt.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Die Cloud ist nicht erreichbar oder hat nicht geantwortet (offline, Fehler, Zeitueberschreitung).
 class CloudUnavailable implements Exception {

@@ -1,3 +1,5 @@
+import '../../core/clock.dart';
+
 /// Kopfdaten eines Bons, wie sie fuer Preisverlauf/Haendlervergleich gebraucht werden.
 typedef PriceHistoryReceipt = ({String id, String? storeId, DateTime purchasedAtUtc});
 
@@ -138,7 +140,7 @@ StoreComparison buildStoreComparison({
   required Iterable<PriceHistoryStore> stores,
   DateTime? now,
 }) {
-  final today = now ?? DateTime.now().toUtc();
+  final today = now ?? appClock.now().toUtc();
   final cutoff = today.subtract(const Duration(days: 180));
   final receiptById = {for (final r in receipts) r.id: r};
   final storeById = {for (final s in stores) s.id: s};

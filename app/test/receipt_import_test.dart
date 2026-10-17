@@ -6,7 +6,7 @@ import 'package:einkaufstracker/core/format.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/pdf/pdf_text_reader.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
-import 'package:einkaufstracker/domain/receipt/vienna_time.dart';
+import 'package:einkaufstracker/core/vienna_time.dart';
 import 'package:einkaufstracker/features/receipt_import/import_review_page.dart';
 import 'package:einkaufstracker/features/receipt_import/receipt_import_service.dart';
 import 'package:flutter/material.dart';

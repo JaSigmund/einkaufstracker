@@ -38,11 +38,15 @@ void main() {
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           activeInventoryStreamProvider.overrideWith((ref) => Stream.value(active)),
           inventorySuggestionsStreamProvider.overrideWith((ref) => Stream.value(const <InventoryItem>[])),
+          // nach dem Speichern geht es ins Inventar, dessen Verbrauchsprognose sonst live aus der Datenbank liest
+          balanceMovementsProvider.overrideWith((ref) => Stream.value(const <InventoryMovement>[])),
+          usageForecastProvider.overrideWithValue(const {}),
           receiptImportServiceProvider.overrideWithValue(ReceiptImportService(FakePdfReader(text: ''), receiptRepo(db))),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [
-            GoRoute(path: '/', builder: (_, _) => const HomeShell()),
+            homeShellRoute(),
+            scanRoute(),
             GoRoute(
               path: '/product-form',
               builder: (_, s) {
@@ -65,7 +69,7 @@ void main() {
     final product = await productRepo(db).create(name: 'Vollmilch 1l', baseUnit: 'l', ean: '9008700000001');
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000001')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('scan-barcode')));
@@ -83,7 +87,7 @@ void main() {
     final product = await productRepo(db).create(name: 'Clever Champignon weiß', baseUnit: 'piece', ean: '9008700000101');
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000101')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -109,7 +113,7 @@ void main() {
   testWidgets('Unbekanntes Produkt ohne OFF-Treffer: manuell anlegen, dann Bestand erfassen', (tester) async {
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000099')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -136,7 +140,7 @@ void main() {
     final existing = await productRepo(db).create(name: 'Clever Champignon weiß', baseUnit: 'piece');
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000100'), products: [existing]));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -161,7 +165,7 @@ void main() {
       offResult: const OffProduct(name: 'Paprika Tricolore', brand: 'Da komm ich her!'), // OFF-Name weicht vom Bon-Namen ab
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -182,7 +186,7 @@ void main() {
     final right = await productRepo(db).create(name: 'Richtiges Produkt');
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000201'), products: [wrong, right]));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -206,7 +210,7 @@ void main() {
       offResult: const OffProduct(name: 'Bio-Joghurt', brand: 'Ja! Natürlich'),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -227,7 +231,7 @@ void main() {
       offResult: const OffProduct(name: 'Vollmilch'),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -247,7 +251,7 @@ void main() {
       offResult: const OffProduct(name: 'Joghurt', quantityText: '500 g'),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -261,7 +265,7 @@ void main() {
   testWidgets('Abbruch im Scanner: nichts passiert', (tester) async {
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner(null)));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();
@@ -274,7 +278,7 @@ void main() {
     final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '9008700000003');
     await tester.pumpWidget(app(scanner: FakeBarcodeScanner('9008700000003'), products: [product], active: [item]));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Scan'));
+    await tester.tap(find.byKey(const Key('shell-scan')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('scan-barcode')));
     await tester.pumpAndSettle();

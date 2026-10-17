@@ -1,5 +1,5 @@
 import 'package:einkaufstracker/data/local/database.dart';
-import 'package:einkaufstracker/domain/receipt/csv_export.dart';
+import 'package:einkaufstracker/data/export/csv_export.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Receipt _receipt(String id, String? storeId, DateTime purchasedAt) => Receipt(

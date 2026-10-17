@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
@@ -183,7 +184,7 @@ class MealRepository {
   Future<Meal> create(MealDraft draft) async {
     _validate(draft);
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final meal = Meal(
       id: _uuid.v4(),
       householdId: hid,
@@ -213,7 +214,7 @@ class MealRepository {
     _validate(draft);
     final existing = await get(mealId);
     if (existing == null || existing.deletedAt != null) throw StateError('Mahlzeit nicht gefunden');
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final meal = existing.copyWith(
       eatenAt: draft.eatenAt.toUtc(),
       mealType: draft.mealType,
@@ -241,7 +242,7 @@ class MealRepository {
   Future<void> delete(String mealId) async {
     final existing = await get(mealId);
     if (existing == null || existing.deletedAt != null) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     await _db.transaction(() async {
       await inventory.restoreForMeal(mealId);
       await _softDeleteIngredients(mealId, now);
@@ -256,7 +257,7 @@ class MealRepository {
   Future<void> setPhotoPath(String mealId, String? path) async {
     final existing = await get(mealId);
     if (existing == null || existing.deletedAt != null || existing.photoPath == path) return;
-    await _putMeal(existing.copyWith(photoPath: Value(path), updatedAt: DateTime.now().toUtc()));
+    await _putMeal(existing.copyWith(photoPath: Value(path), updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 
@@ -265,7 +266,7 @@ class MealRepository {
   Future<int> applyMicros(Map<String, Micros> byIngredientId) async {
     if (byIngredientId.isEmpty) return 0;
     var changed = 0;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     await _db.transaction(() async {
       for (final e in byIngredientId.entries) {
         final row = await (_db.select(_db.mealIngredients)..where((i) => i.id.equals(e.key))).getSingleOrNull();
@@ -346,7 +347,7 @@ class MealRepository {
         sugarG: nutrients?.sugarG,
         fiberG: nutrients?.fiberG,
         saltG: nutrients?.saltG,
-        updatedAt: DateTime.now().toUtc(),
+        updatedAt: appClock.now().toUtc(),
       );
       await _put('meal_ingredients', row.id, mealIngredientToRemote(row),
           () => _db.into(_db.mealIngredients).insertOnConflictUpdate(row.toCompanion(false)));
@@ -381,7 +382,7 @@ class MealRepository {
           remoteTable: remoteTable,
           rowId: rowId,
           payload: jsonEncode(payload),
-          createdAt: DateTime.now().toUtc(),
+          createdAt: appClock.now().toUtc(),
         ));
   }
 }

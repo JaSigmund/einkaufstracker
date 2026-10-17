@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../domain/diagnostics/app_info.dart';
-import '../../domain/diagnostics/data_snapshot.dart';
+import '../../data/diagnostics/data_snapshot.dart';
 
 const _areas = ['Übersicht', 'Inventar', 'Scan', 'Liste', 'Auswertung', 'Einstellungen', 'Sonstiges'];
 
@@ -54,7 +54,7 @@ class _BugReportPageState extends ConsumerState<BugReportPage> {
       final appInfo = collectAppInfo(
         route: _area,
         pendingChanges: pending,
-        lastSyncError: sync.error,
+        lastSyncError: sync.errorDetail ?? sync.error,
         lastSyncAt: sync.lastSync,
       );
       final snapshot = _includeSnapshot ? await buildDataSnapshot(ref.read(databaseProvider)) : null;

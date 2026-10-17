@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/ocr/label_text_reader.dart';
 import 'package:einkaufstracker/features/products/stock_entry_page.dart';
@@ -31,7 +32,7 @@ void main() {
   setUp(() => db = memoryDb());
   tearDown(() => db.close());
 
-  final year = DateTime.now().year + 1;
+  final year = appClock.now().year + 1;
   Product product({String dateKind = 'best_before'}) => Product(
         id: 'p1', householdId: 'h1', name: 'Joghurt', baseUnit: 'piece', defaultDateKind: dateKind, defaultLocation: 'fridge', restock: false, updatedAt: DateTime.utc(2026),
       );
@@ -59,6 +60,7 @@ void main() {
       child: MaterialApp.router(
         routerConfig: GoRouter(initialLocation: '/stock', routes: [
           GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('START'))),
+          GoRoute(path: '/inventory', builder: (_, _) => const Scaffold(body: Text('INVENTAR'))),
           GoRoute(path: '/stock', builder: (_, _) => StockEntryPage(product: product(), ean: '9001', labelScanAvailable: available)),
         ]),
       ),
@@ -97,6 +99,8 @@ void main() {
     final item = await db.select(db.inventoryItems).getSingle();
     expect(item.bestBefore, DateTime.utc(year, 3, 12));
     expect(item.dateKind, 'best_before');
+    // zurueck ins Inventar, wo der neue Posten steht (nicht auf die Uebersicht)
+    expect(find.text('INVENTAR'), findsOneWidget);
   });
 
   testWidgets('"zu verbrauchen bis" stellt die Art des Datums um', (tester) async {

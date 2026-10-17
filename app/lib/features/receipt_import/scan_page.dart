@@ -14,7 +14,7 @@ import 'web_photo_crop_page.dart';
 
 enum _Busy { pdf, paper, barcode }
 
-/// Inhalt des Tabs "Scan": Einstiegspunkte zum Erfassen von Bons.
+/// Inhalt der Seite "Scannen" (`/scan`): Einstiegspunkte zum Erfassen von Bons und Barcodes.
 class ScanPage extends ConsumerStatefulWidget {
   const ScanPage({super.key, this.pickPdf = _pickPdfFromSystem, this.pickCameraPhoto = _pickCameraPhotoFromSystem});
 

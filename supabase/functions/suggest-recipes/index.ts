@@ -17,20 +17,12 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { json } from "../_shared/http.ts";
+import { callAnthropic, costMicroUsd, firstToolUse, PRICES, recordUsage, releaseCall, reserveCall } from "../_shared/llm.ts";
 import { ingredientLines, parseRequest } from "./validate.ts";
 
-// Gleiche Preistabelle wie parse-receipt (Stand 2026-09; vor Produktivbetrieb gegen die offizielle
-// Preisliste pruefen).
-const PRICES: Record<string, { in: number; out: number }> = {
-  "claude-haiku-4-5-20251001": { in: 1, out: 5 },
-  "claude-sonnet-5": { in: 2, out: 10 },
-};
 const DEFAULT_MODEL = Deno.env.get("RECIPE_MODEL") ?? "claude-haiku-4-5-20251001";
 // Anzahl und Laenge der Zutaten (Name, Menge, Einheit) begrenzt validate.ts (Codereview-Funde 2026-10-01 und 2026-10-16).
-
-// Tageslimit je Haushalt ueber alle KI-Funktionen (siehe Block 3b). Grosszuegig fuer normale Nutzung (ein
-// Kochabend mit Chat sind ein paar Dutzend Nachrichten), aber eine harte Obergrenze fuer die Kosten.
-const DAILY_CALL_LIMIT = 40;
 
 const SYSTEM = `Du schlaegst Rezeptideen fuer einen Haushalt vor, basierend auf Zutaten, die er gerade zuhause hat.
 Die Liste ist nach Dringlichkeit geordnet: die ersten Eintraege verderben bald und sollten bevorzugt verwertet werden.
@@ -63,9 +55,6 @@ const TOOL = {
     required: ["suggestions"],
   },
 };
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -101,18 +90,11 @@ Deno.serve(async (req) => {
   if (setErr || !settings) return json({ error: "forbidden" }, 403);
   if (!settings.allow_cloud_ocr) return json({ error: "cloud_ocr_not_allowed" }, 403);
 
-  // 3b) Tageslimit je Haushalt (Doku 09 §2, Missbrauchsschutz): zaehlt ALLE KI-Aufrufe der letzten 24 Stunden
-  //     ueber llm_usage (Bon-Erkennung, Rezeptvorschlaege, Koch-Chat teilen sich die Tabelle). llm_usage
-  //     protokolliert Kosten sonst nur im Nachhinein -- ohne dieses Limit koennte ein direkter API-Aufruf
-  //     beliebig oft Kosten erzeugen. Schlaegt die Zaehlung selbst fehl, wird abgelehnt statt blind zugelassen.
+  // 3b) Tageslimit je Haushalt (Doku 09 §2, Missbrauchsschutz): alle KI-Aufrufe der letzten 24 Stunden, atomar reserviert
+  //     (_shared/llm.ts, Migration 0030). Schlaegt die Pruefung selbst fehl, wird abgelehnt statt blind zugelassen.
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { count: usedToday, error: countErr } = await admin
-    .from("llm_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("household_id", body.household_id)
-    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-  if (countErr) return json({ error: "usage_check_failed" }, 500);
-  if ((usedToday ?? 0) >= DAILY_CALL_LIMIT) return json({ error: "daily_limit_reached" }, 429);
+  const reservation = await reserveCall(admin, body.household_id, model);
+  if (!reservation.ok) return json({ error: reservation.error }, reservation.status);
 
   // 4) Claude
   const messages = [{
@@ -121,47 +103,28 @@ Deno.serve(async (req) => {
   }];
 
   const started = Date.now();
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY")!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_suggestions" },
-      messages,
-    }),
+  const reply = await callAnthropic({
+    model,
+    max_tokens: 1024,
+    system: SYSTEM,
+    tools: [TOOL],
+    tool_choice: { type: "tool", name: "submit_suggestions" },
+    messages,
   });
-  if (!resp.ok) {
-    console.error("anthropic_error", resp.status, await resp.text());
+  const toolUse = reply ? firstToolUse(reply) : null;
+  if (!reply || !toolUse) {
+    await releaseCall(admin, reservation.id);
     return json({ error: "llm_failed" }, 502);
   }
-  const result = await resp.json();
-  const toolUse = (result.content ?? []).find((c: { type: string }) => c.type === "tool_use");
-  if (!toolUse) return json({ error: "llm_failed" }, 502);
-  const usage = result.usage ?? { input_tokens: 0, output_tokens: 0 };
 
-  // 5) Nutzung protokollieren (service role, gleiche Tabelle wie bei parse-receipt)
-  const price = PRICES[model];
-  await admin.from("llm_usage").insert({
-    household_id: body.household_id,
-    receipt_id: null,
-    model,
-    input_tokens: usage.input_tokens,
-    output_tokens: usage.output_tokens,
-    cost_micro_usd: usage.input_tokens * price.in + usage.output_tokens * price.out,
-    duration_ms: Date.now() - started,
-  });
+  // 5) Nutzung in die reservierte Zeile eintragen
+  await recordUsage(admin, reservation.id, { model, usage: reply.usage, durationMs: Date.now() - started });
 
+  const input = (toolUse.input ?? {}) as { suggestions?: unknown };
   return json({
-    suggestions: toolUse.input.suggestions ?? [],
+    suggestions: input.suggestions ?? [],
     model,
-    usage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost_micro_usd: usage.input_tokens * price.in + usage.output_tokens * price.out },
+    usage: { ...reply.usage, cost_micro_usd: costMicroUsd(model, reply.usage) },
     duration_ms: Date.now() - started,
   });
 });

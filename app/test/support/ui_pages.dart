@@ -3,6 +3,8 @@ import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/settings_repository.dart';
 import 'package:einkaufstracker/features/auth/login_page.dart';
+import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
+import 'package:einkaufstracker/features/home/home_shell.dart';
 import 'package:einkaufstracker/features/household/accept_invite_page.dart';
 import 'package:einkaufstracker/features/inventory/inventory_page.dart';
 import 'package:einkaufstracker/features/settings/settings_page.dart';
@@ -56,6 +58,40 @@ ShoppingListItem _listItem(String id, {String? productId, String? freeText, doub
       updatedAt: DateTime.utc(2026),
     );
 
+/// Die Hauptnavigation mit allen fuenf Tabs und der Seite "Scannen"; weitere Ziele zeigen nur ihren Pfad.
+GoRouter homeShellRouter({String location = '/'}) => GoRouter(initialLocation: location, routes: [
+      homeShellRoute(),
+      scanRoute(),
+      for (final path in ['/settings', '/recipe-suggestions', '/journal', '/nutrition-targets', '/trend'])
+        GoRoute(path: path, builder: (_, _) => Scaffold(body: Text('ZIEL $path'))),
+    ]);
+
+/// Alles, was die fuenf Tabs lesen, als feste Momentaufnahme (Drift-Streams liessen sonst Timer offen).
+List<Override> homeShellOverrides(AppDatabase db) => [
+      databaseProvider.overrideWithValue(db),
+      householdSettingsProvider.overrideWith((ref) async => _settings),
+      householdPrefsOnceProvider.overrideWith((ref) async => const <String, Object?>{}),
+      receiptsStreamProvider.overrideWith((ref) => Stream.value(const <Receipt>[])),
+      storesStreamProvider.overrideWith((ref) => Stream.value(const <Store>[])),
+      allItemsStreamProvider.overrideWith((ref) => Stream.value(const <ReceiptItem>[])),
+      categoriesStreamProvider.overrideWith((ref) => Stream.value(const <Category>[])),
+      productsStreamProvider.overrideWith((ref) => Stream.value([_product('p1', 'Vollmilch')])),
+      productRepositoryProvider.overrideWithValue(productRepo(db)),
+      inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
+      activeInventoryStreamProvider.overrideWith((ref) => Stream.value([_item('i1', 'p1', expiresOn: DateTime.utc(2026, 9, 28))])),
+      inventorySuggestionsStreamProvider.overrideWith((ref) => Stream.value(const <InventoryItem>[])),
+      balanceMovementsProvider.overrideWith((ref) => Stream.value(const <InventoryMovement>[])),
+      usageForecastProvider.overrideWithValue(const {}),
+      shoppingListRepositoryProvider.overrideWithValue(shoppingListRepo(db)),
+      shoppingListItemsStreamProvider.overrideWith((ref) => Stream.value([_listItem('s1', freeText: 'Brot')])),
+      shoppingListsStreamProvider.overrideWith((ref) => Stream.value([
+            ShoppingList(id: 'l1', householdId: 'h1', name: 'Einkaufsliste', isDefault: true, updatedAt: DateTime.utc(2026)),
+          ])),
+      mealsStreamProvider.overrideWith((ref) => Stream.value(const <Meal>[])),
+      mealIngredientsStreamProvider.overrideWith((ref) => Stream.value(const <MealIngredient>[])),
+      nutritionTargetsProvider.overrideWith((ref) => Stream.value(const NutritionTargets())),
+    ];
+
 /// Eine zu pruefende Seite: Name fuer die Testausgabe und wie sie aufgebaut wird (eigene Datenbank je Test).
 typedef UiPage = ({String name, Widget Function(AppDatabase db) build});
 
@@ -67,6 +103,18 @@ Widget _routed(Widget page, List<Override> overrides) => ProviderScope(
 /// Seiten, die die Querschnittstests (Barrierefreiheit, Layout) pruefen, mit typischen Daten (lange Namen, mehrere
 /// Eintraege, wartende Aenderungen). Neue Hauptseiten gehoeren hier dazu.
 final uiQualityPages = <UiPage>[
+  (
+    name: 'Hauptnavigation, Übersicht',
+    build: (db) => ProviderScope(overrides: homeShellOverrides(db), child: MaterialApp.router(routerConfig: homeShellRouter())),
+  ),
+  (
+    // der Tab mit den meisten Aktionen in der Kopfzeile
+    name: 'Hauptnavigation, Tagebuch',
+    build: (db) => ProviderScope(
+          overrides: homeShellOverrides(db),
+          child: MaterialApp.router(routerConfig: homeShellRouter(location: '/diary')),
+        ),
+  ),
   (
     name: 'Anmeldung',
     build: (db) => _routed(const LoginPage(), [authRepositoryProvider.overrideWithValue(FakeAuth())]),

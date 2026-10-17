@@ -1,6 +1,9 @@
-import '../../data/local/database.dart';
 import '../inventory/expiry.dart';
 import 'expiry_stages.dart';
+
+/// Was eine Erinnerung von einem Bestandsposten braucht. Eigener Typ statt der drift-Zeile `InventoryItem`, damit die
+/// Fachlogik nicht von der Datenbank abhaengt (Codereview 2026-10-16, test/architecture_test.dart).
+typedef ReminderItem = ({String productId, DateTime? expiresOn, String dateKind});
 
 /// Eine gebuendelte Ablauf-Erinnerung fuer einen Tag (Doku 06 §5): alle Produkte, deren
 /// `expires_on - notify_lead_days` auf diesen Tag faellt, werden zu einer Benachrichtigung zusammengefasst.
@@ -45,12 +48,12 @@ class ExpiryReminderDay {
 /// solange noch eine spaetere Stufe bevorsteht (die kommt ja noch). Nachgeholt wird nur, wenn der Posten gar keine bevorstehende Stufe
 /// mehr hat, und dann einmal fuer die letzte Stufe.
 List<ExpiryReminderDay> computeExpiryReminders({
-  required List<InventoryItem> activeItems,
+  required List<ReminderItem> activeItems,
   required Map<String, String> productNameById,
   required int leadDays,
   required DateTime today,
   int horizonDays = 14,
-  List<int>? Function(InventoryItem item)? stagesFor,
+  List<int>? Function(ReminderItem item)? stagesFor,
 }) {
   final byDay = <DateTime, Map<String, String>>{};
   final overdueDays = <DateTime>{};

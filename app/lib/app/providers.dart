@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -8,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/clock.dart';
 import '../data/app_config/app_config_repository.dart';
 import '../domain/inventory/usage_forecast.dart';
 import '../domain/notifications/expiry_stages.dart';
@@ -73,10 +75,34 @@ final settingsRepositoryProvider =
 
 /// Einstellungen des Haushalts (in Phase 1 online, Cache folgt bei Bedarf). Geteilt zwischen der
 /// Einstellungsseite und der Monatsauswertung (Budget-Fortschritt, Doku 07 §2).
+///
+/// Ohne Netz gelten die zuletzt geladenen Werte (Codereview-Fund 2026-10-16: vorher war die ganze Einstellungsseite offline
+/// leer); [HouseholdSettings.fromCache] sagt der Oberflaeche, dass Aendern erst wieder mit Netz geht.
 final householdSettingsProvider = FutureProvider.autoDispose<HouseholdSettings>((ref) async {
   final hid = await ref.watch(householdIdProvider.future);
   if (hid == null) throw StateError('Kein Haushalt gefunden');
-  return ref.watch(settingsRepositoryProvider).load(hid);
+  const cacheKey = 'household_settings_cache';
+  try {
+    final settings = await ref.watch(settingsRepositoryProvider).load(hid);
+    try {
+      await ref.read(databaseProvider).setKv(cacheKey, jsonEncode({'household_id': hid, ...settings.toJson()}));
+    } catch (_) {
+      // ohne lokalen Speicher (z.B. in Tests) eben ohne Zwischenspeicher
+    }
+    return settings;
+  } catch (_) {
+    String? cached;
+    try {
+      cached = await ref.read(databaseProvider).getKv(cacheKey);
+    } catch (_) {
+      // kein lokaler Speicher: dann bleibt es beim Fehler
+    }
+    if (cached != null) {
+      final json = jsonDecode(cached) as Map<String, dynamic>;
+      if (json['household_id'] == hid) return HouseholdSettings.fromJson(json, fromCache: true);
+    }
+    rethrow;
+  }
 });
 
 /// Aktuelle Sitzung (null = nicht angemeldet). Die Sitzung liegt lokal, der Start klappt auch offline.
@@ -117,19 +143,44 @@ final householdIdProvider = FutureProvider<String?>((ref) async {
   }
 });
 
+/// Haushalt des angemeldeten Nutzers fuer die Repositories; wirft, solange es keinen gibt. Codereview 2026-10-16: stand
+/// vorher als wortgleiche Closure in jedem Repository-Provider.
+Future<String> requireHouseholdId(Ref ref) async {
+  final id = await ref.read(householdIdProvider.future);
+  if (id == null) throw StateError('Kein Haushalt gefunden');
+  return id;
+}
+
 final remoteStoreProvider = Provider<RemoteStore>((ref) => SupabaseRemoteStore(ref.watch(supabaseClientProvider)));
 
 final syncEngineProvider = Provider<SyncEngine>((ref) => SyncEngine(ref.watch(databaseProvider), ref.watch(remoteStoreProvider)));
 
 class SyncStatus {
-  const SyncStatus({this.lastSync, this.error, this.running = false, this.updateRequired = false, this.conflicts = const []});
+  const SyncStatus({
+    this.lastSync,
+    this.error,
+    this.errorDetail,
+    this.running = false,
+    this.updateRequired = false,
+    this.conflicts = const [],
+    this.rejected = 0,
+  });
   final DateTime? lastSync;
+
+  /// Verstaendlicher Text fuer die Oberflaeche.
   final String? error;
+
+  /// Technische Fehlermeldung (Ausnahme als Text) fuer den Fehlerbericht; die Oberflaeche zeigt sie nicht (Codereview-Fund
+  /// 2026-10-16: vorher stand bei unbekannten Fehlern die rohe Ausnahme im Sync-Banner).
+  final String? errorDetail;
   final bool running;
 
   /// Aenderungen dieses Geraets, die beim Senden eine neuere fremde Aenderung ueberschrieben haben (ADR-018) und die der
   /// Nutzer noch nicht bestaetigt hat. Last-write-wins bleibt, es geschieht nur nicht mehr unbemerkt.
   final List<SyncConflict> conflicts;
+
+  /// Wartende Aenderungen, die der Server dauerhaft ablehnt (siehe [SyncResult.rejected]), Stand des letzten Syncs.
+  final int rejected;
 
   /// Die installierte Version ist zu alt fuer den aktuellen Server-Stand (ADR-022) -- Synchronisierung
   /// bleibt bewusst aus, bis aktualisiert wurde, statt mit moeglicherweise inkompatiblen Daten weiterzumachen.
@@ -157,10 +208,10 @@ class SyncController extends Notifier<SyncStatus> {
       state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true, conflicts: state.conflicts);
       return;
     }
-    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts);
+    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts, rejected: state.rejected);
     try {
       final result = await engine.sync();
-      state = SyncStatus(lastSync: DateTime.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts));
+      state = SyncStatus(lastSync: appClock.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts), rejected: result.rejected);
       // Kategorien oder Aliase koennen eben erst angekommen sein: bisher unzugeordnete Artikel nachziehen.
       // Aendert sich nichts, gibt es keine Folge-Synchronisation, also keine Schleife.
       await ref.read(receiptRepositoryProvider).categorizeMissing();
@@ -170,7 +221,7 @@ class SyncController extends Notifier<SyncStatus> {
       // Mitgliederzahl fuer den Takt (ADR-018), im Hintergrund und ohne den Sync zu verzoegern
       unawaited(ref.read(householdSizeProvider.notifier).refreshIfStale());
     } catch (e) {
-      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), conflicts: state.conflicts);
+      state = SyncStatus(lastSync: state.lastSync, error: _friendly(e), errorDetail: '$e', conflicts: state.conflicts, rejected: state.rejected);
       // Netz war (noch) nicht da: nach kurzer Zeit erneut versuchen, statt auf den naechsten Anlass zu warten
       _retry?.cancel();
       _retry = Timer(const Duration(seconds: 15), sync);
@@ -180,7 +231,14 @@ class SyncController extends Notifier<SyncStatus> {
   /// Der Nutzer hat den Hinweis auf ueberschriebene fremde Aenderungen gesehen.
   void dismissConflicts() {
     if (state.conflicts.isEmpty) return;
-    state = SyncStatus(lastSync: state.lastSync, error: state.error, running: state.running, updateRequired: state.updateRequired);
+    state = SyncStatus(
+      lastSync: state.lastSync,
+      error: state.error,
+      errorDetail: state.errorDetail,
+      running: state.running,
+      updateRequired: state.updateRequired,
+      rejected: state.rejected,
+    );
   }
 
   String _friendly(Object e) {
@@ -189,7 +247,7 @@ class SyncController extends Notifier<SyncStatus> {
     }
     if (e is TimeoutException) return 'Verbindung hängt, wird erneut versucht.';
     if (e is AuthException) return 'Anmeldung abgelaufen, bitte neu anmelden.';
-    return e.toString();
+    return 'Synchronisierung fehlgeschlagen, wird erneut versucht. Details stehen im Fehlerbericht.';
   }
 }
 
@@ -219,11 +277,11 @@ class HouseholdSize extends Notifier<int> {
 
   /// Fragt den Server, hoechstens alle [householdSizeMaxAge]. Ein Fehler (offline) laesst den bisherigen Wert stehen.
   Future<void> refreshIfStale() async {
-    if (!isHouseholdSizeStale(fetchedAt: _fetchedAt, now: DateTime.now())) return;
+    if (!isHouseholdSizeStale(fetchedAt: _fetchedAt, now: appClock.now())) return;
     try {
       final n = await ref.read(householdInviteRepositoryProvider).memberCount();
       if (!ref.mounted) return;
-      _fetchedAt = DateTime.now();
+      _fetchedAt = appClock.now();
       state = n < 1 ? 1 : n;
       await ref.read(databaseProvider).setKv(_kv, state.toString());
     } catch (_) {
@@ -241,11 +299,7 @@ final pendingChangesProvider =
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -257,11 +311,7 @@ final offClientProvider = Provider<OffClient>((ref) => HttpOffClient());
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
   return ProductRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     off: ref.watch(offClientProvider),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
@@ -273,11 +323,7 @@ final productsStreamProvider = StreamProvider((ref) => ref.watch(productReposito
 final foodLinkRepositoryProvider = Provider<FoodLinkRepository>((ref) {
   return FoodLinkRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -289,11 +335,7 @@ final onlinePriceRepositoryProvider = Provider<OnlinePriceRepository>((ref) {
   return OnlinePriceRepository(
     ref.watch(databaseProvider),
     ref.watch(onlinePriceRemoteProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -308,11 +350,7 @@ final barcodeScannerProvider = Provider<BarcodeScanner>((ref) => MobileBarcodeSc
 final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
   return InventoryRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     onDepleted: (productId) => ref.read(shoppingListRepositoryProvider).suggestDepleted(productId),
   );
@@ -324,11 +362,7 @@ final activeInventoryStreamProvider = StreamProvider((ref) => ref.watch(inventor
 final mealRepositoryProvider = Provider<MealRepository>((ref) {
   return MealRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     inventory: ref.watch(inventoryRepositoryProvider),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
@@ -340,7 +374,7 @@ final mealIngredientsStreamProvider = StreamProvider((ref) => ref.watch(mealRepo
 
 /// Ledger-Bewegungen der letzten 12 Wochen fuer die Verbrauchsbilanz (LH-MEAL-10).
 final balanceMovementsProvider = StreamProvider((ref) {
-  final since = DateTime.now().toUtc().subtract(const Duration(days: 7 * 12));
+  final since = appClock.now().toUtc().subtract(const Duration(days: 7 * 12));
   return ref.watch(inventoryRepositoryProvider).watchMovementsSince(since);
 });
 
@@ -368,7 +402,7 @@ final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
         (productId: m.productId, occurredAtUtc: m.occurredAt, type: m.type, quantityDelta: m.quantityDelta, unit: m.unit, mealId: m.mealId),
     ],
     stock: stock,
-    now: DateTime.now().toUtc(),
+    now: appClock.now().toUtc(),
   );
 });
 
@@ -376,11 +410,7 @@ final usageForecastProvider = Provider<Map<String, UsageForecast>>((ref) {
 final nutritionTargetsRepositoryProvider = Provider<NutritionTargetsRepository>((ref) {
   return NutritionTargetsRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -391,11 +421,7 @@ final nutritionTargetsProvider = StreamProvider((ref) => ref.watch(nutritionTarg
 final supplementRepositoryProvider = Provider<SupplementRepository>((ref) {
   return SupplementRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -408,11 +434,7 @@ final supplementIntakesStreamProvider = StreamProvider((ref) => ref.watch(supple
 final householdPrefsRepositoryProvider = Provider<HouseholdPrefsRepository>((ref) {
   return HouseholdPrefsRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -449,11 +471,7 @@ final foodUnitsSourceProvider = Provider<FoodUnitsSource>((ref) => SupabaseFoodU
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
   return ShoppingListRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -510,7 +528,7 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   final items = [...await inventoryRepo.activeSnapshot(), ...await inventoryRepo.suggestionsSnapshot()];
   final products = await ref.read(productRepositoryProvider).allSnapshot();
   final names = {for (final p in products) p.id: p.name};
-  now ??= DateTime.now();
+  now ??= appClock.now();
   // Mehrstufige Erinnerungen (Ausbau 1.14): gemeinsame Einstellungen des Haushalts; ohne sie oder bei einem Lesefehler gilt wie bisher
   // die eine Vorlaufzeit der Einstellungen
   Map<String, Object?> prefs = const {};
@@ -521,7 +539,7 @@ Future<void> rescheduleExpiryReminders(WidgetRef ref, {DateTime? now}) async {
   }
   final globalStages = parseExpiryStages(prefs[expiryStagesPref]);
   final reminders = computeExpiryReminders(
-    activeItems: items,
+    activeItems: [for (final i in items) (productId: i.productId, expiresOn: i.expiresOn, dateKind: i.dateKind)],
     productNameById: names,
     leadDays: settings.notifyLeadDays,
     today: DateTime.utc(now.year, now.month, now.day),
@@ -575,11 +593,7 @@ final inventorySuggestionsStreamProvider = StreamProvider((ref) => ref.watch(inv
 final bugReportRepositoryProvider = Provider<BugReportRepository>((ref) {
   return BugReportRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
   );
 });
@@ -653,11 +667,7 @@ final productAliasesStreamProvider =
 final receiptRepositoryProvider = Provider<ReceiptRepository>((ref) {
   return ReceiptRepository(
     ref.watch(databaseProvider),
-    householdId: () async {
-      final id = await ref.read(householdIdProvider.future);
-      if (id == null) throw StateError('Kein Haushalt gefunden');
-      return id;
-    },
+    householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     productRepo: ref.watch(productRepositoryProvider),
     inventoryRepo: ref.watch(inventoryRepositoryProvider),

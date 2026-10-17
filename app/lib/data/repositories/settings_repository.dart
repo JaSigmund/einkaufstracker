@@ -12,6 +12,7 @@ class HouseholdSettings {
     required this.allowCloudOcr,
     required this.keepReceiptImages,
     this.monthlyBudgetCents,
+    this.fromCache = false,
   });
 
   /// Format HH:mm
@@ -23,13 +24,25 @@ class HouseholdSettings {
   /// Monatsbudget in Cent (Doku 07 §2 "Budget"), `null` = kein Budget gesetzt.
   final int? monthlyBudgetCents;
 
-  factory HouseholdSettings.fromJson(Map<String, dynamic> j) => HouseholdSettings(
+  /// Zuletzt bekannte Werte aus dem lokalen Zwischenspeicher (kein Netz), nicht frisch vom Server.
+  final bool fromCache;
+
+  factory HouseholdSettings.fromJson(Map<String, dynamic> j, {bool fromCache = false}) => HouseholdSettings(
         notifyTime: (j['notify_time'] as String).substring(0, 5),
         notifyLeadDays: (j['notify_lead_days'] as num).toInt(),
         allowCloudOcr: j['allow_cloud_ocr'] as bool,
         keepReceiptImages: j['keep_receipt_images'] as bool,
         monthlyBudgetCents: (j['monthly_budget_cents'] as num?)?.toInt(),
+        fromCache: fromCache,
       );
+
+  Map<String, dynamic> toJson() => {
+        'notify_time': notifyTime,
+        'notify_lead_days': notifyLeadDays,
+        'allow_cloud_ocr': allowCloudOcr,
+        'keep_receipt_images': keepReceiptImages,
+        'monthly_budget_cents': monthlyBudgetCents,
+      };
 }
 
 abstract class SettingsRepository {

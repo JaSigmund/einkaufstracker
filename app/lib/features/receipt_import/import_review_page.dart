@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../domain/receipt/parsed_receipt.dart';
 import 'receipt_import_service.dart';
@@ -28,7 +29,7 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
   Future<void> _edit() async {
     final start = p.error == null
         ? p
-        : ImportPreview(receipt: ParsedReceipt.manual(purchasedAtUtc: DateTime.now().toUtc()), source: p.source, note: p.note);
+        : ImportPreview(receipt: ParsedReceipt.manual(purchasedAtUtc: appClock.now().toUtc()), source: p.source, note: p.note);
     final edited = await context.push<ImportPreview>('/import-edit', extra: start);
     if (edited == null || !mounted) return;
     final checked = await ref.read(receiptImportServiceProvider).recheckDuplicate(edited);

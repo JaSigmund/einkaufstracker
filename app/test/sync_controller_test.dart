@@ -101,4 +101,38 @@ void main() {
     expect(status.updateRequired, isFalse);
     expect(status.lastSync, isNull);
   });
+
+  testWidgets('Codereview-Fund 2026-10-16: unbekannter Fehler -> verstaendlicher Text im Banner, Detail fuer den Fehlerbericht', (tester) async {
+    late WidgetRef ref;
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        databaseProvider.overrideWithValue(db),
+        sessionProvider.overrideWith((ref) => Stream.value(_fakeSession)),
+        remoteStoreProvider.overrideWithValue(_BrokenRemoteStore()),
+        appUpdateRequiredProvider.overrideWithValue(false),
+      ],
+      child: MaterialApp(home: Consumer(builder: (context, r, _) {
+        ref = r;
+        r.watch(sessionProvider);
+        return const SizedBox();
+      })),
+    ));
+    await tester.pumpAndSettle();
+
+    await ref.read(syncControllerProvider.notifier).sync();
+
+    final status = ref.read(syncControllerProvider);
+    expect(status.error, isNot(contains('Bad state')), reason: 'keine rohe Ausnahme in der Oberflaeche');
+    expect(status.error, contains('Synchronisierung fehlgeschlagen'));
+    expect(status.errorDetail, contains('Spalte fehlt'));
+    await tester.pumpWidget(const SizedBox()); // beendet den Wiederholungs-Timer
+  });
+}
+
+/// Server, dessen Antwort nicht zum erwarteten Format passt (kein Netz- oder Datenfehler).
+class _BrokenRemoteStore extends FakeRemoteStore {
+  @override
+  Future<List<Map<String, dynamic>>> fetchChanges(String tableName,
+          {String? since, int limit = 500, int offset = 0, List<String> orderKeys = const ['id']}) async =>
+      throw StateError('Spalte fehlt');
 }

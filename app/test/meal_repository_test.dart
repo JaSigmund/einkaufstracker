@@ -277,6 +277,60 @@ void main() {
       expect(nachher.closedAt, isNull);
     });
 
+    test('Codereview-Fund 2026-10-16: erst durch die Mahlzeit angebrochen -> danach wieder ungeoeffnet, alte Haltbarkeit', () async {
+      final posten = await stock(reisId, 1, 'kg', bestBefore: _d(2026, 12, 1));
+      final meal = await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 150, entryUnit: EntryUnit.g)]));
+      final angebrochen = await item(posten.id);
+      expect(angebrochen.status, 'opened');
+      expect(angebrochen.expiresOn, DateTime.utc(2026, 10, 22), reason: '30 Tage nach dem Oeffnen am 22.9.');
+
+      await mealRepo(db).delete(meal.id);
+
+      final nachher = await item(posten.id);
+      expect(nachher.quantity, closeTo(1, 1e-9));
+      expect(nachher.status, 'sealed');
+      expect(nachher.openedOn, isNull);
+      expect(nachher.expiresOn, DateTime.utc(2026, 12, 1), reason: 'wieder das Mindesthaltbarkeitsdatum');
+    });
+
+    test('wurde der Posten danach noch anders verbraucht (zweite Mahlzeit), bleibt er geoeffnet', () async {
+      final posten = await stock(reisId, 1, 'kg', bestBefore: _d(2026, 12, 1));
+      final erste = await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 150, entryUnit: EntryUnit.g)]));
+      await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 100, entryUnit: EntryUnit.g)]));
+
+      await mealRepo(db).delete(erste.id);
+
+      final nachher = await item(posten.id);
+      expect(nachher.quantity, closeTo(0.9, 1e-9));
+      expect(nachher.status, 'opened', reason: 'die zweite Mahlzeit hat aus der offenen Packung gegessen');
+    });
+
+    test('war der Posten schon vorher geoeffnet, bleibt er es', () async {
+      final posten = await stock(reisId, 1, 'kg', bestBefore: _d(2026, 12, 1));
+      await inventoryRepo(db).open(posten.id, now: _d(2026, 9, 20));
+      final meal = await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 150, entryUnit: EntryUnit.g)]));
+
+      await mealRepo(db).delete(meal.id);
+
+      final nachher = await item(posten.id);
+      expect(nachher.status, 'opened');
+      expect(nachher.openedOn, DateTime.utc(2026, 9, 20));
+    });
+
+    test('Codereview-Fund 2026-10-16: Abzuege im Ledger sind auf drei Stellen gerundet wie in der Datenbank', () async {
+      // 1 kg aus 0,7 kg und einer vollen Packung: der zweite Abzug waere ungerundet 0.30000000000000004
+      await stock(reisId, 0.7, 'kg', bestBefore: _d(2026, 10, 1));
+      await stock(reisId, 1, 'kg', bestBefore: _d(2026, 10, 3));
+      final meal = await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 1000, entryUnit: EntryUnit.g)]));
+
+      final deltas = (await mealMovements(meal.id)).map((m) => m.quantityDelta).toList();
+      expect(deltas, hasLength(2));
+      for (final d in deltas) {
+        expect(d * 1000, (d * 1000).roundToDouble(), reason: '$d');
+      }
+      expect(deltas.fold<double>(0, (s, d) => s + d), closeTo(-1, 1e-12));
+    });
+
     test('Rueckbuchung ist idempotent: ein zweiter Aufruf bucht nichts mehr zurueck', () async {
       final posten = await stock(reisId, 1, 'kg', bestBefore: _d(2026, 12, 1));
       final meal = await mealRepo(db).create(lunch(ingredients: [IngredientDraft(productId: reisId, quantity: 150, entryUnit: EntryUnit.g)]));

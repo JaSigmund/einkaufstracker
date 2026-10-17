@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../data/cloud/cloud_receipt.dart';
 import '../../data/ocr/image_prep.dart';
+import '../../data/ocr/receipt_scanner.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../domain/app_update/app_update_gate.dart';
 import '../../domain/ocr/ocr_text.dart';
@@ -12,17 +13,9 @@ import '../../domain/receipt/parsed_receipt.dart';
 import '../../domain/receipt/receipt_text_parser.dart';
 import 'receipt_import_service.dart';
 
-/// Eine fotografierte Seite: Bilddatei und die per OCR erkannten Zeilen (Koordinaten in Pixeln dieser Datei).
-class ScannedPage {
-  const ScannedPage(this.imagePath, this.lines);
-  final String imagePath;
-  final List<OcrLine> lines;
-}
-
-/// Dokumentenscanner plus OCR. Gibt null zurueck, wenn der Nutzer abbricht.
-abstract class ReceiptScanner {
-  Future<List<ScannedPage>?> scan();
-}
+// ScannedPage und ReceiptScanner stehen in data/ocr/receipt_scanner.dart (Codereview 2026-10-16: die Datenschicht
+// implementiert die Schnittstelle und durfte dafuer nicht die Oberflaeche importieren).
+export '../../data/ocr/receipt_scanner.dart';
 
 /// Bereitet ein Foto fuer die Cloud auf: verkleinern und alles ab [cutY] (Zahlungsblock) abschneiden.
 typedef ImagePreparer = Future<Uint8List> Function(String imagePath, {double? cutY});

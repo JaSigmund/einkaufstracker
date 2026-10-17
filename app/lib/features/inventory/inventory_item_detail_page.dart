@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
@@ -118,9 +119,9 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
   Future<void> _changeDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _item.bestBefore ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 3650)),
-      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDate: _item.bestBefore ?? appClock.now(),
+      firstDate: appClock.now().subtract(const Duration(days: 3650)),
+      lastDate: appClock.now().add(const Duration(days: 3650)),
     );
     if (picked == null) return;
     await _repo.updateDetails(_item.id, bestBefore: DateTime.utc(picked.year, picked.month, picked.day));
@@ -271,7 +272,7 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final today = DateTime.now();
+    final today = appClock.now();
     final prefs = ref.watch(householdPrefsOnceProvider).value ?? const <String, Object?>{};
     final ownStages = parseExpiryStages(prefs[expiryStagesPrefFor(_item.productId)]);
     final standardStages = parseExpiryStages(prefs[expiryStagesPref]) ?? const [1];
@@ -370,14 +371,14 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
               child: Wrap(spacing: 8, children: [
                 OutlinedButton(
                   onPressed: () async {
-                    await _repo.updateDetails(_item.id, bestBefore: DateTime.now().add(const Duration(days: 7)).toUtc());
+                    await _repo.updateDetails(_item.id, bestBefore: appClock.now().add(const Duration(days: 7)).toUtc());
                     await _refresh();
                   },
                   child: const Text('+7 Tage'),
                 ),
                 OutlinedButton(
                   onPressed: () async {
-                    await _repo.updateDetails(_item.id, bestBefore: DateTime.now().add(const Duration(days: 14)).toUtc());
+                    await _repo.updateDetails(_item.id, bestBefore: appClock.now().add(const Duration(days: 14)).toUtc());
                     await _refresh();
                   },
                   child: const Text('+14 Tage'),

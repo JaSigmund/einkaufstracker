@@ -14,10 +14,8 @@
 // Automatisch vorhanden: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { json } from "../_shared/http.ts";
 import { type Membership, planDeletion } from "./plan.ts";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // Nur der Storage-Bucket wird gebraucht -- als Parameter statt des ganzen Clients, weil der Typ des Clients von den
 // Datenbank-Generics abhaengt und `deno check` den Client aus createClient() sonst nicht als Parameter akzeptiert.

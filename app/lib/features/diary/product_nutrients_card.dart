@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../data/local/database.dart';
 import 'product_nutrients_page.dart';
 
@@ -58,7 +59,7 @@ class _ProductNutrientsCardState extends ConsumerState<ProductNutrientsCard> {
   }
 
   Future<void> _later() async {
-    final until = (widget.now ?? DateTime.now()).toUtc().add(productsNutrientsCardHideFor);
+    final until = (widget.now ?? appClock.now()).toUtc().add(productsNutrientsCardHideFor);
     setState(() => _hiddenUntil = until);
     try {
       await ref.read(databaseProvider).setKv(productsNutrientsCardHiddenUntilKey, until.toIso8601String());
@@ -70,7 +71,7 @@ class _ProductNutrientsCardState extends ConsumerState<ProductNutrientsCard> {
   @override
   Widget build(BuildContext context) {
     if (!_loaded) return const SizedBox.shrink();
-    final now = (widget.now ?? DateTime.now()).toUtc();
+    final now = (widget.now ?? appClock.now()).toUtc();
     if (_hiddenUntil != null && now.isBefore(_hiddenUntil!)) return const SizedBox.shrink();
     final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
     final open = products.where((p) => p.deletedAt == null && p.nutrientsPer100 == null && !_skipped.contains(p.id)).length;

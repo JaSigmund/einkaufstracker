@@ -14,9 +14,12 @@ String _baseUnitLabel(String baseUnit) => _baseUnitLabels[baseUnit] ?? baseUnit;
 /// Artikel-Detail (Doku 07 §2): Preisverlauf und Haendlervergleich eines einzelnen Produkts, auf Basis
 /// des am jeweiligen Bon-Artikel berechneten Grundpreises (Doku 07 §3.1).
 class ProductPricePage extends ConsumerWidget {
-  const ProductPricePage({super.key, required this.product});
+  const ProductPricePage({super.key, required this.product, this.now});
 
   final Product product;
+
+  /// Stichtag fuer das 180-Tage-Fenster des Haendlervergleichs; ohne Angabe die App-Uhr. Fuer Tests.
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,7 +36,7 @@ class ProductPricePage extends ConsumerWidget {
     final historyStores = [for (final s in stores) (id: s.id, chain: s.chain, branch: s.branch)];
 
     final history = buildPriceHistory(productId: product.id, items: historyItems, receipts: historyReceipts, stores: historyStores).reversed.toList();
-    final comparison = buildStoreComparison(productId: product.id, items: historyItems, receipts: historyReceipts, stores: historyStores);
+    final comparison = buildStoreComparison(productId: product.id, items: historyItems, receipts: historyReceipts, stores: historyStores, now: now);
 
     return Scaffold(
       appBar: AppBar(title: Text(product.name)),

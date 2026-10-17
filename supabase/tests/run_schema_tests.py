@@ -900,6 +900,91 @@ def main():
         check(f"Zubereitung: '{bad}' wird abgelehnt", raises(ins_prep, (ha, meal_for_prep, bad), user=A))
     check("Zubereitung: leer (NULL) ist erlaubt", not raises("insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit) values (%s,%s,'y',1,'piece')", (ha, meal_for_prep), user=A))
 
+    # --- Verweise nur im selben Haushalt (0028, Codereview 2026-10-16 Fund S7) -----------------------------------------
+    pa = one("insert into products (household_id, name) values (%s, 'Probe A') returning id", (ha,))
+    pb = one("insert into products (household_id, name) values (%s, 'Probe B') returning id", (hb,))
+    ins_item = "insert into inventory_items (household_id, product_id) values (%s,%s) returning id"
+    check("Haushaltsgrenze: A kann einen Bestand zum eigenen Produkt anlegen", not raises(ins_item, (ha, pa), user=A))
+    check("Haushaltsgrenze: A kann keinen Bestand auf ein Produkt von B zeigen lassen", raises(ins_item, (ha, pb), user=A))
+    own_item = one("select id from inventory_items where household_id = %s and product_id = %s", (ha, pa))
+    check("Haushaltsgrenze: auch nicht nachtraeglich per Update",
+          raises("update inventory_items set product_id = %s where id = %s", (pb, own_item), user=A))
+    check("Haushaltsgrenze: gilt auch fuer die service_role (Edge Functions)", raises(ins_item, (ha, pb)))
+    lb = one("insert into shopping_lists (household_id, name, is_default) values (%s, 'Probe', false) returning id", (hb,))
+    check("Haushaltsgrenze: kein Eintrag in die Einkaufsliste eines anderen Haushalts",
+          raises("insert into shopping_list_items (household_id, list_id, free_text) values (%s,%s,'x')", (ha, lb), user=A))
+    try:
+        db(ins_item, (ha, pb), user=A)
+        code = None
+    except psycopg.Error as e:
+        code = e.sqlstate
+    check("Haushaltsgrenze: Fehlercode 23503 (die App stuft das als Datenfehler ein, die Outbox bleibt frei)", code == "23503", f"{code}")
+    check("Haushaltsgrenze: ein leerer Verweis bleibt erlaubt",
+          not raises("insert into receipt_items (household_id, receipt_id, line_no, raw_text, line_total_cents, product_id) "
+                     "select %s, id, 99, 'x', 1, null from receipts where household_id = %s limit 1", (ha, ha), user=A))
+    db("delete from inventory_items where product_id in (%s, %s)", (pa, pb))
+    db("delete from products where id in (%s, %s)", (pa, pb))
+    db("delete from shopping_lists where id = %s", (lb,))
+
+    fks = db("""
+        select c.conrelid::regclass::text, a.attname, c.confrelid::regclass::text
+        from pg_constraint c
+        join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+        where c.contype = 'f' and array_length(c.conkey, 1) = 1 and c.connamespace = 'public'::regnamespace
+          and a.attname <> 'household_id'
+          and exists (select 1 from pg_attribute x where x.attrelid = c.conrelid and x.attname = 'household_id' and not x.attisdropped)
+          and exists (select 1 from pg_attribute y where y.attrelid = c.confrelid and y.attname = 'household_id' and not y.attisdropped)
+        order by 1, 2""")[0]
+    trigger_defs = [r[0] for r in db("""
+        select pg_get_triggerdef(t.oid) from pg_trigger t
+        where not t.tgisinternal and t.tgfoid = 'public.ensure_same_household'::regproc""")[0]]
+    unguarded_fks = [f"{tab}.{col}" for tab, col, ref in fks
+                     if not any(f" ON public.{tab} " in d and f"'{col}', '{ref}'" in d for d in trigger_defs)]
+    check("Invariante: jeder Fremdschluessel zwischen Haushaltstabellen prueft den Haushalt (Trigger ensure_same_household)",
+          fks and not unguarded_fks, f"ohne Trigger: {unguarded_fks}")
+
+    # --- Einladungen: Code, Ablauf und Zaehler setzt der Server (0029, Fund S8) ------------------------------------------
+    db("""insert into household_invites (household_id, invited_by, email, token, failed_attempts, expires_at, accepted_at)
+          values (%s, %s, 'selbstgemacht@test.at', 'AAAAAAAAAAAA', -1000, now() + interval '10 years', now())""", (ha, A), user=A)
+    tok, attempts, days, accepted = db("""select token, failed_attempts, extract(day from expires_at - now()), accepted_at
+                                         from household_invites where email = 'selbstgemacht@test.at'""")[0][0]
+    check("Einladung: selbst gewaehlter Code wird ersetzt", tok != "AAAAAAAAAAAA" and re.fullmatch(r"[A-HJKMNP-Z2-9]{12}", tok), tok)
+    check("Einladung: Fehlversuchszaehler startet immer bei 0 (kein Aushebeln der Sperre)", attempts == 0, f"{attempts}")
+    check("Einladung: Ablauf ist immer 7 Tage", days is not None and 6 <= days <= 7, f"{days}")
+    check("Einladung: kann nicht als schon angenommen angelegt werden", accepted is None)
+    db("delete from household_invites where email = 'selbstgemacht@test.at'")
+
+    # --- Tageslimit der KI-Functions: atomare Reservierung (0030, Fund S9) ----------------------------------------------
+    db("delete from llm_usage where household_id = %s", (hb,))
+    first = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    second = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    third = one("select reserve_llm_call(%s, 'm', 2)", (hb,))
+    check("Reservierung: bis zum Limit gibt es eine Zeilen-ID, danach null", first and second and third is None, f"{first} {second} {third}")
+    check("Reservierung: die reservierten Zeilen zaehlen sofort (2 Zeilen mit 0 Tokens)",
+          one("select count(*) from llm_usage where household_id = %s and input_tokens = 0", (hb,)) == 2)
+    db("update llm_usage set created_at = now() - interval '25 hours' where id = %s", (first,))
+    check("Reservierung: Aufrufe aelter als 24 Stunden zaehlen nicht mehr", one("select reserve_llm_call(%s, 'm', 2)", (hb,)) is not None)
+    check("Reservierung: Clients duerfen nicht reservieren (nur service_role)",
+          raises("select reserve_llm_call(%s, 'm', 100)", (hb,), user=B)
+          and one("select has_function_privilege('service_role', 'public.reserve_llm_call(uuid,text,integer)', 'execute')"))
+    # Zwei gleichzeitige Transaktionen: die zweite wartet auf die Sperre der ersten und sieht deren Zeile
+    db("delete from llm_usage where household_id = %s", (hb,))
+    with psycopg.connect(uri) as c1, psycopg.connect(uri) as c2:
+        r1 = c1.execute("select reserve_llm_call(%s, 'm', 1)", (hb,)).fetchone()[0]
+        import threading
+        out = {}
+        t = threading.Thread(target=lambda: out.update(r2=c2.execute("select reserve_llm_call(%s, 'm', 1)", (hb,)).fetchone()[0]))
+        t.start()
+        t.join(timeout=1)
+        waited = t.is_alive()
+        c1.commit()
+        t.join(timeout=10)
+        c2.commit()
+    check("Reservierung: parallele Aufrufe desselben Haushalts warten aufeinander (Advisory-Sperre)", waited)
+    check("Reservierung: von zwei gleichzeitigen Aufrufen bei Limit 1 bekommt nur einer eine Zeile",
+          r1 is not None and out.get("r2", "fehlt") is None, f"{r1} {out}")
+    db("delete from llm_usage where household_id = %s", (hb,))
+
     # --- Sicherheits-Invarianten ueber den Katalog (Codereview 2026-10-16) --------------------------------------------
     # Die Tests oben pruefen einzelne Tabellen; diese hier gelten fuer ALLE, auch fuer kuenftige Migrationen. Eine neue
     # Tabelle ohne RLS oder eine neue SECURITY-DEFINER-Funktion ohne festen search_path faellt so sofort auf.

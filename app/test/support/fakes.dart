@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:flutter/widgets.dart' show BuildContext;
 
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
@@ -164,7 +165,7 @@ class FakeRemoteStore implements RemoteStore {
 
 class FakeAuth implements AuthRepository {
   FakeAuth({this.failWith, this.failSignOutWith});
-  final String? failWith;
+  String? failWith;
 
   /// Laesst nur `signOut()` scheitern (unabhaengig von [failWith], das signIn/deleteAccount betrifft) --
   /// fuer Tests, die pruefen, dass eine bereits erfolgreiche Konto-Loeschung trotzdem versucht, lokal
@@ -408,8 +409,14 @@ class FakeSettingsRepository implements SettingsRepository {
   HouseholdSettings settings;
   Map<String, dynamic>? lastUpdate;
 
+  /// Wenn gesetzt, wirft [load] diesen Fehler (kein Netz).
+  Object? loadError;
+
   @override
-  Future<HouseholdSettings> load(String householdId) async => settings;
+  Future<HouseholdSettings> load(String householdId) async {
+    if (loadError != null) throw loadError!;
+    return settings;
+  }
 
   @override
   Future<void> update(String householdId, Map<String, dynamic> changes) async {
@@ -692,8 +699,8 @@ class FakeHouseholdInviteRepository implements HouseholdInviteRepository {
       id: 'inv$_n',
       email: email,
       token: 'ABCDEFGHJKM${'NPQRSTUVWXYZ'[_n % 12]}',
-      expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)),
-      createdAt: DateTime.now().toUtc(),
+      expiresAt: appClock.now().toUtc().add(const Duration(days: 7)),
+      createdAt: appClock.now().toUtc(),
     );
     invites.insert(0, invite);
     return invite;

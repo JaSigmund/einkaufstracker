@@ -46,6 +46,30 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Zeitreise (Codereview 2026-10-16, B1): dieselben Tests, als waere heute 200 bzw. 400 Tage spaeter. Faellt hier etwas um,
+  # prueft ein Test ein festes Datum gegen die echte Uhr und wird nach dieser Zeit auch auf main rot. Abhilfe: dem Test
+  # einen festen Stichtag geben (meist `now:`). App und Tests lesen die Zeit dafuer ueber appClock (lib/core/clock.dart).
+  time-travel:
+    name: App-Tests in der Zukunft (+${{ matrix.days }} Tage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [200, 400]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test --dart-define=TEST_CLOCK_OFFSET_DAYS=${{ matrix.days }}
+
   web:
     # Die PWA (tools/deploy_web.sh) wurde bisher nur lokal gebaut: ein Import, den es im Browser nicht gibt, fiel erst
     # beim Veroeffentlichen auf. Ohne dart_defines startet der Build mit dem Hinweis "Konfiguration fehlt", das genuegt fuer
@@ -65,6 +89,37 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build web --release --base-href "/einkaufstracker-web/"
+
+  android:
+    # Manifest, Ressourcen und Gradle-Skript wurden bisher nur lokal gebaut (Codereview 2026-10-16). Ein Debug-Build genuegt
+    # fuer die Pruefung, dass sich die App fuer Android bauen laesst; signiert wird weiterhin nur lokal (README).
+    name: Android-Build (Debug-APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      # Der Runner hat nur rund 14 GB frei; NDK, CMake und die nativen Bibliotheken (ML Kit, pdfium) fuer vier ABIs
+      # reichten dafuer nicht ("No space left on device"). Vorinstallierte, hier ungenutzte Werkzeuge entfernen.
+      - name: Platz auf dem Runner schaffen
+        working-directory: .
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # eine ABI genuegt fuer die Pruefung von Manifest, Ressourcen und Gradle-Skript
+      - run: flutter build apk --debug --target-platform android-arm64
 
   db:
     name: Datenbank (Schema- und RLS-Tests)
@@ -98,18 +153,20 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert
+      # In einem leeren Ordner pruefen, damit das package.json im Repo (Supabase CLI) Deno nicht stoert. Der ganze Ordner
+      # supabase/functions wird kopiert, weil die Functions gemeinsamen Code aus ../_shared importieren.
       - run: |
-          # alle Edge Functions, nicht nur eine: neue Funktionen sind damit automatisch abgedeckt
-          for dir in supabase/functions/*/; do
-            fn=$(basename "$dir")
-            mkdir -p "/tmp/fncheck/$fn"
-            # ganzer Ordner: eine Function darf aus mehreren Dateien bestehen (z.B. sanitize.ts neben index.ts)
-            cp "$dir"*.ts "/tmp/fncheck/$fn/"
-            (cd "/tmp/fncheck/$fn" && deno check index.ts)
+          mkdir -p /tmp/fncheck
+          cp -r supabase/functions/. /tmp/fncheck/
+          # alle Edge Functions, nicht nur eine: neue Funktionen sind damit automatisch abgedeckt. Ordner ohne index.ts
+          # (z.B. _shared) sind keine Function, ihre Tests laufen trotzdem mit.
+          for dir in /tmp/fncheck/*/; do
+            if [ -f "$dir/index.ts" ]; then
+              (cd "$dir" && deno check index.ts)
+            fi
             # vorhandene Deno-Tests (*_test.ts) mit ausfuehren
-            if ls "/tmp/fncheck/$fn"/*_test.ts >/dev/null 2>&1; then
-              (cd "/tmp/fncheck/$fn" && deno test)
+            if ls "$dir"*_test.ts >/dev/null 2>&1; then
+              (cd "$dir" && deno test)
             fi
           done
       # Lint ueber alle Functions (u.a. kein unbegruendetes `any`, prefer-const)

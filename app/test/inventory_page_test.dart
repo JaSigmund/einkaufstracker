@@ -1,4 +1,5 @@
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/features/inventory/inventory_item_detail_page.dart';
 import 'package:einkaufstracker/features/inventory/inventory_page.dart';
@@ -227,7 +228,7 @@ void main() {
   });
 
   group('Verbrauchsvorhersage (Ausbau 1.14)', () {
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
 
     InventoryMovement move(String id, String type, double delta, int daysAgo) => InventoryMovement(
           id: id, householdId: 'h1', productId: 'p1', occurredAt: now.subtract(Duration(days: daysAgo)), type: type, quantityDelta: delta, unit: 'piece', updatedAt: now,

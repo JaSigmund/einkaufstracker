@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../data/nutrition/bls_food_search.dart';
@@ -14,7 +15,7 @@ import '../../domain/nutrition/micro_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/micros_backfill.dart';
 import '../../domain/nutrition/nutrient_registry.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Frueherer lokaler KV-Speicher der Referenzmengen (bis 1.12). Seit 1.13 liegen sie als gemeinsame Einstellungen des Haushalts
 /// (`household_prefs`, ADR-035); die alten Werte werden beim ersten Oeffnen dorthin uebernommen.
@@ -66,7 +67,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
   }
 
   DateTime get _today {
-    final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final l = utcToViennaLocal(widget.now ?? appClock.now().toUtc());
     return DateTime(l.year, l.month, l.day);
   }
 

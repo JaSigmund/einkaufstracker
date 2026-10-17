@@ -4,7 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/sync/sync_engine.dart';
 import 'package:einkaufstracker/domain/diagnostics/app_info.dart';
-import 'package:einkaufstracker/domain/diagnostics/data_snapshot.dart';
+import 'package:einkaufstracker/data/diagnostics/data_snapshot.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';

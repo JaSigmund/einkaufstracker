@@ -1,5 +1,5 @@
 import '../categorization/normalize_name.dart';
-import 'vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Kopfdaten eines Bons fuer die Auswertung.
 typedef ReportReceipt = ({String id, DateTime purchasedAtUtc});

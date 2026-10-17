@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../core/clock.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
@@ -32,14 +33,14 @@ class HouseholdPrefsRepository {
     final encoded = jsonEncode(value);
     final existing = await (_db.select(_db.householdPrefs)..where((p) => p.householdId.equals(hid) & p.key.equals(key))).getSingleOrNull();
     if (existing != null && existing.value == encoded) return;
-    final row = HouseholdPref(householdId: hid, key: key, value: encoded, updatedAt: DateTime.now().toUtc());
+    final row = HouseholdPref(householdId: hid, key: key, value: encoded, updatedAt: appClock.now().toUtc());
     await _db.transaction(() async {
       await _db.into(_db.householdPrefs).insertOnConflictUpdate(row.toCompanion(false));
       await _db.into(_db.outbox).insert(OutboxCompanion.insert(
             remoteTable: 'household_prefs',
             rowId: '$hid:$key',
             payload: jsonEncode(householdPrefToRemote(row)),
-            createdAt: DateTime.now().toUtc(),
+            createdAt: appClock.now().toUtc(),
           ));
     });
     onChanged?.call();

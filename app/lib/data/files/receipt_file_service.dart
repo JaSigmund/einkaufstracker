@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/async_lock.dart';
+import '../../core/clock.dart';
 import '../local/database.dart';
 import '../repositories/receipt_repository.dart';
 
@@ -104,7 +105,7 @@ class ReceiptFileService {
   Future<int> attach(String receiptId, List<ReceiptAttachment> attachments) async {
     if (attachments.isEmpty || !await keepFiles()) return 0;
     final hid = await repo.householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final newIds = <String>[];
     var n = 0;
     for (final a in attachments) {

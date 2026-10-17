@@ -117,6 +117,17 @@ void main() {
     });
   });
 
+  test('restore nimmt das Loeschen zurueck und schickt die Aenderung in die Outbox', () async {
+    final item = await repo.addManual(freeText: 'Zahnpasta');
+    await repo.delete(item.id);
+    await repo.restore(item.id);
+    final row = (await items()).single;
+    expect(row.deletedAt, isNull);
+    final last = (await db.select(db.outbox).get()).last;
+    expect(last.rowId, item.id);
+    expect(jsonDecode(last.payload)['deleted_at'], isNull);
+  });
+
   group('Seite', () {
     var forecasts = <String, UsageForecast>{};
 
@@ -252,6 +263,66 @@ void main() {
       await tester.pumpAndSettle();
       expect((await items()).single.listId, l.id);
       expect(find.text('Zahnpasta'), findsNothing, reason: 'die Ansicht zeigt die Standardliste');
+    });
+
+    pageTest('Knopf "Liste bearbeiten" oeffnet das Menue der gewaehlten Liste ohne langes Druecken', (tester) async {
+      final l = await repo.createList('Drogerie');
+      await open(tester);
+      await tester.tap(find.byKey(Key('list-chip-${l.id}')));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Liste „Drogerie“ bearbeiten'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('list-edit')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('list-rename')), findsOneWidget);
+      expect(find.byKey(const Key('list-delete')), findsOneWidget, reason: 'Menue der gewaehlten, nicht der Standardliste');
+    });
+
+    pageTest('Wischen loescht, "Rückgängig" holt den Eintrag zurueck', (tester) async {
+      final item = await repo.addManual(freeText: 'Zahnpasta');
+      await open(tester);
+      await tester.drag(find.byKey(Key('shopping-item-${item.id}')), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Zahnpasta'), findsNothing);
+      expect((await items()).single.deletedAt, isNotNull);
+      expect(find.text('„Zahnpasta“ gelöscht'), findsOneWidget);
+
+      await tester.tap(find.text('Rückgängig'));
+      await tester.pumpAndSettle();
+      expect((await items()).single.deletedAt, isNull);
+      expect(find.text('Zahnpasta'), findsOneWidget);
+    });
+
+    pageTest('die Meldung nach dem Loeschen verschwindet von selbst', (tester) async {
+      final item = await repo.addManual(freeText: 'Zahnpasta');
+      await open(tester);
+      await tester.drag(find.byKey(Key('shopping-item-${item.id}')), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shopping-item-deleted')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shopping-item-deleted')), findsNothing);
+    });
+
+    pageTest('Hinweis auf die Gesten, bis er weggeklickt wird; danach auch beim naechsten Oeffnen nicht mehr', (tester) async {
+      await repo.createList('Drogerie');
+      await repo.addManual(freeText: 'Brot');
+      await open(tester);
+      expect(find.textContaining('Nach links wischen löscht einen Eintrag, langes Drücken verschiebt'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('shopping-gesture-hint-ok')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shopping-gesture-hint')), findsNothing);
+
+      await tester.pumpWidget(const SizedBox());
+      await open(tester);
+      expect(find.byKey(const Key('shopping-gesture-hint')), findsNothing);
+    });
+
+    pageTest('mit nur einer Liste nennt der Hinweis nur das Wischen, ohne Eintraege gibt es keinen', (tester) async {
+      await open(tester);
+      expect(find.byKey(const Key('shopping-gesture-hint')), findsNothing);
+      await repo.addManual(freeText: 'Brot');
+      await tester.pumpAndSettle();
+      expect(find.text('Nach links wischen löscht einen Eintrag.'), findsOneWidget);
     });
 
     pageTest('mit nur einer Liste gibt es nichts zu verschieben', (tester) async {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/format.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
+import '../common/domain_format.dart';
 
 /// Zeilen "Eiweiß 48 g von mindestens 60 g" mit Fortschrittsbalken, nur fuer Naehrwerte mit Richtwert.
 ///

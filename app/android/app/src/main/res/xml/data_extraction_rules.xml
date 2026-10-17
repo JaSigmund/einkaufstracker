@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keine Sicherung und keine Uebertragung auf ein neues Geraet (Android 12+). Codereview 2026-10-16: sonst landen die
+     lokale Datenbank (alle Haushaltsdaten) und die Supabase-Sitzung in der Cloud-Sicherung bzw. auf dem neuen Geraet.
+     Die Daten liegen ohnehin in der Cloud, nach einer Neuinstallation holt sie die App nach der Anmeldung wieder. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

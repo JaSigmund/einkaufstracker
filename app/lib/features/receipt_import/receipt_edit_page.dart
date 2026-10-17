@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../domain/receipt/parsed_receipt.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'receipt_import_service.dart';
 
 enum EditKind { article, discount, deposit, billDiscount }
@@ -103,7 +104,7 @@ class _ReceiptEditPageState extends State<ReceiptEditPage> {
     final r = widget.preview.receipt;
     _lines = r.isParsed ? editLinesOf(r) : [];
     _totalCents = r.totalCents ?? 0;
-    _purchasedAtUtc = r.purchasedAtUtc ?? DateTime.now().toUtc();
+    _purchasedAtUtc = r.purchasedAtUtc ?? appClock.now().toUtc();
     _chain = r.chain;
     _totalCtrl = TextEditingController(text: _plain(_totalCents));
   }
@@ -139,7 +140,7 @@ class _ReceiptEditPageState extends State<ReceiptEditPage> {
       context: context,
       initialDate: local,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: appClock.now().add(const Duration(days: 1)),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(context: context, initialTime: TimeOfDay(hour: local.hour, minute: local.minute));

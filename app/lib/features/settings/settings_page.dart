@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,10 +11,32 @@ import 'package:share_plus/share_plus.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../domain/notifications/expiry_stages.dart';
-import '../../domain/receipt/csv_export.dart';
+import '../../data/export/csv_export.dart';
 import '../common/sync_status_banner.dart';
 import 'expiry_stages_dialog.dart';
+
+const _csvFileName = 'einkaufstracker_export.csv';
+
+/// Teilt die CSV-Datei: auf dem Handy als Datei im Temp-Ordner, im Browser direkt aus dem Speicher. Codereview-Fund
+/// 2026-10-16: im Browser gibt es weder dart:io noch einen Temp-Ordner, der Export scheiterte dort immer; share_plus teilt
+/// die Datei dort ueber den Browser oder bietet sie zum Herunterladen an.
+@visibleForTesting
+Future<ShareParams> csvShareParams(String csv, {bool web = kIsWeb, Future<Directory> Function() tempDir = getTemporaryDirectory}) async {
+  if (web) {
+    return ShareParams(
+      files: [XFile.fromData(utf8.encode(csv), mimeType: 'text/csv', name: _csvFileName)],
+      fileNameOverrides: const [_csvFileName],
+      text: 'Einkaufstracker-Export',
+    );
+  }
+  final file = File('${(await tempDir()).path}/$_csvFileName');
+  await file.writeAsString(csv);
+  return ShareParams(files: [XFile(file.path)], text: 'Einkaufstracker-Export');
+}
+
+enum _SignOutChoice { cancel, syncFirst, signOut }
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -60,6 +84,19 @@ class SettingsPage extends ConsumerWidget {
     try {
       await rescheduleExpiryReminders(ref);
     } catch (_) {}
+  }
+
+  Future<void> _editNotifyTime(BuildContext context, WidgetRef ref, String notifyTime) async {
+    final parts = notifyTime.split(':');
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
+    );
+    if (picked != null && context.mounted) {
+      final hh = picked.hour.toString().padLeft(2, '0');
+      final mm = picked.minute.toString().padLeft(2, '0');
+      await _update(context, ref, {'notify_time': '$hh:$mm:00'});
+    }
   }
 
   /// Monatsbudget setzen oder loeschen (Doku 07 §2 "Budget"), leere Eingabe entfernt das Budget wieder.
@@ -110,11 +147,9 @@ class SettingsPage extends ConsumerWidget {
         products: results[3] as List<Product>,
         categories: results[4] as List<Category>,
       );
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/einkaufstracker_export.csv');
-      await file.writeAsString(csv);
+      final params = await csvShareParams(csv);
       if (!context.mounted) return;
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)], text: 'Einkaufstracker-Export'));
+      await SharePlus.instance.share(params);
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export nicht möglich.')));
@@ -124,7 +159,9 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final pending = ref.read(pendingChangesProvider).value ?? 0;
-    final ok = await showDialog<bool>(
+    // Codereview-Fund 2026-10-16: mit wartenden Aenderungen fragte der Dialog "Erst ... synchronisieren?", bot aber nur
+    // "Abbrechen" und "Abmelden" an. Jetzt gibt es die Antwort dazu, und das verlustreiche Abmelden ist als solches markiert.
+    final choice = await showDialog<_SignOutChoice>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Abmelden?'),
@@ -132,12 +169,37 @@ class SettingsPage extends ConsumerWidget {
             ? '$pending Änderung(en) sind noch nicht übertragen und gehen beim Abmelden verloren. Erst mit dem Netz verbinden und synchronisieren?'
             : 'Die lokalen Daten werden von diesem Gerät entfernt. Deine Daten bleiben in der Cloud.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Abmelden')),
+          TextButton(onPressed: () => Navigator.pop(ctx, _SignOutChoice.cancel), child: const Text('Abbrechen')),
+          if (pending > 0) ...[
+            TextButton(
+              key: const Key('sign-out-anyway'),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+              onPressed: () => Navigator.pop(ctx, _SignOutChoice.signOut),
+              child: const Text('Trotzdem abmelden'),
+            ),
+            FilledButton(
+              key: const Key('sign-out-sync-first'),
+              onPressed: () => Navigator.pop(ctx, _SignOutChoice.syncFirst),
+              child: const Text('Jetzt synchronisieren'),
+            ),
+          ] else
+            FilledButton(onPressed: () => Navigator.pop(ctx, _SignOutChoice.signOut), child: const Text('Abmelden')),
         ],
       ),
     );
-    if (ok != true) return;
+    if (choice == _SignOutChoice.syncFirst) {
+      await ref.read(syncControllerProvider.notifier).sync();
+      if (!context.mounted) return;
+      final left = (await ref.read(databaseProvider).select(ref.read(databaseProvider).outbox).get()).length;
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(left == 0
+            ? 'Alles übertragen. Du kannst dich jetzt ohne Verlust abmelden.'
+            : 'Noch $left Änderung(en) offen. Bitte mit dem Netz verbinden und erneut versuchen.'),
+      ));
+      return;
+    }
+    if (choice != _SignOutChoice.signOut) return;
     // Codereview-Fund 2026-10-01: blockiert einen parallel ausgeloesten Sync (Timer, Connectivity, Tipp auf
     // den Banner), solange die lokale DB geleert wird -- sonst koennte er mit der noch gueltigen Session
     // Daten zurueckschreiben, bevor signOut() sie ungueltig macht (Privacy-Risiko bei Geraete-Weitergabe).
@@ -146,8 +208,9 @@ class SettingsPage extends ConsumerWidget {
       await clearLocalAccountData(ref);
       await ref.read(authRepositoryProvider).signOut();
     } catch (e) {
+      debugPrint('[abmelden] fehlgeschlagen: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abmelden nicht möglich: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abmelden nicht möglich. Bitte erneut versuchen.')));
       }
     } finally {
       ref.read(authTransitionInProgressProvider.notifier).finish();
@@ -192,8 +255,11 @@ class SettingsPage extends ConsumerWidget {
     try {
       await ref.read(authRepositoryProvider).deleteAccount();
     } catch (e) {
+      debugPrint('[konto-loeschen] fehlgeschlagen: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        // SignInFailure traegt schon einen verstaendlichen Text, alles andere nicht (Codereview-Fund 2026-10-16)
+        final text = e is SignInFailure ? e.message : 'Konto konnte nicht gelöscht werden. Bitte erneut versuchen.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
       }
       ref.read(authTransitionInProgressProvider.notifier).finish();
       return;
@@ -259,50 +325,46 @@ class SettingsPage extends ConsumerWidget {
             loading: () => const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
             error: (e, _) => const ListTile(leading: Icon(Icons.cloud_off), title: Text('Einstellungen nicht verfügbar'), subtitle: Text('Für dieses Fenster wird Netz gebraucht.')),
             data: (s) => Column(children: [
+              if (s.fromCache)
+                const ListTile(
+                  key: Key('settings-offline'),
+                  leading: Icon(Icons.cloud_off),
+                  title: Text('Ohne Netz: zuletzt bekannte Werte'),
+                  subtitle: Text('Ändern geht wieder, sobald das Gerät online ist.'),
+                ),
               SwitchListTile(
                 secondary: const Icon(Icons.cloud_outlined),
                 title: const Text('Cloud-Auswertung erlauben'),
                 subtitle: const Text('Ist ein Bon lokal nicht sicher lesbar, darf das Foto zur Auswertung an eine KI gesendet werden. Es enthält u.U. Kartenendziffern und Kassierernamen.'),
                 value: s.allowCloudOcr,
-                onChanged: (v) => _update(context, ref, {'allow_cloud_ocr': v}),
+                onChanged: s.fromCache ? null : (v) => _update(context, ref, {'allow_cloud_ocr': v}),
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.photo_outlined),
                 title: const Text('Originalbelege speichern'),
                 subtitle: const Text('Foto (ohne Zahlungsblock) oder PDF wird beim Bon abgelegt, privat auf dem Server. Gilt für neue Bons.'),
                 value: s.keepReceiptImages,
-                onChanged: (v) => _update(context, ref, {'keep_receipt_images': v}),
+                onChanged: s.fromCache ? null : (v) => _update(context, ref, {'keep_receipt_images': v}),
               ),
               ListTile(
                 key: const Key('settings-reminder-stages'),
                 leading: const Icon(Icons.alarm_add_outlined),
                 title: const Text('Erinnern'),
                 subtitle: Text(describeExpiryStages(parseExpiryStages(ref.watch(householdPrefsOnceProvider).value?[expiryStagesPref]) ?? [s.notifyLeadDays])),
-                onTap: () => _editStages(context, ref, s.notifyLeadDays),
+                onTap: s.fromCache ? null : () => _editStages(context, ref, s.notifyLeadDays),
               ),
               ListTile(
                 leading: const Icon(Icons.notifications_outlined),
                 title: const Text('Ablauf-Erinnerung um'),
                 subtitle: Text('${s.notifyTime} Uhr, ${s.notifyLeadDays} Tag(e) vorher'),
-                onTap: () async {
-                  final parts = s.notifyTime.split(':');
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
-                  );
-                  if (picked != null && context.mounted) {
-                    final hh = picked.hour.toString().padLeft(2, '0');
-                    final mm = picked.minute.toString().padLeft(2, '0');
-                    await _update(context, ref, {'notify_time': '$hh:$mm:00'});
-                  }
-                },
+                onTap: s.fromCache ? null : () => _editNotifyTime(context, ref, s.notifyTime),
               ),
               ListTile(
                 key: const Key('settings-budget'),
                 leading: const Icon(Icons.savings_outlined),
                 title: const Text('Monatsbudget'),
                 subtitle: Text(s.monthlyBudgetCents == null ? 'Kein Budget gesetzt' : 'Warnung ab ${formatEuro(s.monthlyBudgetCents!)} pro Monat'),
-                onTap: () => _editBudget(context, ref, s.monthlyBudgetCents),
+                onTap: s.fromCache ? null : () => _editBudget(context, ref, s.monthlyBudgetCents),
               ),
               ListTile(
                 key: const Key('settings-csv-export'),

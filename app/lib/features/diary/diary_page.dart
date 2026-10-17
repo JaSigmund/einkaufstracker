@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/frequent_meals.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'balance_card.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
@@ -71,24 +72,33 @@ class DiaryPage extends ConsumerWidget {
 
   Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients, NutritionTargets targets) {
     if (meals.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.restaurant_menu_outlined, size: 48, color: t.colorScheme.outline),
-            const SizedBox(height: 12),
-            Text('Noch keine Mahlzeit', style: t.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            const Text(
-              'Halte fest, was du gekocht oder gegessen hast. Die Zutaten werden vom Inventar abgezogen, die Nährwerte pro Tag berechnet.',
-              textAlign: TextAlign.center,
+      // Scrollbar: auf kleinen Handys mit grosser Schrift passt der Hinweis sonst nicht in die Hoehe
+      return LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: c.maxHeight),
+            child: Center(
+              child: Padding(
+                // unten Platz fuer den FAB
+                padding: const EdgeInsets.fromLTRB(32, 32, 32, 96),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.restaurant_menu_outlined, size: 48, color: t.colorScheme.outline),
+                  const SizedBox(height: 12),
+                  Text('Noch keine Mahlzeit', style: t.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Halte fest, was du gekocht oder gegessen hast. Die Zutaten werden vom Inventar abgezogen, die Nährwerte pro Tag berechnet.',
+                    textAlign: TextAlign.center,
+                  ),
+                ]),
+              ),
             ),
-          ]),
+          ),
         ),
       );
     }
 
-    final today = utcToViennaLocal(now ?? DateTime.now().toUtc());
+    final today = utcToViennaLocal(now ?? appClock.now().toUtc());
     final days = buildDailyNutrition([for (final m in meals) _toMeal(m)], [for (final i in ingredients) _toIngredient(i)]);
     final dayInfo = {for (final d in days) d.day: d};
     final weeks = buildWeeklyNutrition(days);
@@ -158,7 +168,7 @@ class DiaryPage extends ConsumerWidget {
 
   /// "Nochmal essen": die haeufigsten Mahlzeiten der letzten 60 Tage, ein Tipp oeffnet eine Kopie (Doku 15 §3.3).
   Widget _frequentChips(BuildContext context, ThemeData t, List<Meal> meals) {
-    final since = (now ?? DateTime.now().toUtc()).subtract(const Duration(days: 60));
+    final since = (now ?? appClock.now().toUtc()).subtract(const Duration(days: 60));
     final frequent = frequentMeals(
       [for (final m in meals) (id: m.id, title: m.title, eatenAtUtc: m.eatenAt)],
       since: since,

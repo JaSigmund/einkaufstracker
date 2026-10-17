@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../data/local/database.dart';
+import '../local/database.dart';
 
 /// Wie viele juengste Zeilen je Tabelle in den Ausschnitt kommen (Doku-Wunsch: genug fuer 1:1-Reproduktion,
 /// aber begrenzt, damit der Bericht nicht unnoetig gross wird).

@@ -40,4 +40,27 @@ void main() {
     await tester.pump();
     expect(tester.widget<TextField>(find.byType(TextField).last).obscureText, isFalse);
   });
+
+  testWidgets('E-Mail und Passwort bilden eine Autofill-Gruppe, gespeichert wird erst nach gelungener Anmeldung', (tester) async {
+    final auth = FakeAuth(failWith: 'E-Mail oder Passwort stimmt nicht.');
+    await tester.pumpWidget(_app(auth));
+    final fields = find.byType(TextField);
+    for (final f in [fields.first, fields.last]) {
+      expect(find.ancestor(of: f, matching: find.byType(AutofillGroup)), findsOneWidget);
+    }
+    expect(tester.widget<TextField>(fields.first).autofillHints, contains(AutofillHints.username));
+    expect(tester.widget<TextField>(fields.last).autofillHints, [AutofillHints.password]);
+
+    await tester.enterText(fields.first, 'a@b.at');
+    await tester.enterText(fields.last, 'falsch');
+    tester.testTextInput.log.clear();
+    await tester.tap(find.text('Anmelden'));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.log.map((c) => c.method), isNot(contains('TextInput.finishAutofillContext')));
+
+    auth.failWith = null;
+    await tester.tap(find.text('Anmelden'));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.log.map((c) => c.method), contains('TextInput.finishAutofillContext'));
+  });
 }

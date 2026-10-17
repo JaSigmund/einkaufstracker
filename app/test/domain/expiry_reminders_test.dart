@@ -1,22 +1,10 @@
-import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/domain/notifications/expiry_reminders.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 DateTime _d(int y, int m, int d) => DateTime.utc(y, m, d);
 
-InventoryItem _item({required String productId, DateTime? expiresOn, String dateKind = 'best_before'}) => InventoryItem(
-      id: 'i-$productId-${expiresOn?.toIso8601String()}',
-      householdId: 'h1',
-      productId: productId,
-      quantity: 1,
-      unit: 'piece',
-      location: 'pantry',
-      dateKind: dateKind,
-      status: 'sealed',
-      isSuggestion: false,
-      expiresOn: expiresOn,
-      updatedAt: DateTime.utc(2026),
-    );
+ReminderItem _item({required String productId, DateTime? expiresOn, String dateKind = 'best_before'}) =>
+    (productId: productId, expiresOn: expiresOn, dateKind: dateKind);
 
 void main() {
   group('computeExpiryReminders (Doku 06 §5, Schritt 1-2)', () {

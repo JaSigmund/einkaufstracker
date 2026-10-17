@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/clock.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
@@ -34,7 +35,7 @@ class FoodLinkRepository {
     final label = name.trim();
     if (label.isEmpty || blsCode.isEmpty) return;
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final existing = (await all()).where((l) => l.nameNorm.toLowerCase() == label.toLowerCase()).firstOrNull;
     if (existing != null && existing.blsCode == blsCode) return;
     // Ein anderer Eintrag heisst: das gemerkte Stueckgewicht galt dem alten Lebensmittel und faellt weg
@@ -66,7 +67,7 @@ class FoodLinkRepository {
     final label = name.trim();
     if (label.isEmpty || blsCode.isEmpty || !(grams > 0) || grams > 5000) return;
     final hid = await householdId();
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final existing = (await all()).where((l) => l.nameNorm.toLowerCase() == label.toLowerCase()).firstOrNull;
     if (existing != null && existing.blsCode == blsCode && existing.unitWeightG == grams) return;
     final row = existing != null && existing.blsCode == blsCode
@@ -85,7 +86,7 @@ class FoodLinkRepository {
   Future<void> forget(String id) async {
     final link = await (_db.select(_db.householdFoodLinks)..where((l) => l.id.equals(id))).getSingleOrNull();
     if (link == null || link.deletedAt != null) return;
-    final now = DateTime.now().toUtc();
+    final now = appClock.now().toUtc();
     final row = link.copyWith(deletedAt: Value(now), updatedAt: now);
     await _db.transaction(() async {
       await _db.into(_db.householdFoodLinks).insertOnConflictUpdate(row.toCompanion(false));
@@ -98,6 +99,6 @@ class FoodLinkRepository {
         remoteTable: 'household_food_links',
         rowId: row.id,
         payload: jsonEncode(householdFoodLinkToRemote(row)),
-        createdAt: DateTime.now().toUtc(),
+        createdAt: appClock.now().toUtc(),
       ));
 }

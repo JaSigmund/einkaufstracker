@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
@@ -20,7 +21,7 @@ import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/retention.dart';
 import '../../domain/nutrition/usual_ingredients.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'ingredient_picker.dart';
 import 'manual_nutrients_dialog.dart';
 import 'meal_labels.dart';
@@ -214,7 +215,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   void initState() {
     super.initState();
     final m = widget.existing;
-    _eatenAt = m?.eatenAt.toUtc() ?? DateTime.now().toUtc();
+    _eatenAt = m?.eatenAt.toUtc() ?? appClock.now().toUtc();
     _type = m?.mealType ?? guessMealType(utcToViennaLocal(_eatenAt).hour);
     if (m != null) {
       _title.text = m.title;
@@ -629,7 +630,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       context: context,
       initialDate: local,
       firstDate: DateTime(local.year - 2),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: appClock.now().add(const Duration(days: 1)),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(context: context, initialTime: TimeOfDay(hour: local.hour, minute: local.minute));

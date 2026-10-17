@@ -1,4 +1,4 @@
-import 'vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Ein Kauf fuer die Monatsrechnung (unabhaengig von der Datenbank-Klasse).
 typedef PurchaseRecord = ({DateTime purchasedAtUtc, int totalCents});

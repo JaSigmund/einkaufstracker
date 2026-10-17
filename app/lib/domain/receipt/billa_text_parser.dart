@@ -1,5 +1,5 @@
 import 'parsed_receipt.dart';
-import 'vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Liest den Text eines digitalen Billa-Bons (PDF-Textebene, jö Bonus Club) ohne OCR und ohne Cloud.
 ///

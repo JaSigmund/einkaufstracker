@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../receipt_import/receipt_import_service.dart';
+import '../common/domain_format.dart';
 
 /// Einzelner gespeicherter Bon mit allen Positionen. Loeschen ueber das Menue oben rechts.
 class ReceiptDetailPage extends ConsumerWidget {

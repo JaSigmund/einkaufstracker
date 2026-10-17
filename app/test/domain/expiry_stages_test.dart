@@ -1,4 +1,3 @@
-import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/domain/notifications/expiry_reminders.dart';
 import 'package:einkaufstracker/domain/notifications/expiry_stages.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,19 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Mehrstufige Ablauf-Erinnerungen (Ausbau 1.14).
 DateTime _d(int y, int m, int d) => DateTime.utc(y, m, d);
 
-InventoryItem _item(String productId, DateTime expiresOn, {String dateKind = 'best_before'}) => InventoryItem(
-      id: 'i-$productId',
-      householdId: 'h1',
-      productId: productId,
-      quantity: 1,
-      unit: 'piece',
-      location: 'pantry',
-      dateKind: dateKind,
-      status: 'sealed',
-      isSuggestion: false,
-      expiresOn: expiresOn,
-      updatedAt: DateTime.utc(2026),
-    );
+ReminderItem _item(String productId, DateTime expiresOn, {String dateKind = 'best_before'}) =>
+    (productId: productId, expiresOn: expiresOn, dateKind: dateKind);
 
 void main() {
   group('parseExpiryStages', () {
@@ -66,7 +54,7 @@ void main() {
 
   group('computeExpiryReminders mit Stufen', () {
     final today = _d(2026, 9, 27);
-    List<ExpiryReminderDay> run(List<InventoryItem> items, {List<int>? stages, int lead = 1}) => computeExpiryReminders(
+    List<ExpiryReminderDay> run(List<ReminderItem> items, {List<int>? stages, int lead = 1}) => computeExpiryReminders(
           activeItems: items,
           productNameById: {for (final i in items) i.productId: 'Produkt ${i.productId}'},
           leadDays: lead,
@@ -120,10 +108,7 @@ void main() {
     });
 
     test('ohne Ablaufdatum nichts, auch mit Stufen', () {
-      final noDate = InventoryItem(
-        id: 'i-x', householdId: 'h1', productId: 'x', quantity: 1, unit: 'piece', location: 'pantry', dateKind: 'best_before', status: 'sealed',
-        isSuggestion: false, updatedAt: DateTime.utc(2026),
-      );
+      const ReminderItem noDate = (productId: 'x', expiresOn: null, dateKind: 'best_before');
       expect(run([noDate], stages: [3, 0]), isEmpty);
     });
   });

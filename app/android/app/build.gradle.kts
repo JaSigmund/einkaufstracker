@@ -59,6 +59,23 @@ android {
     }
 }
 
+// Ohne key.properties signiert der Release-Build mit dem Debug-Schluessel (gewollt fuer lokale Tests, siehe README). Damit
+// so eine APK nicht versehentlich verteilt wird, sagt der Build es jetzt laut (Codereview 2026-10-16).
+if (!hasReleaseKey) {
+    gradle.taskGraph.whenReady {
+        if (allTasks.any { it.name.contains("Release") }) {
+            logger.warn(
+                """
+                |
+                |WARNUNG: android/key.properties fehlt, der Release-Build wird mit dem DEBUG-Schluessel signiert.
+                |Diese APK nur zum lokalen Testen verwenden, nicht verteilen (README, "Signierter Release-Build").
+                |
+                """.trimMargin(),
+            )
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17

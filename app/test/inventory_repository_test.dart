@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' show Value;
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/sync/sync_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -323,8 +324,8 @@ void main() {
       await inventoryRepo(db).setReceiptLink(confirmed.id, 'ri1');
       expect(await inventoryRepo(db).receiptLinkFor('ri1'), isNotNull);
 
-      await (db.update(db.receiptItems)..where((i) => i.id.equals('ri1'))).write(ReceiptItemsCompanion(deletedAt: Value(DateTime.now().toUtc())));
-      await (db.update(db.receipts)..where((r) => r.id.equals('r1'))).write(ReceiptsCompanion(deletedAt: Value(DateTime.now().toUtc())));
+      await (db.update(db.receiptItems)..where((i) => i.id.equals('ri1'))).write(ReceiptItemsCompanion(deletedAt: Value(appClock.now().toUtc())));
+      await (db.update(db.receipts)..where((r) => r.id.equals('r1'))).write(ReceiptsCompanion(deletedAt: Value(appClock.now().toUtc())));
 
       expect(await inventoryRepo(db).receiptLinkFor('ri1'), isNull);
     });

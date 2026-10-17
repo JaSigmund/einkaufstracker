@@ -19,6 +19,10 @@ ReceiptItem _item(String rid, String id, int unitPriceNormCents) => ReceiptItem(
       lineTotalCents: 129, productId: 'p1', unitPriceNormCents: unitPriceNormCents, needsReview: false, updatedAt: DateTime.utc(2026),
     );
 
+/// Fester Stichtag: der Haendlervergleich zaehlt nur Kaeufe der letzten 180 Tage, die Bons hier sind vom August und
+/// September 2026 (mit der echten Uhr waeren die Tests ab Ende Jaenner 2027 rot, gefunden im Zeitreise-Lauf).
+final _now = DateTime.utc(2026, 9, 26);
+
 void main() {
   Widget host({DateTime? now}) => ProviderScope(
         overrides: [
@@ -38,7 +42,7 @@ void main() {
           onlineLinksStreamProvider.overrideWith((ref, productId) => Stream.value(const <ProductOnlineLink>[])),
           onlinePriceCacheStreamProvider.overrideWith((ref) => Stream.value(const <OnlinePriceCacheRow>[])),
         ],
-        child: MaterialApp(home: ProductPricePage(product: _product())),
+        child: MaterialApp(home: ProductPricePage(product: _product(), now: _now)),
       );
 
   testWidgets('zeigt Haendlervergleich und Preisverlauf', (tester) async {
@@ -72,7 +76,7 @@ void main() {
         onlineLinksStreamProvider.overrideWith((ref, productId) => Stream.value(const <ProductOnlineLink>[])),
         onlinePriceCacheStreamProvider.overrideWith((ref) => Stream.value(const <OnlinePriceCacheRow>[])),
       ],
-      child: MaterialApp(home: ProductPricePage(product: _product())),
+      child: MaterialApp(home: ProductPricePage(product: _product(), now: _now)),
     );
     await tester.pumpWidget(widget);
     await tester.pumpAndSettle();

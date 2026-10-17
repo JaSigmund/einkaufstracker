@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInput;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,6 +49,8 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
     });
     try {
       await ref.read(acceptInviteApiProvider).accept(code: code, email: email, password: _password.text);
+      // Das Konto gibt es jetzt: Passwortmanager duerfen die neuen Zugangsdaten speichern (Codereview 2026-10-16, X5)
+      TextInput.finishAutofillContext();
       // Konto existiert jetzt: gleich anmelden, die Weiterleitung erledigt der Router, sobald die Sitzung da ist.
       await ref.read(authRepositoryProvider).signIn(email, _password.text);
     } on InviteFailure catch (e) {
@@ -88,36 +91,41 @@ class _AcceptInvitePageState extends ConsumerState<AcceptInvitePage> {
                   decoration: const InputDecoration(labelText: 'Einladungscode', hintText: 'ABCD-EFGH-JKMN'),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  key: const Key('accept-email'),
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(labelText: 'E-Mail-Adresse', helperText: 'genau die, an die die Einladung ging'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  key: const Key('accept-password'),
-                  controller: _password,
-                  obscureText: _obscure,
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: InputDecoration(
-                    labelText: 'Passwort',
-                    helperText: 'mindestens $minPasswordChars Zeichen',
-                    suffixIcon: IconButton(
-                      tooltip: _obscure ? 'Passwort anzeigen' : 'Passwort verbergen',
-                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => _obscure = !_obscure),
+                AutofillGroup(
+                  child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    TextField(
+                      key: const Key('accept-email'),
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.username, AutofillHints.email],
+                      decoration: const InputDecoration(labelText: 'E-Mail-Adresse', helperText: 'genau die, an die die Einladung ging'),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  key: const Key('accept-repeat'),
-                  controller: _repeat,
-                  obscureText: _obscure,
-                  onSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(labelText: 'Passwort wiederholen'),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: const Key('accept-password'),
+                      controller: _password,
+                      obscureText: _obscure,
+                      autofillHints: const [AutofillHints.newPassword],
+                      decoration: InputDecoration(
+                        labelText: 'Passwort',
+                        helperText: 'mindestens $minPasswordChars Zeichen',
+                        suffixIcon: IconButton(
+                          tooltip: _obscure ? 'Passwort anzeigen' : 'Passwort verbergen',
+                          icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: const Key('accept-repeat'),
+                      controller: _repeat,
+                      obscureText: _obscure,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(labelText: 'Passwort wiederholen'),
+                    ),
+                  ]),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),

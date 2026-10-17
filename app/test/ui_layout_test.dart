@@ -35,6 +35,8 @@ void main() {
     ('kleines Handy, Schrift 130 %', Size(320, 568), 1.3),
     ('normales Handy, Schrift 200 %', Size(412, 915), 2.0),
     ('kleines Handy, Schrift 200 %', Size(320, 568), 2.0),
+    ('Handy quer (800x360)', Size(800, 360), 1.0),
+    ('Handy quer, Schrift 200 %', Size(800, 360), 2.0),
     ('Tablet quer (1280x800)', Size(1280, 800), 1.0),
   ];
 

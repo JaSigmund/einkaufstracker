@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/supplements.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 
 /// Nahrungsergaenzung (Phase N4, ADR-035): was der Haushalt nimmt, "Genommen" mit einem Tipp, und was heute schon eingetragen ist.
 /// Die Werte erscheinen auf der Seite Naehrstoffe als eigene Quelle, getrennt von den Mahlzeiten. Die App bewertet nicht, ob eine
@@ -19,7 +20,7 @@ class SupplementsPage extends ConsumerWidget {
   final DateTime? now;
 
   DateTime _today() {
-    final l = utcToViennaLocal(now ?? DateTime.now().toUtc());
+    final l = utcToViennaLocal(now ?? appClock.now().toUtc());
     return DateTime(l.year, l.month, l.day);
   }
 

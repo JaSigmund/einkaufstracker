@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/meal_repository.dart';
@@ -14,7 +15,7 @@ import '../../domain/nutrition/journal.dart';
 import '../../domain/nutrition/journal_report.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
 import '../../domain/nutrition/unrecorded_estimate.dart';
-import '../../domain/receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'journal_pdf.dart';
 import 'meal_form_page.dart';
 import 'meal_labels.dart';
@@ -75,7 +76,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
   var _exporting = false;
 
   DateTime get _today {
-    final l = utcToViennaLocal(widget.now ?? DateTime.now().toUtc());
+    final l = utcToViennaLocal(widget.now ?? appClock.now().toUtc());
     return DateTime(l.year, l.month, l.day);
   }
 
@@ -150,7 +151,7 @@ class _JournalPageState extends ConsumerState<JournalPage> {
       }
       final regular = (await rootBundle.load('assets/fonts/Roboto-Regular.ttf')).buffer.asUint8List();
       final bold = (await rootBundle.load('assets/fonts/Roboto-Bold.ttf')).buffer.asUint8List();
-      final pdf = await buildJournalPdf(report, regularFont: regular, boldFont: bold, createdAtUtc: widget.now ?? DateTime.now().toUtc(), photos: photos);
+      final pdf = await buildJournalPdf(report, regularFont: regular, boldFont: bold, createdAtUtc: widget.now ?? appClock.now().toUtc(), photos: photos);
       final name = 'Essenstagebuch ${_month.year}-${_month.month.toString().padLeft(2, '0')}.pdf';
       await ref.read(shareFileProvider)(bytes: pdf, fileName: name, mimeType: 'application/pdf', text: 'Essenstagebuch ${formatMonthTitle(_month.year, _month.month)}');
     } catch (_) {

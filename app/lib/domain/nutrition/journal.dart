@@ -2,7 +2,7 @@
 /// Reine Funktionen ohne Datenbankzugriff, bauen auf `buildDailyNutrition` auf (FR-13, FR-15, FR-17).
 library;
 
-import '../receipt/vienna_time.dart';
+import '../../core/vienna_time.dart';
 import 'daily_nutrition.dart';
 import 'frequent_meals.dart';
 

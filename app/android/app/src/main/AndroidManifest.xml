@@ -6,10 +6,15 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <!-- Keine Android-Sicherung der App-Daten (Datenbank, Sitzung), siehe res/xml/data_extraction_rules.xml.
+         allowBackup/fullBackupContent fuer Android bis 11, dataExtractionRules fuer Android 12+. -->
     <application
         android:label="Einkaufstracker"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
