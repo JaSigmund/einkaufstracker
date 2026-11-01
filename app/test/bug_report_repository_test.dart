@@ -154,6 +154,15 @@ void main() {
     test('ohne Sync-Fehler bleibt das Feld null', () {
       final info = collectAppInfo(route: 'Scan', pendingChanges: 0);
       expect(info['last_sync_error'], isNull);
+      expect(info['rejected_changes'], isEmpty);
+    });
+
+    test('nimmt den Grund abgelehnter Aenderungen mit', () {
+      final rejected = [
+        {'table': 'household_food_links', 'row_id': 'x', 'attempts': 4, 'error': '23505: duplicate key'},
+      ];
+      final info = collectAppInfo(route: 'Sonstiges', pendingChanges: 1, rejectedChanges: rejected);
+      expect(info['rejected_changes'], rejected);
     });
   });
 
