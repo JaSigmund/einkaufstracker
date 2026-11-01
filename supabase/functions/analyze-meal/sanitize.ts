@@ -17,13 +17,26 @@ export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack", "drink"] as 
 export const KINDS = ["food", "drink"] as const;
 export const STATES = ["raw", "cooked", "ready_made"] as const;
 export const COUNT_UNITS = ["piece", "slice", "tbsp", "tsp", "clove", "head", "stalk"] as const;
+export const MAX_SEARCH_TERMS = 3;
+export const MAX_TITLE_CHARS = 120;
+export const MAX_NOTE_CHARS = 500;
+export const MAX_KNOWN_INGREDIENTS = 30;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Anfang jedes JPEG in Base64 (FF D8 FF): das Modell bekommt nur JPEG, so passt der media_type, den wir angeben.
 const JPEG_BASE64_PREFIX = "/9j/";
 
 export type Product = { id: string; name: string };
-export type AnalyzeRequest = { household_id: string; image_base64: string; products: Product[]; model?: string };
+/// Was der Nutzer schon eingetragen hat. Es beschreibt das Gericht besser als das Foto (Pizzabroetchen sieht man den Belag nicht an).
+export type MealContext = {
+  title: string | null;
+  note: string | null;
+  meal_type: string | null;
+  servings_made: number | null;
+  known_ingredients: string[];
+};
+export const EMPTY_CONTEXT: MealContext = { title: null, note: null, meal_type: null, servings_made: null, known_ingredients: [] };
+export type AnalyzeRequest = { household_id: string; image_base64: string; products: Product[]; context: MealContext; model?: string };
 /// kind: Speise oder Getraenk (Getraenke fuehrt die App in ml). state: roh, gekocht oder fertig gekauft, null = nicht erkennbar.
 export type Ingredient = {
   name: string;
@@ -36,6 +49,10 @@ export type Ingredient = {
   /// Gramm um (units.ts), die KI schaetzt kein Stueckgewicht.
   count: number | null;
   count_unit: typeof COUNT_UNITS[number];
+  /// Andere Namen fuer die Suche in der Lebensmitteldatenbank ("Rote Beete" -> "Rote Bete"), resolve.ts.
+  search_terms: string[];
+  /// visible: auf dem Foto zu sehen. inferred: nicht zu sehen, gehoert aber zum Gericht (Bratoel, Dressing), die App markiert es.
+  origin: "visible" | "inferred";
 };
 export type Analysis = {
   dish_title: string;
@@ -70,9 +87,38 @@ export function parseRequest(body: unknown): Parsed {
     products.push({ id, name: name.trim() });
   }
   if (b.model != null && typeof b.model !== "string") return { ok: false, error: "invalid_input" };
+  if (b.context != null && (typeof b.context !== "object" || Array.isArray(b.context))) return { ok: false, error: "invalid_input" };
   return {
     ok: true,
-    value: { household_id: b.household_id, image_base64: b.image_base64, products, model: b.model as string | undefined },
+    value: {
+      household_id: b.household_id,
+      image_base64: b.image_base64,
+      products,
+      context: parseContext(b.context),
+      model: b.model as string | undefined,
+    },
+  };
+}
+
+/// Einzeiliger Text: die Angaben landen im Prompt und sollen dort keine eigenen Zeilen vortaeuschen koennen.
+const line = (v: unknown, max: number): string | null => {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/\s+/g, " ").trim();
+  return t.length === 0 ? null : t.slice(0, max);
+};
+
+/// Liest die Angaben des Nutzers. Sie sind freiwillig: Unbrauchbares faellt weg, die Analyse laeuft trotzdem.
+function parseContext(raw: unknown): MealContext {
+  if (typeof raw !== "object" || raw === null) return EMPTY_CONTEXT;
+  const c = raw as Record<string, unknown>;
+  const known = Array.isArray(c.known_ingredients) ? c.known_ingredients : [];
+  const servings = typeof c.servings_made === "number" && Number.isFinite(c.servings_made) && c.servings_made > 0 ? Math.min(c.servings_made, 50) : null;
+  return {
+    title: line(c.title, MAX_TITLE_CHARS),
+    note: line(c.note, MAX_NOTE_CHARS),
+    meal_type: typeof c.meal_type === "string" && (MEAL_TYPES as readonly string[]).includes(c.meal_type) ? c.meal_type : null,
+    servings_made: servings,
+    known_ingredients: known.map((k) => line(k, MAX_LABEL_CHARS)).filter((k): k is string => k !== null).slice(0, MAX_KNOWN_INGREDIENTS),
   };
 }
 
@@ -104,6 +150,7 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
       const kind = i.kind === "drink" ? "drink" : "food";
       const counted = number(i.count);
       const count = kind === "drink" || counted === null || counted <= 0 ? null : Math.min(MAX_COUNT, Math.round(counted * 2) / 2);
+      const terms = Array.isArray(i.search_terms) ? i.search_terms : [];
       ingredients.push({
         name,
         inventory_product_id: id,
@@ -115,6 +162,9 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
         count_unit: typeof i.count_unit === "string" && (COUNT_UNITS as readonly string[]).includes(i.count_unit)
           ? i.count_unit as Ingredient["count_unit"]
           : "piece",
+        search_terms: [...new Set(terms.map((t) => text(t, 60)).filter((t): t is string => t !== null && t.toLowerCase() !== name.toLowerCase()))]
+          .slice(0, MAX_SEARCH_TERMS),
+        origin: i.origin === "inferred" ? "inferred" : "visible",
       });
     }
   }

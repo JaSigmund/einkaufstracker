@@ -61,6 +61,7 @@ class _Row {
     this.learnWeight = false,
     this.microsPer100,
     this.preparation,
+    this.inferred = false,
   });
 
   Product? product;
@@ -75,6 +76,9 @@ class _Row {
 
   /// Sicherheit der Foto-Analyse (0 bis 1), nur bei Zutaten aus einem KI-Vorschlag.
   double? confidence;
+
+  /// KI-Vorschlag, den man auf dem Foto nicht sieht (Bratoel, Dressing): In der Zeile steht "vermutet".
+  bool inferred;
 
   /// BLS-Eintrag, aus dem [per100] stammt (Phase N1), sein Name und wie sicher die Zuordnung ist. [learn]: beim Speichern
   /// im Gedaechtnis des Haushalts vermerken (nur sinnvoll, wenn die Zuordnung dem Server noch nicht bekannt war).
@@ -186,6 +190,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   final _eaten = TextEditingController(text: '1');
   final _made = TextEditingController(text: '1');
   late String _type;
+
+  /// Der Nutzer hat den Mahlzeitentyp selbst gewaehlt: Die Foto-Analyse aendert ihn dann nicht mehr.
+  var _typeChosen = false;
   late DateTime _eatenAt;
   var _estimate = false;
   final _rows = <_Row>[];
@@ -373,7 +380,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Foto in der Cloud auswerten?'),
         content: const Text(
-          'Das Foto und die Namen deiner Produkte werden zur Auswertung an Claude (Anthropic) geschickt. Die App legt das Foto '
+          'Das Foto und die Namen deiner Produkte werden zusammen mit Titel, Notiz, Portionen und schon eingetragenen Zutaten der '
+          'Mahlzeit zur Auswertung an Claude (Anthropic) geschickt. Die App legt das Foto '
           'dafür nicht zusätzlich auf dem Server ab; wie lange Anthropic Eingaben aufbewahrt, regeln deren eigene Bedingungen. '
           'Die Einstellung „Cloud-Auswertung erlauben“ gilt auch hierfür. '
           'Der Vorschlag ist eine Schätzung, du prüfst und änderst ihn, bevor etwas gespeichert wird.',
@@ -410,14 +418,28 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       ..sort((a, b) => (inStock.contains(b.id) ? 1 : 0).compareTo(inStock.contains(a.id) ? 1 : 0));
     final offered = [for (final p in live.take(80)) (id: p.id, name: p.name)];
 
+    // Die Portionen hat der Nutzer gesetzt, wenn er sie geaendert hat oder die Mahlzeit bearbeitet; die Vorbelegung 1 sagt nichts.
+    final made = _parsePositive(_made.text);
+    final servingsGiven = made != null && (_isEdit || made != 1);
+    final title = _title.text.trim();
+    final note = _note.text.trim();
+    final context = MealAnalysisContext(
+      title: title.isEmpty ? null : title,
+      note: note.isEmpty ? null : note,
+      mealType: _isEdit || _typeChosen ? _type : null,
+      servingsMade: servingsGiven ? made : null,
+      // Ein frueherer Vorschlag aus diesem Formular wird ersetzt, ist also keine Angabe des Nutzers
+      knownIngredients: [for (final r in _rows) if (!(_analysisApplied && r.source == 'photo_ai')) r.label],
+    );
+
     setState(() {
       _analyzing = true;
       _error = null;
     });
     try {
-      final analysis = await ref.read(mealAnalysisCloudProvider).analyze(photo, offered);
+      final analysis = await ref.read(mealAnalysisCloudProvider).analyze(photo, offered, context: context);
       if (!mounted) return;
-      _applyAnalysis(analysis, {for (final p in live) p.id: p}, inStock);
+      _applyAnalysis(analysis, {for (final p in live) p.id: p}, inStock, keepServings: servingsGiven);
     } catch (e) {
       if (mounted) setState(() => _error = _analysisError(e));
     } finally {
@@ -425,16 +447,20 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
     }
   }
 
-  void _applyAnalysis(MealAnalysis a, Map<String, Product> byId, Set<String> inStock) {
+  void _applyAnalysis(MealAnalysis a, Map<String, Product> byId, Set<String> inStock, {required bool keepServings}) {
     if (a.isEmpty) {
       setState(() => _error = a.notes ?? 'Auf dem Foto ist keine Mahlzeit zu erkennen.');
       return;
     }
     setState(() {
       if (_title.text.trim().isEmpty && a.dishTitle.isNotEmpty) _title.text = a.dishTitle;
-      if (!_isEdit && a.mealType != null) _type = a.mealType!;
-      if (a.servingsVisible != null) _made.text = formatQuantity(a.servingsVisible!);
+      if (!_isEdit && !_typeChosen && a.mealType != null) _type = a.mealType!;
+      if (!keepServings && a.servingsVisible != null) _made.text = formatQuantity(a.servingsVisible!);
+      // Ein zweiter Vorschlag ersetzt den ersten, statt ihn zu verdoppeln
+      if (_analysisApplied) _rows.removeWhere((r) => r.source == 'photo_ai');
+      final present = {for (final r in _rows) r.label.trim().toLowerCase()};
       for (final i in a.ingredients) {
+        if (!present.add(i.name.trim().toLowerCase())) continue;
         final product = i.inventoryProductId == null ? null : byId[i.inventoryProductId];
         // Hat das Produkt eigene Naehrwerte, gelten sie. Sonst (die meisten Produkte vom Bon) springt der automatisch
         // zugeordnete BLS-Eintrag ein; ohne beides bleibt die Zeile "unbekannt" (Phase N1, ADR-031).
@@ -451,9 +477,11 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           // Getraenke fuehrt die App in ml; die Naehrwerte der BLS gelten je 100 g, bei Wasserdichte 1 ist das dasselbe
           unit: counted != null ? EntryUnit.piece : ((product != null && product.baseUnit == 'l') || i.isDrink ? EntryUnit.ml : EntryUnit.g),
           // Gekochtes wiegt mehr als das Rohgewicht im Bestand: kein Abzug vorbelegt (Q-28), der Nutzer kann ihn einschalten
-          deduct: product != null && inStock.contains(product.id) && i.state != 'cooked',
+          // Was man nur vermutet, wird auch nicht vom Bestand abgezogen
+          deduct: product != null && inStock.contains(product.id) && i.state != 'cooked' && !i.inferred,
           source: 'photo_ai',
           confidence: i.confidence,
+          inferred: i.inferred,
           per100: match?.per100,
           per100Basis: match == null ? null : 'g',
           blsCode: match?.code,
@@ -918,7 +946,10 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
               avatar: Icon(mealTypeIcon(e.key), size: 18),
               label: Text(e.value),
               selected: _type == e.key,
-              onSelected: (_) => setState(() => _type = e.key),
+              onSelected: (_) => setState(() {
+                _type = e.key;
+                _typeChosen = true;
+              }),
             ),
         ]),
         ListTile(
@@ -1031,6 +1062,15 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
               label: const Text('Foto entfernen'),
             ),
         ]),
+        if (_hasPhoto)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Titel, Notiz, Portionen und Zutaten gehen mit. Trag ein, was du weißt, dann wird der Vorschlag genauer.',
+              key: const Key('meal-analyze-hint'),
+              style: t.textTheme.bodySmall,
+            ),
+          ),
         if (_analyzing) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(key: Key('meal-analyzing'))),
         if (_usual.isNotEmpty)
           Card(
@@ -1070,7 +1110,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
                 const SizedBox(height: 4),
                 const Text(
                   'Die Mengen sind Schätzungen, bitte prüfen. Öl, Butter, Gewürze und die Basis von Soßen sieht man auf einem '
-                  'Foto nicht: fehlt etwas?',
+                  'Foto nicht: Was „vermutet“ ist, gehört meist dazu, stimmt aber nicht immer. Fehlt etwas?',
                 ),
                 if (_analysisNotes != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(_analysisNotes!, key: const Key('meal-analysis-notes'), style: t.textTheme.bodySmall)),
               ]),
@@ -1095,7 +1135,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       if (grams != null) '≈ ${formatQuantity(grams.roundToDouble() == grams ? grams : (grams * 10).round() / 10)} g',
       if (n?.kcal != null) formatKcal(n!.kcal!) else 'Nährwerte unbekannt',
       if (r.deduct && r.product != null) 'vom Bestand',
-      if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
+      if (r.inferred) 'vermutet' else if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
     ];
     // Woher die Naehrwerte stammen, wenn nicht aus dem Namen der Zeile selbst ersichtlich ("Paprika" -> "Gemüsepaprika rot, roh")
     final matched = r.matchName != null && r.matchName != r.label && r.per100 != null && r.product == null;

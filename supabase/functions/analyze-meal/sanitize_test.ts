@@ -6,6 +6,9 @@ import {
   MAX_IMAGE_BASE64_CHARS,
   MAX_INGREDIENTS,
   MAX_PRODUCTS,
+  EMPTY_CONTEXT,
+  MAX_KNOWN_INGREDIENTS,
+  MAX_NOTE_CHARS,
   parseRequest,
   sanitizeAnalysis,
 } from "./sanitize.ts";
@@ -79,7 +82,7 @@ Deno.test("sanitizeAnalysis: normale Antwort bleibt erhalten", () => {
     dish_title: "Reispfanne",
     meal_type_guess: "dinner",
     servings_visible: 2,
-    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8, kind: "food", state: null, count: null, count_unit: "piece" }],
+    ingredients: [{ name: "Reis", inventory_product_id: PRODUCT, est_amount_g: 150, confidence: 0.8, kind: "food", state: null, count: null, count_unit: "piece", search_terms: [], origin: "visible" }],
     notes: "Oel nicht sichtbar",
   });
 });
@@ -202,4 +205,49 @@ Deno.test("sanitizeAnalysis: count_unit nur aus der Liste, sonst Stueck", () => 
     ],
   }, new Set());
   assertEquals(a.ingredients.map((i) => i.count_unit), ["slice", "piece", "piece", "piece"]);
+});
+
+Deno.test("parseRequest: ohne Angaben des Nutzers ist der Kontext leer (aeltere App-Versionen)", () => {
+  const r = parseRequest(valid());
+  assertEquals(r.ok && r.value.context, EMPTY_CONTEXT);
+});
+
+Deno.test("parseRequest: Angaben des Nutzers werden bereinigt und begrenzt", () => {
+  const r = parseRequest({
+    ...valid(),
+    context: {
+      title: "  Pizza\nbrötchen ",
+      note: "x".repeat(MAX_NOTE_CHARS + 10),
+      meal_type: "dinner",
+      servings_made: 400,
+      known_ingredients: ["Paprika", "", 7, ...Array(MAX_KNOWN_INGREDIENTS + 5).fill("Salz")],
+    },
+  });
+  if (!r.ok) throw new Error("erwartet ok");
+  assertEquals(r.value.context.title, "Pizza brötchen");
+  assertEquals(r.value.context.note?.length, MAX_NOTE_CHARS);
+  assertEquals(r.value.context.meal_type, "dinner");
+  assertEquals(r.value.context.servings_made, 50);
+  assertEquals(r.value.context.known_ingredients[0], "Paprika");
+  assertEquals(r.value.context.known_ingredients.length, MAX_KNOWN_INGREDIENTS);
+});
+
+Deno.test("parseRequest: unbrauchbare Angaben fallen weg, ein falscher Typ wird abgelehnt", () => {
+  const r = parseRequest({ ...valid(), context: { title: 5, meal_type: "brunch", servings_made: -1, known_ingredients: "Reis" } });
+  assertEquals(r.ok && r.value.context, EMPTY_CONTEXT);
+  assertEquals(parseRequest({ ...valid(), context: "Pizza" }), { ok: false, error: "invalid_input" });
+  assertEquals(parseRequest({ ...valid(), context: [] }), { ok: false, error: "invalid_input" });
+});
+
+Deno.test("sanitizeAnalysis: andere Namen und Herkunft der Zutat", () => {
+  const a = sanitizeAnalysis({
+    ingredients: [
+      { name: "Rote Beete", search_terms: ["Rote Bete", "rote beete", "Rote Bete", "", 3, "A", "B", "C"], origin: "inferred" },
+      { name: "Reis", origin: "irgendwas" },
+    ],
+  }, new Set());
+  assertEquals(a.ingredients[0].search_terms, ["Rote Bete", "A", "B"]);
+  assertEquals(a.ingredients[0].origin, "inferred");
+  assertEquals(a.ingredients[1].search_terms, []);
+  assertEquals(a.ingredients[1].origin, "visible");
 });

@@ -207,6 +207,73 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('meal-analysis-notes'))).data, 'Öl nicht sichtbar');
   });
 
+  group('Angaben des Nutzers gehen mit', () {
+    testWidgets('Titel, Notiz, gewaehlter Typ und Portionen landen in der Anfrage', (tester) async {
+      cloud.analysis = reispfanne();
+      await openWithPhoto(tester);
+      await tester.enterText(find.byKey(const Key('meal-title')), 'Pizzabrötchen');
+      await tester.enterText(find.byKey(const Key('meal-note')), 'mit Sauerrahm');
+      await tester.enterText(find.byKey(const Key('meal-servings-made')), '4');
+      await tester.tap(find.byKey(const Key('meal-type-snack')));
+      await tester.pumpAndSettle();
+      await analyze(tester);
+
+      final c = cloud.lastContext!;
+      expect(c.title, 'Pizzabrötchen');
+      expect(c.note, 'mit Sauerrahm');
+      expect(c.mealType, 'snack');
+      expect(c.servingsMade, 4);
+      expect(tester.widget<TextField>(find.byKey(const Key('meal-servings-made'))).controller!.text, '4', reason: 'Angabe des Nutzers bleibt');
+      expect(tester.widget<ChoiceChip>(find.byKey(const Key('meal-type-snack'))).selected, isTrue, reason: 'gewaehlter Typ bleibt');
+    });
+
+    testWidgets('ohne Eingaben geht nichts mit: Vorbelegungen sind keine Angaben', (tester) async {
+      cloud.analysis = reispfanne();
+      await openWithPhoto(tester);
+      await analyze(tester);
+      final c = cloud.lastContext!;
+      expect(c.toJson(), isEmpty);
+    });
+
+    testWidgets('das Foto-Formular sagt, dass die Angaben mitgehen', (tester) async {
+      await openWithPhoto(tester);
+      expect(find.byKey(const Key('meal-analyze-hint')), findsOneWidget);
+    });
+
+    testWidgets('ein zweiter Vorschlag ersetzt den ersten und zaehlt ihn nicht als Angabe des Nutzers', (tester) async {
+      cloud.analysis = reispfanne();
+      await openWithPhoto(tester);
+      await analyze(tester);
+      expect(cloud.lastContext!.knownIngredients, isEmpty);
+
+      await analyze(tester);
+      expect(cloud.lastContext!.knownIngredients, isEmpty);
+      expect(find.byKey(const Key('ingredient-row-1')), findsOneWidget);
+      expect(find.byKey(const Key('ingredient-row-2')), findsNothing, reason: 'nichts doppelt');
+    });
+  });
+
+  testWidgets('vermutete Zutat: als solche erkennbar und ohne Abzug vom Bestand', (tester) async {
+    cloud.analysis = MealAnalysis(
+      dishTitle: 'Reispfanne',
+      ingredients: [AnalyzedIngredient(name: 'Reis', inventoryProductId: reis.id, estimatedGrams: 150, confidence: 0.4, inferred: true)],
+    );
+    await openWithPhoto(tester);
+    await analyze(tester);
+    expect(find.text('150 g · 525 kcal · vermutet'), findsOneWidget);
+  });
+
+  test('parseMealAnalysis liest die Herkunft der Zutat', () {
+    final a = parseMealAnalysis({
+      'ingredients': [
+        {'name': 'Oel', 'origin': 'inferred'},
+        {'name': 'Reis', 'origin': 'visible'},
+        {'name': 'Ei'},
+      ],
+    });
+    expect(a.ingredients.map((i) => i.inferred), [true, false, false]);
+  });
+
   testWidgets('ein schon getippter Titel wird nicht ueberschrieben', (tester) async {
     cloud.analysis = reispfanne();
     await openWithPhoto(tester);

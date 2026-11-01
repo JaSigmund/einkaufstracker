@@ -17,8 +17,8 @@ typedef AnalysisProduct = ({String id, String name});
 /// Einwilligung (`allow_cloud_ocr`) und dasselbe Tageslimit teilen.
 abstract class MealAnalysisCloud {
   /// Analysiert das (bereits verkleinerte) JPEG [photo]. [products] sind die Produkte des Haushalts, denen die KI
-  /// Zutaten zuordnen darf. Nur auf Tastendruck aufrufen.
-  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products);
+  /// Zutaten zuordnen darf, [context] ist das, was der Nutzer schon eingetragen hat. Nur auf Tastendruck aufrufen.
+  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products, {MealAnalysisContext context = const MealAnalysisContext()});
 }
 
 class SupabaseMealAnalysisCloud implements MealAnalysisCloud {
@@ -28,7 +28,7 @@ class SupabaseMealAnalysisCloud implements MealAnalysisCloud {
   final Future<String> Function() _householdId;
 
   @override
-  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products) async {
+  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products, {MealAnalysisContext context = const MealAnalysisContext()}) async {
     final household = await _householdId();
     try {
       final response = await _client.functions
@@ -36,8 +36,10 @@ class SupabaseMealAnalysisCloud implements MealAnalysisCloud {
             'household_id': household,
             'image_base64': base64Encode(photo),
             'products': [for (final p in products) {'id': p.id, 'name': p.name}],
+            'context': context.toJson(),
           })
-          .timeout(const Duration(seconds: 60));
+          // Das Modell darf nachdenken, und oft folgt eine zweite Auswahl aus der Lebensmitteldatenbank
+          .timeout(const Duration(seconds: 90));
       final data = response.data;
       if (data is! Map<String, dynamic>) throw const CookingCloudUnavailable('unerwartete Antwort');
       return parseMealAnalysis(data['analysis']);
