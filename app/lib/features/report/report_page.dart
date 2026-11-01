@@ -231,7 +231,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                   dense: true,
                   contentPadding: const EdgeInsets.only(left: 32, right: 16),
                   title: Text(a.label),
-                  subtitle: a.purchases == 0 ? null : Text('${a.purchases}× gekauft'),
+                  subtitle: _articleSubtitle(a),
                   trailing: Text(formatEuro(a.totalCents), style: TextStyle(color: a.totalCents < 0 ? t.colorScheme.primary : null)),
                   onTap: a.productId == null || products[a.productId] == null
                       ? null
@@ -241,6 +241,12 @@ class _ReportPageState extends ConsumerState<ReportPage> {
       ],
     );
   }
+}
+
+/// Packungen und Gesamtmenge eines Artikels; ohne Artikelzeilen (Pfand) nur die Anzahl der Zeilen.
+Widget? _articleSubtitle(ItemAggregate a) {
+  final text = a.amount.describe() ?? (a.purchases == 0 ? null : '${a.purchases}× gekauft');
+  return text == null ? null : Text(text);
 }
 
 /// "Wie setzt sich dieser Betrag zusammen": Berechnung oben, darunter die Zeilen je Bon. Ein Tipp auf den

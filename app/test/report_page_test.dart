@@ -20,8 +20,8 @@ ReceiptItem _item(String rid, String id, int no, String text, int cents, {String
 
 Category _cat(String id, String name) => Category(id: id, householdId: 'h', name: name, sortOrder: 0, isStorable: false, updatedAt: DateTime.utc(2026));
 
-Product _product(String id, String name) =>
-    Product(id: id, householdId: 'h', name: name, baseUnit: 'piece', defaultDateKind: 'best_before', defaultLocation: 'pantry', restock: false, updatedAt: DateTime.utc(2026));
+Product _product(String id, String name, {String baseUnit = 'piece', double? packSize}) =>
+    Product(id: id, householdId: 'h', name: name, baseUnit: baseUnit, packSize: packSize, defaultDateKind: 'best_before', defaultLocation: 'pantry', restock: false, updatedAt: DateTime.utc(2026));
 
 void main() {
   Widget host() => ProviderScope(
@@ -38,7 +38,7 @@ void main() {
                 _item('b', 'i3', 1, 'Karottenbrot', 300, cat: 'b'),
               ])),
           categoriesStreamProvider.overrideWith((ref) => Stream.value([_cat('g', 'Gemüse'), _cat('k', 'Käse'), _cat('b', 'Brot & Backwaren')])),
-          productsStreamProvider.overrideWith((ref) => Stream.value([_product('p1', 'Champignon weiß')])),
+          productsStreamProvider.overrideWith((ref) => Stream.value([_product('p1', 'Champignon weiß', baseUnit: 'kg', packSize: 0.5)])),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(routes: [
@@ -77,6 +77,19 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('report-total'))).data, '3,00 €');
     expect(find.text('Brot & Backwaren'), findsOneWidget);
     expect(find.text('Champignon weiß'), findsNothing); // Auswahl beim Monatswechsel zurueckgesetzt
+  });
+
+  testWidgets('Artikelzeile zeigt die Packungsgroesse, ohne bekannte Groesse nur die Anzahl', (tester) async {
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Gemüse'));
+    await tester.pumpAndSettle();
+    expect(find.text('1× 500 g'), findsOneWidget);
+
+    await tester.tap(find.text('Käse'));
+    await tester.pumpAndSettle();
+    expect(find.text('1× gekauft'), findsOneWidget);
   });
 
   testWidgets('Tippen auf einen zugeordneten Artikel oeffnet das Artikel-Detail (Doku 07 §2)', (tester) async {
