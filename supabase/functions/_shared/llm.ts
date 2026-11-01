@@ -15,7 +15,9 @@ export type Admin = SupabaseClient<any, any, any>;
 /// Preisliste pruefen. Nur Modelle aus dieser Tabelle sind erlaubt.
 export const PRICES: Record<string, { in: number; out: number }> = {
   "claude-haiku-4-5-20251001": { in: 1, out: 5 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
   "claude-sonnet-5": { in: 2, out: 10 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
 };
 
 /// Tageslimit je Haushalt ueber alle KI-Functions (Doku 09 §2, Missbrauchsschutz): ein Aufruf zaehlt als einer, egal wie
@@ -107,10 +109,10 @@ export type ToolUse = { id: string; name: string; input: unknown };
 export type AnthropicReply = { content: { type: string; text?: string; id?: string; name?: string; input?: unknown }[]; usage: Usage };
 
 /// Ruft die Messages-API auf. `null` bei einem Fehler der API (wird protokolliert, ohne den Inhalt der Anfrage).
-/// [deps] nur fuer Tests (eigenes fetch, Schluessel ohne Zugriff auf die Umgebung).
+/// [deps]: fetch und apiKey nur fuer Tests (ohne Zugriff auf die Umgebung), beta fuer den Header anthropic-beta.
 export async function callAnthropic(
   body: Record<string, unknown>,
-  deps: { fetch?: typeof fetch; apiKey?: string } = {},
+  deps: { fetch?: typeof fetch; apiKey?: string; beta?: string } = {},
 ): Promise<AnthropicReply | null> {
   const resp = await (deps.fetch ?? fetch)("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -118,6 +120,7 @@ export async function callAnthropic(
       "x-api-key": deps.apiKey ?? Deno.env.get("ANTHROPIC_API_KEY") ?? "",
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
+      ...(deps.beta ? { "anthropic-beta": deps.beta } : {}),
     },
     body: JSON.stringify(body),
   });
@@ -127,6 +130,8 @@ export async function callAnthropic(
   }
   const result = await resp.json();
   const u = result.usage ?? {};
+  // Bei einer Ablehnung oder ohne Platz fuer die Antwort fehlt der Werkzeugaufruf; der Aufrufer sieht nur noch das Ergebnis
+  if (result.stop_reason !== "tool_use" && result.stop_reason !== "end_turn") console.error("anthropic_stop", result.stop_reason);
   return {
     content: Array.isArray(result.content) ? result.content : [],
     usage: { input_tokens: Number(u.input_tokens ?? 0), output_tokens: Number(u.output_tokens ?? 0) },

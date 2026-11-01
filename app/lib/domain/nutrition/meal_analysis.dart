@@ -20,6 +20,7 @@ class AnalyzedIngredient {
     this.state,
     this.match,
     this.unit,
+    this.inferred = false,
   });
 
   final String name;
@@ -43,6 +44,9 @@ class AnalyzedIngredient {
   /// Bei Stueckware, deren Gewicht der Server kennt: "2 Stk a 59 g" (Phase N2). Dann ersetzt es die Gramm-Schaetzung.
   final AnalyzedUnit? unit;
 
+  /// Nicht auf dem Foto zu sehen, gehoert aber zum Gericht (Bratoel, Dressing). Die App markiert die Zeile und zieht nichts vom Bestand ab.
+  final bool inferred;
+
   bool get isDrink => kind == 'drink';
 }
 
@@ -59,6 +63,32 @@ class MealAnalysis {
 
   /// Auf dem Foto war nichts Essbares zu erkennen (oder das Modell hat keine Zutat geliefert).
   bool get isEmpty => ingredients.isEmpty;
+}
+
+/// Was der Nutzer schon eingetragen hat, bevor er das Foto auswerten laesst. Es geht mit und beschreibt das Gericht oft besser als das
+/// Foto (Pizzabroetchen sieht man den Belag nicht an).
+class MealAnalysisContext {
+  const MealAnalysisContext({this.title, this.note, this.mealType, this.servingsMade, this.knownIngredients = const []});
+
+  final String? title;
+  final String? note;
+
+  /// Nur, wenn der Nutzer den Typ selbst gewaehlt hat. Die Vorbelegung nach der Uhrzeit ist keine Angabe von ihm.
+  final String? mealType;
+
+  /// Nur, wenn der Nutzer die Portionen selbst gesetzt hat. Die Mengen gelten dann fuer alle diese Portionen.
+  final double? servingsMade;
+
+  /// Schon eingetragene Zutaten: Die KI ergaenzt nur, was fehlt.
+  final List<String> knownIngredients;
+
+  Map<String, Object> toJson() => {
+        'title': ?title,
+        'note': ?note,
+        'meal_type': ?mealType,
+        'servings_made': ?servingsMade,
+        if (knownIngredients.isNotEmpty) 'known_ingredients': knownIngredients,
+      };
 }
 
 const _mealTypes = {'breakfast', 'lunch', 'dinner', 'snack', 'drink'};
@@ -88,6 +118,7 @@ MealAnalysis parseMealAnalysis(Object? json) {
         state: state is String && const {'raw', 'cooked', 'ready_made'}.contains(state) ? state : null,
         match: parseFoodMatch(item['match']),
         unit: parseAnalyzedUnit(item['unit']),
+        inferred: item['origin'] == 'inferred',
       ));
     }
   }

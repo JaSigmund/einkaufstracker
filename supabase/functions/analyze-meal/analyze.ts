@@ -3,6 +3,7 @@
 
 import {
   candidatesOf,
+  effectiveState,
   type ChooseItem,
   type FoodRow,
   type Match,
@@ -31,32 +32,51 @@ export type Resolution = {
   stats: { sure: number; auto: number; llm: number; unknown: number };
 };
 
+/// Sucht unter dem Namen der Zutat und, solange es keinen Treffer gibt, unter ihren anderen Namen ("Rote Beete" findet die Suche nicht,
+/// "Rote Bete" schon). Ein Treffer ueber einen anderen Namen gilt nur als automatisch: So hiess die Zutat ja nicht. Er zaehlt auch nur, wenn er den
+/// ganzen anderen Namen abdeckt und kein genauerer Name schon Kandidaten brachte: Die Namen werden allgemeiner, und fuer ein Wassereis fand
+/// "Eis am Stiel" und "Speiseeis" das Vanilleeis (194 kcal), obwohl "Fruchteis" (128 kcal) schon gefunden war. Dann entscheidet die KI-Auswahl.
+/// Enthaelt ein Kandidat alle Woerter des Namens selbst ("Tomatensauce"), bleibt es bei diesen Kandidaten ("Tomatenmark" kommt nicht dazu).
+async function searchAll(name: string, terms: string[], state: State | null, deps: Deps): Promise<{ rows: FoodRow[]; match: Match | null }> {
+  const rows: FoodRow[] = [];
+  let sawCandidates = false;
+  for (const [i, term] of [name, ...terms].entries()) {
+    let found: FoodRow[] = [];
+    try {
+      found = await deps.search(searchQuery(term, effectiveState(term, state)));
+    } catch (e) {
+      console.error("search_failed", term, e);
+    }
+    rows.push(...found);
+    const match = pickMatch(found, effectiveState(term, state));
+    if (match && (i === 0 || (!sawCandidates && found.find((r) => r.bls_code === match.code)!.coverage >= 1))) {
+      return { rows, match: i === 0 ? match : { ...match, method: "search", trust: "auto" } };
+    }
+    if (i === 0 && found.some((r) => r.coverage >= 1)) break;
+    sawCandidates ||= found.length > 0;
+  }
+  return { rows, match: null };
+}
+
 /// Ordnet die erkannten Zutaten Eintraegen der Lebensmitteldatenbank zu: erst die Suche (sichere und automatische Treffer
-/// gelten), dann fuer den Rest die KI-Auswahl aus den Kandidaten, sonst unbekannt.
+/// gelten, wenn sie zum Zustand passen), dann fuer den Rest die KI-Auswahl aus den Kandidaten, sonst unbekannt.
 export async function resolveIngredients(
-  ingredients: { name: string; state: State | null }[],
+  ingredients: { name: string; state: State | null; search_terms?: string[] }[],
   deps: Deps,
 ): Promise<Resolution> {
-  const rows: FoodRow[][] = await Promise.all(
-    ingredients.map(async (i) => {
-      try {
-        return await deps.search(searchQuery(i.name, i.state));
-      } catch (e) {
-        console.error("search_failed", i.name, e);
-        return [];
-      }
-    }),
-  );
+  const found = await Promise.all(ingredients.map((i) => searchAll(i.name, i.search_terms ?? [], i.state, deps)));
+  const rows: FoodRow[][] = found.map((f) => f.rows);
 
-  const matches: (Match | null)[] = rows.map((r) => pickMatch(r));
+  const matches: (Match | null)[] = found.map((f) => f.match);
   const stats = { sure: 0, auto: 0, llm: 0, unknown: 0 };
 
   // Fuer alle ohne sicheren Treffer, aber mit Kandidaten: eine gemeinsame KI-Auswahl
   const items: ChooseItem[] = [];
   rows.forEach((r, index) => {
     if (matches[index] !== null) return;
-    const candidates = candidatesOf(r);
-    if (candidates.length > 0) items.push({ index, name: ingredients[index].name, state: ingredients[index].state, candidates });
+    const state = effectiveState(ingredients[index].name, ingredients[index].state);
+    const candidates = candidatesOf(r, state);
+    if (candidates.length > 0) items.push({ index, name: ingredients[index].name, state, candidates });
   });
 
   let usage: Usage | null = null;

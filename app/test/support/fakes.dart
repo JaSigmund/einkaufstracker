@@ -664,12 +664,14 @@ class FakeMealAnalysisCloud implements MealAnalysisCloud {
   int calls = 0;
   Uint8List? lastPhoto;
   List<AnalysisProduct>? lastProducts;
+  MealAnalysisContext? lastContext;
 
   @override
-  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products) async {
+  Future<MealAnalysis> analyze(Uint8List photo, List<AnalysisProduct> products, {MealAnalysisContext context = const MealAnalysisContext()}) async {
     calls++;
     lastPhoto = photo;
     lastProducts = products;
+    lastContext = context;
     if (error != null) throw error!;
     return analysis;
   }
