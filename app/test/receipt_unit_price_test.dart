@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/domain/receipt/parsed_receipt.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,6 +104,24 @@ void main() {
       ));
       final second = (await (db.select(db.receiptItems)..where((i) => i.kind.equals('article'))).get()).firstWhere((i) => i.id != first.id);
       expect(second.unitPriceNormCents, 1327); // 199 / 0,15
+    });
+
+    test('Packungsgroesse aus dem Bon-Text: zwei Groessen desselben Produkts ergeben je den richtigen Grundpreis', () async {
+      final products = productRepo(db);
+      final repo = receiptRepo(db, productRepo: products, inventoryRepo: inventoryRepo(db));
+      final zwiebeln = await products.create(name: 'Zwiebeln gelb', baseUnit: 'kg', packSize: 1);
+      // Der Alias-Schluessel enthaelt keine Gewichtsangabe: beide Bon-Texte landen beim selben Produkt
+      await db.into(db.productAliases).insert(ProductAliasesCompanion.insert(
+          id: 'a1', householdId: 'h1', aliasText: 'zwiebeln gelb', productId: zwiebeln.id, updatedAt: appClock.now().toUtc()));
+
+      await repo.saveParsed(_receipt([
+        const ParsedItem(rawText: 'Zwiebeln gelb 1kg', kind: ReceiptItemKind.article, lineTotalCents: 123, quantity: 1, quantityUnit: 'piece'),
+        const ParsedItem(rawText: 'Zwiebeln gelb 3kg', kind: ReceiptItemKind.article, lineTotalCents: 199, quantity: 1, quantityUnit: 'piece'),
+      ]));
+
+      final items = await (db.select(db.receiptItems)..where((i) => i.kind.equals('article'))..orderBy([(i) => OrderingTerm.asc(i.lineNo)])).get();
+      expect(items.map((i) => i.productId), everyElement(zwiebeln.id));
+      expect(items.map((i) => i.unitPriceNormCents), [123, 66]);
     });
 
     test('Marke wird vom Produkt uebernommen', () async {

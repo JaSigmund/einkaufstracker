@@ -45,5 +45,98 @@ void main() {
     test('Menge 0: kein Grundpreis (Division durch 0 vermeiden)', () {
       expect(computeUnitPriceNormCents(lineTotalCents: 129, quantity: 0, quantityUnit: 'kg', productBaseUnit: 'kg'), isNull);
     });
+
+    test('Bon-Text geht packSize vor: Zwiebeln 3 kg bei einem Produkt, das mit 1 kg angelegt ist', () {
+      final price = computeUnitPriceNormCents(
+          lineTotalCents: 199, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'kg', packSize: 1, rawText: 'Zwiebeln gelb 3kg');
+      expect(price, 66); // 1,99 EUR / 3 kg
+    });
+
+    test('Bon-Text ohne Mengenangabe: packSize gilt', () {
+      final price = computeUnitPriceNormCents(
+          lineTotalCents: 199, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'kg', packSize: 0.5, rawText: 'Zwiebeln gelb');
+      expect(price, 398);
+    });
+
+    test('Bon-Text liefert den Inhalt, auch wenn das Produkt keinen packSize hat', () {
+      final price = computeUnitPriceNormCents(
+          lineTotalCents: 399, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'kg', rawText: 'Heidelbeeren 300g');
+      expect(price, 1330);
+    });
+
+    test('Mehrfachpackung aus dem Bon-Text, mehrere gekaufte Packungen', () {
+      final price = computeUnitPriceNormCents(
+          lineTotalCents: 798, quantity: 2, quantityUnit: 'piece', productBaseUnit: 'kg', rawText: 'Tyrolini mild 4x40g');
+      expect(price, 2494); // 7,98 EUR / (2 * 0,16 kg)
+    });
+
+    test('Einheit im Bon-Text passt nicht zur Basiseinheit: packSize gilt, der Grundpreis bleibt je Stueck', () {
+      expect(
+          computeUnitPriceNormCents(lineTotalCents: 249, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'piece', packSize: 4, rawText: 'Paprika 500g'),
+          62);
+      expect(computeUnitPriceNormCents(lineTotalCents: 249, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'piece', rawText: 'Rote Papr i ka 500g'), 249);
+      expect(computeUnitPriceNormCents(lineTotalCents: 129, quantity: 1, quantityUnit: 'piece', productBaseUnit: 'l', rawText: 'Kaese 200g'), isNull);
+    });
+
+    test('Wiegeware: die Bon-Menge zaehlt, eine Angabe im Text aendert nichts', () {
+      final price = computeUnitPriceNormCents(lineTotalCents: 249, quantity: 0.62, quantityUnit: 'kg', productBaseUnit: 'kg', rawText: 'Trauben 500g');
+      expect(price, 402);
+    });
+  });
+
+  group('parsePackSizeFromReceiptText', () {
+    // Schreibweisen von echten Bons (Stand der Produktbereinigung 2026-11-01)
+    const realTexts = <String, ReceiptPackSize>{
+      'Zwiebeln gelb 3kg': (amount: 3, unit: 'kg'),
+      'IC DKIH Zwiebel gelb 1kg': (amount: 1, unit: 'kg'),
+      'Heidelbeeren 300g': (amount: 0.3, unit: 'kg'),
+      'BM GUACAMOLE 150 G': (amount: 0.15, unit: 'kg'),
+      'SG RUCOLA SALAT 125G': (amount: 0.125, unit: 'kg'),
+      'CV FASCHIERTES GEM.500G': (amount: 0.5, unit: 'kg'),
+      'Chips Papr i ka 250g': (amount: 0.25, unit: 'kg'),
+      'Tyrolini mild 4x40g': (amount: 0.16, unit: 'kg'),
+      'BIO-MW Milch 1l': (amount: 1, unit: 'l'),
+      'HAPPY DAY WINTERAPFEL 1 L': (amount: 1, unit: 'l'),
+    };
+    for (final e in realTexts.entries) {
+      test(e.key, () {
+        final size = parsePackSizeFromReceiptText(e.key)!;
+        expect(size.amount, closeTo(e.value.amount, 1e-9));
+        expect(size.unit, e.value.unit);
+      });
+    }
+
+    test('weitere Schreibweisen: Komma, Punkt, dag, ml, cl, Mehrfachpackung mit Leerzeichen', () {
+      expect(parsePackSizeFromReceiptText('Mineral 0,5l')!.amount, 0.5);
+      expect(parsePackSizeFromReceiptText('Cola 1.5 L')!.amount, 1.5);
+      expect(parsePackSizeFromReceiptText('Extrawurst 20 dag')!.amount, closeTo(0.2, 1e-9));
+      expect(parsePackSizeFromReceiptText('Wurst 15dkg')!.amount, closeTo(0.15, 1e-9));
+      expect(parsePackSizeFromReceiptText('Hafer 250 ml'), (amount: 0.25, unit: 'l'));
+      expect(parsePackSizeFromReceiptText('Bier 33cl'), (amount: 0.33, unit: 'l'));
+      expect(parsePackSizeFromReceiptText('Joghurt 4 X 150G')!.amount, closeTo(0.6, 1e-9));
+    });
+
+    test('keine Mengenangabe, auch wenn Ziffern im Text stehen', () {
+      for (final text in [
+        'Faschiertes',
+        'FLASCHE 0.20',
+        'IC CV Champig. 3.Wahl',
+        'Frisch gekocht November 2',
+        'Eier BH 10er',
+        'IC Knoppers Kokosr. 3er',
+        'Vollmilch 3,5%',
+        'H2O Limo',
+        'Gurke Stk.',
+        '1 Liebe',
+        'Kaese 0g',
+      ]) {
+        expect(parsePackSizeFromReceiptText(text), isNull, reason: text);
+      }
+    });
+
+    test('mehrere verschiedene Angaben sind unklar, dieselbe doppelt nicht', () {
+      expect(parsePackSizeFromReceiptText('Thunfisch 185g 140g'), isNull);
+      expect(parsePackSizeFromReceiptText('Thunfisch 0,5kg 500g'), (amount: 0.5, unit: 'kg'));
+    });
   });
 }

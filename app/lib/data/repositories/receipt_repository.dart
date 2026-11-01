@@ -272,6 +272,7 @@ class ReceiptRepository {
                 quantityUnit: i.quantityUnit,
                 productBaseUnit: product.baseUnit,
                 packSize: product.packSize,
+                rawText: i.rawText,
               );
 
         await putItem(ReceiptItem(
