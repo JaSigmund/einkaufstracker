@@ -51,11 +51,17 @@ class _BugReportPageState extends ConsumerState<BugReportPage> {
     try {
       final sync = ref.read(syncControllerProvider);
       final pending = ref.read(pendingChangesProvider).value ?? 0;
+      final db = ref.read(databaseProvider);
+      final outbox = await db.select(db.outbox).get();
       final appInfo = collectAppInfo(
         route: _area,
         pendingChanges: pending,
         lastSyncError: sync.errorDetail ?? sync.error,
         lastSyncAt: sync.lastSync,
+        rejectedChanges: [
+          for (final e in outbox)
+            if (e.lastError != null) {'table': e.remoteTable, 'row_id': e.rowId, 'attempts': e.attempts, 'error': e.lastError},
+        ],
       );
       final snapshot = _includeSnapshot ? await buildDataSnapshot(ref.read(databaseProvider)) : null;
 

@@ -586,7 +586,6 @@ def main():
     check("Gedaechtnis: Haushalt B sieht die Zuordnung von A nicht, bekommt das Synonym", r == ("G543100", "synonym"), str(r))
     check("Gedaechtnis: B sieht die Zeile nicht", one("select count(*) from household_food_links", user=B) == 0)
     check("Gedaechtnis: B kann nicht in Haushalt A schreiben", raises(ins_food_link, (ha, "x", paprika_gruen), user=B))
-    check("Gedaechtnis: je Haushalt und Name nur eine aktive Zeile", raises(ins_food_link, (ha, one("select public.food_key('Paprika')"), "G542100"), user=A))
     r = db("select bls_code, method from search_bls_foods('Paprika', 1, %s)", (ha,))[0][0]
     check("Gedaechtnis: mit Haushaltsangabe (Service-Aufruf) wird das Gedaechtnis dieses Haushalts genutzt", r == (paprika_gruen, "memory"), str(r))
     r = db("select bls_code, method from search_bls_foods('Paprika', 1, %s)", (hb,))[0][0]
@@ -605,8 +604,20 @@ def main():
     db(ins_food_link, (ha, "Frische Rote Paprika", "G543100"))
     check("Gedaechtnis: der Name wird beim Speichern zum Schluessel (Frische Rote Paprika -> paprika rot)",
           one("select name_norm from household_food_links where household_id = %s", (ha,)) == "paprika rot")
-    check("Gedaechtnis: derselbe Name in anderer Schreibweise ist dieselbe Zeile (Unique-Index nach der Normalisierung)",
-          raises(ins_food_link, (ha, "paprika, ROTE", "G542100")))
+    # Die App kennt den Schluessel nicht und legt dafuer eine neue Zeile an: die darf nie dauerhaft in der Outbox haengen bleiben (0031)
+    check("Gedaechtnis: derselbe Name in anderer Schreibweise wird angenommen", not raises(ins_food_link, (ha, "paprika, ROTE", "G542100"), user=A))
+    check("Gedaechtnis: die neue Zuordnung gilt",
+          one("select bls_code from household_food_links where deleted_at is null and household_id = %s", (ha,)) == "G542100")
+    check("Gedaechtnis: es bleibt eine aktive Zeile, die alte ist weich geloescht",
+          one("select count(*) filter (where deleted_at is null) || '/' || count(*) from household_food_links where household_id = %s", (ha,)) == "1/2")
+    db("update household_food_links set unit_weight_g = 150 where deleted_at is null and household_id = %s", (ha,))
+    db(ins_food_link, (ha, "Rote Paprika", "G542100"))
+    check("Gedaechtnis: bei gleichem Eintrag bleibt das Stueckgewicht",
+          float(one("select unit_weight_g from household_food_links where deleted_at is null and household_id = %s", (ha,))) == 150.0)
+    db(ins_food_link, (ha, "Rote Paprika", "G543100"))
+    check("Gedaechtnis: bei anderem Eintrag faellt das Stueckgewicht weg",
+          one("select unit_weight_g from household_food_links where deleted_at is null and household_id = %s", (ha,)) is None)
+    db("delete from household_food_links where deleted_at is not null and household_id = %s", (ha,))
     check("Gedaechtnis: ein Name ohne Kernwoerter wird abgelehnt", raises(ins_food_link, (ha, "200 g", "G543100")))
     db("update household_food_links set name_norm = 'Gelbe Paprika' where household_id = %s", (ha,))
     check("Gedaechtnis: auch beim Aendern des Namens", one("select name_norm from household_food_links where household_id = %s", (ha,)) == "gelb paprika")

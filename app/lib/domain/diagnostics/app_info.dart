@@ -13,6 +13,7 @@ Map<String, dynamic> collectAppInfo({
   required int pendingChanges,
   String? lastSyncError,
   DateTime? lastSyncAt,
+  List<Map<String, dynamic>> rejectedChanges = const [],
 }) {
   final now = appClock.now().toUtc();
   return {
@@ -22,6 +23,8 @@ Map<String, dynamic> collectAppInfo({
     'pending_changes': pendingChanges,
     'last_sync_error': lastSyncError,
     'last_sync_at': lastSyncAt?.toIso8601String(),
+    // Der Banner schickt bei abgelehnten Aenderungen zum Fehlerbericht, dort ist last_sync_error aber leer: der Grund muss hierher
+    'rejected_changes': rejectedChanges,
     'reported_at_utc': now.toIso8601String(),
   };
 }
