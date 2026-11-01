@@ -33,9 +33,13 @@ export type Resolution = {
 };
 
 /// Sucht unter dem Namen der Zutat und, solange es keinen Treffer gibt, unter ihren anderen Namen ("Rote Beete" findet die Suche nicht,
-/// "Rote Bete" schon). Ein Treffer ueber einen anderen Namen gilt nur als automatisch: So hiess die Zutat ja nicht.
+/// "Rote Bete" schon). Ein Treffer ueber einen anderen Namen gilt nur als automatisch: So hiess die Zutat ja nicht. Er zaehlt auch nur, wenn er den
+/// ganzen anderen Namen abdeckt und kein genauerer Name schon Kandidaten brachte: Die Namen werden allgemeiner, und fuer ein Wassereis fand
+/// "Eis am Stiel" und "Speiseeis" das Vanilleeis (194 kcal), obwohl "Fruchteis" (128 kcal) schon gefunden war. Dann entscheidet die KI-Auswahl.
+/// Enthaelt ein Kandidat alle Woerter des Namens selbst ("Tomatensauce"), bleibt es bei diesen Kandidaten ("Tomatenmark" kommt nicht dazu).
 async function searchAll(name: string, terms: string[], state: State | null, deps: Deps): Promise<{ rows: FoodRow[]; match: Match | null }> {
   const rows: FoodRow[] = [];
+  let sawCandidates = false;
   for (const [i, term] of [name, ...terms].entries()) {
     let found: FoodRow[] = [];
     try {
@@ -45,7 +49,11 @@ async function searchAll(name: string, terms: string[], state: State | null, dep
     }
     rows.push(...found);
     const match = pickMatch(found, effectiveState(term, state));
-    if (match) return { rows, match: i === 0 ? match : { ...match, method: "search", trust: "auto" } };
+    if (match && (i === 0 || (!sawCandidates && found.find((r) => r.bls_code === match.code)!.coverage >= 1))) {
+      return { rows, match: i === 0 ? match : { ...match, method: "search", trust: "auto" } };
+    }
+    if (i === 0 && found.some((r) => r.coverage >= 1)) break;
+    sawCandidates ||= found.length > 0;
   }
   return { rows, match: null };
 }

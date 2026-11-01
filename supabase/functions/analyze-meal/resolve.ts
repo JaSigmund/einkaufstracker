@@ -12,7 +12,8 @@
 // mit passendem Code hat. Solche Treffer gehen deshalb in die KI-Auswahl (stateFits).
 // Die KI schaetzt hier keine Naehrwerte. Die kommen ausschliesslich aus der Datenbank.
 
-export const MAX_CANDIDATES = 8;
+// Grosszuegig: Mehrere Suchnamen fuellen die Liste, und die Auswahl laeuft auf dem guenstigen Modell.
+export const MAX_CANDIDATES = 14;
 
 export type State = "raw" | "cooked" | "ready_made";
 
@@ -119,7 +120,7 @@ export function searchQuery(name: string, state: State | null): string {
 
 // Isst man nicht roh oder trocken. Sagt das Modell "roh", "unbekannt" oder "fertig gekauft" (Kidneybohnen aus der Dose), wuerde die Suche
 // den trockenen Eintrag mit der zweieinhalbfachen Energie finden.
-const NEVER_DRY = /(^|[\s-])(\S*reis|nudeln?|spaghetti|penne|fusilli|tagliatelle|pasta|gnocchi|linsen?|kichererbsen?|kidneybohnen?|wei(ß|ss)e bohnen|schwarze bohnen|quinoa|couscous|bulgur|hirse|polenta|graupen)$/i;
+const NEVER_DRY = /(^|[\s-])((basmati|jasmin|langkorn|rundkorn|natur|vollkorn|wild)?reis|nudeln?|spaghetti|penne|fusilli|tagliatelle|pasta|gnocchi|linsen?|kichererbsen?|kidneybohnen?|wei(ß|ss)e bohnen|schwarze bohnen|quinoa|couscous|bulgur|hirse|polenta|graupen)$/i;
 
 /// Der Zustand, mit dem gesucht wird: bei Reis, Nudeln, Huelsenfruechten und Getreide auf dem Teller immer gekocht.
 export function effectiveState(name: string, state: State | null): State | null {

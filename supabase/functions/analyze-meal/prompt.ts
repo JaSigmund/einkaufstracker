@@ -19,7 +19,7 @@ Zutaten:
 - kind ist "drink" fuer Getraenke, sonst "food".
 
 Mengen:
-- est_amount_g ist die Menge in Gramm (Getraenke in Millilitern) fuer das GANZE Gericht auf dem Foto, wie sie auf dem Teller liegt: gekochter Reis gekocht gewogen. Hat der Nutzer die gekochten Portionen genannt, gilt die Menge fuer alle diese Portionen: Zeigt das Foto nur einen Teller davon, rechnest du hoch.
+- est_amount_g ist die Menge in Gramm (Getraenke in Millilitern) fuer das GANZE Gericht auf dem Foto, wie sie auf dem Teller liegt: gekochter Reis gekocht gewogen. Hat der Nutzer die gekochten Portionen genannt, gilt die Menge fuer alle diese Portionen: Zeigt das Foto nur einen Teller davon, rechnest du hoch. Ist die Portion angebrochen oder schon teilweise gegessen (angebissenes Brot, halb leere Pommes-Tuete), schaetzt du die ganze urspruengliche Portion, denn es zaehlt, was gegessen wird.
 - Leite die Menge von Bezugsgroessen im Bild ab, bevor du dich festlegst: Essteller etwa 26 cm, tiefer Teller oder Bowl etwa 20 cm, Gabel etwa 20 cm, Glas etwa 250 ml, Dose 250 oder 330 ml. Schaetze zuerst Flaeche und Hoehe, dann das Gewicht. Uebliche Portionen zur Kontrolle: Reis oder Nudeln gekocht 150 bis 300 g, Fleisch 100 bis 200 g, Gemuesebeilage 100 bis 200 g, Salat 50 bis 150 g, Scheibe Brot 40 bis 50 g, Scheibe Kaese oder Schinken 20 bis 30 g.
 - Lege dich immer auf eine Zahl fest. 0 nur, wenn du wirklich gar nichts ableiten kannst.
 - count ist die Anzahl bei zaehlbarer Stueckware (2 Eier, 1 Banane, 3 Scheiben Brot, 2 EL Oel), sonst 0; count_unit ist dann "piece", "slice", "tbsp", "tsp", "clove", "head" oder "stalk". Auch dann schaetzt du est_amount_g.

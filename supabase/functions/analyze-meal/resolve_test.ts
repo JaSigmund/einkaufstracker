@@ -81,12 +81,12 @@ Deno.test("pickMatch: nur Rang 1 zaehlt, auch wenn die Liste anders sortiert ist
   assertEquals(pickMatch(rows)?.code, "A");
 });
 
-Deno.test("candidatesOf: hoechstens acht, ohne doppelte Codes, in Reihenfolge", () => {
-  const rows = Array.from({ length: 12 }, (_, i) => row({ bls_code: `C${i}`, name_de: `n${i}`, rank: i + 1 }));
+Deno.test("candidatesOf: begrenzt, ohne doppelte Codes, in Reihenfolge", () => {
+  const rows = Array.from({ length: MAX_CANDIDATES + 4 }, (_, i) => row({ bls_code: `C${i}`, name_de: `n${i}`, rank: i + 1 }));
   rows.splice(3, 0, row({ bls_code: "C1", name_de: "doppelt", rank: 4 }));
   const c = candidatesOf(rows);
   assertEquals(c.length, MAX_CANDIDATES);
-  assertEquals(c.map((x) => x.code), ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7"]);
+  assertEquals(c.map((x) => x.code), Array.from({ length: MAX_CANDIDATES }, (_, i) => `C${i}`));
   assertEquals(c[1].name, "n1");
 });
 
@@ -283,6 +283,7 @@ Deno.test("effectiveState: Reis, Nudeln und Huelsenfruechte sind nie trocken auf
   assertEquals(effectiveState("Linsen", "raw"), "cooked");
   assertEquals(effectiveState("Schwarze Bohnen", null), "cooked");
   assertEquals(effectiveState("Reiswaffel", "ready_made"), "ready_made");
+  assertEquals(effectiveState("Wassereis", "ready_made"), "ready_made");
   assertEquals(effectiveState("Tomate", "raw"), "raw");
 });
 
@@ -343,4 +344,33 @@ Deno.test("resolveIngredients: Kidneybohnen aus der Dose werden als gekocht gesu
     choose: () => Promise.resolve(null),
   });
   assertEquals(queries, ["Kidneybohnen gekocht"]);
+});
+
+Deno.test("resolveIngredients: ein anderer Name zaehlt nur, wenn er ganz abgedeckt ist (echter Fall Wassereis)", async () => {
+  const vanille = row({ bls_code: "S241000", name_de: "Vanilleeis", method: "synonym", confidence: "auto", coverage: 0.99, kcal: 194 });
+  const frucht = row({ bls_code: "S300000", name_de: "Fruchteis", rank: 1, coverage: 1 });
+  const seen: ChooseItem[][] = [];
+  const res = await resolveIngredients([{ name: "Wassereis", state: "ready_made", search_terms: ["Eis am Stiel", "Fruchteis"] }], {
+    search: (q) => Promise.resolve(q === "Eis am Stiel" ? [vanille] : q === "Fruchteis" ? [frucht] : []),
+    choose: (items) => {
+      seen.push(items);
+      return Promise.resolve({ choices: { choices: [{ index: 0, bls_code: "S300000", confidence: 0.8 }] }, usage });
+    },
+  });
+  assertEquals(seen[0][0].candidates.map((c) => c.code).sort(), ["S241000", "S300000"]);
+  assertEquals(res.matches[0]?.code, "S300000");
+});
+
+Deno.test("resolveIngredients: passt ein Kandidat zum ganzen Namen, gewinnt kein anderer Name (echter Fall Tomatensauce)", async () => {
+  const queries: string[] = [];
+  const sauce = row({ bls_code: "X331353", name_de: "Tomatensauce italienische Art", confidence: "unsure", coverage: 1, kcal: 55 });
+  const res = await resolveIngredients([{ name: "Tomatensauce", state: "ready_made", search_terms: ["Tomatenmark"] }], {
+    search: (q) => {
+      queries.push(q);
+      return Promise.resolve([sauce]);
+    },
+    choose: () => Promise.resolve({ choices: { choices: [{ index: 0, bls_code: "X331353", confidence: 0.8 }] }, usage }),
+  });
+  assertEquals(queries, ["Tomatensauce"]);
+  assertEquals(res.matches[0]?.code, "X331353");
 });

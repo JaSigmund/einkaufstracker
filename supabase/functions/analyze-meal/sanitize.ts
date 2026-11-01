@@ -130,6 +130,30 @@ const text = (v: unknown, max: number): string | null => {
 
 const number = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
+/// Dieselbe Zutat in zwei Schalen kommt als eine Zeile mit der Summe der Mengen (Rotkohl in der Bowl und im Salat). Die Zaehlung entfaellt, wenn
+/// nicht beide gezaehlt sind; die Sicherheit ist die kleinere.
+function mergeSameName(items: Ingredient[]): Ingredient[] {
+  const byName = new Map<string, Ingredient>();
+  for (const i of items) {
+    const key = i.name.toLowerCase();
+    const seen = byName.get(key);
+    if (!seen) {
+      byName.set(key, i);
+      continue;
+    }
+    const grams = (seen.est_amount_g ?? 0) + (i.est_amount_g ?? 0);
+    byName.set(key, {
+      ...seen,
+      est_amount_g: grams === 0 ? null : Math.min(grams, MAX_AMOUNT_G),
+      count: seen.count !== null && i.count !== null && seen.count_unit === i.count_unit ? Math.min(MAX_COUNT, seen.count + i.count) : null,
+      confidence: Math.min(seen.confidence, i.confidence),
+      search_terms: [...new Set([...seen.search_terms, ...i.search_terms])].slice(0, MAX_SEARCH_TERMS),
+      origin: seen.origin === "visible" || i.origin === "visible" ? "visible" : "inferred",
+    });
+  }
+  return [...byName.values()];
+}
+
 /// Bereinigt die Tool-Antwort des Modells. Verwirft einzelne kaputte Zutaten statt die ganze Antwort, begrenzt
 /// Zahlen und laesst nur Produkt-IDs durch, die die App selbst mitgeschickt hat.
 export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): Analysis {
@@ -168,6 +192,7 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
       });
     }
   }
+  const merged = mergeSameName(ingredients);
   const guess = typeof r.meal_type_guess === "string" && (MEAL_TYPES as readonly string[]).includes(r.meal_type_guess)
     ? r.meal_type_guess
     : null;
@@ -176,7 +201,7 @@ export function sanitizeAnalysis(raw: unknown, allowedProductIds: Set<string>): 
     dish_title: text(r.dish_title, 120) ?? "",
     meal_type_guess: guess,
     servings_visible: servings === null || servings <= 0 ? null : Math.min(servings, 50),
-    ingredients,
+    ingredients: merged,
     notes: text(r.notes, 500),
   };
 }

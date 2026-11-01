@@ -251,3 +251,24 @@ Deno.test("sanitizeAnalysis: andere Namen und Herkunft der Zutat", () => {
   assertEquals(a.ingredients[1].search_terms, []);
   assertEquals(a.ingredients[1].origin, "visible");
 });
+
+Deno.test("sanitizeAnalysis: dieselbe Zutat in zwei Schalen wird zusammengezaehlt (echter Fall Vitamin-Bowl)", () => {
+  const a = sanitizeAnalysis({
+    ingredients: [
+      { name: "Rotkohl", est_amount_g: 120, confidence: 0.6, origin: "visible" },
+      { name: "Reis", est_amount_g: 100, confidence: 0.8 },
+      { name: "rotkohl", est_amount_g: 60, confidence: 0.4, origin: "inferred" },
+    ],
+  }, new Set());
+  assertEquals(a.ingredients.map((i) => i.name), ["Rotkohl", "Reis"]);
+  assertEquals(a.ingredients[0].est_amount_g, 180);
+  assertEquals(a.ingredients[0].confidence, 0.4);
+  assertEquals(a.ingredients[0].origin, "visible");
+});
+
+Deno.test("sanitizeAnalysis: zusammengezaehlt bleibt die Zaehlung nur, wenn beide gezaehlt sind", () => {
+  const beide = sanitizeAnalysis({ ingredients: [{ name: "Ei", count: 1, count_unit: "piece" }, { name: "Ei", count: 2, count_unit: "piece" }] }, new Set());
+  assertEquals(beide.ingredients[0].count, 3);
+  const einer = sanitizeAnalysis({ ingredients: [{ name: "Ei", count: 1 }, { name: "Ei", est_amount_g: 50 }] }, new Set());
+  assertEquals(einer.ingredients[0].count, null);
+});
