@@ -340,8 +340,9 @@ class ProductRepository {
     onChanged?.call();
   }
 
-  /// Fuehrt zwei Duplikate zusammen (Doku 07 §4.3): alle Bons, Inventar-Eintraege, Einkaufslisten-Positionen,
-  /// Barcodes und gelernten Alias-Zuordnungen von [sourceId] werden auf [targetId] umgehaengt, danach wird
+  /// Fuehrt zwei Duplikate zusammen (Doku 07 §4.3): alle Bons, Inventar-Eintraege und -Bewegungen,
+  /// Mahlzeiten-Zutaten, Einkaufslisten-Positionen, Barcodes, Online-Verknuepfungen und gelernten
+  /// Alias-Zuordnungen von [sourceId] werden auf [targetId] umgehaengt, danach wird
   /// [sourceId] geloescht wie bei [softDelete]. So bleibt die Kaufhistorie (und damit der Grundpreis-Verlauf,
   /// Doku 07 §3) unter einem einzigen Produkt vereint, statt auf zwei Eintraege verstreut zu sein.
   Future<void> mergeInto(String sourceId, String targetId) async {
@@ -363,6 +364,18 @@ class ProductRepository {
       for (final item in inventoryItems) {
         final updated = item.copyWith(productId: targetId, updatedAt: now);
         await _put('inventory_items', updated.id, inventoryItemToRemote(updated), () => _db.into(_db.inventoryItems).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+
+      final movements = await (_db.select(_db.inventoryMovements)..where((m) => m.productId.equals(sourceId))).get();
+      for (final movement in movements) {
+        final updated = movement.copyWith(productId: targetId, updatedAt: now);
+        await _put('inventory_movements', updated.id, inventoryMovementToRemote(updated), () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+
+      final ingredients = await (_db.select(_db.mealIngredients)..where((i) => i.productId.equals(sourceId))).get();
+      for (final ingredient in ingredients) {
+        final updated = ingredient.copyWith(productId: Value(targetId), updatedAt: now);
+        await _put('meal_ingredients', updated.id, mealIngredientToRemote(updated), () => _db.into(_db.mealIngredients).insertOnConflictUpdate(updated.toCompanion(false)));
       }
 
       final listItems = await (_db.select(_db.shoppingListItems)..where((i) => i.productId.equals(sourceId))).get();
@@ -394,6 +407,19 @@ class ProductRepository {
           final updated = alias.copyWith(productId: targetId, updatedAt: now);
           await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
         }
+      }
+
+      // Ein Online-Artikel ist je Produkt nur einmal aktiv verknuepft (Index product_online_links_active auf dem
+      // Server): hat das Zielprodukt ihn schon, wird die Zeile der Quelle geloescht statt umgehaengt, sonst
+      // scheitert der Sync an der Eindeutigkeit.
+      final links = await (_db.select(_db.productOnlineLinks)..where((l) => l.productId.equals(sourceId) & l.deletedAt.isNull())).get();
+      for (final link in links) {
+        final clash = await (_db.select(_db.productOnlineLinks)
+              ..where((l) =>
+                  l.householdId.equals(link.householdId) & l.productId.equals(targetId) & l.store.equals(link.store) & l.externalId.equals(link.externalId) & l.deletedAt.isNull()))
+            .get();
+        final updated = clash.isNotEmpty ? link.copyWith(deletedAt: Value(now), updatedAt: now) : link.copyWith(productId: targetId, updatedAt: now);
+        await _put('product_online_links', updated.id, productOnlineLinkToRemote(updated), () => _db.into(_db.productOnlineLinks).insertOnConflictUpdate(updated.toCompanion(false)));
       }
 
       await softDelete(sourceId);
