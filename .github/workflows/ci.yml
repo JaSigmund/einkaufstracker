@@ -189,4 +189,5 @@ jobs:
         run: |
           python tools/test_check_repo_hygiene.py
           python tools/test_check_coverage.py
+          python tools/test_resumable_upload.py
           python tools/test_import_bls_foods.py

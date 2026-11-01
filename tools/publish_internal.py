@@ -23,9 +23,12 @@ import os
 import sys
 from pathlib import Path
 
+import httplib2
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+
+from resumable_upload import ResumingUpload
 
 # Fest verdrahtet, siehe Modul-Docstring oben -- absichtlich kein CLI-Parameter.
 TRACK = "internal"
@@ -38,8 +41,12 @@ DEFAULT_AAB_PATH = Path(__file__).resolve().parent.parent / "app" / "build" / "a
 # Das ~100-MB-Bundle in einem einzigen Request hochzuladen scheiterte regelmaessig mit
 # "TimeoutError: The read operation timed out" (mehrfach beobachtet 2026-10-02). Resumable Upload in
 # Chunks mit Wiederholung je Chunk macht einen kurzen Netzaussetzer unkritisch.
-UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
+# Klein, weil die Verbindung auf schlechten Leitungen schon nach wenigen hundert KB abbrechen kann (2026-11-01):
+# 8 MB kamen dort nicht ueber den ersten Block hinaus, mit 256 KiB und Fortsetzen ging der Upload durch.
+UPLOAD_CHUNK_BYTES = 256 * 1024
 RETRIES = 5
+# Abbrueche, nach denen der Upload fortgesetzt wird. ServerNotFoundError (DNS) ist kein OSError.
+UPLOAD_RETRYABLE = (OSError, httplib2.HttpLib2Error)
 
 
 def publish(aab_path: Path, key_path: Path, notes: str) -> None:
@@ -62,9 +69,10 @@ def publish(aab_path: Path, key_path: Path, notes: str) -> None:
             str(aab_path), mimetype="application/octet-stream", resumable=True, chunksize=UPLOAD_CHUNK_BYTES
         )
         request = edits.bundles().upload(editId=edit_id, packageName=PACKAGE_NAME, media_body=media)
+        resuming = ResumingUpload(request, retryable=UPLOAD_RETRYABLE, num_retries=RETRIES)
         upload = None
         while upload is None:
-            status, upload = request.next_chunk(num_retries=RETRIES)
+            status, upload = resuming.next_chunk()
             if status:
                 print(f"  Upload {int(status.progress() * 100)} %")
         version_code = upload["versionCode"]
@@ -85,7 +93,12 @@ def publish(aab_path: Path, key_path: Path, notes: str) -> None:
         edits.commit(editId=edit_id, packageName=PACKAGE_NAME).execute(num_retries=RETRIES)
         print(f"Release {version_code} auf '{TRACK}' veroeffentlicht.")
     except Exception:
-        edits.delete(editId=edit_id, packageName=PACKAGE_NAME).execute()
+        # Ist das Netz weg, scheitert auch das Aufraeumen. Der eigentliche Fehler soll trotzdem sichtbar bleiben,
+        # ein nicht abgeschlossener Edit veroeffentlicht nichts.
+        try:
+            edits.delete(editId=edit_id, packageName=PACKAGE_NAME).execute()
+        except Exception as e:
+            print(f"Edit nicht geloescht ({type(e).__name__}), er verfaellt ungenutzt.", file=sys.stderr)
         raise
 
 
