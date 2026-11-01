@@ -1,6 +1,7 @@
 // Tests fuer feed.ts. Lokal und in der CI: `deno test feed_test.ts`
 import { assertEquals, assertNotEquals, assertThrows } from "jsr:@std/assert@1";
 import {
+  checkStores,
   extractSlice,
   fetchWindow,
   normalizeEntry,
@@ -180,6 +181,13 @@ Deno.test("sanityOk: kein Loeschen bei Einbruch der Menge", () => {
   assertEquals(sanityOk(11848, 0), false);
   assertEquals(sanityOk(11848, 19793), false); // Feld "unavailable" umbenannt: alle Artikel wirkten verfuegbar
   assertEquals(sanityOk(50, 10), true); // kleine Bestaende: keine Schwelle
+});
+
+Deno.test("checkStores: der Ausfall eines Haendlers reisst die anderen nicht mit", () => {
+  // Echter Fall 2026-11-01: Spar im Feed komplett unavailable, Billa normal
+  assertEquals(checkStores(["billa", "spar"], { billa: 10707, spar: 22364 }, { billa: 10659, spar: 0 }), { ok: ["billa"], failed: ["spar"] });
+  assertEquals(checkStores(["billa", "spar"], { billa: 10707, spar: 22364 }, { billa: 10659, spar: 22000 }), { ok: ["billa", "spar"], failed: [] });
+  assertEquals(checkStores(["billa", "spar"], { billa: 10707, spar: 22364 }, { billa: 0, spar: 0 }), { ok: [], failed: ["billa", "spar"] });
 });
 
 Deno.test("Signatur: stimmt nur fuer dieselben Werte", async () => {

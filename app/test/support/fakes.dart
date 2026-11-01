@@ -604,6 +604,7 @@ OnlineArticle onlineArticle({
   String? unit = 'l',
   String? baseUnit = 'l',
   int? unitPriceNormCents = 132,
+  DateTime? seenAt,
 }) =>
     OnlineArticle(
       store: store,
@@ -614,6 +615,7 @@ OnlineArticle onlineArticle({
       unit: unit,
       baseUnit: baseUnit,
       unitPriceNormCents: unitPriceNormCents,
+      seenAt: seenAt,
     );
 
 OnlinePriceRepository onlinePriceRepo(AppDatabase db, OnlinePriceRemote remote,

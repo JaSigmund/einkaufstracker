@@ -40,7 +40,7 @@ class SupabaseOnlinePriceRemote implements OnlinePriceRemote {
   final SupabaseClient _client;
 
   static const _timeout = Duration(seconds: 15);
-  static const _columns = 'store,external_id,name,price_cents,quantity,unit,base_unit,unit_price_norm_cents';
+  static const _columns = 'store,external_id,name,price_cents,quantity,unit,base_unit,unit_price_norm_cents,seen_at';
 
   @override
   Future<List<OnlineArticle>> search(String query, {List<String> stores = const ['billa', 'spar'], int perStore = 8, String? preferBase}) async {

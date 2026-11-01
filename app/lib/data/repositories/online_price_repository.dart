@@ -118,7 +118,7 @@ class OnlinePriceRepository {
         final article = result.found[key];
         if (article != null) {
           await _db.into(_db.onlinePriceCache).insertOnConflictUpdate(
-                _cacheRow(article, available: true, feedUpdatedAt: result.feedLastModified, fetchedAt: now),
+                _cacheRow(article, available: true, feedUpdatedAt: onlineArticleUpdatedAt(article.seenAt, result.feedLastModified), fetchedAt: now),
               );
           continue;
         }

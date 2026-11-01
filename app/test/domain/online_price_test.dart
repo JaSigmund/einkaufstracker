@@ -111,6 +111,30 @@ void main() {
     });
   });
 
+  group('onlineArticleUpdatedAt', () {
+    final feed = DateTime.utc(2026, 11, 1, 5, 2);
+
+    test('Artikel im letzten Lauf gesehen: es gilt der Feed-Stand', () {
+      expect(onlineArticleUpdatedAt(DateTime.utc(2026, 11, 1, 6), feed), feed);
+    });
+
+    test('Haendler in der Quelle ausgefallen: es gilt der letzte Lauf, der den Artikel gesehen hat', () {
+      final seen = DateTime.utc(2026, 10, 29, 6);
+      expect(onlineArticleUpdatedAt(seen, feed), seen);
+    });
+
+    test('ohne Feed-Stand bleibt der Stand unbekannt, ohne seen_at gilt der Feed-Stand', () {
+      expect(onlineArticleUpdatedAt(DateTime.utc(2026, 11, 1, 6), null), isNull);
+      expect(onlineArticleUpdatedAt(null, feed), feed);
+    });
+
+    test('seen_at wird aus der Zeile gelesen', () {
+      final row = {'store': 'spar', 'external_id': '1', 'name': 'A', 'price_cents': 100, 'seen_at': '2026-10-29T06:00:03.015+00:00'};
+      expect(onlineArticleFromRow(row)!.seenAt, DateTime.utc(2026, 10, 29, 6, 0, 3, 15));
+      expect(onlineArticleFromRow({...row, 'seen_at': null})!.seenAt, isNull);
+    });
+  });
+
   group('onlinePriceFreshness', () {
     final now = DateTime.utc(2026, 10, 10, 12);
 

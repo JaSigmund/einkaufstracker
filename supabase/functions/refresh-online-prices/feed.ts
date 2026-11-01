@@ -193,6 +193,15 @@ export function sanityOk(previousCount: number, newCount: number): boolean {
   return newCount >= previousCount * 0.5 && newCount <= previousCount * 1.35;
 }
 
+/**
+ * Prueft jeden Haendler einzeln: Der Ausfall eines Haendlers im Feed (Spar seit 2026-10-30: Scraper der Quelle kaputt,
+ * alle Artikel `unavailable`) darf die uebrigen nicht mitreissen. Nur Haendler in `ok` duerfen veraltete Zeilen loeschen.
+ */
+export function checkStores(stores: readonly string[], before: Record<string, number>, after: Record<string, number>): { ok: string[]; failed: string[] } {
+  const ok = stores.filter((s) => sanityOk(before[s], after[s]));
+  return { ok, failed: stores.filter((s) => !ok.includes(s)) };
+}
+
 // --- Signatur der Abschnitts-Aufrufe -----------------------------------------------------------------------------
 // Der Koordinator ruft die Abschnitts-Worker ueber das oeffentliche Function-URL auf. Die Signatur (HMAC mit dem
 // Service-Schluessel, der nur serverseitig existiert) verhindert, dass Dritte Abschnitte anstossen.
