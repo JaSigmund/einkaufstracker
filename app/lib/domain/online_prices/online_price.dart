@@ -25,6 +25,7 @@ class OnlineArticle {
     this.unit,
     this.baseUnit,
     this.unitPriceNormCents,
+    this.seenAt,
   });
 
   final String store;
@@ -39,6 +40,16 @@ class OnlineArticle {
   /// `kg`, `l` oder `stk`; `null`, wenn die Feed-Einheit nicht eindeutig war (dann gibt es auch keinen Grundpreis).
   final String? baseUnit;
   final int? unitPriceNormCents;
+
+  /// Lauf auf dem Server, in dem der Artikel zuletzt im Feed verfuegbar war (`online_prices.seen_at`).
+  final DateTime? seenAt;
+}
+
+/// Stand eines Artikels: der Feed-Stand, aber nie juenger als der Lauf, der den Artikel zuletzt gesehen hat. Faellt ein
+/// Haendler in der Quelle aus, laeuft der Feed fuer die anderen weiter und seine Preise veralten trotzdem sichtbar.
+DateTime? onlineArticleUpdatedAt(DateTime? seenAt, DateTime? feedLastModified) {
+  if (feedLastModified == null || seenAt == null) return feedLastModified;
+  return seenAt.isBefore(feedLastModified) ? seenAt : feedLastModified;
 }
 
 /// Liest eine Zeile von `online_prices` bzw. das Ergebnis von `search_online_prices`. PostgREST liefert `numeric` als
@@ -52,6 +63,7 @@ OnlineArticle? onlineArticleFromRow(Map<String, dynamic> row) {
   if (store is! String || id is! String || name is! String || price is! num) return null;
   final base = row['base_unit'];
   final unitPrice = row['unit_price_norm_cents'];
+  final seenAt = row['seen_at'];
   return OnlineArticle(
     store: store,
     externalId: id,
@@ -61,6 +73,7 @@ OnlineArticle? onlineArticleFromRow(Map<String, dynamic> row) {
     unit: row['unit'] is String ? row['unit'] as String : null,
     baseUnit: base is String && const {'kg', 'l', 'stk'}.contains(base) ? base : null,
     unitPriceNormCents: unitPrice is num ? unitPrice.toInt() : null,
+    seenAt: seenAt is String ? DateTime.tryParse(seenAt)?.toUtc() : null,
   );
 }
 

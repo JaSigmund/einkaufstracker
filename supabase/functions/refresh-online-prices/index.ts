@@ -10,8 +10,9 @@
 //     Datei in 10-MB-Abschnitte und ruft je Abschnitt einen Worker auf.
 //   * Worker (POST mit run/start/end/signature, vom Koordinator): liest den Abschnitt per HTTP-Range, filtert Billa und
 //     Spar, schreibt die Zeilen per Upsert.
-//   * Am Ende: veraltete Zeilen loeschen (nur wenn der Lauf vollstaendig und plausibel war) und `online_feed_status`
-//     aktualisieren. Schlaegt etwas fehl, bleiben die alten Preise stehen und die App zeigt sie als "zuletzt bekannt".
+//   * Am Ende: je Haendler pruefen, ob die Menge plausibel ist, nur dann dessen veraltete Zeilen loeschen, und
+//     `online_feed_status` aktualisieren. Faellt ein Haendler aus, bleiben seine alten Preise mit altem `seen_at` stehen
+//     (die App zeigt sie nach Ablauf der Frist als "zuletzt bekannt"), steht in `last_error`, und die anderen laufen normal.
 //
 // Die Function braucht keine Anmeldung (`--no-verify-jwt`, der Cron-Job hat keinen Nutzer). Das ist ungefaehrlich: ein
 // Aufruf macht hoechstens einen HEAD-Request, solange der Feed unveraendert ist oder gerade ein Lauf laeuft; die
@@ -22,12 +23,12 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { json } from "../_shared/http.ts";
 import {
+  checkStores,
   extractSlice,
   FEED_URL,
   fetchWindow,
   planSlices,
   type PriceRow,
-  sanityOk,
   signSlice,
   verifySlice,
   WANTED_STORES,
@@ -108,9 +109,10 @@ async function handleCoordinator(): Promise<Response> {
     return json({ status: "feed_unreachable" }, 502);
   }
 
-  // 2) Unveraendert und beim letzten Mal erfolgreich: nichts zu tun
+  // 2) Unveraendert und schon verarbeitet: nichts zu tun. `feed_etag` wird erst am Ende eines Laufs geschrieben, ein
+  // abgebrochener Lauf wird also wiederholt; ein ausgefallener Haendler (`last_error` gesetzt) wird es erst mit neuem Feed.
   const { data: status } = await db.from("online_feed_status").select("*").eq("source", SOURCE).maybeSingle();
-  if (status && etag !== "" && status.feed_etag === etag && status.last_success_at && !status.last_error) {
+  if (status && etag !== "" && status.feed_etag === etag && status.last_success_at) {
     return json({ status: "up_to_date", feed_last_modified: status.feed_last_modified });
   }
 
@@ -171,16 +173,16 @@ async function runAll(db: SupabaseClient, run: string, startedAt: Date, size: nu
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, slices.length) }, runWorker));
 
-    // Veraltete Zeilen (diesmal nicht mehr verfuegbar) nur loeschen, wenn der Lauf plausibel war
+    // Veraltete Zeilen (diesmal nicht mehr verfuegbar) nur bei Haendlern loeschen, deren Menge plausibel ist
     const after: Record<string, number> = {};
     for (const s of WANTED_STORES) {
       const { count } = await db.from("online_prices").select("external_id", { count: "exact", head: true }).eq("store", s).gte("seen_at", started);
       after[s] = count ?? 0;
-      if (!sanityOk(before[s], after[s])) {
-        throw new Error(`${s}: nur ${after[s]} Eintraege statt ${before[s]} (Feed geaendert?), alte Preise bleiben stehen`);
-      }
     }
-    for (const s of WANTED_STORES) {
+    const { ok, failed } = checkStores(WANTED_STORES, before, after);
+    const storeError = failed.map((s) => `${s}: nur ${after[s]} Eintraege statt ${before[s]} (Feed geaendert?), alte Preise bleiben stehen`).join("; ");
+    if (ok.length === 0) throw new Error(storeError);
+    for (const s of ok) {
       const { error } = await db.from("online_prices").delete().eq("store", s).lt("seen_at", started);
       if (error) throw new Error(`delete: ${error.message}`);
     }
@@ -192,10 +194,10 @@ async function runAll(db: SupabaseClient, run: string, startedAt: Date, size: nu
       feed_last_modified: modified,
       last_success_at: new Date().toISOString(),
       running_since: null,
-      last_error: null,
+      last_error: storeError === "" ? null : storeError.slice(0, 300),
       row_counts: { ...after, parse_errors: parseErrors },
     });
-    console.log("refresh_done", run, after, "parse_errors", parseErrors);
+    console.log("refresh_done", run, after, "parse_errors", parseErrors, "failed", failed);
   } catch (e) {
     console.error("refresh_failed", run, e);
     await db.from("online_feed_status").upsert({

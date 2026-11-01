@@ -166,6 +166,19 @@ void main() {
       expect(cached.fetchedAt, clock);
     });
 
+    test('Haendler in der Quelle ausgefallen: sein Artikel behaelt den alten Stand, der andere bekommt den neuen', () async {
+      final repo = repoOf();
+      final spar = onlineArticle(store: 'spar', externalId: '2020', seenAt: DateTime.utc(2026, 9, 29, 6));
+      final billa = onlineArticle(seenAt: DateTime.utc(2026, 10, 2, 6));
+      await repo.linkAll('p1', [spar, billa]);
+      remote.articles = [spar, billa];
+      await repo.refresh(force: true);
+
+      Future<DateTime?> stand(String store) async => (await (db.select(db.onlinePriceCache)..where((c) => c.store.equals(store))).getSingle()).feedUpdatedAt;
+      expect(await stand('spar'), DateTime.utc(2026, 9, 29, 6));
+      expect(await stand('billa'), DateTime.utc(2026, 10, 2, 5, 5));
+    });
+
     test('Artikel aus dem Feed verschwunden: letzter Preis bleibt, aber als nicht verfuegbar markiert', () async {
       final repo = repoOf();
       await repo.link('p1', onlineArticle());
