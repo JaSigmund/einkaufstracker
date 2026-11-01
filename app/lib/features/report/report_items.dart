@@ -7,7 +7,7 @@ import '../../domain/receipt/month_report.dart';
 /// separate "Ausgeschlossen"-Zeile. Preisverlauf und Haendlervergleich lesen weiter alle Positionen, weil sie
 /// reale Marktpreise abbilden, unabhaengig davon, wer bezahlt hat.
 ///
-/// [products] liefert optional den Produktnamen fuer die Artikelliste (Monatsauswertung); der Trend braucht ihn nicht.
+/// [products] liefert optional Produktname und Packungsgroesse fuer die Artikelliste (Monatsauswertung); der Trend braucht sie nicht.
 ({List<ReportItem> own, List<ReportItem> excluded}) reportItemsOf(
   Iterable<ReceiptItem> rows, {
   Map<String, Product> products = const {},
@@ -23,6 +23,9 @@ import '../../domain/receipt/month_report.dart';
         productId: i.productId,
         productName: i.productId == null ? null : products[i.productId]?.name,
         quantity: i.quantity,
+        quantityUnit: i.quantityUnit,
+        productBaseUnit: i.productId == null ? null : products[i.productId]?.baseUnit,
+        productPackSize: i.productId == null ? null : products[i.productId]?.packSize,
         lineTotalCents: i.lineTotalCents,
       ),
   ];

@@ -1,5 +1,6 @@
 import '../categorization/normalize_name.dart';
 import '../../core/vienna_time.dart';
+import 'purchased_amount.dart';
 
 /// Kopfdaten eines Bons fuer die Auswertung.
 typedef ReportReceipt = ({String id, DateTime purchasedAtUtc});
@@ -14,6 +15,9 @@ typedef ReportItem = ({
   String? productId,
   String? productName,
   double quantity,
+  String quantityUnit, // piece | kg | l
+  String? productBaseUnit,
+  double? productPackSize,
   int lineTotalCents,
 });
 
@@ -44,6 +48,9 @@ class ItemAggregate {
 
   /// Produkt-Zuordnung fuer den Sprung ins Artikel-Detail (Doku 07 §2), sofern eine bekannt ist.
   String? productId;
+
+  /// Packungen und Gesamtmenge der Artikelzeilen; Pfand und Rabatte gehen nicht ein.
+  final PurchasedAmount amount = PurchasedAmount();
 }
 
 class CategoryTotal {
@@ -117,7 +124,7 @@ MonthReport buildMonthReport(
   final discountLines = <ReportLine>[];
   var saved = 0;
 
-  void add(String receiptId, String categoryKey, String itemKey, String label, int cents, String kind,
+  ItemAggregate add(String receiptId, String categoryKey, String itemKey, String label, int cents, String kind,
       {double quantity = 0, bool purchase = false, String? productId}) {
     final c = totals.putIfAbsent(categoryKey, () => CategoryTotal(categoryKey));
     c.totalCents += cents;
@@ -132,6 +139,7 @@ MonthReport buildMonthReport(
       discountLines.add(line);
       if (cents < 0) saved -= cents;
     }
+    return a;
   }
 
   final receiptIds = byReceipt.keys.toList()..sort((a, b) => inMonth[a]!.compareTo(inMonth[b]!));
@@ -161,8 +169,15 @@ MonthReport buildMonthReport(
       final normalized = normalizeItemName(i.rawText);
       final k = i.productId ?? (normalized.isEmpty ? i.rawText : normalized);
       final label = i.productName ?? i.rawText;
-      add(id, i.categoryId ?? unassignedKey, k, label, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true, productId: i.productId);
+      final aggregate = add(id, i.categoryId ?? unassignedKey, k, label, i.lineTotalCents, i.kind, quantity: i.quantity, purchase: true, productId: i.productId);
       if (i.kind == 'article') {
+        aggregate.amount.add(
+          quantity: i.quantity,
+          quantityUnit: i.quantityUnit,
+          rawText: i.rawText,
+          productBaseUnit: i.productBaseUnit,
+          productPackSize: i.productPackSize,
+        );
         hasArticle = true;
         lastKey = k;
         lastCategory = i.categoryId;

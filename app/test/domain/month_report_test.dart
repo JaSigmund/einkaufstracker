@@ -1,7 +1,7 @@
 import 'package:einkaufstracker/domain/receipt/month_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ReportItem _i(String rid, int no, String text, int cents, {String kind = 'article', String? cat, double qty = 1, String? productId, String? productName}) => (
+ReportItem _i(String rid, int no, String text, int cents, {String kind = 'article', String? cat, double qty = 1, String unit = 'piece', String? productId, String? productName, String? baseUnit, double? packSize}) => (
       receiptId: rid,
       lineNo: no,
       kind: kind,
@@ -10,6 +10,9 @@ ReportItem _i(String rid, int no, String text, int cents, {String kind = 'articl
       productId: productId,
       productName: productName,
       quantity: qty,
+      quantityUnit: unit,
+      productBaseUnit: baseUnit,
+      productPackSize: packSize,
       lineTotalCents: cents,
     );
 
@@ -20,6 +23,23 @@ int _total(MonthReport r, String cat) => r.categories.firstWhere((c) => c.catego
 void main() {
   group('buildMonthReport', () {
     final sep = DateTime.utc(2026, 9, 10, 10);
+
+    test('Artikelzeile nennt Packungsgroesse und Gesamtmenge ueber alle Bons des Monats', () {
+      final rep = buildMonthReport(
+        [_r('a', sep), _r('b', DateTime.utc(2026, 9, 20, 10))],
+        [
+          _i('a', 1, 'IC CV Faschiertes gem.', 500, cat: 'f', qty: 3, productId: 'p', productName: 'Faschiertes', baseUnit: 'kg', packSize: 0.5),
+          _i('a', 2, 'EXTREM AKTION', -100, kind: 'discount', cat: 'f'),
+          _i('b', 1, 'CV FASCHIERTES GEM.500G', 200, cat: 'f', productId: 'p', productName: 'Faschiertes', baseUnit: 'kg', packSize: 0.5),
+          _i('b', 2, 'Pfand', 25, kind: 'deposit', cat: 'x'),
+        ],
+        year: 2026,
+        month: 9,
+      );
+      final article = rep.category('f')!.items.single;
+      expect(article.amount.describe(), '4× je 500 g · 2 kg gesamt');
+      expect(rep.category('x')!.items.single.amount.describe(), isNull);
+    });
 
     test('summiert je Kategorie, nur der gewaehlte Monat (Wiener Zeit)', () {
       final rep = buildMonthReport(

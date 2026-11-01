@@ -11,6 +11,9 @@ ReportItem _i(String rid, int no, String text, int cents, {String kind = 'articl
       productId: null,
       productName: null,
       quantity: qty,
+      quantityUnit: 'piece',
+      productBaseUnit: null,
+      productPackSize: null,
       lineTotalCents: cents,
     );
 
