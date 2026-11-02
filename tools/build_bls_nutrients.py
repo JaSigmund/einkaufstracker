@@ -183,19 +183,21 @@ def build_sql(doc, source_dir):
     units = components_info(components)
     code_col = next(c for c in data.columns if clean(c).casefold() in ("bls code", "bls-code", "code"))
     cols = {}
-    for n in doc["nutrients"]:
+    # Koffein steht nicht in der BLS (bls_code null): Es kommt nur vom Produkt
+    nutrients = [n for n in doc["nutrients"] if n["bls_code"]]
+    for n in nutrients:
         if n["bls_code"] not in units:
             sys.exit(f"{n['key']}: BLS-Code {n['bls_code']} steht nicht in der Components-Tabelle")
         if not unit_equal(units[n["bls_code"]].split("/")[0], n["bls_unit"]):
             sys.exit(f"{n['key']}: Einheit in der BLS ist '{units[n['bls_code']]}', erwartet '{n['bls_unit']}'")
         cols[n["key"]] = value_columns(list(data.columns), n["bls_code"])
-    rows, missing = [], {n["key"]: 0 for n in doc["nutrients"]}
+    rows, missing = [], {n["key"]: 0 for n in nutrients}
     for _, rec in data.iterrows():
         code = clean(rec[code_col])
         if not code:
             continue
         vals = {}
-        for n in doc["nutrients"]:
+        for n in nutrients:
             vcol, ocol = cols[n["key"]]
             v = value_of(rec[vcol], rec[ocol])
             if v is None:
@@ -225,10 +227,11 @@ def check_sql(doc):
         sys.exit(f"{SQL_OUT.name} fehlt: python tools/build_bls_nutrients.py --source-dir tools/BLS_4_0_2025_DE")
     text = SQL_OUT.read_text(encoding="utf-8")
     keys = {n["key"] for n in doc["nutrients"]}
+    from_bls = {n["key"] for n in doc["nutrients"] if n["bls_code"]}
     used = set(re.findall(r'"([a-z0-9_]+_(?:g|mg|ug))":', text))
     if not used <= keys:
         sys.exit(f"{SQL_OUT.name} enthaelt Schluessel, die das Register nicht kennt: {sorted(used - keys)}")
-    absent = keys - used
+    absent = from_bls - used
     if absent:
         sys.exit(f"{SQL_OUT.name} enthaelt keine Werte fuer: {sorted(absent)} (Register geaendert? neu erzeugen)")
     return text.count("::jsonb)")

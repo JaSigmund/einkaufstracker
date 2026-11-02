@@ -7,9 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// Register der Mikronaehrstoffe (Phase N3, ADR-032): die Dart-Fassung ist aus `tools/nutrient_registry.json` erzeugt und muss mit
 /// ihr uebereinstimmen (die CI prueft es zusaetzlich mit `tools/build_bls_nutrients.py --check`).
 void main() {
-  test('38 Naehrstoffe, Schluessel eindeutig, Einheit steht im Schluessel', () {
-    expect(nutrientRegistry, hasLength(38));
-    expect(nutrientKeys.toSet(), hasLength(38));
+  test('39 Naehrstoffe, Schluessel eindeutig, Einheit steht im Schluessel', () {
+    expect(nutrientRegistry, hasLength(39));
+    expect(nutrientKeys.toSet(), hasLength(39));
     for (final n in nutrientRegistry) {
       final suffix = n.key.split('_').last;
       expect({'g': 'g', 'mg': 'mg', 'ug': 'µg'}[suffix], n.unit, reason: n.key);
@@ -18,14 +18,16 @@ void main() {
     }
   });
 
-  test('zwoelf Naehrstoffe stehen in der Vorauswahl, jede Gruppe hat Eintraege', () {
-    expect(nutrientRegistry.where((n) => n.featured), hasLength(12));
+  test('14 Naehrstoffe stehen in der Vorauswahl, darunter Alkohol und Koffein, jede Gruppe hat Eintraege', () {
+    expect(nutrientRegistry.where((n) => n.featured), hasLength(14));
+    expect(nutrientDef('alcohol_g')!.featured, isTrue);
+    expect(nutrientDef('caffeine_mg')!.featured, isTrue);
     for (final g in NutrientGroup.values) {
       expect(nutrientRegistry.where((n) => n.group == g), isNotEmpty, reason: g.name);
     }
   });
 
-  test('Referenzmengen nur bei Vitaminen und Mineralstoffen, nie negativ; Selen und Koffein fehlen', () {
+  test('Referenzmengen nur bei Vitaminen und Mineralstoffen, nie negativ; Selen fehlt', () {
     for (final n in nutrientRegistry) {
       if (n.euReference != null) {
         expect(n.euReference, greaterThan(0), reason: n.key);
@@ -33,7 +35,8 @@ void main() {
       }
     }
     expect(nutrientRegistry.where((n) => n.euReference != null), hasLength(26));
-    expect(nutrientKeys.any((k) => k.contains('selen') || k.contains('caffeine')), isFalse);
+    expect(nutrientKeys.any((k) => k.contains('selen')), isFalse);
+    expect(nutrientDef('caffeine_mg')!.euReference, isNull);
   });
 
   test('bekannte Referenzmengen laut Verordnung (EU) 1169/2011', () {

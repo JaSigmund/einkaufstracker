@@ -449,7 +449,19 @@
    "bls_unit": "g",
    "factor": 1,
    "eu_reference": null,
-   "featured": false
+   "featured": true
+  },
+  {
+   "key": "caffeine_mg",
+   "label_de": "Koffein",
+   "group": "other",
+   "unit": "mg",
+   "decimals": 0,
+   "bls_code": null,
+   "bls_unit": null,
+   "factor": 1,
+   "eu_reference": null,
+   "featured": true
   },
   {
    "key": "starch_g",

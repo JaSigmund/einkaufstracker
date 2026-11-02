@@ -40,6 +40,13 @@ class SupplementRepository {
     return take(water, at: at);
   }
 
+  /// Glaeser Wasser seit [since] als ml (Trinkmenge, ADR-049).
+  Future<List<({DateTime at, double ml})>> waterSince(DateTime since) async {
+    final id = waterIdFor(await householdId());
+    final rows = await (_db.select(_db.supplementIntakes)..where((i) => i.supplementId.equals(id) & i.deletedAt.isNull() & i.takenAt.isBiggerOrEqualValue(since))).get();
+    return [for (final i in rows) (at: i.takenAt, ml: parseMicros(i.micros)?['water_g'] ?? 0)];
+  }
+
   /// Nicht geloeschte Ergaenzungen, alphabetisch.
   Stream<List<Supplement>> watchSupplements() => (_db.select(_db.supplements)
         ..where((s) => s.deletedAt.isNull())

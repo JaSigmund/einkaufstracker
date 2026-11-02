@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../data/products/off_client.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
 import '../../domain/products/off_quantity.dart';
+import '../../domain/nutrition/micros.dart';
 import '../../domain/products/drinkable.dart';
 import '../../domain/products/packaging.dart';
 import '../../domain/receipt/unit_price.dart';
@@ -73,6 +76,41 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
   /// Die eigene Entscheidung "trinkbar" (ADR-048). `null`: Die Regel entscheidet, auch spaeter noch.
   late bool? _drinkChoice = widget.existing?.isDrink;
+
+  /// Alkohol als Vol.-% und Koffein je 100 ml (ADR-049). Gibt es nur fuer Produkte mit Naehrwertprofil.
+  late final String _initialVol = _initialDrinkValue('alcohol_g', volPercentFromAlcoholGrams);
+  late final String _initialCaffeine = _initialDrinkValue('caffeine_mg', (v) => v);
+  late final _vol = TextEditingController(text: _initialVol);
+  late final _caffeine = TextEditingController(text: _initialCaffeine);
+
+  String _initialDrinkValue(String key, double Function(double) convert) {
+    final v = parseMicros(widget.existing?.nutrientsPer100)?[key];
+    return v == null ? '' : formatListNumberExact((convert(v) * 10).round() / 10);
+  }
+
+  String? get _profileRaw => widget.existing?.nutrientsPer100 ?? (widget.suggestion?.nutrientsPer100 == null ? null : jsonEncode(widget.suggestion!.nutrientsPer100));
+
+  /// Liest beide Felder; geaendert wird nur, was der Nutzer angefasst hat, damit ein BLS-Wert nicht durch die gerundete Anzeige wandert.
+  ({String? raw, String? error}) _mergedDrinkValues() {
+    double? read(String text) => double.tryParse(text.replaceAll(',', '.').trim());
+    final volText = _vol.text.trim();
+    final caffeineText = _caffeine.text.trim();
+    final vol = read(volText);
+    final caffeine = read(caffeineText);
+    if (volText.isNotEmpty && (vol == null || vol < 0 || vol > 100)) return (raw: null, error: 'Alkohol: Bitte Vol.-% zwischen 0 und 100 eingeben.');
+    if (caffeineText.isNotEmpty && (caffeine == null || caffeine < 0 || caffeine > 1000)) return (raw: null, error: 'Koffein: Bitte mg je 100 ml zwischen 0 und 1000 eingeben.');
+    final volChanged = volText != _initialVol;
+    final caffeineChanged = caffeineText != _initialCaffeine;
+    return (
+      raw: withDrinkValues(
+        _profileRaw,
+        alcoholG: volChanged && vol != null ? alcoholGramsFromVolPercent(vol) : null,
+        caffeineMg: caffeineChanged ? caffeine : null,
+        clear: {if (volChanged && volText.isEmpty) 'alcohol_g', if (caffeineChanged && caffeineText.isEmpty) 'caffeine_mg'},
+      ),
+      error: null,
+    );
+  }
   var _saving = false;
   String? _error;
   late final _search = TextEditingController();
@@ -145,6 +183,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _pieceCount.dispose();
     _pieceLabel.dispose();
     _openedDays.dispose();
+    _vol.dispose();
+    _caffeine.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -214,6 +254,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       return;
     }
     final openedDays = int.tryParse(_openedDays.text.trim());
+    final drinkValues = _mergedDrinkValues();
+    if (drinkValues.error != null) {
+      setState(() => _error = drinkValues.error);
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -236,6 +281,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           openedShelfLifeDays: Value(openedDays),
           restock: _restock,
           isDrink: Value(_drinkChoice),
+          nutrientsPer100: Value(drinkValues.raw),
         );
         await repo.update(updated);
         // Der Bestand folgt, wenn sich die Einheit geaendert hat oder der Inhalt jetzt erst bekannt ist
@@ -255,7 +301,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           openedShelfLifeDays: openedDays,
           restock: _restock,
           offCode: null,
-          nutrientsPer100: widget.suggestion?.nutrientsPer100,
+          nutrientsPer100: drinkValues.raw == null ? null : {for (final e in (jsonDecode(drinkValues.raw!) as Map<String, dynamic>).entries) if (e.value is num) e.key: (e.value as num).toDouble()},
           nutrientsBasis: widget.suggestion?.nutrientsBasis,
           nutrientsSource: widget.suggestion?.nutrientsPer100 == null ? null : 'off',
           unitWeightG: packaging.pieceWeightG ?? (widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!)),
@@ -359,14 +405,39 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             builder: (context, _) {
               final p = resolvePackaging(kind: _kind, looseUnit: _looseUnit, count: _pieceCount.text, amount: _packSize.text, amountUnit: _amountUnit, label: _pieceLabel.text);
               final categoryName = categories.where((c) => c.id == _categoryId).firstOrNull?.name;
-              return SwitchListTile(
-                key: const Key('product-is-drink'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Trinkbar'),
-                subtitle: const Text('Steht dann unter „Schnell eintragen“ bei den Getränken'),
-                value: isDrinkable(flag: _drinkChoice, name: _name.text, baseUnit: p.baseUnit, packSize: p.packSize, categoryName: categoryName),
-                onChanged: (v) => setState(() => _drinkChoice = v),
-              );
+              final drinkable = isDrinkable(flag: _drinkChoice, name: _name.text, baseUnit: p.baseUnit, packSize: p.packSize, categoryName: categoryName);
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                SwitchListTile(
+                  key: const Key('product-is-drink'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Trinkbar'),
+                  subtitle: const Text('Steht dann unter „Schnell eintragen“ bei den Getränken'),
+                  value: drinkable,
+                  onChanged: (v) => setState(() => _drinkChoice = v),
+                ),
+                if (drinkable && _profileRaw != null)
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('product-alcohol'),
+                        controller: _vol,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Alkohol (optional)', suffixText: 'Vol.-%'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        key: const Key('product-caffeine'),
+                        controller: _caffeine,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Koffein (optional)', suffixText: 'mg/100 ml'),
+                      ),
+                    ),
+                  ])
+                else if (drinkable)
+                  Text('Alkohol und Koffein lassen sich eintragen, sobald das Produkt Nährwerte hat.', key: const Key('product-drink-values-hint'), style: Theme.of(context).textTheme.bodySmall),
+              ]);
             },
           ),
           const SizedBox(height: 12),

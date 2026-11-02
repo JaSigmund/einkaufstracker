@@ -37,7 +37,7 @@ class QuickIntakePage extends ConsumerWidget {
         content: Text(text),
         // mit Aktion bliebe die SnackBar sonst stehen, bis man sie wegwischt
         persist: false,
-        action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.deleteIntake(intake.id)),
+        action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.deleteIntake(intake.id).then((_) => rescheduleFluidReminders(ref))),
       ));
   }
 
@@ -45,6 +45,7 @@ class QuickIntakePage extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final intake = await ref.read(supplementRepositoryProvider).takeWater(at: now);
+      rescheduleFluidReminders(ref);
       if (context.mounted) _confirm(context, ref, messenger, 'Ein Glas Wasser eingetragen', intake);
     } catch (_) {
       messenger.showSnackBar(const SnackBar(content: Text('Eintragen nicht möglich.')));
@@ -118,7 +119,7 @@ class QuickIntakePage extends ConsumerWidget {
               label: const Text('Nahrungsergänzung anlegen'),
             ),
           ),
-        DrinksSection(now: now),
+        DrinksSection(now: now, waterMl: waterMl),
         const Padding(padding: EdgeInsets.only(top: 8), child: Divider()),
         // Von jedem Tab aus erreichbar, deshalb auch hier: der Timer fuer zwischendurch (ADR-046)
         Card(

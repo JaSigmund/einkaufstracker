@@ -1,4 +1,5 @@
 import '../../domain/nutrition/drink_mix.dart';
+import '../../domain/nutrition/fluid_intake.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
@@ -39,6 +40,12 @@ class DrinkRepository {
 
   /// Nimmt einen Eintrag zurueck, samt Abzug vom Bestand.
   Future<void> undo(String mealId) => _meals.delete(mealId);
+}
+
+/// Wie viel eine Getraenke-Mahlzeit in ml ist. Bearbeitete Eintraege koennen Portionen haben, deshalb der gegessene Anteil.
+double drinkMealMl(Meal meal, Iterable<MealIngredient> ingredients) {
+  final ml = ingredients.where((i) => i.deletedAt == null).fold<double>(0, (sum, i) => sum + drinkIngredientMl(unit: i.unit, quantity: i.quantity, amountG: i.amountG));
+  return meal.servingsMade > 0 ? ml * meal.servingsEaten / meal.servingsMade : ml;
 }
 
 /// Der erste Eintrag eines Produkts: bei einer Mehrfachpackung ein Stueck (65 ml Yakult), sonst ein Glas, bei Stueckware eines mit bekanntem Volumen.

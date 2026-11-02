@@ -101,20 +101,20 @@ void main() {
     expect(find.byKey(const Key('nutrient-coverage-vit_c_mg')), findsNothing);
   });
 
-  pageTest('Vorauswahl der zwoelf, "Alle zeigen" blendet den Rest ein und wieder aus', (tester) async {
+  pageTest('Vorauswahl der 14, "Alle zeigen" blendet den Rest ein und wieder aus', (tester) async {
     await bananaDay();
     await open(tester);
     expect(find.byKey(const Key('nutrient-row-vit_c_mg')), findsOneWidget);
     expect(find.byKey(const Key('nutrient-row-omega3_g')), findsOneWidget);
     expect(find.byKey(const Key('nutrient-row-vit_e_mg')), findsNothing);
     expect(find.byKey(const Key('nutrient-row-starch_g')), findsNothing);
-    expect(tester.widgetList(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('nutrient-row-'))), hasLength(12));
+    expect(tester.widgetList(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('nutrient-row-'))), hasLength(14));
 
     await tester.tap(find.byKey(const Key('nutrients-show-all')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('nutrient-row-vit_e_mg')), findsOneWidget);
     expect(find.byKey(const Key('nutrient-row-starch_g')), findsOneWidget);
-    expect(tester.widgetList(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('nutrient-row-'))), hasLength(38));
+    expect(tester.widgetList(find.byWidgetPredicate((w) => w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('nutrient-row-'))), hasLength(39));
 
     await tester.tap(find.byKey(const Key('nutrients-show-all')));
     await tester.pumpAndSettle();
@@ -280,7 +280,7 @@ void main() {
     await open(tester);
     expect(text(tester, 'nutrients-limits'), contains('Garverluste'));
     expect(text(tester, 'nutrients-limits'), contains('Nahrungsergänzung zählt nur'));
-    expect(text(tester, 'nutrients-limits'), contains('Selen und Koffein fehlen'));
+    expect(text(tester, 'nutrients-limits'), contains('Selen fehlt'));
     await tester.tap(find.byKey(const Key('nutrients-info')));
     await tester.pumpAndSettle();
     expect(find.text('Woher stammen die Werte?'), findsWidgets);

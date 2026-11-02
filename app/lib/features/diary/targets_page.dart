@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
+import 'fluid_settings.dart';
 
 /// Richtwerte fuer die Naehrwerte festlegen (LH-MEAL-09). Die App gibt keine Werte vor und bewertet nichts
 /// (Doku 15 §2): leere Felder heissen "kein Richtwert".
@@ -102,6 +103,15 @@ class _TargetsPageState extends ConsumerState<TargetsPage> {
               ),
               const SizedBox(height: 16),
               for (final k in NutrientKey.values) _row(k),
+              ListTile(
+                key: const Key('targets-fluid'),
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.local_drink_outlined),
+                title: const Text('Trinkmenge'),
+                subtitle: const Text('Ziel und Erinnerung'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showFluidSettings(context),
+              ),
             ]),
     );
   }

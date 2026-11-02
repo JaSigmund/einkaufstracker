@@ -67,7 +67,8 @@ const nutrientRegistry = <NutrientDef>[
   NutrientDef(key: 'linoleic_g', label: 'Linolsäure (Omega-6)', group: NutrientGroup.fat, unit: 'g', decimals: 1),
   NutrientDef(key: 'cholesterol_mg', label: 'Cholesterin', group: NutrientGroup.fat, unit: 'mg', decimals: 0),
   NutrientDef(key: 'water_g', label: 'Wasser', group: NutrientGroup.other, unit: 'g', decimals: 0),
-  NutrientDef(key: 'alcohol_g', label: 'Alkohol', group: NutrientGroup.other, unit: 'g', decimals: 1),
+  NutrientDef(key: 'alcohol_g', label: 'Alkohol', group: NutrientGroup.other, unit: 'g', decimals: 1, featured: true),
+  NutrientDef(key: 'caffeine_mg', label: 'Koffein', group: NutrientGroup.other, unit: 'mg', decimals: 0, featured: true),
   NutrientDef(key: 'starch_g', label: 'Stärke', group: NutrientGroup.other, unit: 'g', decimals: 1),
   NutrientDef(key: 'eaa_g', label: 'Unentbehrliche Aminosäuren (gesamt)', group: NutrientGroup.other, unit: 'g', decimals: 1),
 ];
