@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/clock.dart';
+import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
@@ -56,6 +57,7 @@ class IngredientDraft {
     this.blsCode,
     this.nutrientBasis,
     this.unitWeightG,
+    this.unitKey,
     this.microsPer100,
     this.preparation,
     this.lineProfileWins = false,
@@ -92,6 +94,10 @@ class IngredientDraft {
   /// Produkt kein eigenes Gewicht hat (Phase N2). Es geht dem Gewicht des Produkts vor, weil die Oberflaeche die Kette
   /// Haushalt > Produkt > Tabelle schon aufgeloest hat.
   final double? unitWeightG;
+
+  /// Haushaltseinheit einer Stueckmenge. `null` oder [FoodUnitKey.piece] zaehlt ganze Stuecke, alles andere Teile davon: Bei Stueckware rechnet
+  /// der Abzug dann ueber das Stueckgewicht des Produkts, und ohne dieses wird nichts abgezogen.
+  final FoodUnitKey? unitKey;
 
   /// Mikronaehrstoffe je 100 g des zugeordneten BLS-Eintrags (Phase N3). Bei einem Produkt mit eigenem Profil gilt dessen Profil.
   final Micros? microsPer100;
@@ -307,7 +313,9 @@ class MealRepository {
         entryUnit: d.entryUnit,
         baseUnit: product?.baseUnit ?? d.entryUnit.dimensionBaseUnit,
         nutrientsBasis: basis,
-        unitWeightG: d.unitWeightG ?? product?.unitWeightG,
+        unitWeightG: d.unitWeightG,
+        productPieceWeightG: product?.unitWeightG,
+        unitKey: d.unitKey,
       );
       final nutrients = d.manualNutrients ?? ingredientNutrients(per100, amount);
       // Garfaktoren: nur fuer ein BLS-Profil der Zeile (kein Produkt, keine Handwerte) und nur mit bekannter Kategorie und Zubereitung

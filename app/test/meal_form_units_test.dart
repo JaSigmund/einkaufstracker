@@ -245,6 +245,41 @@ void main() {
     expect(await db.select(db.householdFoodLinks).get(), isEmpty, reason: 'ein Produkt merkt das Gewicht am Produkt, nicht im Gedaechtnis');
   });
 
+  group('Scheiben von Stueckware', () {
+    Future<Product> addBrot(WidgetTester tester, {double? unitWeightG}) async {
+      final created = await productRepo(db).create(name: 'Brot', baseUnit: 'piece', unitWeightG: unitWeightG);
+      // Das BLS-Profil bringt den Code mit, ueber den die Einheit "Scheibe" aus der Tabelle kommt
+      final brot = (await productRepo(db).setBlsProfile(created.id, const BlsFood(code: 'B311000', nameDe: 'Weizenbrot/Weißbrot', per100: NutrientsPer100(kcal: 260))))!;
+      await inventoryRepo(db).recordFromScan(productId: brot.id, ean: '1', quantity: 1, unit: 'piece', bestBefore: DateTime.utc(2026, 12, 1), now: DateTime.utc(2026, 9, 1));
+      products = [brot];
+      await open(tester);
+      await tester.tap(find.byKey(const Key('meal-add-ingredient')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('picker-search')), 'Brot');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('pick-product-${brot.id}')));
+      await tester.pumpAndSettle();
+      await enterQuantity(tester, '2', unit: const Key('ingredient-unit-slice'));
+      return brot;
+    }
+
+    Future<double> stock(WidgetTester tester) async => (await tester.runAsync(() => db.select(db.inventoryItems).getSingle()))!.quantity;
+
+    formTest('mit Stueckgewicht: die Zeile sagt "vom Bestand", abgezogen wird der Anteil', (tester) async {
+      await addBrot(tester, unitWeightG: 560);
+      expect(subtitleOf(tester, 0), '2 Scheiben · ≈ 56 g · 146 kcal · vom Bestand');
+      await save(tester);
+      expect(await stock(tester), closeTo(0.9, 1e-9));
+    });
+
+    formTest('ohne Stueckgewicht: die Zeile sagt, dass nichts abgezogen wird, und der Bestand bleibt', (tester) async {
+      await addBrot(tester);
+      expect(subtitleOf(tester, 0), '2 Scheiben · ≈ 56 g · 146 kcal · kein Bestandsabzug: Stückgewicht fehlt');
+      await save(tester);
+      expect(await stock(tester), 1);
+    });
+  });
+
   group('Foto-Analyse', () {
     MealAnalysis counted() => const MealAnalysis(dishTitle: 'Fruehstueck', ingredients: [
           AnalyzedIngredient(

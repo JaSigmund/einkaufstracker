@@ -148,6 +148,7 @@ class _Row {
         blsCode: blsCode,
         nutrientBasis: manual != null ? 'manual' : (_productProfile != null ? 'product' : (blsCode != null && per100 != null ? trust.basis : null)),
         unitWeightG: unit == EntryUnit.piece ? unitWeightG : null,
+        unitKey: unit == EntryUnit.piece ? unitKey : null,
         microsPer100: microsPer100,
         preparation: retentionCategoryOfRow == null ? null : preparation,
         lineProfileWins: lineProfileWins,
@@ -164,15 +165,21 @@ class _Row {
   NutrientAmounts? get nutrients {
     final profile = _productProfile ?? per100;
     final basis = _productProfile != null ? product!.nutrientsBasis : per100Basis;
-    final amount = resolveIngredientAmount(
-      quantity: quantity,
-      entryUnit: unit,
-      baseUnit: product?.baseUnit ?? unit.dimensionBaseUnit,
-      nutrientsBasis: profile == null ? null : basis,
-      unitWeightG: unitWeightG ?? product?.unitWeightG,
-    );
-    return manual ?? ingredientNutrients(profile, amount);
+    return manual ?? ingredientNutrients(profile, _amount(profile == null ? null : basis));
   }
+
+  /// Der Abzug ist gewuenscht, die Menge laesst sich aber nicht in die Einheit des Bestands umrechnen: Beim Speichern wird nichts abgezogen.
+  bool get deductBlocked => deduct && product != null && _amount(null).inventoryQuantity == null;
+
+  IngredientAmount _amount(String? nutrientsBasis) => resolveIngredientAmount(
+        quantity: quantity,
+        entryUnit: unit,
+        baseUnit: product?.baseUnit ?? unit.dimensionBaseUnit,
+        nutrientsBasis: nutrientsBasis,
+        unitWeightG: unitWeightG,
+        productPieceWeightG: product?.unitWeightG,
+        unitKey: unitKey,
+      );
 }
 
 /// Mahlzeit erfassen oder bearbeiten (Doku 15 §3.1, Phase 7b): Titel, Zeitpunkt, Typ, Portionen und Zutaten aus
@@ -1266,7 +1273,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       // Bei Stueck, Scheibe, EL: was das in Gramm ist, damit nichts verborgen bleibt
       if (grams != null) '≈ ${formatQuantity(grams.roundToDouble() == grams ? grams : (grams * 10).round() / 10)} g',
       if (n?.kcal != null) formatKcal(n!.kcal!) else 'Nährwerte unbekannt',
-      if (r.deduct && r.product != null) 'vom Bestand',
+      if (r.deductBlocked) 'kein Bestandsabzug: Stückgewicht fehlt' else if (r.deduct && r.product != null) 'vom Bestand',
       if (r.inferred) 'vermutet' else if (r.source == 'photo_ai') (r.confidence ?? 0) < 0.5 ? 'unsicher geschätzt' : 'geschätzt',
     ];
     // Woher die Naehrwerte stammen, wenn nicht aus dem Namen der Zeile selbst ersichtlich ("Paprika" -> "Gemüsepaprika rot, roh")
