@@ -103,6 +103,50 @@ void main() {
     expect(find.text('nutzt den Kürbis'), findsOneWidget);
   });
 
+  testWidgets('Gericht suchen: geht auch mit leerem Inventar und schickt den Namen mit', (tester) async {
+    final cloud = FakeCookingCloud(suggestions: const [
+      RecipeSuggestion(title: 'Lasagne Bolognese', reason: 'der Klassiker', matchingIngredients: [], missingIngredients: ['Lasagneblätter', 'Faschiertes']),
+    ]);
+    await tester.pumpWidget(app(active: const [], products: const [], cloud: cloud));
+    await tester.pumpAndSettle();
+    await _dismissFirstUseNoticeIfShown(tester);
+
+    await tester.enterText(find.byKey(const Key('recipe-dish-input')), '  Lasagne ');
+    await tester.tap(find.byKey(const Key('recipe-dish-search')));
+    await tester.pumpAndSettle();
+
+    expect(cloud.lastDish, 'Lasagne');
+    expect(cloud.lastAllowMissing, isFalse);
+    expect(cloud.lastIngredients, isEmpty);
+    expect(find.text('Lasagne Bolognese'), findsOneWidget);
+    expect(find.textContaining('Fehlt: Lasagneblätter, Faschiertes'), findsOneWidget);
+
+    // Gefundenes laesst sich speichern, wie jeder andere Vorschlag
+    await tester.tap(find.byKey(const Key('save-Lasagne Bolognese')));
+    await tester.pumpAndSettle();
+    final saved = (await SavedRecipeRepository(db).loadAll()).single;
+    expect(saved.title, 'Lasagne Bolognese');
+    expect(saved.ingredients.map((i) => i.name), ['Lasagneblätter', 'Faschiertes']);
+    expect(saved.sourceUrl, isNotEmpty);
+  });
+
+  testWidgets('Gericht suchen: leere Eingabe ruft die Cloud nicht, kein Treffer wird gesagt', (tester) async {
+    final cloud = FakeCookingCloud();
+    await tester.pumpWidget(app(active: const [], products: const [], cloud: cloud));
+    await tester.pumpAndSettle();
+    await _dismissFirstUseNoticeIfShown(tester);
+
+    await tester.tap(find.byKey(const Key('recipe-dish-search')));
+    await tester.pumpAndSettle();
+    expect(cloud.suggestCalls, 0);
+
+    await tester.enterText(find.byKey(const Key('recipe-dish-input')), 'Fahrrad');
+    await tester.tap(find.byKey(const Key('recipe-dish-search')));
+    await tester.pumpAndSettle();
+    expect(cloud.suggestCalls, 1);
+    expect(find.textContaining('kein Gericht gefunden'), findsOneWidget);
+  });
+
   testWidgets('Leeres Inventar: Hinweis statt Cloud-Aufruf', (tester) async {
     final cloud = FakeCookingCloud();
     await tester.pumpWidget(app(active: const [], products: const [], cloud: cloud));

@@ -167,6 +167,15 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
             },
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: IconButton(
+            key: const Key('open-shopping-archive'),
+            tooltip: 'Abgeschlossene Einkäufe',
+            icon: const Icon(Icons.inventory_2_outlined),
+            onPressed: () => context.push('/shopping-archive'),
+          ),
+        ),
         if (orderedStores.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -286,6 +295,23 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
       if (ref.read(selectedShoppingListProvider) == list.id) ref.read(selectedShoppingListProvider.notifier).select(null);
       await repo.deleteList(list.id);
     }
+  }
+
+  /// "Einkauf abschließen" (ADR-043): nimmt das Abgehakte von der Liste, ins Archiv statt in den Papierkorb. Keine Rueckfrage, dafuer
+  /// "Rückgängig" und im Archiv der Weg zurueck.
+  Future<void> _finishPurchase(List<ShoppingListItem> done) async {
+    final repo = ref.read(shoppingListRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final archived = await repo.archiveItems([for (final i in done) i.id]);
+    if (archived.isEmpty) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        key: const Key('shopping-archived'),
+        content: Text(archived.length == 1 ? 'Ein Eintrag archiviert' : '${archived.length} Einträge archiviert'),
+        persist: false,
+        action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.unarchive(archived)),
+      ));
   }
 
   /// "Bald aufgebraucht": Produkte, die nach dem bisherigen Verbrauch in hoechstens drei Tagen leer sind und noch nirgends auf einer Liste
@@ -452,7 +478,18 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                 for (final i in grouped[group]!) _ItemTile(item: i, label: labelOf(i), product: i.productId == null ? null : products[i.productId]),
               ],
               if (done.isNotEmpty) ...[
-                Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Erledigt (${done.length})', style: t.textTheme.titleSmall)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+                  child: Row(children: [
+                    Expanded(child: Text('Erledigt (${done.length})', style: t.textTheme.titleSmall)),
+                    TextButton.icon(
+                      key: const Key('finish-purchase'),
+                      onPressed: () => _finishPurchase(done),
+                      icon: const Icon(Icons.task_alt),
+                      label: const Text('Einkauf abschließen'),
+                    ),
+                  ]),
+                ),
                 for (final i in done) _ItemTile(item: i, label: labelOf(i), product: i.productId == null ? null : products[i.productId]),
               ],
             ],

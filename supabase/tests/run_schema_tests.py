@@ -862,6 +862,12 @@ def main():
     check("Vertrag: Gegenbuchung der geloeschten Mahlzeit ist mit meal_id verknuepft",
           one("select count(*) from inventory_movements where type='adjustment' and meal_id = any(%s::uuid[])", (meal_ids,)) >= 1)
 
+    # --- Einkaufsliste archivieren (Migration 0034) ---------------------------------------------------------------------
+    check("Archiv: der abgeschlossene Einkauf aus dem Fixture traegt seinen Zeitstempel",
+          one("select count(*) from shopping_list_items where household_id = %s and archived_at is not null and checked", (ha,)) >= 1)
+    check("Archiv: B sieht nichts von Haushalt A",
+          one("select count(*) from shopping_list_items where archived_at is not null", user=B) == 0)
+
     # --- Wochenplan (Migration 0033) ----------------------------------------------------------------------------------
     check("Wochenplan: Fixture-Zeilen sind da, Zutaten als jsonb-Array",
           one("select count(*) from meal_plan_entries where household_id = %s and jsonb_typeof(ingredients) = 'array'", (ha,)) >= 2)

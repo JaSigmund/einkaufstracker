@@ -8,18 +8,27 @@
 export const MAX_INGREDIENTS = 40;
 export const MAX_LABEL_CHARS = 200;
 export const MAX_QUANTITY = 100_000;
+export const MAX_DISH_CHARS = 100;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type Ingredient = { name: string; quantity?: number; unit?: string };
-export type SuggestRequest = { household_id: string; ingredients: Ingredient[]; model?: string; allow_missing: boolean };
+export type SuggestRequest = { household_id: string; ingredients: Ingredient[]; model?: string; allow_missing: boolean; dish?: string };
 export type Parsed = { ok: true; value: SuggestRequest } | { ok: false; error: string };
 
 export function parseRequest(body: unknown): Parsed {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return { ok: false, error: "invalid_input" };
   const b = body as Record<string, unknown>;
   if (typeof b.household_id !== "string" || !UUID.test(b.household_id)) return { ok: false, error: "invalid_input" };
-  if (!Array.isArray(b.ingredients) || b.ingredients.length < 1) return { ok: false, error: "invalid_input" };
+  // Die Suche nach einem Gericht (ADR-044) landet als Text im Prompt: Laenge begrenzt, Zeilenumbrueche und Steuerzeichen weg, damit sie eine Zeile bleibt.
+  let dish: string | undefined;
+  if (b.dish != null) {
+    if (typeof b.dish !== "string") return { ok: false, error: "invalid_input" };
+    dish = b.dish.replace(/[\p{Cc}\s]+/gu, " ").trim();
+    if (dish.length === 0 || dish.length > MAX_DISH_CHARS) return { ok: false, error: "invalid_input" };
+  }
+  // Ein gesuchtes Gericht geht auch mit leerem Inventar, Vorschlaege aus dem Inventar nicht
+  if (!Array.isArray(b.ingredients) || (b.ingredients.length < 1 && dish == null)) return { ok: false, error: "invalid_input" };
   if (b.ingredients.length > MAX_INGREDIENTS) return { ok: false, error: "too_many_ingredients" };
 
   const ingredients: Ingredient[] = [];
@@ -41,7 +50,7 @@ export function parseRequest(body: unknown): Parsed {
   }
   if (b.model != null && typeof b.model !== "string") return { ok: false, error: "invalid_input" };
   if (b.allow_missing != null && typeof b.allow_missing !== "boolean") return { ok: false, error: "invalid_input" };
-  return { ok: true, value: { household_id: b.household_id, ingredients, model: b.model as string | undefined, allow_missing: b.allow_missing === true } };
+  return { ok: true, value: { household_id: b.household_id, ingredients, model: b.model as string | undefined, allow_missing: b.allow_missing === true, ...(dish != null ? { dish } : {}) } };
 }
 
 /// Zutatenzeilen fuer den Prompt, dringlichste zuerst (Reihenfolge der App).

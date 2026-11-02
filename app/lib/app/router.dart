@@ -34,13 +34,16 @@ import '../features/bugreport/feature_request_page.dart';
 import '../features/changelog/changelog_page.dart';
 import '../features/inventory/inventory_item_detail_page.dart';
 import '../features/products/stock_entry_page.dart';
+import '../features/recipes/recipe_form_page.dart';
 import '../features/recipes/recipe_suggestions_page.dart';
 import '../features/recipes/recipe_viewer_page.dart';
 import '../features/recipes/saved_recipes_page.dart';
 import '../domain/recipes/recipe_search_url.dart';
+import '../domain/recipes/saved_recipe.dart';
 import '../features/report/trend_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/shopping_list/aisle_order_page.dart';
+import '../features/shopping_list/shopping_archive_page.dart';
 import 'providers.dart';
 
 class _AuthRefresh extends ChangeNotifier {
@@ -141,6 +144,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
       GoRoute(path: '/nutrients', builder: (_, _) => const NutrientsPage()),
       GoRoute(path: '/aisle-order', builder: (_, state) => AisleOrderPage(initialStoreId: state.extra as String?)),
+      GoRoute(path: '/shopping-archive', builder: (_, _) => const ShoppingArchivePage()),
       GoRoute(path: '/quick-intake', builder: (_, _) => const QuickIntakePage()),
       GoRoute(path: '/meal-plan', builder: (_, _) => const MealPlanPage()),
       GoRoute(path: '/supplements', builder: (_, _) => const SupplementsPage()),
@@ -168,6 +172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         redirect: (_, state) => state.extra is RecipeViewerArgs ? null : '/',
       ),
       GoRoute(path: '/saved-recipes', builder: (_, _) => const SavedRecipesPage()),
+      GoRoute(path: '/recipe-form', builder: (_, state) => RecipeFormPage(existing: state.extra as SavedRecipe?)),
     ],
   );
 });

@@ -500,6 +500,9 @@ final listComparisonProvider = FutureProvider.autoDispose.family<ListComparison?
 
 final shoppingListItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchItems());
 
+/// Archivierte Eintraege der Einkaufsliste (ADR-043).
+final archivedShoppingItemsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchArchivedItems());
+
 /// Alle Einkaufslisten des Haushalts, die Standardliste zuerst (Ausbau 1.14).
 final shoppingListsStreamProvider = StreamProvider((ref) => ref.watch(shoppingListRepositoryProvider).watchLists());
 

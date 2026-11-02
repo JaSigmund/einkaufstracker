@@ -50,6 +50,37 @@ void main() {
     expect(find.byKey(const Key('shopping-list-empty')), findsOneWidget);
   });
 
+  testWidgets('Einkauf abschliessen archiviert nur das Abgehakte, Rueckgaengig holt es zurueck', (tester) async {
+    final repo = shoppingListRepo(db);
+    final bought = await repo.addManual(freeText: 'Milch');
+    final open = await repo.addManual(freeText: 'Brot');
+    await repo.setChecked(bought.id, true);
+    final items = await db.select(db.shoppingListItems).get();
+
+    await tester.pumpWidget(app(items: items));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('finish-purchase')));
+    await tester.pumpAndSettle();
+
+    Future<ShoppingListItem> row(String id) => (db.select(db.shoppingListItems)..where((i) => i.id.equals(id))).getSingle();
+    expect((await row(bought.id)).archivedAt, isNotNull);
+    expect((await row(open.id)).archivedAt, isNull);
+    expect(find.text('Ein Eintrag archiviert'), findsOneWidget);
+
+    await tester.tap(find.text('Rückgängig'));
+    await tester.pumpAndSettle();
+    expect((await row(bought.id)).archivedAt, isNull);
+    expect((await row(bought.id)).checked, isTrue);
+  });
+
+  testWidgets('ohne Abgehaktes gibt es nichts abzuschliessen', (tester) async {
+    await shoppingListRepo(db).addManual(freeText: 'Brot');
+    await tester.pumpWidget(app(items: await db.select(db.shoppingListItems).get()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('finish-purchase')), findsNothing);
+    expect(find.byKey(const Key('open-shopping-archive')), findsOneWidget);
+  });
+
   testWidgets('manuell per Freitext hinzufuegen', (tester) async {
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();

@@ -21,8 +21,44 @@ class ShoppingListRepository {
   final Uuid _uuid;
   Future<String>? _listIdFuture;
 
+  /// Was auf den Listen steht; archivierte Eintraege gehoeren nicht mehr dazu (ADR-043).
   Stream<List<ShoppingListItem>> watchItems() =>
-      (_db.select(_db.shoppingListItems)..where((i) => i.deletedAt.isNull())).watch();
+      (_db.select(_db.shoppingListItems)..where((i) => i.deletedAt.isNull() & i.archivedAt.isNull())).watch();
+
+  /// Die archivierten Eintraege, siehe `list_archive.dart`.
+  Stream<List<ShoppingListItem>> watchArchivedItems() =>
+      (_db.select(_db.shoppingListItems)..where((i) => i.deletedAt.isNull() & i.archivedAt.isNotNull())).watch();
+
+  /// "Einkauf abschließen" (ADR-043): nimmt die abgehakten unter [ids] mit demselben Zeitstempel von der Liste. Offenes bleibt stehen, es
+  /// wurde ja nicht gekauft. Gibt die wirklich archivierten IDs zurueck, damit "Rückgängig" genau diese trifft.
+  Future<List<String>> archiveItems(Iterable<String> ids) async {
+    final wanted = ids.toList();
+    final items = await (_db.select(_db.shoppingListItems)
+          ..where((i) => i.id.isIn(wanted) & i.checked.equals(true) & i.archivedAt.isNull() & i.deletedAt.isNull()))
+        .get();
+    if (items.isEmpty) return const [];
+    final now = appClock.now().toUtc();
+    await _db.transaction(() async {
+      for (final i in items) {
+        await _putItem(i.copyWith(archivedAt: Value(now), updatedAt: now));
+      }
+    });
+    onChanged?.call();
+    return [for (final i in items) i.id];
+  }
+
+  /// Holt archivierte Eintraege zurueck unter "Erledigt".
+  Future<void> unarchive(Iterable<String> ids) async {
+    final items = await (_db.select(_db.shoppingListItems)..where((i) => i.id.isIn(ids.toList()) & i.archivedAt.isNotNull())).get();
+    if (items.isEmpty) return;
+    final now = appClock.now().toUtc();
+    await _db.transaction(() async {
+      for (final i in items) {
+        await _putItem(i.copyWith(archivedAt: const Value(null), updatedAt: now));
+      }
+    });
+    onChanged?.call();
+  }
 
   Future<String> _defaultListId() => _listIdFuture ??= _loadOrCreateDefaultList();
 

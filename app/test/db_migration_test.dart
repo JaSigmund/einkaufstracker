@@ -21,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0, 20 ab 1.13.0, 21 ab 1.15.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0, 20 ab 1.13.0, 21 ab 1.15.0, 22 ab 1.17.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {

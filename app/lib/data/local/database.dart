@@ -445,6 +445,9 @@ class ShoppingListItems extends Table {
   /// 'manual' | 'expiring' | 'depleted' | 'recurring' | 'scan'
   TextColumn get source => text().withDefault(const Constant('manual'))();
   BoolColumn get isSuggestion => boolean().withDefault(const Constant(false))();
+
+  /// Gesetzt, sobald der Eintrag mit "Einkauf abschließen" archiviert wurde (ADR-043); Eintraege eines Abschlusses tragen denselben Wert.
+  DateTimeColumn get archivedAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
@@ -650,7 +653,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -772,6 +775,10 @@ class AppDatabase extends _$AppDatabase {
           // 21 -> 22: Wochenplan (ADR-042)
           if (from < 22) {
             await m.createTable(mealPlanEntries);
+          }
+          // 22 -> 23: Einkaeufe archivieren (ADR-043). Installationen vor 10 legen die Tabelle oben schon mit der Spalte an.
+          if (from >= 10 && from < 23) {
+            await m.addColumn(shoppingListItems, shoppingListItems.archivedAt);
           }
         },
       );

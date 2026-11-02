@@ -27,7 +27,8 @@ class SavedIngredient {
 
 /// Ein gespeichertes Rezept (ADR-021, Jakobs Anforderung "Rezepte sollen auch gespeichert werden
 /// koennen"). Nur Titel, die eigene (nicht kopierte) Zutatenliste und der Link zur echten Rezeptseite
-/// -- keine Kochanleitung (Urheberrecht, siehe ADR-021).
+/// -- keine Kochanleitung (Urheberrecht, siehe ADR-021). [notes] ist die einzige Ausnahme: eine Zubereitung, die der Nutzer selbst schreibt
+/// (ADR-044). Eigene Rezepte haben einen leeren [sourceUrl].
 ///
 /// **Vorerst rein lokal** (kein Sync): die Server-Tabelle dafuer ist nur als Entwurf vorhanden
 /// (`supabase/planned/recipes_draft.sql`), noch nicht eingespielt. Gespeichert wird deshalb ueber den
@@ -36,13 +37,14 @@ class SavedIngredient {
 /// sobald die Migration eingespielt ist, kann das 1:1 auf eine echte, synchronisierte Tabelle
 /// umgestellt werden, ohne dass sich dieses Modell aendern muss.
 class SavedRecipe {
-  const SavedRecipe({required this.id, required this.title, required this.sourceUrl, required this.ingredients, required this.savedAt});
+  const SavedRecipe({required this.id, required this.title, required this.sourceUrl, required this.ingredients, required this.savedAt, this.notes = ''});
 
   final String id;
   final String title;
   final String sourceUrl;
   final List<SavedIngredient> ingredients;
   final DateTime savedAt;
+  final String notes;
 
   factory SavedRecipe.fromJson(Map<String, dynamic> json) => SavedRecipe(
         id: json['id'] as String,
@@ -50,6 +52,7 @@ class SavedRecipe {
         sourceUrl: json['sourceUrl'] as String? ?? '',
         ingredients: [for (final i in (json['ingredients'] as List? ?? const [])) SavedIngredient.fromJson(i as Map<String, dynamic>)],
         savedAt: DateTime.parse(json['savedAt'] as String),
+        notes: json['notes'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -58,5 +61,6 @@ class SavedRecipe {
         'sourceUrl': sourceUrl,
         'ingredients': [for (final i in ingredients) i.toJson()],
         'savedAt': savedAt.toIso8601String(),
+        if (notes.isNotEmpty) 'notes': notes,
       };
 }

@@ -626,6 +626,8 @@ OnlinePriceRepository onlinePriceRepo(AppDatabase db, OnlinePriceRemote remote,
 class FakeCookingCloud implements CookingCloud {
   FakeCookingCloud({this.suggestions = const [], this.chatReply = 'ok', this.error});
 
+  String? lastDish;
+
   List<RecipeSuggestion> suggestions;
   String chatReply;
   Exception? error;
@@ -638,10 +640,11 @@ class FakeCookingCloud implements CookingCloud {
   CookingChatContext? lastContext;
 
   @override
-  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false}) async {
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false, String? dish}) async {
     suggestCalls++;
     lastIngredients = ingredients;
     lastAllowMissing = allowMissing;
+    lastDish = dish;
     if (error != null) throw error!;
     return suggestions;
   }
