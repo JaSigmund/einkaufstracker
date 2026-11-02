@@ -66,6 +66,7 @@ class _Row {
     this.microsPer100,
     this.preparation,
     this.inferred = false,
+    this.lineProfileWins = false,
   });
 
   Product? product;
@@ -83,6 +84,10 @@ class _Row {
 
   /// KI-Vorschlag, den man auf dem Foto nicht sieht (Bratoel, Dressing): In der Zeile steht "vermutet".
   bool inferred;
+
+  /// [per100] gilt, obwohl das Produkt ein eigenes Profil hat: Die Menge ist "wie gegessen" (Q-28), das Profil des Produkts gilt fuer die
+  /// rohe Ware. 200 g gekochter Reis haben etwa 260 kcal, nicht die 700 kcal von 200 g rohem.
+  bool lineProfileWins;
 
   /// BLS-Eintrag, aus dem [per100] stammt (Phase N1), sein Name und wie sicher die Zuordnung ist. [learn]: beim Speichern
   /// im Gedaechtnis des Haushalts vermerken (nur sinnvoll, wenn die Zuordnung dem Server noch nicht bekannt war).
@@ -118,7 +123,7 @@ class _Row {
   String get label => product?.name ?? freeText ?? 'Zutat';
 
   /// Naehrwertprofil des Produkts, falls es eines hat (Produkte vom Bon haben meist keines).
-  NutrientsPer100? get _productProfile => product == null ? null : productNutrientProfile(product!);
+  NutrientsPer100? get _productProfile => product == null || lineProfileWins ? null : productNutrientProfile(product!);
 
   /// Wie sicher die Naehrwerte dieser Zeile sind: Produkt mit eigenem Profil und Handwerte gelten als sicher, ein BLS-Treffer
   /// nach seiner Zuordnung, ohne Naehrwerte ist es unbekannt.
@@ -145,6 +150,7 @@ class _Row {
         unitWeightG: unit == EntryUnit.piece ? unitWeightG : null,
         microsPer100: microsPer100,
         preparation: retentionCategoryOfRow == null ? null : preparation,
+        lineProfileWins: lineProfileWins,
       );
 
   /// Das Naehrwertprofil, mit dem diese Zeile rechnet (Produkt vor BLS-Eintrag).
@@ -359,7 +365,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       final product = i.productId == null ? null : products[i.productId];
       NutrientsPer100? per100;
       NutrientAmounts? manual;
-      if (product == null) {
+      // Ein Produkt speichert seinen BLS-Code nur, wenn die Zeile mit dem BLS-Eintrag gerechnet hat (siehe MealRepository)
+      final fromSnapshot = product == null || i.blsCode != null;
+      if (fromSnapshot) {
         // Ohne Produkt (Freitext, BLS oder geloeschtes Produkt) steht nur der Snapshot zur Verfuegung: daraus je 100 g
         // zurueckrechnen, damit die Menge noch aenderbar bleibt; ohne bekannte Menge bleiben die Werte absolut.
         final basis = i.amountG;
@@ -374,7 +382,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             fiberG: per(i.fiberG),
             saltG: per(i.saltG),
           );
-        } else if ([i.kcal, i.proteinG, i.fatG, i.carbsG, i.sugarG, i.fiberG, i.saltG].any((v) => v != null)) {
+        } else if (product == null && [i.kcal, i.proteinG, i.fatG, i.carbsG, i.sugarG, i.fiberG, i.saltG].any((v) => v != null)) {
           manual = NutrientAmounts(
             kcal: i.kcal, proteinG: i.proteinG, fatG: i.fatG, carbsG: i.carbsG, sugarG: i.sugarG, fiberG: i.fiberG, saltG: i.saltG,
           );
@@ -395,8 +403,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
         // Bei Stueckmengen steht das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl)
         unitWeightG: unit == EntryUnit.piece && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null,
-        microsPer100: product == null ? undoRetention(micros100From(parseMicros(i.micros), i.amountG), retentionFromStorage(i.preparation)) : null,
+        microsPer100: fromSnapshot ? undoRetention(micros100From(parseMicros(i.micros), i.amountG), retentionFromStorage(i.preparation)) : null,
         preparation: product == null && retentionFromStorage(i.preparation) != null ? i.preparation : null,
+        lineProfileWins: product != null && per100 != null,
       ));
     }
     return rows;
@@ -557,7 +566,9 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         // Hat das Produkt eigene Naehrwerte, gelten sie. Sonst (die meisten Produkte vom Bon) springt der automatisch
         // zugeordnete BLS-Eintrag ein; ohne beides bleibt die Zeile "unbekannt" (Phase N1, ADR-031).
         final ownProfile = product != null && productNutrientProfile(product) != null;
-        final match = ownProfile ? null : i.match;
+        // Gekocht geschaetzte Mengen brauchen den gekochten Eintrag: Das Profil des Produkts gilt fuer die rohe Ware (Q-28)
+        final asEaten = ownProfile && i.state == 'cooked' && i.match != null;
+        final match = ownProfile && !asEaten ? null : i.match;
         // Hat der Server eine Stueckzahl samt Gewicht geliefert ("2 Eier a 50 g"), gilt sie statt der Gramm-Schaetzung (Phase N2)
         final counted = i.unit;
         _rows.add(_Row(
@@ -582,6 +593,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           matchTrust: match?.trust ?? MatchTrust.sure,
           // Gedaechtnis und Synonym kennt der Server schon, alles andere merkt sich der Haushalt beim Speichern
           learn: match != null && !match.alreadyKnown,
+          lineProfileWins: asEaten,
         ));
       }
       // FR-17: Mengen aus einem Foto sind Schaetzungen und muessen in allen Auswertungen erkennbar sein.
@@ -721,6 +733,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           ..microsPer100 = null
           ..preparation = null
           ..learn = false
+          ..lineProfileWins = false
           ..deduct = active.any((i) => i.productId == product.id);
         if (product.baseUnit == 'l' && row.unit == EntryUnit.g) row.unit = EntryUnit.ml;
       } else if (bls != null) {

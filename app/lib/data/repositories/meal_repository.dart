@@ -58,6 +58,7 @@ class IngredientDraft {
     this.unitWeightG,
     this.microsPer100,
     this.preparation,
+    this.lineProfileWins = false,
   }) : assert(productId != null || freeText != null, 'Eine Zutat braucht ein Produkt oder einen Text');
 
   final String? productId;
@@ -99,6 +100,10 @@ class IngredientDraft {
   /// der Zeile werden dann um die Verluste gemindert; [microsPer100] bleibt das rohe Profil. Nur mit einem BLS-Profil ohne Produkt
   /// sinnvoll; bei einem unbekannten Wert wird nichts gemindert und nichts gespeichert.
   final String? preparation;
+
+  /// [per100] gilt auch bei einem Produkt mit eigenem Profil: Die Menge ist "wie gegessen" (Q-28), etwa gekochter Reis aus der Foto-Analyse,
+  /// das Profil des Produkts gilt fuer die rohe Ware. Der BLS-Code bleibt dann an der Zeile.
+  final bool lineProfileWins;
 }
 
 /// Eine Mahlzeit samt Zutaten, wie sie gespeichert werden soll.
@@ -290,7 +295,7 @@ class MealRepository {
           : await (_db.select(_db.products)..where((p) => p.id.equals(d.productId!))).getSingleOrNull();
       // Ein Produkt mit eigenen Naehrwerten gilt zuerst; hat es keine (35 von 39 Produkten vom Bon), springt das Profil des
       // zugeordneten BLS-Eintrags ein (Phase N1), das die Zeile mitbringt.
-      final productProfile = product == null ? null : productNutrientProfile(product);
+      final productProfile = product == null || d.lineProfileWins ? null : productNutrientProfile(product);
       final per100 = productProfile ?? d.per100;
       final basis = productProfile != null ? product!.nutrientsBasis : (per100 == null ? null : d.per100Basis);
       final String? nutrientBasis = d.nutrientBasis ??

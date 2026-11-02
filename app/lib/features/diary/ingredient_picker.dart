@@ -160,7 +160,14 @@ class _QuantityDialogState extends State<_QuantityDialog> {
   /// Gewicht und Herkunft von 1 [key], in der Reihenfolge: selbst eingetragen, gewaehlte Groesse, bekanntes Stueckgewicht
   /// (Haushalt/Produkt), Tabellenwert.
   ({double grams, String source})? _weightOf(FoodUnitKey key) {
-    if (key == _key && _typedWeight != null) return (grams: _typedWeight!, source: 'own');
+    // Das Feld fragt nach dem Gewicht von 1 Stueck: fuer eine Scheibe oder einen EL gilt die Zahl nicht
+    if (key == FoodUnitKey.piece && key == _key && _typedWeight != null) return (grams: _typedWeight!, source: 'own');
+    return _knownWeightOf(key);
+  }
+
+  /// Das Gewicht von 1 [key] ohne die gerade getippte Zahl. Danach richtet sich, ob das Eingabefeld da ist: Mit der getippten Zahl
+  /// verschwaende es nach der ersten Ziffer, und der Fokus spraenge auf die Menge.
+  ({double grams, String source})? _knownWeightOf(FoodUnitKey key) {
     final chosen = _picked[key];
     if (chosen != null) return (grams: chosen.gramsEdible, source: chosen.source);
     // Eine gespeicherte Zeile bringt ihr Gewicht mit: es gilt, bis jemand etwas anderes waehlt (und wird nicht "gelernt")
@@ -180,6 +187,8 @@ class _QuantityDialogState extends State<_QuantityDialog> {
   void _selectKey(FoodUnitKey k) => setState(() {
         _unit = EntryUnit.piece;
         _key = k;
+        // Wer das Aendern verlaesst, verwirft es: sonst gaelte spaeter eine Zahl, deren Feld gar nicht mehr zu sehen ist
+        if (_editWeight) _weightController.clear();
         _editWeight = false;
       });
 
@@ -224,7 +233,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
   Widget _sizeChips(FoodUnitKey key) {
     final sizes = sizesOf(widget.units, key).where((u) => u.size != UnitSize.none).toList();
     if (sizes.length < 2) return const SizedBox.shrink();
-    final current = _weightOf(key)?.grams;
+    final current = _weightOf(key);
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Wrap(key: const Key('ingredient-sizes'), spacing: 8, runSpacing: 4, children: [
@@ -232,7 +241,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
           ChoiceChip(
             key: Key('ingredient-size-${u.size.db}'),
             label: Text('${u.size.label} · ${formatQuantity(u.gramsEdible)} g'),
-            selected: _picked[key] == u || (_picked[key] == null && current == u.gramsEdible && _typedWeight == null),
+            selected: _picked[key] == u || (_picked[key] == null && current?.grams == u.gramsEdible && current?.source != 'own'),
             onSelected: (_) => setState(() {
               _picked[key] = u;
               _weightController.clear();
@@ -287,7 +296,7 @@ class _QuantityDialogState extends State<_QuantityDialog> {
   @override
   Widget build(BuildContext context) {
     final key = _key;
-    final known = key == null ? null : _weightOf(key);
+    final known = key == null ? null : _knownWeightOf(key);
     // Ohne bekanntes Stueckgewicht fragt der Dialog einmal danach; mit bekanntem nur auf Wunsch
     final askWeight = key == FoodUnitKey.piece && (known == null || _editWeight);
     final foodName = widget.label;
