@@ -33,6 +33,7 @@ import '../features/bugreport/bug_report_page.dart';
 import '../features/bugreport/feature_request_page.dart';
 import '../features/changelog/changelog_page.dart';
 import '../features/inventory/inventory_item_detail_page.dart';
+import '../features/products/manual_stock_page.dart';
 import '../features/products/stock_entry_page.dart';
 import '../features/recipes/recipe_form_page.dart';
 import '../features/recipes/recipe_suggestions_page.dart';
@@ -115,7 +116,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/product-form',
         builder: (_, state) {
           final a = state.extra as ProductFormArgs?;
-          return ProductFormPage(ean: a?.ean, suggestion: a?.suggestion, existing: a?.existing);
+          return ProductFormPage(ean: a?.ean, suggestion: a?.suggestion, existing: a?.existing, initialName: a?.initialName);
         },
       ),
       GoRoute(
@@ -153,10 +154,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/stock-entry',
         builder: (_, state) {
           final a = state.extra as StockEntryArgs;
-          return StockEntryPage(product: a.product, ean: a.ean);
+          return StockEntryPage(product: a.product, ean: a.ean, suggestion: a.suggestion);
         },
         redirect: (_, state) => state.extra is StockEntryArgs ? null : '/',
       ),
+      GoRoute(path: '/stock-manual', builder: (_, _) => const ManualStockPage()),
       GoRoute(path: '/recipe-suggestions', builder: (_, _) => const RecipeSuggestionsPage()),
       GoRoute(
         path: '/recipe-viewer',

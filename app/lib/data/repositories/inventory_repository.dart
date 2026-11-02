@@ -7,6 +7,7 @@ import '../../core/clock.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/nutrition/fefo_deduction.dart';
 import '../../domain/products/packaging.dart';
+import '../../domain/receipt/unit_price.dart';
 import '../local/database.dart';
 import '../../core/vienna_time.dart';
 import '../sync/mappers.dart';
@@ -28,19 +29,22 @@ class MealDeduction {
 /// Der Bon, dem ein Inventar-Eintrag zugeordnet ist (siehe [InventoryRepository.receiptLinkFor]).
 class ReceiptLink {
   const ReceiptLink(
-      {required this.receiptId, required this.receiptItemId, required this.purchasedAt, this.storeChain, required this.rawText, this.lineTotalCents});
+      {required this.receiptId, required this.receiptItemId, required this.purchasedAt, this.storeChain, required this.rawText, this.lineTotalCents, this.productName});
   final String receiptId;
   final String receiptItemId;
   final DateTime purchasedAt;
   final String? storeChain;
   final String rawText;
   final int? lineTotalCents;
+
+  /// Produkt, zu dem die Bon-Position bisher gehoert. Nur bei [InventoryRepository.otherReceiptLinksFor] gesetzt.
+  final String? productName;
 }
 
 /// Inventar und Bestandsbewegungen (Doku 06). Jede Bestandsaenderung schreibt in derselben "Transaktion"
 /// (lokal: drift-Transaktion, remote: zwei Outbox-Eintraege) auch eine Zeile ins Ledger (§9).
 class InventoryRepository {
-  InventoryRepository(this._db, {required this.householdId, this.onChanged, this.onDepleted, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  InventoryRepository(this._db, {required this.householdId, this.onChanged, this.onDepleted, this.relearnReceiptText, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
   final Future<String> Function() householdId;
@@ -50,6 +54,10 @@ class InventoryRepository {
   /// (Doku 06 §6, Ausloeser "Leer"): haengt die Einkaufsliste per Vorschlag ein, ohne dass InventoryRepository
   /// die Einkaufsliste selbst kennen muss.
   final Future<void> Function(String productId)? onDepleted;
+
+  /// Merkt sich nach dem Umhaengen einer Bon-Position, zu welchem Produkt ihr Bon-Text gehoert, damit der naechste Bon
+  /// gleich stimmt (siehe [setReceiptLink]). Wie [onDepleted], damit dieses Repository die Produkte nicht kennen muss.
+  final Future<void> Function(String rawText, String productId)? relearnReceiptText;
   final Uuid _uuid;
 
   /// Aktiver Bestand (sealed/opened), nicht geloescht, nach Ablaufdatum sortiert (unbekannt zuletzt).
@@ -127,7 +135,19 @@ class InventoryRepository {
   /// Bestand zuordnen will (Fehlerbericht "kein passender Bon bei Inventarartikel gefunden", 2026-10-01) -- sie
   /// auszublenden hiess, dass die Liste leer blieb, obwohl der passende Bon als Vorschlag direkt daneben lag.
   /// [setReceiptLink] nimmt den Vorschlag dann auf.
-  Future<List<ReceiptLink>> candidateReceiptLinksFor(String productId, {int limit = 10}) async {
+  Future<List<ReceiptLink>> candidateReceiptLinksFor(String productId, {int limit = 10}) =>
+      _unlinkedReceiptLinks(_db.receiptItems.productId.equals(productId), limit: limit);
+
+  /// Noch nicht zugeordnete Bon-Positionen, die bisher zu einem ANDEREN Produkt gehoeren oder zu gar keinem. Die Bon-Zuordnung
+  /// passt beim Import nur nach dem Text: "CV Champig. 3.Wahl" landete bei den frischen "Champignons", der Scan der Dose legte
+  /// "Champinions Dose" an, und die Position war fuer die Dose nicht mehr auswaehlbar (Fehlerbericht "Bon Zuordnung",
+  /// 2026-11-02). [setReceiptLink] haengt die gewaehlte Position dann um.
+  Future<List<ReceiptLink>> otherReceiptLinksFor(String productId, {int limit = 100}) => _unlinkedReceiptLinks(
+        _db.receiptItems.productId.isNull() | _db.receiptItems.productId.equals(productId).not(),
+        limit: limit,
+      );
+
+  Future<List<ReceiptLink>> _unlinkedReceiptLinks(Expression<bool> filter, {required int limit}) async {
     final hid = await householdId();
     final linked = _db.selectOnly(_db.inventoryItems)
       ..addColumns([_db.inventoryItems.receiptItemId])
@@ -139,8 +159,13 @@ class InventoryRepository {
     final query = _db.select(_db.receiptItems).join([
       innerJoin(_db.receipts, _db.receipts.id.equalsExp(_db.receiptItems.receiptId)),
       leftOuterJoin(_db.stores, _db.stores.id.equalsExp(_db.receipts.storeId)),
+      leftOuterJoin(_db.products, _db.products.id.equalsExp(_db.receiptItems.productId)),
     ])
-      ..where(_db.receiptItems.householdId.equals(hid) & _db.receiptItems.productId.equals(productId) & _db.receiptItems.deletedAt.isNull())
+      ..where(_db.receiptItems.householdId.equals(hid) &
+          _db.receiptItems.kind.equals('article') &
+          filter &
+          _db.receiptItems.deletedAt.isNull() &
+          _db.receipts.deletedAt.isNull())
       ..orderBy([OrderingTerm.desc(_db.receipts.purchasedAt)])
       ..limit(limit + linkedIds.length);
     final rows = await query.get();
@@ -158,6 +183,7 @@ class InventoryRepository {
             storeChain: store?.chain,
             rawText: item.rawText,
             lineTotalCents: item.lineTotalCents,
+            productName: row.readTableOrNull(_db.products)?.name,
           );
         })
         .toList();
@@ -170,6 +196,10 @@ class InventoryRepository {
   /// Vorschlag auf: er und seine Kaufbuchung werden geloescht. Beides beschreibt denselben Einkauf wie der
   /// bestaetigte Eintrag (Vorschlag: Beleg per Bon, Eintrag: Beleg per Scan) -- bliebe der Vorschlag stehen,
   /// stuende die Ware doppelt im Bestand und im Ledger. Vorschlaege anderer Bon-Positionen bleiben unberuehrt.
+  ///
+  /// Gehoert die Position bisher zu einem anderen Produkt, wandert sie zum Produkt des Eintrags, und der Bon-Text wird dort
+  /// gelernt. Sonst stuenden Ausgaben und Preisverlauf weiter beim falschen Produkt, und der naechste Bon irrte sich wieder.
+  /// Andere Bons mit demselben Text bleiben, wie sie sind: dort war es vielleicht wirklich das andere Produkt.
   Future<void> setReceiptLink(String inventoryItemId, String? receiptItemId) async {
     final item = await _get(inventoryItemId);
     final now = appClock.now().toUtc();
@@ -185,9 +215,33 @@ class InventoryRepository {
         await _putItem(suggestion.copyWith(deletedAt: Value(now), updatedAt: now));
         await _deleteMovementsOf(suggestion.id, now);
       }
+      await _moveReceiptItemTo(receiptItemId, item.productId, now);
     }
     await _putItem(item.copyWith(receiptItemId: Value(receiptItemId), updatedAt: now));
     onChanged?.call();
+  }
+
+  Future<void> _moveReceiptItemTo(String receiptItemId, String productId, DateTime now) async {
+    final position = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(receiptItemId))).getSingleOrNull();
+    if (position == null || position.productId == productId) return;
+    final product = await (_db.select(_db.products)..where((p) => p.id.equals(productId))).getSingleOrNull();
+    final moved = position.copyWith(
+      productId: Value(productId),
+      // Der Grundpreis haengt an der Packung des Produkts und muss neu gerechnet werden
+      unitPriceNormCents: Value(product == null
+          ? null
+          : computeUnitPriceNormCents(
+              lineTotalCents: position.lineTotalCents,
+              quantity: position.quantity,
+              quantityUnit: position.quantityUnit,
+              productBaseUnit: product.baseUnit,
+              packSize: product.packSize,
+              rawText: position.rawText,
+            )),
+      updatedAt: now,
+    );
+    await _put('receipt_items', moved.id, receiptItemToRemote(moved), () => _db.into(_db.receiptItems).insertOnConflictUpdate(moved.toCompanion(false)));
+    await relearnReceiptText?.call(position.rawText, productId);
   }
 
   Future<void> _deleteMovementsOf(String inventoryItemId, DateTime now) async {
@@ -272,9 +326,13 @@ class InventoryRepository {
 
   /// Barcode-Scan eines Produkts (Doku 06 §3.5): verfeinert einen passenden Bon-Vorschlag, sonst legt es einen
   /// neuen, sofort bestaetigten Bestand an (mit Kaufbewegung, weil kein Bon dahintersteht).
+  ///
+  /// Ohne [ean] ist es lose Ware ohne Strichcode (Fehlerbericht "Produkte ohne Barcode", 2026-11-02). Mit [suggestionId] wird
+  /// genau dieser Bon-Vorschlag uebernommen, auch wenn er aelter als die 7 Tage von [findRefinableSuggestion] ist.
   Future<InventoryItem> recordFromScan({
     required String productId,
-    required String ean,
+    String? ean,
+    String? suggestionId,
     double quantity = 1,
     String unit = 'piece',
     DateTime? bestBefore,
@@ -285,12 +343,12 @@ class InventoryRepository {
   }) async {
     final hid = await householdId();
     final today = _today(now);
-    final refine = await findRefinableSuggestion(productId, now: now);
+    final refine = suggestionId != null ? await _get(suggestionId) : await findRefinableSuggestion(productId, now: now);
     final expiresOn = computeExpiresOn(bestBefore: bestBefore, openShelfLifeDays: openShelfLifeDays);
 
     if (refine != null) {
       final updated = refine.copyWith(
-        ean: Value(ean),
+        ean: Value(ean ?? refine.ean),
         quantity: quantity,
         unit: unit,
         bestBefore: Value(bestBefore),

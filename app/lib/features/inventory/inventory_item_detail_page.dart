@@ -213,35 +213,63 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
   /// auch aenderbar sein, nicht nur anzeigbar).
   Future<void> _changeReceiptLink() async {
     final candidates = await _repo.candidateReceiptLinksFor(_item.productId);
+    final others = await _repo.otherReceiptLinksFor(_item.productId);
     if (!mounted) return;
+    var query = '';
     final choice = await showModalBottomSheet<_ReceiptLinkChoice>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            if (_receiptLink != null)
-              ListTile(
-                key: const Key('receipt-link-remove'),
-                leading: const Icon(Icons.link_off),
-                title: const Text('Zuordnung lösen'),
-                subtitle: const Text('Wird zu einem reinen Scan ohne Bon-Herkunft'),
-                onTap: () => Navigator.pop(ctx, const _ReceiptLinkChoice(null)),
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheetState) {
+        final q = query.trim().toLowerCase();
+        final shown = q.isEmpty ? others : others.where((c) => c.rawText.toLowerCase().contains(q) || (c.productName?.toLowerCase().contains(q) ?? false)).toList();
+        Widget tile(ReceiptLink c) => ListTile(
+              key: Key('receipt-link-candidate-${c.receiptItemId}'),
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(c.storeChain ?? 'Bon'),
+              subtitle: Text([
+                '${_formatDate(c.purchasedAt)} · „${c.rawText}“',
+                if (c.productName != null && c.productName != _product?.name) 'bisher bei ${c.productName}',
+              ].join('\n')),
+              trailing: c.lineTotalCents == null ? null : Text(formatEuro(c.lineTotalCents!)),
+              onTap: () => Navigator.pop(ctx, _ReceiptLinkChoice(c.receiptItemId)),
+            );
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.8),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  if (_receiptLink != null)
+                    ListTile(
+                      key: const Key('receipt-link-remove'),
+                      leading: const Icon(Icons.link_off),
+                      title: const Text('Zuordnung lösen'),
+                      subtitle: const Text('Wird zu einem reinen Scan ohne Bon-Herkunft'),
+                      onTap: () => Navigator.pop(ctx, const _ReceiptLinkChoice(null)),
+                    ),
+                  if (candidates.isEmpty && others.isEmpty && _receiptLink == null)
+                    const Padding(padding: EdgeInsets.all(16), child: Text('Keine passenden Bon-Positionen gefunden.')),
+                  for (final c in candidates) tile(c),
+                  if (others.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        key: const Key('receipt-link-search'),
+                        decoration: const InputDecoration(labelText: 'Andere Bon-Positionen durchsuchen', prefixIcon: Icon(Icons.search)),
+                        onChanged: (v) => setSheetState(() => query = v),
+                      ),
+                    ),
+                    for (final c in shown) tile(c),
+                    if (shown.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Nichts gefunden.')),
+                  ],
+                ],
               ),
-            if (candidates.isEmpty && _receiptLink == null)
-              const Padding(padding: EdgeInsets.all(16), child: Text('Keine passenden Bon-Positionen gefunden.')),
-            for (final c in candidates)
-              ListTile(
-                key: Key('receipt-link-candidate-${c.receiptItemId}'),
-                leading: const Icon(Icons.receipt_long_outlined),
-                title: Text(c.storeChain ?? 'Bon'),
-                subtitle: Text('${_formatDate(c.purchasedAt)} · „${c.rawText}“'),
-                trailing: c.lineTotalCents == null ? null : Text(formatEuro(c.lineTotalCents!)),
-                onTap: () => Navigator.pop(ctx, _ReceiptLinkChoice(c.receiptItemId)),
-              ),
-          ],
-        ),
-      ),
+            ),
+          ),
+        );
+      }),
     );
     if (choice == null) return;
     await _repo.setReceiptLink(_item.id, choice.receiptItemId);

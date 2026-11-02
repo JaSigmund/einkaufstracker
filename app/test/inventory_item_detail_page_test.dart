@@ -214,6 +214,35 @@ void main() {
       expect(row.receiptItemId, 'ri1');
     });
 
+    // Fehlerbericht "Bon Zuordnung" (2026-11-02): die Position haengt beim Import an einem anderen Produkt.
+    testWidgets('Position eines anderen Produkts: per Suche findbar, Zuordnen haengt sie um', (tester) async {
+      await makeReceiptItem('ri1', 'CV Champig. 3.Wahl');
+      final can = await productRepo(db).create(name: 'Champinions Dose');
+      final item = await inventoryRepo(db).recordFromScan(productId: can.id, ean: '1', now: DateTime.utc(2026, 9, 27));
+      await tester.pumpWidget(app(item, p: can));
+      await tester.pumpAndSettle();
+      GoRouter.of(tester.element(find.text('START'))).push('/item');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('receipt-link-add')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('bisher bei Vollmilch'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('receipt-link-search')), 'tomaten');
+      await tester.pump();
+      expect(find.byKey(const Key('receipt-link-candidate-ri1')), findsNothing);
+      expect(find.text('Nichts gefunden.'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('receipt-link-search')), 'champig');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('receipt-link-candidate-ri1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-link')), findsOneWidget);
+      final position = await (db.select(db.receiptItems)..where((i) => i.id.equals('ri1'))).getSingle();
+      expect(position.productId, can.id);
+    });
+
     // Fehlerbericht "kein passender Bon bei Inventarartikel gefunden" (2026-10-01): "Bergbauern Milch" war
     // schon gescannt, der Bon kam danach als Vorschlag dazu -- die Liste zeigte trotzdem "keine passende
     // Bon-Position", weil der Vorschlag die Position fuer "schon zugeordnet" hielt.
