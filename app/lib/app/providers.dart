@@ -59,6 +59,7 @@ import '../data/notifications/notification_scheduler.dart';
 import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
 import '../data/repositories/cooking_session_repository.dart';
+import '../data/repositories/drink_repository.dart';
 import '../features/recipes/cooking_chat_panel.dart';
 import '../features/recipes/cooking_timer_controller.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
@@ -498,6 +499,8 @@ final mealPlanRepositoryProvider = Provider<MealPlanRepository>((ref) {
 });
 
 final mealPlanStreamProvider = StreamProvider((ref) => ref.watch(mealPlanRepositoryProvider).watchEntries());
+
+final drinkRepositoryProvider = Provider<DrinkRepository>((ref) => DrinkRepository(ref.watch(mealRepositoryProvider)));
 
 final cookingSessionRepositoryProvider = Provider<CookingSessionRepository>((ref) {
   return CookingSessionRepository(

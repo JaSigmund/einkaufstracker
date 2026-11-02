@@ -38,6 +38,9 @@ class Products extends Table {
   /// Name der Stuecke in der Mehrzahl ("Fläschchen"), ohne Angabe "Stk".
   TextColumn get pieceLabel => text().nullable()();
 
+  /// Vom Nutzer entschieden: trinkbar oder nicht (ADR-048). `null`: Die Regel in `domain/products/drinkable.dart` entscheidet.
+  BoolColumn get isDrink => boolean().nullable()();
+
   /// Standardhaltbarkeit ab Kauf (Tage), falls kein MHD bekannt ist.
   IntColumn get sealedShelfLifeDays => integer().nullable()();
 
@@ -676,7 +679,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -811,6 +814,10 @@ class AppDatabase extends _$AppDatabase {
           // 24 -> 25: Kochzeiten (ADR-046)
           if (from < 25) {
             await m.createTable(cookingSessions);
+          }
+          // 25 -> 26: Trinkbare Produkte (ADR-048)
+          if (from < 26) {
+            await m.addColumn(products, products.isDrink);
           }
         },
       );

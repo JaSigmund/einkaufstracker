@@ -9,6 +9,7 @@ import '../../data/products/off_client.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
 import '../../domain/products/off_quantity.dart';
+import '../../domain/products/drinkable.dart';
 import '../../domain/products/packaging.dart';
 import '../../domain/receipt/unit_price.dart';
 import '../../domain/shopping_list/list_quantity.dart';
@@ -69,6 +70,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late String _location = widget.existing?.defaultLocation ?? _shelfLifeSuggestion?.location ?? 'pantry';
   late String _dateKind = widget.existing?.defaultDateKind ?? _shelfLifeSuggestion?.dateKind ?? 'best_before';
   late bool _restock = widget.existing?.restock ?? false;
+
+  /// Die eigene Entscheidung "trinkbar" (ADR-048). `null`: Die Regel entscheidet, auch spaeter noch.
+  late bool? _drinkChoice = widget.existing?.isDrink;
   var _saving = false;
   String? _error;
   late final _search = TextEditingController();
@@ -231,6 +235,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           defaultDateKind: _dateKind,
           openedShelfLifeDays: Value(openedDays),
           restock: _restock,
+          isDrink: Value(_drinkChoice),
         );
         await repo.update(updated);
         // Der Bestand folgt, wenn sich die Einheit geaendert hat oder der Inhalt jetzt erst bekannt ist
@@ -254,6 +259,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           nutrientsBasis: widget.suggestion?.nutrientsBasis,
           nutrientsSource: widget.suggestion?.nutrientsPer100 == null ? null : 'off',
           unitWeightG: packaging.pieceWeightG ?? (widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!)),
+          isDrink: _drinkChoice,
           ean: widget.ean,
         );
       }
@@ -347,6 +353,21 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               for (final c in categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
             ],
             onChanged: (v) => setState(() => _categoryId = v),
+          ),
+          ListenableBuilder(
+            listenable: _name,
+            builder: (context, _) {
+              final p = resolvePackaging(kind: _kind, looseUnit: _looseUnit, count: _pieceCount.text, amount: _packSize.text, amountUnit: _amountUnit, label: _pieceLabel.text);
+              final categoryName = categories.where((c) => c.id == _categoryId).firstOrNull?.name;
+              return SwitchListTile(
+                key: const Key('product-is-drink'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Trinkbar'),
+                subtitle: const Text('Steht dann unter „Schnell eintragen“ bei den Getränken'),
+                value: isDrinkable(flag: _drinkChoice, name: _name.text, baseUnit: p.baseUnit, packSize: p.packSize, categoryName: categoryName),
+                onChanged: (v) => setState(() => _drinkChoice = v),
+              );
+            },
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<PackagingKind>(
