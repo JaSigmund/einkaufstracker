@@ -9,6 +9,7 @@ import '../../domain/inventory/expiry.dart';
 import '../../domain/inventory/usage_forecast.dart';
 import '../common/quantity_dialog.dart';
 import '../products/barcode_flow.dart';
+import '../products/products_list_page.dart';
 import '../products/stock_entry_page.dart';
 import 'inventory_item_detail_page.dart';
 
@@ -44,7 +45,8 @@ String _expiryText(InventoryItem item, ExpiryLevel level, DateTime today) {
 
 /// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand nach Dringlichkeit gruppiert (abgelaufen/
 /// bald faellig zuerst, wie auf der Uebersicht), Filter nach Lagerort, Vorschlaege aus Bons einklappbar oben.
-/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber die Seite "Scannen".
+/// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber die Seite "Scannen". Der zweite Reiter ist die Produktliste, der eine Ort
+/// fuer alle Zuordnungen (Doku 27, Q-36): der Bestand sagt, was da ist, die Produkte, was die App darueber weiss.
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key, this.now});
 
@@ -57,6 +59,10 @@ class InventoryPage extends ConsumerStatefulWidget {
 class _InventoryPageState extends ConsumerState<InventoryPage> {
   String? _location; // null = alle
   var _suggestionsOpen = true;
+  var _showProducts = false;
+
+  /// Erst beim ersten Oeffnen aufbauen, danach behaelt die Produktliste Filter und Scrollposition.
+  var _productsVisited = false;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +72,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final today = widget.now ?? appClock.now();
     final t = Theme.of(context);
     final forecasts = ref.watch(usageForecastProvider);
+    final openAssignments = ref.watch(openAssignmentCountProvider);
 
     return active.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -79,7 +86,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
         }
 
         return Scaffold(
-          floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+          floatingActionButton: _showProducts ? null : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
             FloatingActionButton.extended(
               key: const Key('inventory-manual-fab'),
               heroTag: 'inventory-manual-fab',
@@ -96,7 +103,59 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               label: const Text('Scannen'),
             ),
           ]),
-          body: ListView(
+          body: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  key: const Key('inventory-sections'),
+                  showSelectedIcon: false,
+                  segments: [
+                    const ButtonSegment(value: false, label: Text('Bestand', key: Key('inventory-section-stock'))),
+                    ButtonSegment(
+                      value: true,
+                      label: Badge.count(
+                        key: const Key('inventory-products-badge'),
+                        count: openAssignments,
+                        isLabelVisible: openAssignments > 0,
+                        offset: const Offset(18, -6),
+                        child: const Text('Produkte', key: Key('inventory-section-products')),
+                      ),
+                    ),
+                  ],
+                  selected: {_showProducts},
+                  onSelectionChanged: (s) => setState(() {
+                    _showProducts = s.first;
+                    _productsVisited = _productsVisited || _showProducts;
+                  }),
+                ),
+              ),
+            ),
+            Expanded(
+              child: IndexedStack(index: _showProducts ? 1 : 0, children: [
+                _stockList(t, all, shown, locations, groups, suggestions, products, today, forecasts),
+                if (_productsVisited) const ProductsView() else const SizedBox.shrink(),
+              ]),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+
+  Widget _stockList(
+    ThemeData t,
+    List<InventoryItem> all,
+    List<InventoryItem> shown,
+    List<String> locations,
+    Map<ExpiryLevel, List<InventoryItem>> groups,
+    List<InventoryItem> suggestions,
+    Map<String, Product> products,
+    DateTime today,
+    Map<String, UsageForecast> forecasts,
+  ) =>
+      ListView(
             padding: const EdgeInsets.only(bottom: 168),
             children: [
               if (suggestions.isNotEmpty)
@@ -165,11 +224,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                     for (final item in items) _InventoryTile(item: item, product: products[item.productId], level: level, today: today, forecast: forecasts[item.productId]),
                   ],
             ],
-          ),
-        );
-      },
-    );
-  }
+          );
 }
 
 /// Bis zu dieser Reichweite (Tage) zeigt die Bestandsliste die Vorhersage.

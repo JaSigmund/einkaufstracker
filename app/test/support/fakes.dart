@@ -384,8 +384,8 @@ class FakeMealPhotoService extends MealPhotoService {
   Future<int> uploadPending() async => 0;
 }
 
-ProductRepository productRepo(AppDatabase db, {String household = 'h1', OffClient? off, void Function()? onChanged}) =>
-    ProductRepository(db, householdId: () async => household, off: off, onChanged: onChanged);
+ProductRepository productRepo(AppDatabase db, {String household = 'h1', OffClient? off, void Function()? onChanged, Future<void> Function(String, String)? onMerged}) =>
+    ProductRepository(db, householdId: () async => household, off: off, onChanged: onChanged, onMerged: onMerged);
 
 InventoryRepository inventoryRepo(AppDatabase db,
         {String household = 'h1', void Function()? onChanged, Future<void> Function(String productId)? onDepleted}) =>

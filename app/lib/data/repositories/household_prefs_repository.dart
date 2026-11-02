@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../core/clock.dart';
+import '../../domain/products/product_assignment.dart';
 import '../local/database.dart';
 import '../sync/mappers.dart';
 
@@ -13,6 +14,9 @@ import '../sync/mappers.dart';
 /// beliebiges JSON (Zahl, Text, Wahrheitswert, Objekt).
 const microReferenceOnPref = 'micro_reference_on';
 const microReferenceOverridesPref = 'micro_reference_overrides';
+
+/// KV-Schluessel der frueheren, nur lokalen Liste "Ueberspringen" (JSON-Liste der Produkt-IDs), siehe [HouseholdPrefsRepository.adoptLocalNutrientSkips].
+const productsNutrientsSkippedKey = 'products_nutrients_skipped';
 
 class HouseholdPrefsRepository {
   HouseholdPrefsRepository(this._db, {required this.householdId, this.onChanged});
@@ -44,6 +48,32 @@ class HouseholdPrefsRepository {
           ));
     });
     onChanged?.call();
+  }
+
+  /// "Nicht nötig" (Doku 27): dieses Produkt braucht keine Naehrwerte und zaehlt nicht mehr als offen.
+  Future<void> setNutrientsNotNeeded(String productId, bool value) => set(noNutrientsPrefFor(productId), value);
+
+  /// Beim Zusammenfuehren wandert "Nicht nötig" mit. Hat das Ziel ein Profil, schadet die Marke nicht, das Profil gilt.
+  Future<void> moveNutrientsNotNeeded(String sourceId, String targetId) async {
+    if (!nutrientsNotNeeded(await load(), sourceId)) return;
+    await set(noNutrientsPrefFor(targetId), true);
+    await set(noNutrientsPrefFor(sourceId), false);
+  }
+
+  /// Uebernimmt die fruehere, nur lokale Liste "Ueberspringen" einmalig in die gemeinsame Einstellung. Unlesbar: nichts ist uebersprungen.
+  Future<void> adoptLocalNutrientSkips() async {
+    final raw = await _db.getKv(productsNutrientsSkippedKey);
+    if (raw == null || raw == '[]') return;
+    var ids = const <String>[];
+    try {
+      ids = [for (final x in jsonDecode(raw) as List) x as String];
+    } catch (_) {
+      // bleibt leer
+    }
+    for (final id in ids) {
+      await setNutrientsNotNeeded(id, true);
+    }
+    await _db.setKv(productsNutrientsSkippedKey, '[]');
   }
 
   Map<String, Object?> _decode(List<HouseholdPref> rows) {

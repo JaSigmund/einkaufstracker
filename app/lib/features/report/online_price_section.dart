@@ -14,6 +14,25 @@ import 'online_article_search.dart';
 /// zwei Artikel, fuer den Einkauf aber dasselbe Produkt). Jeder zeigt Preis, Grundpreis und "Stand vom ...", oder "zuletzt
 /// bekannt", wenn der Feed nicht mehr gepflegt wird. Der guenstigste Artikel nach Grundpreis ist markiert. Faellt der Abruf
 /// aus, bleibt der letzte Preis stehen.
+/// Artikelsuche eines Haendlers und Zuordnen an [product], aus diesem Abschnitt und aus der Ansicht Online der Produktliste.
+Future<void> linkOnlineArticles(BuildContext context, WidgetRef ref, Product product, String store, List<ProductOnlineLink> links) async {
+  final articles = await showOnlineArticleSearch(
+    context,
+    store: store,
+    initialQuery: product.name,
+    productBaseUnit: product.baseUnit,
+    alreadyLinked: {for (final l in links.where((l) => l.store == store)) l.externalId},
+  );
+  if (articles == null || articles.isEmpty || !context.mounted) return;
+  final repo = ref.read(onlinePriceRepositoryProvider);
+  await repo.linkAll(product.id, articles);
+  try {
+    await repo.refresh(force: true);
+  } catch (_) {
+    // Die Preise sind eine Zugabe
+  }
+}
+
 class OnlinePriceSection extends ConsumerStatefulWidget {
   const OnlinePriceSection({super.key, required this.product, this.now});
 
@@ -42,18 +61,7 @@ class _OnlinePriceSectionState extends ConsumerState<OnlinePriceSection> {
     }
   }
 
-  Future<void> _add(String store, List<ProductOnlineLink> links) async {
-    final articles = await showOnlineArticleSearch(
-      context,
-      store: store,
-      initialQuery: widget.product.name,
-      productBaseUnit: widget.product.baseUnit,
-      alreadyLinked: {for (final l in links.where((l) => l.store == store)) l.externalId},
-    );
-    if (articles == null || articles.isEmpty || !mounted) return;
-    await ref.read(onlinePriceRepositoryProvider).linkAll(widget.product.id, articles);
-    unawaited(_refresh(force: true));
-  }
+  Future<void> _add(String store, List<ProductOnlineLink> links) => linkOnlineArticles(context, ref, widget.product, store, links);
 
   Future<void> _unlink(ProductOnlineLink link) => ref.read(onlinePriceRepositoryProvider).unlink(link.id);
 

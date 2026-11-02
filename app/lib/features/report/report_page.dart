@@ -235,7 +235,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                   trailing: Text(formatEuro(a.totalCents), style: TextStyle(color: a.totalCents < 0 ? t.colorScheme.primary : null)),
                   onTap: a.productId == null || products[a.productId] == null
                       ? null
-                      : () => context.push('/product-price', extra: products[a.productId]!),
+                      : () => context.push('/product/${a.productId}'),
                 ),
           ],
       ],

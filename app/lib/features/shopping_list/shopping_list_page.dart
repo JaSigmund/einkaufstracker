@@ -558,12 +558,22 @@ class _ItemTile extends ConsumerWidget {
   Future<void> _move(BuildContext context, WidgetRef ref) async {
     final lists = ref.read(shoppingListsStreamProvider).value ?? const <ShoppingList>[];
     final others = [for (final l in lists) if (l.id != item.listId) l];
-    if (others.isEmpty) return;
+    if (others.isEmpty && item.productId == null) return;
     final target = await showModalBottomSheet<ShoppingList>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(padding: const EdgeInsets.all(16), child: Text('„$label“ verschieben nach', style: Theme.of(ctx).textTheme.titleSmall)),
+          if (item.productId != null)
+            ListTile(
+              key: Key('open-product-${item.id}'),
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: const Text('Produkt öffnen'),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/product/${item.productId}');
+              },
+            ),
+          if (others.isNotEmpty) Padding(padding: const EdgeInsets.all(16), child: Text('„$label“ verschieben nach', style: Theme.of(ctx).textTheme.titleSmall)),
           for (final l in others) ListTile(key: Key('move-to-${l.id}'), leading: const Icon(Icons.drive_file_move_outline), title: Text(l.name), onTap: () => Navigator.pop(ctx, l)),
         ]),
       ),

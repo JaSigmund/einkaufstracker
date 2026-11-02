@@ -151,6 +151,7 @@ final uiQualityPages = <UiPage>[
             ])),
         inventorySuggestionsStreamProvider.overrideWith((ref) => Stream.value(const <InventoryItem>[])),
         productsStreamProvider.overrideWith((ref) => Stream.value(products)),
+        householdPrefsProvider.overrideWith((ref) => Stream.value(const <String, Object?>{})),
         inventoryMovementsStreamProvider.overrideWith((ref, _) => Stream.value(const <InventoryMovement>[])),
         balanceMovementsProvider.overrideWith((ref) => Stream.value(const <InventoryMovement>[])),
         productRepositoryProvider.overrideWithValue(productRepo(db)),

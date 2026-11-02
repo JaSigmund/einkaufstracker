@@ -189,23 +189,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     super.dispose();
   }
 
-  Future<void> _removeAlias(ProductAlias alias) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Zuordnung lösen?'),
-        content: Text('„${alias.aliasText}“ wird beim nächsten Bon nicht mehr automatisch diesem Produkt zugeordnet.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lösen')),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await ref.read(productRepositoryProvider).removeAlias(alias.id);
-    }
-  }
-
   Future<void> _searchExisting(String query) async {
     final results = query.trim().isEmpty ? const <Product>[] : await ref.read(productRepositoryProvider).search(query);
     if (mounted) setState(() => _matches = results);
@@ -382,10 +365,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             Text('Oder neu anlegen', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
           ],
-          if (editing) ...[
-            _AliasSection(productId: widget.existing!.id, onRemove: _removeAlias),
-            const SizedBox(height: 16),
-          ],
           TextField(key: const Key('product-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name')),
           const SizedBox(height: 12),
           TextField(key: const Key('product-brand'), controller: _brand, decoration: const InputDecoration(labelText: 'Marke (optional)')),
@@ -551,45 +530,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Speichern'),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Gelernte Bon-Text-Zuordnungen (ADR-010) dieses Produkts, mit der Moeglichkeit, eine falsch gelernte
-/// wieder zu loesen (Fehlerbericht "Alias ändern", 2026-09-27).
-class _AliasSection extends ConsumerWidget {
-  const _AliasSection({required this.productId, required this.onRemove});
-  final String productId;
-  final Future<void> Function(ProductAlias alias) onRemove;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final aliases = ref.watch(productAliasesStreamProvider(productId)).value ?? const <ProductAlias>[];
-    if (aliases.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Gelernte Bon-Zuordnungen', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            'Diese Bon-Texte werden automatisch diesem Produkt zugeordnet.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          for (final a in aliases)
-            ListTile(
-              key: Key('alias-${a.id}'),
-              contentPadding: EdgeInsets.zero,
-              title: Text(a.aliasText),
-              trailing: IconButton(
-                key: Key('alias-remove-${a.id}'),
-                icon: const Icon(Icons.link_off),
-                tooltip: 'Zuordnung lösen',
-                onPressed: () => onRemove(a),
-              ),
-            ),
-        ]),
       ),
     );
   }

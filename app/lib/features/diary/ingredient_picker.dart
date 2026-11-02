@@ -51,13 +51,13 @@ class IngredientQuantity {
 }
 
 /// [initialQuery] fuellt das Suchfeld vor und startet die Suche sofort, z.B. mit dem Namen einer Zutat, die die
-/// Foto-Analyse ohne Naehrwerte erkannt hat.
-Future<PickedIngredient?> showIngredientPicker(BuildContext context, {String initialQuery = ''}) =>
+/// Foto-Analyse ohne Naehrwerte erkannt hat. [foodsOnly]: nur die Lebensmitteldatenbank, fuer die Naehrwerte eines Produkts.
+Future<PickedIngredient?> showIngredientPicker(BuildContext context, {String initialQuery = '', bool foodsOnly = false}) =>
     showModalBottomSheet<PickedIngredient>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _IngredientPickerSheet(initialQuery: initialQuery),
+      builder: (_) => _IngredientPickerSheet(initialQuery: initialQuery, foodsOnly: foodsOnly),
     );
 
 /// Fragt Menge und Einheit einer Zutat ab. [canDeduct] blendet "Vom Bestand abziehen" ein (nur bei Produkten),
@@ -388,9 +388,10 @@ class _QuantityDialogState extends State<_QuantityDialog> {
 }
 
 class _IngredientPickerSheet extends ConsumerStatefulWidget {
-  const _IngredientPickerSheet({this.initialQuery = ''});
+  const _IngredientPickerSheet({this.initialQuery = '', this.foodsOnly = false});
 
   final String initialQuery;
+  final bool foodsOnly;
 
   @override
   ConsumerState<_IngredientPickerSheet> createState() => _IngredientPickerSheetState();
@@ -471,7 +472,7 @@ class _IngredientPickerSheetState extends ConsumerState<_IngredientPickerSheet> 
     final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
     final active = ref.watch(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
     final q = _query.toLowerCase();
-    final matches = q.isEmpty ? const <Product>[] : products.where((p) => p.deletedAt == null && p.name.toLowerCase().contains(q)).take(20).toList();
+    final matches = q.isEmpty || widget.foodsOnly ? const <Product>[] : products.where((p) => p.deletedAt == null && p.name.toLowerCase().contains(q)).take(20).toList();
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -484,7 +485,7 @@ class _IngredientPickerSheetState extends ConsumerState<_IngredientPickerSheet> 
               key: const Key('picker-search'),
               controller: _search,
               autofocus: true,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'Zutat suchen'),
+              decoration: InputDecoration(prefixIcon: const Icon(Icons.search), labelText: widget.foodsOnly ? 'Lebensmittel suchen' : 'Zutat suchen'),
               onChanged: _onChanged,
             ),
           ),
@@ -523,7 +524,7 @@ class _IngredientPickerSheetState extends ConsumerState<_IngredientPickerSheet> 
                       onTap: () => Navigator.pop(context, PickedIngredient.bls(f)),
                     ),
               ],
-              if (_query.isNotEmpty)
+              if (_query.isNotEmpty && !widget.foodsOnly)
                 ListTile(
                   key: const Key('pick-freetext'),
                   leading: const Icon(Icons.edit_outlined),
