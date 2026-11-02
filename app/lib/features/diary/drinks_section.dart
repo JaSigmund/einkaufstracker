@@ -5,21 +5,27 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/clock.dart';
 import '../../core/format.dart';
+import '../../core/vienna_time.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/drink_repository.dart';
 import '../../domain/nutrition/drink_mix.dart';
+import '../../domain/nutrition/fluid_intake.dart';
 import '../../domain/products/drinkable.dart';
 import '../products/product_form_page.dart';
 import 'drink_sheet.dart';
+import 'fluid_settings.dart';
 import 'ingredient_picker.dart';
 
 /// Getraenke unter "Schnell eintragen" (ADR-048): Der Plus-Knopf bucht, was in dieser Zeile zuletzt getrunken wurde, ein Tipp auf die Zeile oeffnet
 /// Menge und Mischverhaeltnis.
 class DrinksSection extends ConsumerWidget {
-  const DrinksSection({super.key, this.now});
+  const DrinksSection({super.key, this.now, this.waterMl = 0});
 
   /// Aktueller Zeitpunkt (UTC), austauschbar fuer Tests.
   final DateTime? now;
+
+  /// Heute getrunkene Glaeser Wasser in ml; sie zaehlen zur Trinkmenge.
+  final double waterMl;
 
   DateTime get _at => now ?? appClock.now().toUtc();
 
@@ -28,6 +34,7 @@ class DrinksSection extends ConsumerWidget {
     final repo = ref.read(drinkRepositoryProvider);
     try {
       final meal = await repo.book(drink, at: _at, inStock: inStock);
+      rescheduleFluidReminders(ref);
       final missing = drink.parts.any((p) => p.productId != null && !inStock.contains(p.productId));
       messenger
         ..hideCurrentSnackBar()
@@ -35,7 +42,7 @@ class DrinksSection extends ConsumerWidget {
           content: Text('${drink.title}: ${formatQuantity(drink.totalMl)} ml eingetragen${missing ? ' · nicht im Bestand' : ''}'),
           // mit Aktion bliebe die SnackBar sonst stehen, bis man sie wegwischt
           persist: false,
-          action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.undo(meal.id)),
+          action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.undo(meal.id).then((_) => rescheduleFluidReminders(ref))),
         ));
     } catch (_) {
       messenger.showSnackBar(const SnackBar(content: Text('Eintragen nicht möglich.')));
@@ -128,7 +135,32 @@ class DrinksSection extends ConsumerWidget {
       now: _at,
     );
 
+    final today = utcToViennaLocal(_at);
+    final drunk = waterMl +
+        fluidMlOn(today, [
+          for (final m in drinkMeals) (at: utcToViennaLocal(m.eatenAt), ml: drinkMealMl(m, byMeal[m.id] ?? const [])),
+        ]);
+    final fluid = FluidSettings.fromPrefs(ref.watch(householdPrefsProvider).value ?? const {});
+
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Card(
+        child: InkWell(
+          key: const Key('fluid-today'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => showFluidSettings(context),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Expanded(child: Text('Heute ${formatLiters(drunk)} von ${formatLiters(fluid.targetMl)} getrunken', key: const Key('fluid-today-text'))),
+                const Icon(Icons.tune, size: 18),
+              ]),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: (drunk / fluid.targetMl).clamp(0, 1).toDouble()),
+            ]),
+          ),
+        ),
+      ),
       Padding(padding: const EdgeInsets.only(top: 12, bottom: 4), child: Text('Getränke', style: t.textTheme.titleMedium)),
       for (final (i, row) in rows.indexed) _rowTile(context, ref, i, row, mealsById, byMeal, products, inStock),
       Wrap(spacing: 8, children: [

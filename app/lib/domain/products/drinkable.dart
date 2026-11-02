@@ -3,7 +3,32 @@
 /// beim Lesen, nicht einmalig: So gilt sie auch fuer Produkte, die spaeter vom Bon kommen oder erst dann eine Kategorie bekommen.
 library;
 
+import 'dart:convert';
+
 const _drinkCategory = 'Getränke';
+
+/// Dichte von Alkohol in g/ml: rechnet Vol.-% in Gramm je 100 ml um.
+const alcoholDensity = 0.789;
+
+double alcoholGramsFromVolPercent(double vol) => vol * alcoholDensity;
+double volPercentFromAlcoholGrams(double grams) => grams / alcoholDensity;
+
+/// Setzt `alcohol_g` und `caffeine_mg` im Naehrwertprofil eines Produkts (ADR-049). `null` laesst einen Wert stehen, [clear] nimmt ihn heraus. Ohne lesbares
+/// Profil bleibt es dabei: Ein Profil nur aus diesen beiden Werten wuerde die uebrigen Naehrwerte als bekannt ausgeben und den BLS-Eintrag verdraengen.
+String? withDrinkValues(String? rawProfile, {double? alcoholG, double? caffeineMg, Set<String> clear = const {}}) {
+  if (rawProfile == null || rawProfile.isEmpty) return rawProfile;
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(rawProfile);
+  } on FormatException {
+    return rawProfile;
+  }
+  if (decoded is! Map<String, dynamic>) return rawProfile;
+  final out = Map<String, dynamic>.of(decoded)..removeWhere((k, _) => clear.contains(k));
+  if (alcoholG != null) out['alcohol_g'] = (alcoholG * 100).round() / 100;
+  if (caffeineMg != null) out['caffeine_mg'] = caffeineMg;
+  return jsonEncode(out);
+}
 
 /// Trinkbares, das nicht in der Kategorie "Getraenke" steht (Milch, Hafermilch, Yakult).
 const _drinkWords = ['saft', 'milch', 'drink', 'limo', 'eistee', 'sirup', 'smoothie', 'kefir', 'oatly', 'barista', 'cola', 'bier', 'wein', 'kakao'];

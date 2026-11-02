@@ -75,6 +75,7 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
     rescheduleExpiryReminders(ref).catchError((Object e, StackTrace st) {
       debugPrint('[expiry-reminders] Neuplanen fehlgeschlagen: $e\n$st');
     });
+    rescheduleFluidReminders(ref);
   }
 
   @override

@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../core/clock.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../data/repositories/drink_repository.dart' show drinkMealMl;
 import '../../domain/nutrition/daily_nutrition.dart';
 import '../../domain/nutrition/frequent_meals.dart';
 import '../../domain/nutrition/nutrition_targets.dart';
@@ -142,29 +143,49 @@ class DiaryPage extends ConsumerWidget {
       _frequentChips(context, t, meals),
       for (final day in dayKeys) ...[
         _dayHeader(t, day, today, dayInfo[day], targets),
-        for (final m in (byDay[day]!..sort((a, b) => b.eatenAt.compareTo(a.eatenAt))))
-          ListTile(
-            key: Key('meal-${m.id}'),
-            leading: m.photoPath == null
-                ? Icon(mealTypeIcon(m.mealType))
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: MealPhoto(meal: m, size: 44, placeholder: Icon(mealTypeIcon(m.mealType))),
-                  ),
-            title: Text(m.title),
-            subtitle: Text([
-              formatViennaTime(m.eatenAt),
-              mealTypeLabel(m.mealType),
-              _countText((ingredientsByMeal[m.id] ?? const []).length),
-              if (m.isEstimate) 'geschätzt',
-            ].join(' · ')),
-            trailing: (ingredientsByMeal[m.id] ?? const []).any((i) => i.kcal != null) ? Text(formatKcal(perMeal[m.id]!.kcal)) : null,
-            onTap: () => context.push('/meal-form', extra: MealFormArgs(existing: m)),
-            onLongPress: () => _showMealActions(context, m, ingredientsByMeal[m.id] ?? const <MealIngredient>[]),
-          ),
+        ..._dayMeals(context, day, byDay[day]!..sort((a, b) => b.eatenAt.compareTo(a.eatenAt)), ingredientsByMeal, perMeal),
       ],
     ]);
   }
+
+  /// Die Eintraege eines Tages. Ab zwei Getraenken stehen sie in einer aufklappbaren Zeile unter den Mahlzeiten (ADR-049), sonst schieben fuenf Glaeser
+  /// die Mahlzeiten aus dem Blick; in den Tagessummen zaehlen sie normal mit.
+  List<Widget> _dayMeals(BuildContext context, DateTime day, List<Meal> meals, Map<String, List<MealIngredient>> ingredients, Map<String, NutrientTotals> perMeal) {
+    Widget tile(Meal m) => _mealTile(context, m, ingredients[m.id] ?? const <MealIngredient>[], perMeal[m.id]!);
+    final drinks = [for (final m in meals) if (m.mealType == 'drink') m];
+    if (drinks.length < 2) return [for (final m in meals) tile(m)];
+    final ml = drinks.fold<double>(0, (sum, m) => sum + drinkMealMl(m, ingredients[m.id] ?? const []));
+    final kcal = drinks.fold<double>(0, (sum, m) => sum + perMeal[m.id]!.kcal);
+    return [
+      for (final m in meals) if (m.mealType != 'drink') tile(m),
+      ExpansionTile(
+        key: Key('day-drinks-${day.year}-${day.month}-${day.day}'),
+        leading: Icon(mealTypeIcon('drink')),
+        title: Text('Getränke · ${drinks.length} · ${formatQuantity(ml.roundToDouble())} ml · ${formatKcal(kcal)}'),
+        children: [for (final m in drinks) tile(m)],
+      ),
+    ];
+  }
+
+  Widget _mealTile(BuildContext context, Meal m, List<MealIngredient> own, NutrientTotals totals) => ListTile(
+        key: Key('meal-${m.id}'),
+        leading: m.photoPath == null
+            ? Icon(mealTypeIcon(m.mealType))
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: MealPhoto(meal: m, size: 44, placeholder: Icon(mealTypeIcon(m.mealType))),
+              ),
+        title: Text(m.title),
+        subtitle: Text([
+          formatViennaTime(m.eatenAt),
+          mealTypeLabel(m.mealType),
+          _countText(own.length),
+          if (m.isEstimate) 'geschätzt',
+        ].join(' · ')),
+        trailing: own.any((i) => i.kcal != null) ? Text(formatKcal(totals.kcal)) : null,
+        onTap: () => context.push('/meal-form', extra: MealFormArgs(existing: m)),
+        onLongPress: () => _showMealActions(context, m, own),
+      );
 
   /// "Nochmal essen": die haeufigsten Mahlzeiten der letzten 60 Tage, ein Tipp oeffnet eine Kopie (Doku 15 §3.3).
   Widget _frequentChips(BuildContext context, ThemeData t, List<Meal> meals) {

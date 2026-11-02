@@ -9,6 +9,7 @@ import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
 import '../../domain/receipt/unit_price.dart';
+import '../../domain/nutrition/micros.dart';
 import '../local/database.dart';
 import '../nutrition/bls_food_search.dart';
 import '../products/off_client.dart';
@@ -331,6 +332,8 @@ class ProductRepository {
       if (p.saltG != null) 'salt_g': p.saltG!,
     };
     if (profile.isEmpty) return null;
+    // Die BLS kennt kein Koffein: Was der Nutzer eingetragen hat, ueberlebt den Wechsel des Eintrags
+    if (parseMicros(product.nutrientsPer100)?['caffeine_mg'] case final caffeine?) profile['caffeine_mg'] = caffeine;
     final updated = product.copyWith(
       nutrientsPer100: Value(jsonEncode(profile)),
       nutrientsBasis: const Value('g'),

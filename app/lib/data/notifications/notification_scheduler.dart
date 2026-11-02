@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../domain/notifications/expiry_reminders.dart';
+import '../../domain/nutrition/fluid_intake.dart' show fluidReminderDays;
 import '../../domain/recipes/cooking_timer.dart' show kitchenTimerSlots;
 
 /// Plant lokale Ablauf-Erinnerungen (Doku 06 §5, ADR-007: `flutter_local_notifications` statt Server-Push).
@@ -27,6 +28,11 @@ abstract class NotificationScheduler {
   /// Verwirft alle Alarme der Kurzzeitmesser (Abmelden): Sie tragen selbst gewaehlte Bezeichnungen.
   Future<void> cancelKitchenTimers();
 
+  /// Plant die Trink-Erinnerungen (ADR-049) und ersetzt alle bisherigen. [times] in Wiener Ortszeit.
+  Future<void> scheduleFluidReminders(List<DateTime> times);
+
+  Future<void> cancelFluidReminders();
+
   /// Ob Android den Alarm auf die Sekunde genau ausloesen darf. Ohne diese Erlaubnis kann er sich im Hintergrund um Minuten verspaeten.
   Future<bool> canScheduleExactAlarms();
 
@@ -43,6 +49,10 @@ const _channelId = 'expiry_reminders';
 /// Eigener ID-Bereich und Kanal der Kurzzeitmesser: ein Timer soll laut sein, eine Ablauf-Erinnerung nicht.
 const _timerIdBase = 6000;
 const _timerChannelId = 'kitchen_timers';
+
+/// Trink-Erinnerungen: einer je geplantem Tag.
+const _fluidIdBase = 7000;
+const _fluidChannelId = 'fluid_reminders';
 
 class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   FlutterLocalNotificationsScheduler({required this.onAddToList});
@@ -213,6 +223,38 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
     await _initializePlugin();
     for (var i = 0; i < kitchenTimerSlots; i++) {
       await _plugin.cancel(_timerIdBase + i);
+    }
+  }
+
+  @override
+  Future<void> scheduleFluidReminders(List<DateTime> times) async {
+    if (kIsWeb) return;
+    await initialize();
+    await cancelFluidReminders();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _fluidChannelId,
+        'Trink-Erinnerung',
+        channelDescription: 'Erinnert am Nachmittag ans Trinken, wenn du dein Ziel noch nicht zur Hälfte erreicht hast',
+        importance: Importance.defaultImportance,
+      ),
+    );
+    final now = tz.TZDateTime.now(tz.local);
+    for (var i = 0; i < times.length && i < fluidReminderDays; i++) {
+      final t = times[i];
+      final at = tz.TZDateTime(tz.local, t.year, t.month, t.day, t.hour, t.minute);
+      if (!at.isAfter(now)) continue;
+      // Zum Ausloesezeitpunkt laeuft kein App-Code, deshalb steht hier keine Menge
+      await _plugin.zonedSchedule(_fluidIdBase + i, 'Trinken', 'Schon genug getrunken?', at, details, androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle);
+    }
+  }
+
+  @override
+  Future<void> cancelFluidReminders() async {
+    if (kIsWeb) return;
+    await _initializePlugin();
+    for (var i = 0; i < fluidReminderDays; i++) {
+      await _plugin.cancel(_fluidIdBase + i);
     }
   }
 

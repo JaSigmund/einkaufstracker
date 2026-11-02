@@ -59,7 +59,9 @@ import '../data/notifications/notification_scheduler.dart';
 import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
 import '../data/repositories/cooking_session_repository.dart';
+import '../core/vienna_time.dart';
 import '../data/repositories/drink_repository.dart';
+import '../domain/nutrition/fluid_intake.dart';
 import '../features/recipes/cooking_chat_panel.dart';
 import '../features/recipes/cooking_timer_controller.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
@@ -544,6 +546,31 @@ final notificationSchedulerProvider = Provider<NotificationScheduler>((ref) {
   );
 });
 
+/// Plant die Trink-Erinnerungen neu (ADR-049): beim App-Start und nach jedem Eintrag. Ein Fehler darf nie einen Eintrag stoeren, deshalb nur im Log.
+Future<void> rescheduleFluidReminders(WidgetRef ref) async {
+  try {
+    final scheduler = ref.read(notificationSchedulerProvider);
+    final settings = FluidSettings.fromPrefs(await ref.read(householdPrefsRepositoryProvider).load());
+    if (!settings.reminderOn) {
+      await scheduler.cancelFluidReminders();
+      return;
+    }
+    final now = appClock.now().toUtc();
+    final since = now.subtract(const Duration(days: 2));
+    final water = await ref.read(supplementRepositoryProvider).waterSince(since);
+    final history = await ref.read(mealRepositoryProvider).recentHistory(limit: 40);
+    final today = utcToViennaLocal(now);
+    final drunk = fluidMlOn(today, [
+      for (final w in water) (at: utcToViennaLocal(w.at), ml: w.ml),
+      for (final (meal, ingredients) in history)
+        if (meal.mealType == 'drink') (at: utcToViennaLocal(meal.eatenAt), ml: drinkMealMl(meal, ingredients)),
+    ]);
+    await scheduler.scheduleFluidReminders(fluidReminderTimes(now: today, settings: settings, drunkMl: drunk));
+  } catch (e) {
+    debugPrint('[fluid-reminder] Neuplanen fehlgeschlagen: $e');
+  }
+}
+
 /// Plant die Ablauf-Erinnerungen neu (Doku 06 §5, Schritt 1): nach jeder Inventaraenderung und beim
 /// App-Start aufgerufen. Ohne Netz (Einstellungen sind bislang online-only) bleibt die zuletzt geplante
 /// Erinnerung unveraendert bestehen, statt abzubrechen.
@@ -614,6 +641,7 @@ Future<void> clearLocalAccountData(WidgetRef ref, {bool continueOnDatabaseError 
   }
   final steps = <String, Future<void> Function()>{
     'Erinnerungen': () => ref.read(notificationSchedulerProvider).cancelExpiryReminders(),
+    'Trink-Erinnerung': () => ref.read(notificationSchedulerProvider).cancelFluidReminders(),
     'Koch-Timer': () async {
       await ref.read(notificationSchedulerProvider).cancelKitchenTimers();
       ref.invalidate(cookingTimerProvider);

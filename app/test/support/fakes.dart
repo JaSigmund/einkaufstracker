@@ -467,6 +467,15 @@ class FakeNotificationScheduler implements NotificationScheduler {
   @override
   Future<void> cancelKitchenTimers() async => kitchenTimers.clear();
 
+  /// Zuletzt geplante Trink-Erinnerungen.
+  List<DateTime> fluidReminders = const [];
+
+  @override
+  Future<void> scheduleFluidReminders(List<DateTime> times) async => fluidReminders = times;
+
+  @override
+  Future<void> cancelFluidReminders() async => fluidReminders = const [];
+
   @override
   Future<bool> canScheduleExactAlarms() async => exactAlarmsAllowed;
 
