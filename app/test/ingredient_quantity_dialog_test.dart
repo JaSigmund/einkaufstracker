@@ -169,6 +169,67 @@ void main() {
     expect(result!.unitKey, FoodUnitKey.piece);
   });
 
+  testWidgets('mehrstelliges Gewicht: das Feld bleibt nach jeder Ziffer da und behaelt den Fokus', (tester) async {
+    await open(tester, label: 'Gewürzgurke', units: const [], per100: const NutrientsPer100(kcal: 11));
+    await tester.tap(find.byKey(const Key('ingredient-unit-piece')));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('ingredient-unit-weight'));
+    await tester.tap(field);
+    await tester.pump();
+    for (final typed in ['1', '13', '135']) {
+      tester.testTextInput.enterText(typed);
+      await tester.pump();
+      expect(field, findsOneWidget, reason: 'nach "$typed"');
+      expect(find.byKey(const Key('ingredient-unit-weight-edit')), findsNothing, reason: 'nach "$typed"');
+      final editable = tester.widget<EditableText>(find.descendant(of: field, matching: find.byType(EditableText)));
+      expect(editable.focusNode.hasFocus, isTrue, reason: 'nach "$typed"');
+    }
+    expect(find.textContaining('Wie viel wiegt 1 Stück Gewürzgurke'), findsOneWidget);
+    await quantity(tester, '2');
+    expect(text(tester, 'ingredient-unit-info'), '1 Stk ≈ 135 g (dein Gewicht)');
+    await ok(tester);
+    expect(result!.unitWeightG, 135);
+    expect(result!.learnWeight, isTrue);
+  });
+
+  testWidgets('das Stueckgewicht gilt nicht fuer eine andere Einheit und bleibt bei der Rueckkehr erhalten', (tester) async {
+    await open(tester, label: 'Weizenbrot', units: sampleFoodUnits()['B311000']!.where((u) => u.key != FoodUnitKey.piece).toList(), per100: const NutrientsPer100(kcal: 260));
+    await tester.tap(find.byKey(const Key('ingredient-unit-piece')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('ingredient-unit-weight')), '500');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('ingredient-unit-slice')));
+    await tester.pumpAndSettle();
+    await quantity(tester, '2');
+    expect(text(tester, 'ingredient-unit-info'), '1 Scheibe ≈ 28 g (Richtwert)');
+    expect(text(tester, 'ingredient-preview'), '2 Scheiben = 56 g · 146 kcal');
+
+    await tester.tap(find.byKey(const Key('ingredient-unit-piece')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('ingredient-unit-weight'))).controller!.text, '500');
+    expect(text(tester, 'ingredient-unit-info'), '1 Stk ≈ 500 g (dein Gewicht)');
+  });
+
+  testWidgets('"Gewicht aendern" verlassen verwirft die Zahl', (tester) async {
+    await open(tester, pieceWeightG: 135);
+    await tester.tap(find.byKey(const Key('ingredient-unit-piece')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ingredient-unit-weight-edit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('ingredient-unit-weight')), '999');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('ingredient-unit-g')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ingredient-unit-piece')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ingredient-unit-weight')), findsNothing);
+    expect(text(tester, 'ingredient-unit-info'), '1 Stk ≈ 135 g (dein Gewicht)');
+    await quantity(tester, '1');
+    await ok(tester);
+    expect(result!.unitWeightG, 135);
+    expect(result!.learnWeight, isFalse);
+  });
+
   testWidgets('Stueck ohne Gewicht bleibt moeglich (Hinweis statt Zwang): die Zutat zaehlt dann nicht in den Naehrwerten', (tester) async {
     await open(tester, label: 'Gewürzgurke', units: const [], per100: null);
     await tester.tap(find.byKey(const Key('ingredient-unit-piece')));

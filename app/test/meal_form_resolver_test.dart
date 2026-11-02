@@ -304,6 +304,55 @@ void main() {
     expect(find.text('70 g · 245 kcal · vom Bestand · geschätzt'), findsOneWidget, reason: 'roh: Abzug wie bisher');
   });
 
+  testWidgets('gekochter Reis aus dem Bestand rechnet mit dem gekochten Eintrag, nicht mit dem Rohprofil des Produkts (Q-28)', (tester) async {
+    cloud.analysis = MealAnalysis(dishTitle: 'x', ingredients: [
+      AnalyzedIngredient(name: 'Reis', inventoryProductId: reis.id, estimatedGrams: 200, confidence: 0.8, state: 'cooked', match: _match('C352032', 'Reis gekocht', 130)),
+      AnalyzedIngredient(name: 'Reis roh', inventoryProductId: reis.id, estimatedGrams: 70, confidence: 0.8, state: 'raw', match: _match('C352000', 'Reis roh', 340)),
+    ]);
+    await open(tester);
+    await analyze(tester);
+    expect(find.text('200 g · 260 kcal · geschätzt'), findsOneWidget);
+    expect(find.text('70 g · 245 kcal · vom Bestand · geschätzt'), findsOneWidget, reason: 'roh: das Profil des Produkts gilt');
+
+    await tester.enterText(find.byKey(const Key('meal-title')), 'Reis');
+    await save(tester);
+    final rows = await db.select(db.mealIngredients).get();
+    final cooked = rows.firstWhere((r) => r.amountG == 200);
+    expect([cooked.productId, cooked.kcal, cooked.blsCode, cooked.nutrientBasis], [reis.id, 260, 'C352032', 'bls_matched']);
+    final raw = rows.firstWhere((r) => r.amountG == 70);
+    expect([raw.productId, raw.kcal, raw.blsCode, raw.nutrientBasis], [reis.id, 245, null, 'product']);
+
+    // Beim Bearbeiten bleibt es dabei, auch mit geaenderter Menge, und das Speichern verliert nichts
+    final saved = (await db.select(db.meals).get()).single;
+    await tester.pumpWidget(const SizedBox());
+    await open(tester, existing: saved, photo: false);
+    await tester.pumpAndSettle();
+    expect(find.text('200 g · 260 kcal · geschätzt'), findsOneWidget);
+    expect(find.text('70 g · 245 kcal · vom Bestand · geschätzt'), findsOneWidget);
+    await save(tester);
+    final again = (await (db.select(db.mealIngredients)..where((r) => r.deletedAt.isNull())).get()).firstWhere((r) => r.amountG == 200);
+    expect([again.productId, again.kcal, again.blsCode], [reis.id, 260, 'C352032']);
+  });
+
+  testWidgets('Produkt ohne eigenes Profil: die Naehrwerte des BLS-Eintrags ueberleben das Bearbeiten', (tester) async {
+    cloud.analysis = MealAnalysis(dishTitle: 'x', ingredients: [
+      AnalyzedIngredient(name: 'Milch', inventoryProductId: milch.id, estimatedGrams: 200, confidence: 0.8, state: 'ready_made', match: _match('M111300', 'Vollmilch', 65)),
+    ]);
+    await open(tester);
+    await analyze(tester);
+    await tester.enterText(find.byKey(const Key('meal-title')), 'Milch');
+    await save(tester);
+    expect((await db.select(db.mealIngredients).get()).single.kcal, 130);
+
+    final saved = (await db.select(db.meals).get()).single;
+    await tester.pumpWidget(const SizedBox());
+    await open(tester, existing: saved, photo: false);
+    await tester.pumpAndSettle();
+    await save(tester);
+    final again = (await (db.select(db.mealIngredients)..where((r) => r.deletedAt.isNull())).get()).single;
+    expect([again.productId, again.kcal, again.blsCode], [milch.id, 130, 'M111300']);
+  });
+
   testWidgets('Bearbeiten: Herkunft und Marke einer gespeicherten Zutat bleiben erhalten', (tester) async {
     cloud.analysis = allCases();
     await open(tester);
