@@ -31,8 +31,9 @@ typedef SuggestionIngredient = ({String name, double? quantity, String? unit});
 /// Ruft die Edge Functions `suggest-recipes` und `cooking-chat` auf (ADR-021).
 abstract class CookingCloud {
   /// Liefert 3 bis 5 Rezeptideen passend zu [ingredients] (dringlichste zuerst, siehe
-  /// `buildRecipeSuggestionContext`). Nur auf Tastendruck aufrufen (Q-21).
-  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients);
+  /// `buildRecipeSuggestionContext`). Nur auf Tastendruck aufrufen (Q-21). Mit [allowMissing] duerfen die Ideen auch Zutaten brauchen, die
+  /// noch eingekauft werden muessen (ADR-042).
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false});
 
   /// Schickt eine Chat-Nachricht samt Kontext ab. Kompatibel mit [CookingChatSend].
   Future<String> chat(String message, CookingChatContext context);

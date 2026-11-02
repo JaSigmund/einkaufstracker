@@ -69,6 +69,13 @@ class HomeShell extends StatelessWidget {
             icon: const Icon(Icons.soup_kitchen_outlined),
             onPressed: () => context.push('/recipe-suggestions'),
           ),
+        if (path == '/list')
+          IconButton(
+            key: const Key('shell-meal-plan'),
+            tooltip: 'Wochenplan',
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: () => context.push('/meal-plan'),
+          ),
         if (path == '/diary')
           IconButton(
             tooltip: 'Journal',
@@ -114,6 +121,12 @@ class HomeShell extends StatelessWidget {
         title: Text(tab.label),
         actions: [
           ..._actions(context, tab.path),
+          IconButton(
+            key: const Key('shell-quick-intake'),
+            tooltip: 'Schnell eintragen',
+            icon: const Icon(Icons.water_drop_outlined),
+            onPressed: () => context.push('/quick-intake'),
+          ),
           // Auf dem Handy von jedem Tab aus erreichbar; breit steht der Knopf oben in der Seitenleiste
           if (!wide)
             IconButton(

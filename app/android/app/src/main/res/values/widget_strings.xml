@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quick_widget_description">Ein Glas Wasser oder Nahrungsergänzung mit einem Tipp eintragen</string>
+    <string name="quick_water">Wasser</string>
+    <string name="quick_water_long">Ein Glas Wasser eintragen</string>
+    <string name="quick_supplement">Ergänzung</string>
+    <string name="quick_open_long">Schnell eintragen</string>
+</resources>

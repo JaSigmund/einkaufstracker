@@ -586,6 +586,24 @@ class SupplementIntakes extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Ein geplantes Gericht im Wochenplan (Spiegel von public.meal_plan_entries, ADR-042). `plannedOn` ist die UTC-Mitternacht des
+/// Kalendertags, die Zutaten sind eine JSON-Kopie (`domain/recipes/meal_plan.dart`).
+@DataClassName('MealPlanEntry')
+class MealPlanEntries extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  DateTimeColumn get plannedOn => dateTime()();
+  TextColumn get slot => text().withDefault(const Constant('dinner'))();
+  TextColumn get title => text()();
+  TextColumn get ingredients => text().withDefault(const Constant('[]'))();
+  TextColumn get sourceUrl => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Gemeinsame Einstellungen des Haushalts als Schluessel-Wert-Zeilen (Spiegel von public.household_prefs, Phase N4, ADR-035).
 @DataClassName('HouseholdPref')
 class HouseholdPrefs extends Table {
@@ -613,7 +631,7 @@ class KeyValues extends Table {
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
   ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
-  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Supplements, SupplementIntakes, HouseholdPrefs, Outbox, SyncStates, KeyValues,
+  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Supplements, SupplementIntakes, HouseholdPrefs, MealPlanEntries, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -632,7 +650,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -750,6 +768,10 @@ class AppDatabase extends _$AppDatabase {
           // der Spalte an.
           if (from >= 14 && from < 21) {
             await m.addColumn(mealIngredients, mealIngredients.preparation);
+          }
+          // 21 -> 22: Wochenplan (ADR-042)
+          if (from < 22) {
+            await m.createTable(mealPlanEntries);
           }
         },
       );

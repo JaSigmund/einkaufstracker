@@ -47,8 +47,10 @@ import '../data/repositories/bug_report_repository.dart';
 import '../data/repositories/inventory_repository.dart';
 import '../data/repositories/meal_repository.dart';
 import '../data/repositories/nutrition_targets_repository.dart';
+import '../data/repositories/meal_plan_repository.dart';
 import '../data/repositories/supplement_repository.dart';
 import '../data/repositories/product_repository.dart';
+import '../data/share/quick_action_source.dart';
 import '../data/share/shared_pdf_source.dart';
 import '../data/repositories/receipt_repository.dart';
 import '../data/repositories/saved_recipe_repository.dart';
@@ -477,6 +479,17 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>((ref) {
 });
 
 /// Rein lokal, kein Sync -- siehe Doku-Kommentar in `saved_recipe.dart`.
+/// Wochenplan (ADR-042).
+final mealPlanRepositoryProvider = Provider<MealPlanRepository>((ref) {
+  return MealPlanRepository(
+    ref.watch(databaseProvider),
+    householdId: () => requireHouseholdId(ref),
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final mealPlanStreamProvider = StreamProvider((ref) => ref.watch(mealPlanRepositoryProvider).watchEntries());
+
 final savedRecipeRepositoryProvider = Provider<SavedRecipeRepository>((ref) => SavedRecipeRepository(ref.watch(databaseProvider)));
 
 /// Ist-Soll-Abgleich eines Bons: Listeneintraege, die dieser Bon abgehakt hat, geschaetzt gegen bezahlt (Wettbewerbsanalyse,
@@ -688,6 +701,8 @@ final receiptItemsProvider =
     StreamProvider.family((ref, String id) => ref.watch(receiptRepositoryProvider).watchItems(id));
 
 final sharedPdfSourceProvider = Provider<SharedPdfSource>((ref) => AndroidSharedPdfSource());
+
+final quickActionSourceProvider = Provider<QuickActionSource>((ref) => AndroidQuickActionSource());
 
 final pdfTextReaderProvider = Provider<PdfTextReader>((ref) => const PdfrxTextReader());
 

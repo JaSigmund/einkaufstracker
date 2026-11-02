@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="quick_water"
+        android:shortcutLongLabel="@string/quick_water_long"
+        android:shortcutShortLabel="@string/quick_water">
+        <intent
+            android:action="at.jakob.einkaufstracker.QUICK_ACTION"
+            android:targetClass="at.jakob.einkaufstracker.MainActivity"
+            android:targetPackage="at.jakob.einkaufstracker">
+            <extra android:name="quick_action" android:value="water"/>
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="quick_open"
+        android:shortcutLongLabel="@string/quick_open_long"
+        android:shortcutShortLabel="@string/quick_supplement">
+        <intent
+            android:action="at.jakob.einkaufstracker.QUICK_ACTION"
+            android:targetClass="at.jakob.einkaufstracker.MainActivity"
+            android:targetPackage="at.jakob.einkaufstracker">
+            <extra android:name="quick_action" android:value="open"/>
+        </intent>
+    </shortcut>
+</shortcuts>

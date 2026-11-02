@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../data/local/database.dart';
 import '../../domain/recipes/recipe_shopping_gap.dart';
 import '../../domain/recipes/saved_recipe.dart';
+import 'plan_recipe.dart';
 import 'recipe_viewer_page.dart';
 
 /// "Meine Rezepte": gespeicherte Rezeptvorschläge (Jakobs Anforderung "Rezepte sollen auch gespeichert
@@ -105,6 +106,12 @@ class _SavedRecipesPageState extends ConsumerState<SavedRecipesPage> {
                           subtitle: Text('${r.ingredients.length} Zutat(en)'),
                           onTap: () => _open(r),
                           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                            IconButton(
+                              key: Key('plan-recipe-${r.id}'),
+                              tooltip: 'In den Wochenplan',
+                              icon: const Icon(Icons.calendar_month_outlined),
+                              onPressed: () => addRecipeToPlan(context, ref, title: r.title, ingredients: r.ingredients, sourceUrl: r.sourceUrl),
+                            ),
                             IconButton(
                               key: Key('add-missing-${r.id}'),
                               tooltip: 'Fehlende Zutaten zur Einkaufsliste',

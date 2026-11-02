@@ -604,6 +604,30 @@ SupplementIntakesCompanion supplementIntakeFromRemote(Map<String, dynamic> j) =>
       deletedAt: Value(_dt(j['deleted_at'])),
     );
 
+Map<String, dynamic> mealPlanEntryToRemote(MealPlanEntry e) => {
+      'id': e.id,
+      'household_id': e.householdId,
+      'planned_on': _dateStr(e.plannedOn),
+      'slot': e.slot,
+      'title': e.title,
+      'ingredients': jsonDecode(e.ingredients),
+      'source_url': e.sourceUrl,
+      'updated_at': e.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': e.deletedAt?.toUtc().toIso8601String(),
+    };
+
+MealPlanEntriesCompanion mealPlanEntryFromRemote(Map<String, dynamic> j) => MealPlanEntriesCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      plannedOn: Value(_date(j['planned_on'])!),
+      slot: Value(j['slot'] as String? ?? 'dinner'),
+      title: Value(j['title'] as String),
+      ingredients: Value(jsonEncode(j['ingredients'] ?? const <dynamic>[])),
+      sourceUrl: Value(j['source_url'] as String?),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
 Map<String, dynamic> householdPrefToRemote(HouseholdPref p) => {
       'household_id': p.householdId,
       'key': p.key,

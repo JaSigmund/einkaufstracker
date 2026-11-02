@@ -5,7 +5,9 @@ import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
+import 'package:einkaufstracker/data/repositories/meal_plan_repository.dart';
 import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
+import 'package:einkaufstracker/domain/recipes/saved_recipe.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
@@ -167,6 +169,10 @@ Future<List<Map<String, dynamic>>> _collect() async {
   final twice = await supplements.take(multi, at: DateTime.utc(2026, 9, 22, 6, 31), servings: 2);
   await supplements.deleteIntake(twice.id);
   await supplements.delete((await supplements.save(name: 'Alt', servingLabel: 'Tropfen', micros: {'zinc_mg': 1.0})).id);
+  final plan = MealPlanRepository(db, householdId: () async => 'h1');
+  final planned = await plan.add(day: DateTime(2026, 9, 23), title: 'Linsencurry', ingredients: const [SavedIngredient(productId: null, name: 'Linsen', unit: 'piece')], sourceUrl: 'https://example.com/suche');
+  await plan.move(planned.id, DateTime(2026, 9, 24));
+  await plan.delete((await plan.add(day: DateTime(2026, 9, 25), title: 'Alt', slot: 'lunch')).id);
   final prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
   await prefs.set(microReferenceOnPref, true);
   await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
@@ -208,7 +214,7 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 

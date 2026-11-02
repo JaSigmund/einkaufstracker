@@ -853,7 +853,7 @@ def main():
             contract_failures.append(f"{table}: {str(ex).splitlines()[0]}")
     tables_in_fixture = {e["table"] for e in entries}
     check("Vertrag: Fixture enthaelt Tagebuch, Ledger, Richtwerte, Ergaenzungen und Einstellungen",
-          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets", "supplements", "supplement_intakes", "household_prefs"} <= tables_in_fixture,
+          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets", "supplements", "supplement_intakes", "household_prefs", "meal_plan_entries"} <= tables_in_fixture,
           str(tables_in_fixture))
     check(f"Vertrag: alle {len(entries)} Zeilen der App werden vom echten Schema angenommen", not contract_failures, "; ".join(contract_failures[:3]))
     meal_ids = [e["payload"]["id"] for e in entries if e["table"] == "meals"]
@@ -861,6 +861,16 @@ def main():
           one("select count(*) from meals where id = any(%s::uuid[])", (meal_ids,)) == len(set(meal_ids)))
     check("Vertrag: Gegenbuchung der geloeschten Mahlzeit ist mit meal_id verknuepft",
           one("select count(*) from inventory_movements where type='adjustment' and meal_id = any(%s::uuid[])", (meal_ids,)) >= 1)
+
+    # --- Wochenplan (Migration 0033) ----------------------------------------------------------------------------------
+    check("Wochenplan: Fixture-Zeilen sind da, Zutaten als jsonb-Array",
+          one("select count(*) from meal_plan_entries where household_id = %s and jsonb_typeof(ingredients) = 'array'", (ha,)) >= 2)
+    check("Wochenplan: B sieht nichts von Haushalt A", one("select count(*) from meal_plan_entries", user=B) == 0)
+    ins_plan = "insert into meal_plan_entries (household_id, planned_on, slot, title) values (%s,'2026-11-02',%s,%s)"
+    check("Wochenplan: A kann planen", not raises(ins_plan, (ha, "dinner", "Linsencurry"), user=A))
+    check("Wochenplan: B kann nicht in Haushalt A schreiben", raises(ins_plan, (ha, "dinner", "Fremd"), user=B))
+    check("Wochenplan: unbekannte Tageszeit wird abgelehnt", raises(ins_plan, (ha, "drink", "Tee"), user=A))
+    check("Wochenplan: leerer Titel wird abgelehnt", raises(ins_plan, (ha, "dinner", "  "), user=A))
 
     # --- Nahrungsergaenzung und gemeinsame Einstellungen (Phase N4, Migration 0026) -----------------------------------
     check("Ergaenzungen: Fixture-Zeilen sind da (angelegt, geaendert, geloescht)",

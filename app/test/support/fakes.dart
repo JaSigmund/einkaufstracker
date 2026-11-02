@@ -632,14 +632,16 @@ class FakeCookingCloud implements CookingCloud {
 
   int suggestCalls = 0;
   List<SuggestionIngredient>? lastIngredients;
+  bool? lastAllowMissing;
   int chatCalls = 0;
   String? lastMessage;
   CookingChatContext? lastContext;
 
   @override
-  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients) async {
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false}) async {
     suggestCalls++;
     lastIngredients = ingredients;
+    lastAllowMissing = allowMissing;
     if (error != null) throw error!;
     return suggestions;
   }

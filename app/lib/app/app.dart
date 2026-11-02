@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
 
 import '../core/clock.dart';
 import '../domain/sync/sync_schedule.dart';
+import '../features/diary/quick_action_handler.dart';
 import '../features/receipt_import/shared_pdf_importer.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -22,6 +24,7 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
   Timer? _timer;
   StreamSubscription<List<ConnectivityResult>>? _connectivity;
   late final SharedPdfImporter _shared;
+  late final QuickActionHandler _quick;
 
   @override
   void initState() {
@@ -42,6 +45,14 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
       openReview: (preview) => ref.read(routerProvider).push('/import-review', extra: preview),
     );
     _shared.start();
+    // Widget auf dem Startbildschirm und langes Druecken auf das App-Symbol (ADR-041)
+    _quick = QuickActionHandler(
+      source: ref.read(quickActionSourceProvider),
+      isSignedIn: () => Supabase.instance.client.auth.currentSession != null,
+      takeWater: () => ref.read(supplementRepositoryProvider).takeWater(),
+      open: () => ref.read(routerProvider).push('/quick-intake'),
+    );
+    _quick.start();
     // Hintergrund-Auffrischung beim App-Start (Doku 06 §5, Schritt 5): haelt die geplanten
     // Ablauf-Erinnerungen konsistent, auch nach einem Geraete-Neustart (der die Alarme loescht).
     _rescheduleReminders();
@@ -76,6 +87,7 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
     _timer?.cancel();
     _connectivity?.cancel();
     _shared.dispose();
+    _quick.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -87,6 +99,7 @@ class _EinkaufstrackerAppState extends ConsumerState<EinkaufstrackerApp> with Wi
       if (next.value != null) {
         _sync();
         _shared.onSignedIn();
+        _quick.onSignedIn();
       }
     });
     // Nach jeder Inventaraenderung (Doku 06 §5, Schritt 1): der aktive Bestand aendert sich bei jedem

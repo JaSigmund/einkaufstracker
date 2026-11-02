@@ -15,6 +15,8 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var pending: ByteArray? = null
+    private var quickChannel: MethodChannel? = null
+    private var pendingQuick: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -30,14 +32,39 @@ class MainActivity : FlutterActivity() {
         }
         channel = ch
         readPdf(intent)?.let { pending = it }
+        val quick = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, QUICK_CHANNEL)
+        quick.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "takeQuickAction" -> {
+                    result.success(pendingQuick)
+                    pendingQuick = null
+                }
+                else -> result.notImplemented()
+            }
+        }
+        quickChannel = quick
+        readQuickAction(intent)?.let { pendingQuick = it }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        readQuickAction(intent)?.let {
+            pendingQuick = it
+            quickChannel?.invokeMethod("quickActionAvailable", null)
+            return
+        }
         val bytes = readPdf(intent) ?: return
         pending = bytes
         channel?.invokeMethod("sharedPdfAvailable", null)
+    }
+
+    /** Schnellaktion aus Widget oder App-Symbol. Das Extra wird entfernt, damit ein Neuaufbau der Activity nicht noch ein Glas eintraegt. */
+    private fun readQuickAction(intent: Intent?): String? {
+        if (intent?.action != QUICK_ACTION) return null
+        val action = intent.getStringExtra(QUICK_EXTRA)
+        intent.removeExtra(QUICK_EXTRA)
+        return action
     }
 
     private fun readPdf(intent: Intent?): ByteArray? {
@@ -72,6 +99,9 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val CHANNEL = "at.jakob.einkaufstracker/share"
+        const val QUICK_CHANNEL = "at.jakob.einkaufstracker/quick"
+        const val QUICK_ACTION = "at.jakob.einkaufstracker.QUICK_ACTION"
+        const val QUICK_EXTRA = "quick_action"
         const val MAX_BYTES = 10 * 1024 * 1024
     }
 }

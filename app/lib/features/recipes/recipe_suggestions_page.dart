@@ -12,6 +12,7 @@ import '../../domain/recipes/recipe_search_url.dart';
 import '../../domain/recipes/recipe_suggestion.dart';
 import '../../domain/recipes/recipe_suggestion_context.dart';
 import '../../domain/recipes/saved_recipe.dart';
+import 'plan_recipe.dart';
 import 'recipe_viewer_page.dart';
 
 const _cloudNoticeKv = 'cooking_cloud_notice_seen';
@@ -27,6 +28,7 @@ class RecipeSuggestionsPage extends ConsumerStatefulWidget {
 
 class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   bool _loading = false;
+  bool _allowMissing = false;
   String? _error;
   List<RecipeSuggestion>? _suggestions;
   List<RecipeIngredient> _lastIngredients = const [];
@@ -71,7 +73,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     try {
       final result = await ref.read(cookingCloudProvider).suggestRecipes([
         for (final i in ingredients) (name: i.productName, quantity: i.quantity, unit: i.unit),
-      ]);
+      ], allowMissing: _allowMissing);
       if (!mounted) return;
       setState(() {
         _suggestions = result;
@@ -114,7 +116,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   }
 
   void _openRecipe(RecipeSuggestion s) {
-    context.push('/recipe-viewer', extra: RecipeViewerArgs(title: s.title, ingredients: s.matchingIngredients));
+    context.push('/recipe-viewer', extra: RecipeViewerArgs(title: s.title, ingredients: [...s.matchingIngredients, ...s.missingIngredients]));
   }
 
   /// Speichert einen Vorschlag (Jakobs Anforderung "Rezepte sollen auch gespeichert werden können").
@@ -123,13 +125,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   /// wieder automatisch gegen das Inventar abgleichen (siehe `saved_recipe.dart`). Keine Menge: siehe
   /// Dokumentation dort (Codereview-Fund 2026-10-01).
   Future<void> _saveRecipe(RecipeSuggestion s) async {
-    final ingredients = [
-      for (final name in s.matchingIngredients)
-        if (_matchByName(name) case final match?)
-          SavedIngredient(productId: match.productId, name: name, unit: match.unit)
-        else
-          SavedIngredient(productId: null, name: name, unit: 'piece'),
-    ];
+    final ingredients = _ingredientsOf(s);
     await ref.read(savedRecipeRepositoryProvider).save(SavedRecipe(
           id: _uuid.v4(),
           title: s.title,
@@ -141,6 +137,15 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     setState(() => _savedTitles.add(s.title));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"${s.title}" gespeichert.')));
   }
+
+  /// Alle Zutaten eines Vorschlags: vorhandene mit Produkt-Zuordnung, fehlende nur mit Namen.
+  List<SavedIngredient> _ingredientsOf(RecipeSuggestion s) => [
+        for (final name in [...s.matchingIngredients, ...s.missingIngredients])
+          if (_matchByName(name) case final match?)
+            SavedIngredient(productId: match.productId, name: name, unit: match.unit)
+          else
+            SavedIngredient(productId: null, name: name, unit: 'piece'),
+      ];
 
   RecipeIngredient? _matchByName(String name) {
     for (final i in _lastIngredients) {
@@ -163,6 +168,12 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
         title: const Text('Rezeptvorschläge'),
         actions: [
           IconButton(
+            key: const Key('open-meal-plan'),
+            tooltip: 'Wochenplan',
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: () => context.push('/meal-plan'),
+          ),
+          IconButton(
             key: const Key('open-saved-recipes'),
             tooltip: 'Meine Rezepte',
             icon: const Icon(Icons.bookmarks_outlined),
@@ -177,7 +188,15 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
             'Schlägt Rezepte aus dem vor, was gerade im Haus ist — bevorzugt das, was bald abläuft.',
             style: t.textTheme.bodyMedium,
           ),
-          const SizedBox(height: 16),
+          SwitchListTile(
+            key: const Key('suggestions-allow-missing'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Auch mit Zutaten, die noch fehlen'),
+            subtitle: const Text('Für die Wochenplanung: Fehlendes lässt sich danach auf die Einkaufsliste setzen.'),
+            value: _allowMissing,
+            onChanged: _loading ? null : (v) => setState(() => _allowMissing = v),
+          ),
+          const SizedBox(height: 8),
           FilledButton.icon(
             key: const Key('fetch-suggestions'),
             onPressed: _loading ? null : () => _fetchSuggestions(active, products),
@@ -195,9 +214,13 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
             for (final s in _suggestions!)
               Card(
                 margin: const EdgeInsets.only(top: 12),
-                child: ListTile(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ListTile(
                   title: Text(s.title),
-                  subtitle: Text(s.reason.isEmpty ? s.matchingIngredients.join(', ') : s.reason),
+                  subtitle: Text([
+                    s.reason.isEmpty ? s.matchingIngredients.join(', ') : s.reason,
+                    if (s.missingIngredients.isNotEmpty) 'Fehlt: ${s.missingIngredients.join(', ')}',
+                  ].join('\n')),
                   onTap: () => _openRecipe(s),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     IconButton(
@@ -209,6 +232,22 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
                     const Icon(Icons.chevron_right),
                   ]),
                 ),
+                OverflowBar(alignment: MainAxisAlignment.end, children: [
+                  if (s.missingIngredients.isNotEmpty)
+                    TextButton.icon(
+                      key: Key('missing-to-list-${s.title}'),
+                      onPressed: () => addMissingToList(context, ref, _ingredientsOf(s), active: active, products: products.values.toList()),
+                      icon: const Icon(Icons.add_shopping_cart_outlined),
+                      label: const Text('Fehlendes auf die Liste'),
+                    ),
+                  TextButton.icon(
+                    key: Key('plan-${s.title}'),
+                    onPressed: () => addRecipeToPlan(context, ref, title: s.title, ingredients: _ingredientsOf(s), sourceUrl: buildRecipeSearchUrl(s.title)),
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: const Text('In den Wochenplan'),
+                  ),
+                ]),
+                ]),
               ),
         ],
       ),

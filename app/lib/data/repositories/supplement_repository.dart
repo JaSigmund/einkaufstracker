@@ -14,12 +14,31 @@ import '../sync/mappers.dart';
 /// Eine Einnahme speichert Name und absolute Mengen selbst. Wird die Ergaenzung spaeter geaendert oder geloescht, bleibt die
 /// Vergangenheit unveraendert (wie bei den Zutaten einer Mahlzeit).
 class SupplementRepository {
+  static const defaultGlassMl = 250.0;
+
   SupplementRepository(this._db, {required this.householdId, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
   final Future<String> Function() householdId;
   final void Function()? onChanged;
   final Uuid _uuid;
+
+  /// Die Kennung des Eintrags "Wasser" (ADR-041). Fest je Haushalt, damit zwei Geraete dieselbe Zeile anlegen statt zwei verschiedene.
+  String waterIdFor(String householdId) => _uuid.v5(Namespace.url.value, 'einkaufstracker:water:$householdId');
+
+  /// Wasser ist eine Ergaenzung mit der Einheit "Glas" und dem Naehrstoff `water_g`. So gelten Sync, Rueckgaengig und die Seite
+  /// Naehrstoffe auch dafuer, und die Glasgroesse laesst sich wie jeder andere Wert aendern.
+  bool isWater(Supplement s) => s.id == waterIdFor(s.householdId);
+
+  /// Traegt ein Glas Wasser ein und legt den Eintrag beim ersten Mal an (auch wieder, falls er geloescht wurde).
+  Future<SupplementIntake> takeWater({DateTime? at}) async {
+    final id = waterIdFor(await householdId());
+    final existing = await get(id);
+    final water = existing != null && existing.deletedAt == null
+        ? existing
+        : await save(id: id, name: 'Wasser', servingLabel: 'Glas', micros: const {'water_g': defaultGlassMl});
+    return take(water, at: at);
+  }
 
   /// Nicht geloeschte Ergaenzungen, alphabetisch.
   Stream<List<Supplement>> watchSupplements() => (_db.select(_db.supplements)
@@ -49,7 +68,7 @@ class SupplementRepository {
     final now = appClock.now().toUtc();
     final existing = id == null ? null : await get(id);
     final row = Supplement(
-      id: existing?.id ?? _uuid.v4(),
+      id: existing?.id ?? id ?? _uuid.v4(),
       householdId: existing?.householdId ?? hid,
       name: label,
       servingLabel: unit,
