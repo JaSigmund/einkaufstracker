@@ -913,6 +913,12 @@ def main():
     check("Wochenplan: unbekannte Tageszeit wird abgelehnt", raises(ins_plan, (ha, "drink", "Tee"), user=A))
     check("Wochenplan: leerer Titel wird abgelehnt", raises(ins_plan, (ha, "dinner", "  "), user=A))
 
+    # --- Trinkbare Produkte (Migration 0037) ---------------------------------------------------------------------------
+    check("Trinkbar: true, false und null aus dem Fixture sind da",
+          one("select count(distinct coalesce(is_drink::text, 'null')) from products where household_id = %s", (ha,)) == 3)
+    check("Getraenk: Eintrag vom Typ drink mit Wasseranteil aus dem Fixture",
+          one("select count(*) from meals m join meal_ingredients i on i.meal_id = m.id where m.household_id = %s and m.meal_type = 'drink' and i.bls_code = 'N110000' and i.kcal = 0", (ha,)) >= 1)
+
     # --- Kochzeiten (Migration 0036) ----------------------------------------------------------------------------------
     check("Kochzeiten: Fixture-Zeilen sind da", one("select count(*) from cooking_sessions where household_id = %s and active_seconds > 0", (ha,)) >= 2)
     check("Kochzeiten: B sieht nichts von Haushalt A", one("select count(*) from cooking_sessions", user=B) == 0)

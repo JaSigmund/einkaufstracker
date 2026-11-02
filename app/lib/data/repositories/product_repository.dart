@@ -244,6 +244,7 @@ class ProductRepository {
     // Aufrufer (OFF-Scan) unveraendert.
     String? nutrientsSource,
     double? unitWeightG,
+    bool? isDrink,
     String? ean,
   }) async {
     final n = name.trim();
@@ -273,6 +274,7 @@ class ProductRepository {
       nutrientsBasis: nutrientsBasis,
       nutrientsSource: nutrientsSource,
       unitWeightG: unitWeightG,
+      isDrink: isDrink,
       updatedAt: now,
     );
     await _put('products', product.id, productToRemote(product), () => _db.into(_db.products).insertOnConflictUpdate(product.toCompanion(false)));
@@ -285,6 +287,13 @@ class ProductRepository {
     final updated = product.copyWith(updatedAt: appClock.now().toUtc());
     await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
+  }
+
+  /// Merkt sich die Entscheidung, ob das Produkt trinkbar ist (ADR-048). `null` gibt sie an die Regel zurueck.
+  Future<void> setIsDrink(String productId, bool? value) async {
+    final product = await byId(productId);
+    if (product == null || product.deletedAt != null || product.isDrink == value) return;
+    await update(product.copyWith(isDrink: Value(value)));
   }
 
   /// Merkt sich das Gewicht von 1 Stueck des Produkts in g (Phase N2): einmal angegeben, gilt es fuer jede Mahlzeit. `null` bei

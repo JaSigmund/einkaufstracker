@@ -11,6 +11,7 @@ import '../../data/local/database.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/supplements.dart';
 import '../recipes/cooking_timer_panel.dart';
+import 'drinks_section.dart';
 
 /// Schnell eintragen (ADR-041): ein Glas Wasser und jede Nahrungsergaenzung mit einem Tipp, erreichbar aus jedem Tab, vom Widget auf dem
 /// Startbildschirm und ueber langes Druecken auf das App-Symbol.
@@ -117,6 +118,8 @@ class QuickIntakePage extends ConsumerWidget {
               label: const Text('Nahrungsergänzung anlegen'),
             ),
           ),
+        DrinksSection(now: now),
+        const Padding(padding: EdgeInsets.only(top: 8), child: Divider()),
         // Von jedem Tab aus erreichbar, deshalb auch hier: der Timer fuer zwischendurch (ADR-046)
         Card(
           child: ListTile(

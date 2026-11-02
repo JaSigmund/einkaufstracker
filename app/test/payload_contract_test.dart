@@ -6,7 +6,9 @@ import 'package:einkaufstracker/data/repositories/household_prefs_repository.dar
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
 import 'package:einkaufstracker/data/repositories/cooking_session_repository.dart';
+import 'package:einkaufstracker/data/repositories/drink_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_plan_repository.dart';
+import 'package:einkaufstracker/domain/nutrition/drink_mix.dart';
 import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
 import 'package:einkaufstracker/domain/recipes/saved_recipe.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
@@ -182,6 +184,13 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
 
   // Mehrfachpackung (ADR-045): Produkt mit Stueckzahl und Namen, ein Flaeschchen verbraucht
+  // Trinkbar von Hand entschieden (ADR-048), ein gespritzter Saft mit Wasseranteil ohne Abzug
+  final saft = await productRepo(db).create(name: 'Orangensaft', baseUnit: 'l', packSize: 1, isDrink: true, nutrientsPer100: const {'kcal': 45.0}, nutrientsBasis: 'g', nutrientsSource: 'off');
+  await productRepo(db).setIsDrink((await productRepo(db).create(name: 'Grünkernöl', baseUnit: 'l')).id, false);
+  await inventoryRepo(db).recordFromScan(productId: saft.id, ean: '9001234567892', quantity: 1, unit: 'l', now: DateTime.utc(2026, 9, 1));
+  final drink = DrinkDraft(title: 'Orangensaft gespritzt', parts: [DrinkPart(name: 'Orangensaft', amount: 125, productId: saft.id), DrinkPart.water(125)]);
+  await DrinkRepository(mealRepo(db)).book(drink, at: DateTime.utc(2026, 9, 24, 12), inStock: {saft.id});
+
   final mehrfach = await productRepo(db).create(name: 'Yakult Drink', baseUnit: 'l', packSize: 0.39, piecesPerPack: 6, pieceLabel: 'Fläschchen', unitWeightG: 65);
   final inventory = inventoryRepo(db);
   final flaeschchen = await inventory.recordFromScan(productId: mehrfach.id, ean: '9001234567891', quantity: 0.39, unit: 'l', now: DateTime.utc(2026, 9, 1));
@@ -236,6 +245,11 @@ void main() {
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
+    expect(rows('products').any((p) => p['is_drink'] == true), isTrue, reason: 'von Hand trinkbar');
+    expect(rows('products').any((p) => p['is_drink'] == false), isTrue, reason: 'von Hand nicht trinkbar');
+    expect(rows('products').any((p) => p['is_drink'] == null), isTrue, reason: 'die Regel entscheidet');
+    expect(rows('meals').any((m) => m['meal_type'] == 'drink' && m['title'] == 'Orangensaft gespritzt'), isTrue);
+    expect(rows('meal_ingredients').any((i) => i['free_text'] == 'Wasser' && i['bls_code'] == 'N110000' && i['kcal'] == 0 && i['source'] == 'manual'), isTrue, reason: 'Wasseranteil');
     expect(rows('cooking_sessions').any((s) => s['deleted_at'] != null), isTrue, reason: 'Kochzeit zurueckgenommen');
     expect(rows('cooking_sessions').any((s) => s['active_seconds'] == 2520 && s['recipe_title'] == 'Linsencurry'), isTrue);
     expect(rows('shopping_list_items').any((i) => i['archived_at'] != null), isTrue, reason: 'abgeschlossener Einkauf');
