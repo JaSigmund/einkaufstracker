@@ -177,6 +177,14 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await prefs.set(microReferenceOnPref, true);
   await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
 
+  // Einkaufsliste mit abgeschlossenem Einkauf (ADR-043): archiviert, zurueckgeholt, wieder archiviert
+  final shopping = shoppingListRepo(db);
+  final bought = await shopping.addManual(productId: reis.id, unit: 'kg');
+  await shopping.setChecked(bought.id, true);
+  await shopping.archiveItems([bought.id]);
+  await shopping.unarchive([bought.id]);
+  await shopping.archiveItems([bought.id]);
+
   final outbox = await (db.select(db.outbox)..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
   return [for (final e in outbox) {'table': e.remoteTable, 'payload': jsonDecode(e.payload)}];
 }
@@ -214,10 +222,12 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries', 'shopping_lists', 'shopping_list_items']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
+    expect(rows('shopping_list_items').any((i) => i['archived_at'] != null), isTrue, reason: 'abgeschlossener Einkauf');
+    expect(rows('shopping_list_items').any((i) => i['archived_at'] == null), isTrue, reason: 'offener oder zurueckgeholter Eintrag');
     final movementTypes = {for (final m in rows('inventory_movements')) m['type']};
     expect(movementTypes, containsAll(['purchase', 'meal', 'adjustment']), reason: 'Abzug und Gegenbuchung');
     expect(rows('inventory_movements').any((m) => m['meal_id'] != null), isTrue);

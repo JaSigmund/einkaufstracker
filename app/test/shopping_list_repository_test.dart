@@ -1,9 +1,73 @@
 import 'package:einkaufstracker/data/local/database.dart';
+import 'package:einkaufstracker/data/repositories/shopping_list_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fakes.dart';
 
 void main() {
+  group('Archiv (ADR-043)', () {
+    late AppDatabase db;
+    late ShoppingListRepository repo;
+    setUp(() {
+      db = memoryDb();
+      repo = shoppingListRepo(db);
+    });
+    tearDown(() => db.close());
+
+    test('archiviert nur Abgehaktes, alle mit demselben Zeitstempel, und sendet es an den Server', () async {
+      final a = await repo.addManual(freeText: 'Milch');
+      final b = await repo.addManual(freeText: 'Eier');
+      final open = await repo.addManual(freeText: 'Brot');
+      await repo.setChecked(a.id, true);
+      await repo.setChecked(b.id, true);
+
+      final archived = await repo.archiveItems([a.id, b.id, open.id]);
+
+      expect(archived, unorderedEquals([a.id, b.id]));
+      final rows = await repo.watchArchivedItems().first;
+      expect(rows.map((r) => r.archivedAt).toSet(), hasLength(1));
+      expect((await repo.watchItems().first).map((i) => i.id), [open.id]);
+      final payload = (await db.select(db.outbox).get()).last.payload;
+      expect(payload, contains('"archived_at":"'));
+    });
+
+    test('archivierte Eintraege zaehlen nicht mehr als gelistet, das Produkt darf neu auf die Liste', () async {
+      final a = await repo.addManual(freeText: 'Milch');
+      await repo.setChecked(a.id, true);
+      await repo.archiveItems([a.id]);
+
+      expect(await repo.openItems(), isEmpty);
+      expect(await repo.addMany([(productId: null, freeText: 'Milch', unit: 'piece')]), 1);
+    });
+
+    test('Zurueckholen stellt den Eintrag unter Erledigt wieder her, zweimal Archivieren aendert nichts', () async {
+      final a = await repo.addManual(freeText: 'Milch');
+      await repo.setChecked(a.id, true);
+      await repo.archiveItems([a.id]);
+      expect(await repo.archiveItems([a.id]), isEmpty);
+
+      await repo.unarchive([a.id]);
+
+      final item = (await repo.watchItems().first).single;
+      expect(item.checked, isTrue);
+      expect(item.archivedAt, isNull);
+      expect(await repo.watchArchivedItems().first, isEmpty);
+    });
+
+    test('geloeschte Liste: ihr Archiv bleibt erhalten und wandert zur Standardliste', () async {
+      final list = await repo.createList('Drogerie');
+      final a = await repo.addManual(freeText: 'Seife', listId: list.id);
+      await repo.setChecked(a.id, true);
+      await repo.archiveItems([a.id]);
+
+      await repo.deleteList(list.id);
+
+      final archived = (await repo.watchArchivedItems().first).single;
+      expect(archived.listId, await repo.defaultListId());
+      expect(archived.archivedAt, isNotNull);
+    });
+  });
+
   late AppDatabase db;
   late String productId;
 

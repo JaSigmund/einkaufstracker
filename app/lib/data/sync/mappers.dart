@@ -526,6 +526,7 @@ Map<String, dynamic> shoppingListItemToRemote(ShoppingListItem i) => {
       'checked': i.checked,
       'source': i.source,
       'is_suggestion': i.isSuggestion,
+      'archived_at': i.archivedAt?.toUtc().toIso8601String(),
       'updated_at': i.updatedAt.toUtc().toIso8601String(),
       'deleted_at': i.deletedAt?.toUtc().toIso8601String(),
     };
@@ -541,6 +542,7 @@ ShoppingListItemsCompanion shoppingListItemFromRemote(Map<String, dynamic> j) =>
       checked: Value(j['checked'] as bool? ?? false),
       source: Value(j['source'] as String? ?? 'manual'),
       isSuggestion: Value(j['is_suggestion'] as bool? ?? false),
+      archivedAt: Value(_dt(j['archived_at'])),
       updatedAt: Value(_dt(j['updated_at'])!),
       deletedAt: Value(_dt(j['deleted_at'])),
     );

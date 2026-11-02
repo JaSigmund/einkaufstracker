@@ -32,8 +32,9 @@ typedef SuggestionIngredient = ({String name, double? quantity, String? unit});
 abstract class CookingCloud {
   /// Liefert 3 bis 5 Rezeptideen passend zu [ingredients] (dringlichste zuerst, siehe
   /// `buildRecipeSuggestionContext`). Nur auf Tastendruck aufrufen (Q-21). Mit [allowMissing] duerfen die Ideen auch Zutaten brauchen, die
-  /// noch eingekauft werden muessen (ADR-042).
-  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false});
+  /// noch eingekauft werden muessen (ADR-042). Mit [dish] sucht es Varianten genau dieses Gerichts, [ingredients] darf dann leer sein und
+  /// zeigt nur, was davon schon im Haus ist (ADR-044).
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false, String? dish});
 
   /// Schickt eine Chat-Nachricht samt Kontext ab. Kompatibel mit [CookingChatSend].
   Future<String> chat(String message, CookingChatContext context);

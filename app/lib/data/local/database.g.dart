@@ -11465,6 +11465,17 @@ class $ShoppingListItemsTable extends ShoppingListItems
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _archivedAtMeta = const VerificationMeta(
+    'archivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archivedAt = GeneratedColumn<DateTime>(
+    'archived_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -11499,6 +11510,7 @@ class $ShoppingListItemsTable extends ShoppingListItems
     checked,
     source,
     isSuggestion,
+    archivedAt,
     updatedAt,
     deletedAt,
   ];
@@ -11583,6 +11595,12 @@ class $ShoppingListItemsTable extends ShoppingListItems
         ),
       );
     }
+    if (data.containsKey('archived_at')) {
+      context.handle(
+        _archivedAtMeta,
+        archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -11646,6 +11664,10 @@ class $ShoppingListItemsTable extends ShoppingListItems
         DriftSqlType.bool,
         data['${effectivePrefix}is_suggestion'],
       )!,
+      archivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archived_at'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -11679,6 +11701,9 @@ class ShoppingListItem extends DataClass
   /// 'manual' | 'expiring' | 'depleted' | 'recurring' | 'scan'
   final String source;
   final bool isSuggestion;
+
+  /// Gesetzt, sobald der Eintrag mit "Einkauf abschließen" archiviert wurde (ADR-043); Eintraege eines Abschlusses tragen denselben Wert.
+  final DateTime? archivedAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
   const ShoppingListItem({
@@ -11692,6 +11717,7 @@ class ShoppingListItem extends DataClass
     required this.checked,
     required this.source,
     required this.isSuggestion,
+    this.archivedAt,
     required this.updatedAt,
     this.deletedAt,
   });
@@ -11712,6 +11738,9 @@ class ShoppingListItem extends DataClass
     map['checked'] = Variable<bool>(checked);
     map['source'] = Variable<String>(source);
     map['is_suggestion'] = Variable<bool>(isSuggestion);
+    if (!nullToAbsent || archivedAt != null) {
+      map['archived_at'] = Variable<DateTime>(archivedAt);
+    }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
@@ -11735,6 +11764,9 @@ class ShoppingListItem extends DataClass
       checked: Value(checked),
       source: Value(source),
       isSuggestion: Value(isSuggestion),
+      archivedAt: archivedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivedAt),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
@@ -11758,6 +11790,7 @@ class ShoppingListItem extends DataClass
       checked: serializer.fromJson<bool>(json['checked']),
       source: serializer.fromJson<String>(json['source']),
       isSuggestion: serializer.fromJson<bool>(json['isSuggestion']),
+      archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
@@ -11776,6 +11809,7 @@ class ShoppingListItem extends DataClass
       'checked': serializer.toJson<bool>(checked),
       'source': serializer.toJson<String>(source),
       'isSuggestion': serializer.toJson<bool>(isSuggestion),
+      'archivedAt': serializer.toJson<DateTime?>(archivedAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
@@ -11792,6 +11826,7 @@ class ShoppingListItem extends DataClass
     bool? checked,
     String? source,
     bool? isSuggestion,
+    Value<DateTime?> archivedAt = const Value.absent(),
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
   }) => ShoppingListItem(
@@ -11805,6 +11840,7 @@ class ShoppingListItem extends DataClass
     checked: checked ?? this.checked,
     source: source ?? this.source,
     isSuggestion: isSuggestion ?? this.isSuggestion,
+    archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
@@ -11824,6 +11860,9 @@ class ShoppingListItem extends DataClass
       isSuggestion: data.isSuggestion.present
           ? data.isSuggestion.value
           : this.isSuggestion,
+      archivedAt: data.archivedAt.present
+          ? data.archivedAt.value
+          : this.archivedAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
@@ -11842,6 +11881,7 @@ class ShoppingListItem extends DataClass
           ..write('checked: $checked, ')
           ..write('source: $source, ')
           ..write('isSuggestion: $isSuggestion, ')
+          ..write('archivedAt: $archivedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt')
           ..write(')'))
@@ -11860,6 +11900,7 @@ class ShoppingListItem extends DataClass
     checked,
     source,
     isSuggestion,
+    archivedAt,
     updatedAt,
     deletedAt,
   );
@@ -11877,6 +11918,7 @@ class ShoppingListItem extends DataClass
           other.checked == this.checked &&
           other.source == this.source &&
           other.isSuggestion == this.isSuggestion &&
+          other.archivedAt == this.archivedAt &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt);
 }
@@ -11892,6 +11934,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
   final Value<bool> checked;
   final Value<String> source;
   final Value<bool> isSuggestion;
+  final Value<DateTime?> archivedAt;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
   final Value<int> rowid;
@@ -11906,6 +11949,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
     this.checked = const Value.absent(),
     this.source = const Value.absent(),
     this.isSuggestion = const Value.absent(),
+    this.archivedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11921,6 +11965,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
     this.checked = const Value.absent(),
     this.source = const Value.absent(),
     this.isSuggestion = const Value.absent(),
+    this.archivedAt = const Value.absent(),
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11939,6 +11984,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
     Expression<bool>? checked,
     Expression<String>? source,
     Expression<bool>? isSuggestion,
+    Expression<DateTime>? archivedAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
@@ -11954,6 +12000,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
       if (checked != null) 'checked': checked,
       if (source != null) 'source': source,
       if (isSuggestion != null) 'is_suggestion': isSuggestion,
+      if (archivedAt != null) 'archived_at': archivedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
@@ -11971,6 +12018,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
     Value<bool>? checked,
     Value<String>? source,
     Value<bool>? isSuggestion,
+    Value<DateTime?>? archivedAt,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
     Value<int>? rowid,
@@ -11986,6 +12034,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
       checked: checked ?? this.checked,
       source: source ?? this.source,
       isSuggestion: isSuggestion ?? this.isSuggestion,
+      archivedAt: archivedAt ?? this.archivedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
@@ -12025,6 +12074,9 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
     if (isSuggestion.present) {
       map['is_suggestion'] = Variable<bool>(isSuggestion.value);
     }
+    if (archivedAt.present) {
+      map['archived_at'] = Variable<DateTime>(archivedAt.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -12050,6 +12102,7 @@ class ShoppingListItemsCompanion extends UpdateCompanion<ShoppingListItem> {
           ..write('checked: $checked, ')
           ..write('source: $source, ')
           ..write('isSuggestion: $isSuggestion, ')
+          ..write('archivedAt: $archivedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
@@ -22206,6 +22259,7 @@ typedef $$ShoppingListItemsTableCreateCompanionBuilder =
       Value<bool> checked,
       Value<String> source,
       Value<bool> isSuggestion,
+      Value<DateTime?> archivedAt,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -22222,6 +22276,7 @@ typedef $$ShoppingListItemsTableUpdateCompanionBuilder =
       Value<bool> checked,
       Value<String> source,
       Value<bool> isSuggestion,
+      Value<DateTime?> archivedAt,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
       Value<int> rowid,
@@ -22283,6 +22338,11 @@ class $$ShoppingListItemsTableFilterComposer
 
   ColumnFilters<bool> get isSuggestion => $composableBuilder(
     column: $table.isSuggestion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -22356,6 +22416,11 @@ class $$ShoppingListItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -22407,6 +22472,11 @@ class $$ShoppingListItemsTableAnnotationComposer
 
   GeneratedColumn<bool> get isSuggestion => $composableBuilder(
     column: $table.isSuggestion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
     builder: (column) => column,
   );
 
@@ -22467,6 +22537,7 @@ class $$ShoppingListItemsTableTableManager
                 Value<bool> checked = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<bool> isSuggestion = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -22481,6 +22552,7 @@ class $$ShoppingListItemsTableTableManager
                 checked: checked,
                 source: source,
                 isSuggestion: isSuggestion,
+                archivedAt: archivedAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,
@@ -22497,6 +22569,7 @@ class $$ShoppingListItemsTableTableManager
                 Value<bool> checked = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<bool> isSuggestion = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -22511,6 +22584,7 @@ class $$ShoppingListItemsTableTableManager
                 checked: checked,
                 source: source,
                 isSuggestion: isSuggestion,
+                archivedAt: archivedAt,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
                 rowid: rowid,

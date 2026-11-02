@@ -25,13 +25,14 @@ class SupabaseCookingCloud implements CookingCloud {
   final Future<String> Function() _householdId;
 
   @override
-  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false}) async {
+  Future<List<RecipeSuggestion>> suggestRecipes(List<SuggestionIngredient> ingredients, {bool allowMissing = false, String? dish}) async {
     final household = await _householdId();
     try {
       final response = await _client.functions
           .invoke('suggest-recipes', body: {
             'household_id': household,
             if (allowMissing) 'allow_missing': true,
+            'dish': ?dish,
             'ingredients': [for (final i in ingredients) {'name': i.name, if (i.quantity != null) 'quantity': i.quantity, if (i.unit != null) 'unit': i.unit}],
           })
           .timeout(const Duration(seconds: 30));

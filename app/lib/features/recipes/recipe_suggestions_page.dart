@@ -34,6 +34,13 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
   List<RecipeIngredient> _lastIngredients = const [];
   final _savedTitles = <String>{};
   final _uuid = const Uuid();
+  final _dish = TextEditingController();
+
+  @override
+  void dispose() {
+    _dish.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -43,7 +50,9 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowFirstUseNotice());
   }
 
-  Future<void> _fetchSuggestions(List<InventoryItem> active, Map<String, Product> products) async {
+  /// Ohne [dish] Vorschlaege aus dem Inventar, mit [dish] Varianten genau dieses Gerichts (ADR-044); das Inventar zeigt dann nur, was schon
+  /// im Haus ist, und darf leer sein.
+  Future<void> _fetchSuggestions(List<InventoryItem> active, Map<String, Product> products, {String? dish}) async {
     final ingredients = buildRecipeSuggestionContext(
       [
         for (final item in active)
@@ -60,7 +69,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
       today: appClock.now(),
     );
 
-    if (ingredients.isEmpty) {
+    if (ingredients.isEmpty && dish == null) {
       setState(() => _error = 'Im Inventar ist nichts, woraus sich ein Rezept vorschlagen ließe.');
       return;
     }
@@ -73,12 +82,13 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
     try {
       final result = await ref.read(cookingCloudProvider).suggestRecipes([
         for (final i in ingredients) (name: i.productName, quantity: i.quantity, unit: i.unit),
-      ], allowMissing: _allowMissing);
+      ], allowMissing: dish == null && _allowMissing, dish: dish);
       if (!mounted) return;
       setState(() {
         _suggestions = result;
         _lastIngredients = ingredients;
         _savedTitles.clear();
+        if (result.isEmpty) _error = dish == null ? 'Dazu ist gerade nichts eingefallen. Versuch es noch einmal.' : 'Zu „$dish“ wurde kein Gericht gefunden.';
       });
     } catch (e) {
       if (!mounted) return;
@@ -107,12 +117,19 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
       builder: (_) => AlertDialog(
         title: const Text('Rezeptvorschläge aus der Cloud'),
         content: const Text(
-          'Dafür werden dein Inventar und deine Chat-Nachrichten an die Cloud geschickt — wie bei der '
+          'Dafür werden dein Inventar, deine Suchbegriffe und deine Chat-Nachrichten an die Cloud geschickt — wie bei der '
           'Foto-Erkennung von Bons. Die Einstellung "Cloud-Auswertung erlauben" gilt auch hierfür.',
         ),
         actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Verstanden'))],
       ),
     );
+  }
+
+  void _searchDish(List<InventoryItem> active, Map<String, Product> products) {
+    final dish = _dish.text.trim();
+    if (dish.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    _fetchSuggestions(active, products, dish: dish);
   }
 
   void _openRecipe(RecipeSuggestion s) {
@@ -165,7 +182,7 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rezeptvorschläge'),
+        title: const Text('Rezepte'),
         actions: [
           IconButton(
             key: const Key('open-meal-plan'),
@@ -184,8 +201,39 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          TextField(
+            key: const Key('recipe-dish-input'),
+            controller: _dish,
+            maxLength: 100,
+            textInputAction: TextInputAction.search,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Gericht suchen',
+              hintText: 'zum Beispiel Lasagne',
+              counterText: '',
+              suffixIcon: IconButton(
+                key: const Key('recipe-dish-search'),
+                tooltip: 'Suchen',
+                icon: const Icon(Icons.search),
+                onPressed: _loading ? null : () => _searchDish(active, products),
+              ),
+            ),
+            onSubmitted: (_) {
+              if (!_loading) _searchDish(active, products);
+            },
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('create-own-recipe'),
+              onPressed: () => context.push('/recipe-form'),
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Eigenes Rezept anlegen'),
+            ),
+          ),
+          const Divider(height: 24),
           Text(
-            'Schlägt Rezepte aus dem vor, was gerade im Haus ist — bevorzugt das, was bald abläuft.',
+            'Oder Rezepte aus dem, was gerade im Haus ist — bevorzugt das, was bald abläuft.',
             style: t.textTheme.bodyMedium,
           ),
           SwitchListTile(
