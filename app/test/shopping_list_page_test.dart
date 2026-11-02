@@ -100,9 +100,69 @@ void main() {
     await tester.pumpWidget(app(items: items, products: [product]));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 kg'), findsOneWidget); // Anzahl (2 Packungen)
-    expect(find.textContaining('insgesamt'), findsOneWidget);
-    expect(find.textContaining('0,3 kg'), findsOneWidget); // 2 x 0,15 kg
+    expect(find.text('2 × 150 g'), findsOneWidget); // 2 Packungen zu je 150 g
+    expect(find.text('insgesamt 300 g'), findsOneWidget);
+  });
+
+  testWidgets('Fehlerbericht Yakult: eine Packung mit 0,29 l zeigt weder "1 l" noch einen Widerspruch', (tester) async {
+    final product = Product(id: 'p1', householdId: 'h1', name: 'Yakult', baseUnit: 'l', packSize: 0.29, restock: false, defaultDateKind: 'best_before', defaultLocation: 'pantry', updatedAt: DateTime.utc(2026));
+    final items = [
+      ShoppingListItem(id: 'i1', householdId: 'h1', listId: 'l1', productId: 'p1', quantity: 1, unit: 'l', checked: false, source: 'manual', isSuggestion: false, updatedAt: DateTime.utc(2026)),
+    ];
+    await tester.pumpWidget(app(items: items, products: [product]));
+    await tester.pumpAndSettle();
+    expect(find.text('1 × 290 ml'), findsOneWidget);
+    expect(find.text('1 l'), findsNothing);
+    expect(find.textContaining('insgesamt'), findsNothing);
+  });
+
+  testWidgets('Menge statt Packungen eingeben: wird in Packungen gespeichert und so angezeigt', (tester) async {
+    final product = Product(id: 'p1', householdId: 'h1', name: 'Mehl', baseUnit: 'kg', packSize: 0.5, restock: false, defaultDateKind: 'best_before', defaultLocation: 'pantry', updatedAt: DateTime.utc(2026));
+    final item = ShoppingListItem(id: 'i1', householdId: 'h1', listId: 'l1', productId: 'p1', quantity: 1, unit: 'kg', checked: false, source: 'manual', isSuggestion: false, updatedAt: DateTime.utc(2026));
+    await db.into(db.shoppingLists).insert(ShoppingList(id: 'l1', householdId: 'h1', name: 'Einkaufsliste', isDefault: true, updatedAt: DateTime.utc(2026)));
+    await db.into(db.shoppingListItems).insert(item);
+    await tester.pumpWidget(app(items: [item], products: [product]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-i1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Menge').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('shopping-item-quantity-input'))).controller!.text, '500');
+    await tester.enterText(find.byKey(const Key('shopping-item-quantity-input')), '150');
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+
+    final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals('i1'))).getSingle();
+    expect(row.quantity, 0.3);
+    expect(row.unit, 'kg');
+  });
+
+  testWidgets('Frei getippter Eintrag: Einheit waehlbar, 0 wird abgelehnt', (tester) async {
+    final item = ShoppingListItem(id: 'i1', householdId: 'h1', listId: 'l1', freeText: 'Hackfleisch', quantity: 1, unit: 'piece', checked: false, source: 'manual', isSuggestion: false, updatedAt: DateTime.utc(2026));
+    await db.into(db.shoppingLists).insert(ShoppingList(id: 'l1', householdId: 'h1', name: 'Einkaufsliste', isDefault: true, updatedAt: DateTime.utc(2026)));
+    await db.into(db.shoppingListItems).insert(item);
+    await tester.pumpWidget(app(items: [item]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-i1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('shopping-item-quantity-input')), '0');
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bitte eine Menge größer als 0 eingeben'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-unit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('g').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('shopping-item-quantity-input')), '250');
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+
+    final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals('i1'))).getSingle();
+    expect(row.quantity, 0.25);
+    expect(row.unit, 'kg');
   });
 
   testWidgets('ohne Inhalt (packSize): keine Gesamtmenge-Zeile', (tester) async {

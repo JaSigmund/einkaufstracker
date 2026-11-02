@@ -180,11 +180,11 @@ class ShoppingListRepository {
     onChanged?.call();
   }
 
-  /// Anzahl aendern (wie viele Packungen/Stueck gekauft werden sollen). Die Gesamtmenge ergibt sich daraus
-  /// zusammen mit dem Inhalt des Produkts (`products.pack_size`), siehe `shopping_list_page.dart`.
-  Future<void> setQuantity(String id, double quantity) async {
+  /// Menge aendern. Bei Produkten mit Inhalt (`products.pack_size`) zaehlt [quantity] Packungen, sonst ist es die Menge in [unit]
+  /// (ohne [unit] bleibt die bisherige), siehe `list_quantity.dart`.
+  Future<void> setQuantity(String id, double quantity, {String? unit}) async {
     final item = await _get(id);
-    await _putItem(item.copyWith(quantity: quantity, updatedAt: appClock.now().toUtc()));
+    await _putItem(item.copyWith(quantity: quantity, unit: unit ?? item.unit, updatedAt: appClock.now().toUtc()));
     onChanged?.call();
   }
 

@@ -201,6 +201,8 @@ class _InventoryTile extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(consumed ? 'Als aufgebraucht markiert' : 'Als weggeworfen markiert'),
+            // mit Aktion bliebe die SnackBar sonst stehen, bis man sie wegwischt
+            persist: false,
             action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.reopen(item.id)),
           ));
         }
