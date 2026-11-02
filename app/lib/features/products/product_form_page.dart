@@ -17,10 +17,13 @@ import '../common/quantity_dialog.dart';
 /// Argumente fuer /product-form: entweder ein unbekannter Barcode (mit optionalem OFF-Vorschlag) oder ein
 /// bestehendes Produkt zum Bearbeiten.
 class ProductFormArgs {
-  const ProductFormArgs({this.ean, this.suggestion, this.existing});
+  const ProductFormArgs({this.ean, this.suggestion, this.existing, this.initialName});
   final String? ean;
   final OffProduct? suggestion;
   final Product? existing;
+
+  /// Vorbelegter Name, wenn das Produkt ohne Barcode aus der Suche heraus angelegt wird.
+  final String? initialName;
 }
 
 const _amountUnits = [QuantityOption.g, QuantityOption.kg, QuantityOption.ml, QuantityOption.l];
@@ -30,7 +33,9 @@ const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu ve
 /// Anlegen oder Bearbeiten eines Produkts (Doku 06 §3.5, §4). Nach einem Barcode-Scan eines unbekannten
 /// Produkts vorbelegt mit dem OFF-Vorschlag, sonst leer oder mit dem bestehenden Produkt.
 class ProductFormPage extends ConsumerStatefulWidget {
-  const ProductFormPage({super.key, this.ean, this.suggestion, this.existing});
+  const ProductFormPage({super.key, this.ean, this.suggestion, this.existing, this.initialName});
+
+  final String? initialName;
 
   /// EAN, mit dem das neue Produkt verknuepft wird (Barcode-Scan eines unbekannten Produkts).
   final String? ean;
@@ -47,7 +52,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   /// Vorbelegung fuer ein neues Produkt aus dem OFF-Namen (Doku 06 §3.2, Roadmap Phase 3), damit
   /// Haltbarkeit-nach-Oeffnen, Lagerort und Datumsart nicht bei jedem Produkt neu eingetippt werden muessen.
   late final _shelfLifeSuggestion = widget.existing == null ? suggestShelfLife(widget.suggestion?.name ?? '') : null;
-  late final _name = TextEditingController(text: widget.existing?.name ?? widget.suggestion?.name ?? '');
+  late final _name = TextEditingController(text: widget.existing?.name ?? widget.suggestion?.name ?? widget.initialName ?? '');
   late final _brand = TextEditingController(text: widget.existing?.brand ?? widget.suggestion?.brand ?? '');
   /// Was ueber die Packung schon bekannt ist: das Produkt selbst, sonst die Angabe von Open Food Facts ("6 x 65 ml").
   late final Packaging _knownPackaging = _initialPackaging();

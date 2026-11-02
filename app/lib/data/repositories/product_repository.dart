@@ -92,6 +92,20 @@ class ProductRepository {
     return all.where((p) => !linkedIds.contains(p.id)).take(limit).toList();
   }
 
+  /// Der Nutzer hat eine Bon-Position von Hand einem Produkt zugeordnet: ihr Bon-Text gehoert ab jetzt dorthin. Eine bisherige
+  /// Zuordnung zu einem anderen Produkt wird geloest, zwei aktive Aliase auf denselben Text wuerden [matchByLearnedName] sprengen.
+  Future<void> relearnReceiptText(String rawText, String productId) async {
+    final hid = await householdId();
+    final key = normalizeItemName(rawText);
+    if (key.isEmpty) return;
+    final active = await (_db.select(_db.productAliases)..where((a) => a.householdId.equals(hid) & a.aliasText.equals(key) & a.deletedAt.isNull())).get();
+    for (final alias in active.where((a) => a.productId != productId)) {
+      await removeAlias(alias.id);
+    }
+    if (!active.any((a) => a.productId == productId)) await _learnAlias(key, productId, hid);
+    onChanged?.call();
+  }
+
   /// Sucht den EAN zuerst lokal (schon einmal zugeordnet), dann bei Open Food Facts. Das lokale Produkt hat
   /// immer Vorrang, auch offline verfuegbar; OFF wird nur befragt, wenn nichts gefunden wurde.
   Future<BarcodeLookupResult> lookup(String ean) async {

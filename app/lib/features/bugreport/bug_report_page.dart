@@ -58,6 +58,7 @@ class _BugReportPageState extends ConsumerState<BugReportPage> {
         pendingChanges: pending,
         lastSyncError: sync.errorDetail ?? sync.error,
         lastSyncAt: sync.lastSync,
+        syncRunning: sync.running,
         rejectedChanges: [
           for (final e in outbox)
             if (e.lastError != null) {'table': e.remoteTable, 'row_id': e.rowId, 'attempts': e.attempts, 'error': e.lastError},

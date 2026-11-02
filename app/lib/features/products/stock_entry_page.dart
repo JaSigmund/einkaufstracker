@@ -13,9 +13,14 @@ import '../common/quantity_dialog.dart';
 import 'product_form_page.dart';
 
 class StockEntryArgs {
-  const StockEntryArgs({required this.product, required this.ean});
+  const StockEntryArgs({required this.product, this.ean, this.suggestion});
   final Product product;
-  final String ean;
+
+  /// `null` bei Ware ohne Barcode.
+  final String? ean;
+
+  /// Bon-Vorschlag, der hier uebernommen wird: seine Werte sind vorbelegt.
+  final InventoryItem? suggestion;
 }
 
 String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
@@ -27,10 +32,11 @@ const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer'
 /// Bestand speichern (Doku 06 §3.5). Ist bereits Bestand vorhanden, bietet die Seite oben die Schnellaktionen
 /// **Öffnen** und **Aufgebraucht** fuer den juengsten aktiven Eintrag an.
 class StockEntryPage extends ConsumerStatefulWidget {
-  const StockEntryPage({super.key, required this.product, required this.ean, this.labelScanAvailable = !kIsWeb});
+  const StockEntryPage({super.key, required this.product, this.ean, this.suggestion, this.labelScanAvailable = !kIsWeb});
 
   final Product product;
-  final String ean;
+  final String? ean;
+  final InventoryItem? suggestion;
 
   /// Das MHD-Foto (Texterkennung auf dem Geraet) gibt es nicht im Browser. Als Parameter statt einer festverdrahteten `kIsWeb`-Abfrage,
   /// damit beide Faelle testbar sind.
@@ -41,9 +47,9 @@ class StockEntryPage extends ConsumerStatefulWidget {
 }
 
 class _StockEntryPageState extends ConsumerState<StockEntryPage> {
-  DateTime? _date;
-  late String _dateKind = widget.product.defaultDateKind;
-  late String _location = widget.product.defaultLocation;
+  late DateTime? _date = widget.suggestion?.bestBefore;
+  late String _dateKind = widget.suggestion?.dateKind ?? widget.product.defaultDateKind;
+  late String _location = widget.suggestion?.location ?? widget.product.defaultLocation;
   late final Packaging _packaging = packagingOf(widget.product, widget.product.baseUnit);
 
   /// Was man eingeben kann: passend zum Produkt, danach die uebrigen Einheiten, falls das Produkt bisher falsch angelegt ist ("Für dieses Produkt
@@ -53,8 +59,15 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     for (final o in QuantityOption.free)
       if (!_packaging.options.any((p) => p.label == o.label)) o,
   ];
-  late QuantityOption _option = _options.first;
-  late final _quantity = TextEditingController(text: '1');
+  // Ein Bon-Vorschlag kennt die Menge schon (1,406 kg Bananen), sonst wird eine Packung vorgeschlagen
+  late QuantityOption _option = switch (widget.suggestion) {
+    final s? => _options.firstWhere((o) => o.baseUnit == s.unit && o.toBase == 1, orElse: () => _options.first),
+    null => _options.first,
+  };
+  late final _quantity = TextEditingController(text: switch (widget.suggestion?.quantity) {
+    final q? when _option.baseUnit == widget.suggestion!.unit && _option.toBase == 1 => (q == q.truncateToDouble() ? q.toInt().toString() : q.toString()).replaceAll('.', ','),
+    _ => '1',
+  });
   var _rememberUnit = false;
   String? _quantityError;
   var _saving = false;
@@ -127,6 +140,7 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
       await ref.read(inventoryRepositoryProvider).recordFromScan(
             productId: widget.product.id,
             ean: widget.ean,
+            suggestionId: widget.suggestion?.id,
             quantity: qty,
             unit: unit,
             bestBefore: _date,
@@ -180,12 +194,14 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
       appBar: AppBar(
         title: Text(widget.product.name),
         actions: [
-          IconButton(
-            key: const Key('stock-reassign'),
-            tooltip: 'Falsches Produkt? Anderes verknüpfen',
-            icon: const Icon(Icons.swap_horiz),
-            onPressed: _reassign,
-          ),
+          // Ohne Barcode gibt es nichts neu zu verknuepfen
+          if (widget.ean != null)
+            IconButton(
+              key: const Key('stock-reassign'),
+              tooltip: 'Falsches Produkt? Anderes verknüpfen',
+              icon: const Icon(Icons.swap_horiz),
+              onPressed: _reassign,
+            ),
         ],
       ),
       body: ListView(

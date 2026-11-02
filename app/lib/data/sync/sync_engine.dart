@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
@@ -104,6 +105,14 @@ class SyncEngine {
   bool _running = false;
   bool get isRunning => _running;
 
+  /// Waehrend des Laufs kam eine neue Aenderung dazu. Der Lauf hat seine Outbox da schon gelesen, sie bliebe sonst bis zum
+  /// naechsten Takt liegen (Fehlerbericht "Synchronisierung", 2026-11-02).
+  bool _pushAgain = false;
+
+  void requestAnotherPush() {
+    if (_running) _pushAgain = true;
+  }
+
   /// Server-Zeitstempel der Zeilen, die dieses Geraet in dieser Sitzung selbst geschrieben hat (Schluessel
   /// "tabelle:id"). Ohne sie wuerde ein eigener, noch nicht wieder geholter Schreibvorgang bei der naechsten Aenderung
   /// derselben Zeile als fremde Aenderung gelten.
@@ -114,12 +123,18 @@ class SyncEngine {
     if (_running) return const SyncResult();
     _running = true;
     try {
-      final push = await _push();
+      var push = await _push();
       final pulled = await _pull();
+      while (_pushAgain) {
+        _pushAgain = false;
+        final more = await _push();
+        push = (pushed: push.pushed + more.pushed, skipped: more.skipped, conflicts: [...push.conflicts, ...more.conflicts]);
+      }
       final rejected = await (_db.select(_db.outbox)..where((t) => t.attempts.isBiggerOrEqualValue(rejectedAfterAttempts))).get();
       return SyncResult(pushed: push.pushed, skipped: push.skipped, pulled: pulled, rejected: rejected.length, conflicts: push.conflicts);
     } finally {
       _running = false;
+      _pushAgain = false;
     }
   }
 
@@ -159,6 +174,9 @@ class SyncEngine {
             if (remoteAt.isAfter(known)) found.add((table: table, rowId: id));
           }
         }
+      } on TimeoutException {
+        // Die Verbindung haengt: jede weitere Tabelle wuerde wieder das ganze Zeitlimit warten, bevor ueberhaupt gesendet wird.
+        break;
       } on Object {
         continue; // siehe oben: kein Befund fuer diese Tabelle, gesendet wird trotzdem
       }

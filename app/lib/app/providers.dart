@@ -206,13 +206,19 @@ class SyncController extends Notifier<SyncStatus> {
     // alten Session Daten in die gerade geleerte lokale DB zurueckschreiben -- siehe settings_page.dart.
     if (ref.read(authTransitionInProgressProvider)) return;
     final engine = ref.read(syncEngineProvider);
-    if (engine.isRunning) return;
+    if (engine.isRunning) {
+      engine.requestAnotherPush();
+      return;
+    }
     if (ref.read(sessionProvider).value == null) return;
     if (ref.read(appUpdateRequiredProvider)) {
       state = SyncStatus(lastSync: state.lastSync, error: 'Update erforderlich, Synchronisierung ist deaktiviert.', updateRequired: true, conflicts: state.conflicts);
       return;
     }
-    state = SyncStatus(lastSync: state.lastSync, running: true, conflicts: state.conflicts, rejected: state.rejected);
+    // Der letzte Fehler bleibt stehen, bis ein Sync klappt: der Banner zeigt beim Laufen ohnehin "Synchronisiere", aber ein
+    // Fehlerbericht braucht ihn. Bei hakender Verbindung laeuft fast immer gerade der naechste Versuch, die Berichte vom
+    // 2026-11-02 meldeten deshalb 75 wartende Aenderungen ohne jeden Fehler.
+    state = SyncStatus(lastSync: state.lastSync, error: state.error, errorDetail: state.errorDetail, running: true, conflicts: state.conflicts, rejected: state.rejected);
     try {
       final result = await engine.sync();
       state = SyncStatus(lastSync: appClock.now(), conflicts: mergeConflicts(state.conflicts, result.conflicts), rejected: result.rejected);
@@ -357,6 +363,7 @@ final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
     householdId: () => requireHouseholdId(ref),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
     onDepleted: (productId) => ref.read(shoppingListRepositoryProvider).suggestDepleted(productId),
+    relearnReceiptText: (rawText, productId) => ref.read(productRepositoryProvider).relearnReceiptText(rawText, productId),
   );
 });
 

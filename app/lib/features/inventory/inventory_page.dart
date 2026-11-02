@@ -9,6 +9,7 @@ import '../../domain/inventory/expiry.dart';
 import '../../domain/inventory/usage_forecast.dart';
 import '../common/quantity_dialog.dart';
 import '../products/barcode_flow.dart';
+import '../products/stock_entry_page.dart';
 import 'inventory_item_detail_page.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
@@ -78,14 +79,25 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
         }
 
         return Scaffold(
-          floatingActionButton: FloatingActionButton.extended(
-            key: const Key('inventory-scan-fab'),
-            onPressed: () => startBarcodeScan(context, ref),
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Scannen'),
-          ),
+          floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+            FloatingActionButton.extended(
+              key: const Key('inventory-manual-fab'),
+              heroTag: 'inventory-manual-fab',
+              onPressed: () => context.push('/stock-manual'),
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Ohne Barcode'),
+            ),
+            const SizedBox(height: 12),
+            FloatingActionButton.extended(
+              key: const Key('inventory-scan-fab'),
+              heroTag: 'inventory-scan-fab',
+              onPressed: () => startBarcodeScan(context, ref),
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scannen'),
+            ),
+          ]),
           body: ListView(
-            padding: const EdgeInsets.only(bottom: 96),
+            padding: const EdgeInsets.only(bottom: 168),
             children: [
               if (suggestions.isNotEmpty)
                 Card(
@@ -95,7 +107,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                       key: const Key('suggestions-toggle'),
                       leading: const Icon(Icons.inbox_outlined),
                       title: Text('Noch nicht gescannt (${suggestions.length})'),
-                      subtitle: const Text('Aus Bons vorgeschlagen'),
+                      subtitle: const Text('Aus Bons vorgeschlagen. Antippen übernimmt auch ohne Barcode.'),
                       trailing: Icon(_suggestionsOpen ? Icons.expand_less : Icons.expand_more),
                       onTap: () => setState(() => _suggestionsOpen = !_suggestionsOpen),
                     ),
@@ -105,6 +117,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                           dense: true,
                           title: Text(products[s.productId]?.name ?? 'Unbekanntes Produkt'),
                           subtitle: Text(describeStock(s.quantity, s.unit, products[s.productId])),
+                          // Lose Ware wie Bananen hat keinen Strichcode, ein Scan koennte den Vorschlag nie bestaetigen
+                          onTap: products[s.productId] == null ? null : () => context.push('/stock-entry', extra: StockEntryArgs(product: products[s.productId]!, suggestion: s)),
                           trailing: TextButton(
                             key: Key('discard-suggestion-${s.id}'),
                             onPressed: () => ref.read(inventoryRepositoryProvider).discardSuggestion(s.id),

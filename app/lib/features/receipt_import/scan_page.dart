@@ -202,6 +202,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             onTap: _isBusy ? null : _scanBarcode,
           ),
         ),
+        Card(
+          child: ListTile(
+            key: const Key('scan-manual'),
+            leading: const Icon(Icons.edit_note),
+            title: const Text('Ohne Barcode erfassen'),
+            subtitle: const Text('Für lose Ware wie Bananen: Produkt wählen oder neu anlegen.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _isBusy ? null : () => context.push('/stock-manual'),
+          ),
+        ),
         const SizedBox(height: 8),
         Text(
           'Tipp: Speichere den digitalen Bon in der jö-App als PDF und wähle ihn hier aus. Derselbe Einkauf wird nie doppelt gespeichert.',
