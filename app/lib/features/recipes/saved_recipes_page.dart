@@ -4,7 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../data/local/database.dart';
+import '../../domain/recipes/cooking_timer.dart';
 import '../../domain/recipes/saved_recipe.dart';
+import '../diary/meal_form_page.dart';
+import '../diary/recipe_picker.dart';
+import 'cooking_timer_panel.dart';
 import 'plan_recipe.dart';
 import 'recipe_viewer_page.dart';
 
@@ -57,6 +61,9 @@ class _SavedRecipesPageState extends ConsumerState<SavedRecipesPage> {
     // ref.watch, nicht read: haelt den Stream von Beginn an abonniert (siehe Kommentar oben).
     final active = ref.watch(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
     final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
+    final sessions = [
+      for (final s in ref.watch(cookingSessionsStreamProvider).value ?? const <CookingSession>[]) (title: s.recipeTitle, seconds: s.activeSeconds),
+    ];
     return Scaffold(
       appBar: AppBar(title: const Text('Meine Rezepte')),
       floatingActionButton: FloatingActionButton.extended(
@@ -88,10 +95,23 @@ class _SavedRecipesPageState extends ConsumerState<SavedRecipesPage> {
                             subtitle: Text([
                               r.ingredients.length == 1 ? '1 Zutat' : '${r.ingredients.length} Zutaten',
                               if (r.sourceUrl.isEmpty) 'eigenes Rezept',
+                              if (cookingStatsFor(r.title, sessions) case final stats?) stats.label,
                             ].join(' · ')),
                             onTap: () => _open(r),
                           ),
                           OverflowBar(alignment: MainAxisAlignment.end, children: [
+                            IconButton(
+                              key: Key('cook-recipe-${r.id}'),
+                              tooltip: 'Kochzeit messen',
+                              icon: const Icon(Icons.timer_outlined),
+                              onPressed: () => showCookingTimerPanel(context, recipeTitle: r.title),
+                            ),
+                            IconButton(
+                              key: Key('diary-recipe-${r.id}'),
+                              tooltip: 'Ins Tagebuch eintragen',
+                              icon: const Icon(Icons.restaurant_menu_outlined),
+                              onPressed: () => context.push('/meal-form', extra: MealFormArgs(recipe: RecipeForMeal.fromSaved(r))),
+                            ),
                             IconButton(
                               key: Key('edit-recipe-${r.id}'),
                               tooltip: 'Bearbeiten',

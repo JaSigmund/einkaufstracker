@@ -2,6 +2,7 @@ import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/saved_recipe_repository.dart';
 import 'package:einkaufstracker/domain/recipes/saved_recipe.dart';
+import 'package:einkaufstracker/features/diary/meal_form_page.dart';
 import 'package:einkaufstracker/features/recipes/recipe_viewer_page.dart';
 import 'package:einkaufstracker/features/recipes/saved_recipes_page.dart';
 import 'package:flutter/material.dart';
@@ -40,13 +41,15 @@ void main() {
   setUp(() => db = memoryDb());
   tearDown(() => db.close());
 
-  Widget app({List<InventoryItem> active = const [], List<Product> products = const []}) => ProviderScope(
+  Widget app({List<InventoryItem> active = const [], List<Product> products = const [], List<CookingSession> sessions = const []}) => ProviderScope(
         overrides: [
           databaseProvider.overrideWithValue(db),
           savedRecipeRepositoryProvider.overrideWithValue(SavedRecipeRepository(db)),
           activeInventoryStreamProvider.overrideWith((ref) => Stream.value(active)),
           productsStreamProvider.overrideWith((ref) => Stream.value(products)),
           shoppingListRepositoryProvider.overrideWithValue(shoppingListRepo(db)),
+          cookingSessionsStreamProvider.overrideWith((ref) => Stream.value(sessions)),
+          notificationSchedulerProvider.overrideWithValue(FakeNotificationScheduler()),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [
@@ -54,6 +57,10 @@ void main() {
             GoRoute(
               path: '/recipe-form',
               builder: (_, state) => Scaffold(body: Text('FORM: ${(state.extra as SavedRecipe?)?.title ?? 'neu'}')),
+            ),
+            GoRoute(
+              path: '/meal-form',
+              builder: (_, state) => Scaffold(body: Text('TAGEBUCH: ${(state.extra as MealFormArgs).recipe!.title}')),
             ),
             GoRoute(
               path: '/recipe-viewer',
@@ -70,6 +77,45 @@ void main() {
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     expect(find.textContaining('Noch keine Rezepte gespeichert'), findsOneWidget);
+  });
+
+  group('Koch-Timer und Tagebuch', () {
+    Future<void> saved() => SavedRecipeRepository(db).save(SavedRecipe(
+          id: 'r1',
+          title: 'Kürbissuppe',
+          sourceUrl: '',
+          ingredients: const [SavedIngredient(productId: null, name: 'Kürbis', unit: 'piece')],
+          savedAt: DateTime.utc(2026),
+        ));
+
+    testWidgets('zeigt die bisherige Kochzeit am Rezept', (tester) async {
+      await saved();
+      await tester.pumpWidget(app(sessions: [
+        CookingSession(id: 's', householdId: 'h1', recipeTitle: 'Kürbissuppe', startedAt: DateTime.utc(2026), endedAt: DateTime.utc(2026), activeSeconds: 1800, updatedAt: DateTime.utc(2026)),
+      ]));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1× gekocht, im Schnitt 30 min'), findsOneWidget);
+    });
+
+    testWidgets('Timer-Knopf oeffnet die Kochzeit dieses Rezepts', (tester) async {
+      await saved();
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('cook-recipe-r1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Kochzeit: Kürbissuppe'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 2));
+    });
+
+    testWidgets('Tagebuch-Knopf oeffnet das Formular mit dem Rezept', (tester) async {
+      await saved();
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('diary-recipe-r1')));
+      await tester.pumpAndSettle();
+      expect(find.text('TAGEBUCH: Kürbissuppe'), findsOneWidget);
+    });
   });
 
   testWidgets('zeigt gespeicherte Rezepte, Tippen oeffnet den Viewer', (tester) async {

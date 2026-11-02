@@ -58,7 +58,9 @@ import '../data/repositories/shopping_list_repository.dart';
 import '../data/notifications/notification_scheduler.dart';
 import '../domain/app_update/app_update_gate.dart';
 import '../domain/notifications/expiry_reminders.dart';
+import '../data/repositories/cooking_session_repository.dart';
 import '../features/recipes/cooking_chat_panel.dart';
+import '../features/recipes/cooking_timer_controller.dart';
 import '../features/receipt_import/photo_receipt_service.dart';
 import '../features/receipt_import/receipt_import_service.dart';
 import '../data/repositories/settings_repository.dart';
@@ -490,6 +492,16 @@ final mealPlanRepositoryProvider = Provider<MealPlanRepository>((ref) {
 
 final mealPlanStreamProvider = StreamProvider((ref) => ref.watch(mealPlanRepositoryProvider).watchEntries());
 
+final cookingSessionRepositoryProvider = Provider<CookingSessionRepository>((ref) {
+  return CookingSessionRepository(
+    ref.watch(databaseProvider),
+    householdId: () => requireHouseholdId(ref),
+    onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+  );
+});
+
+final cookingSessionsStreamProvider = StreamProvider((ref) => ref.watch(cookingSessionRepositoryProvider).watchSessions());
+
 final savedRecipeRepositoryProvider = Provider<SavedRecipeRepository>((ref) => SavedRecipeRepository(ref.watch(databaseProvider)));
 
 /// Ist-Soll-Abgleich eines Bons: Listeneintraege, die dieser Bon abgehakt hat, geschaetzt gegen bezahlt (Wettbewerbsanalyse,
@@ -592,6 +604,10 @@ Future<void> clearLocalAccountData(WidgetRef ref, {bool continueOnDatabaseError 
   }
   final steps = <String, Future<void> Function()>{
     'Erinnerungen': () => ref.read(notificationSchedulerProvider).cancelExpiryReminders(),
+    'Koch-Timer': () async {
+      await ref.read(notificationSchedulerProvider).cancelKitchenTimers();
+      ref.invalidate(cookingTimerProvider);
+    },
     'Bon-Belege': () => ref.read(receiptFileServiceProvider).deleteAllLocal(),
     'Essensfotos': () => ref.read(mealPhotoServiceProvider).deleteAllLocal(),
   };

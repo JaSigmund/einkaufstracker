@@ -62,6 +62,8 @@ final syncTables = <SyncTableDef>[
       idOf: (j) => '${j['household_id']}:${j['key']}', orderKeys: const ['household_id', 'key']),
   // Wochenplan (ADR-042)
   SyncTableDef('meal_plan_entries', (db, j) => db.into(db.mealPlanEntries).insertOnConflictUpdate(mealPlanEntryFromRemote(j))),
+  // Kochzeiten (ADR-046)
+  SyncTableDef('cooking_sessions', (db, j) => db.into(db.cookingSessions).insertOnConflictUpdate(cookingSessionFromRemote(j))),
   // Fremdschluessel: shopping_list_items -> shopping_lists, deshalb zuerst die Liste
   SyncTableDef('shopping_lists', (db, j) => db.into(db.shoppingLists).insertOnConflictUpdate(shoppingListFromRemote(j))),
   SyncTableDef('shopping_list_items', (db, j) => db.into(db.shoppingListItems).insertOnConflictUpdate(shoppingListItemFromRemote(j))),

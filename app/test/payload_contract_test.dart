@@ -5,6 +5,7 @@ import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
 import 'package:einkaufstracker/data/repositories/online_price_repository.dart';
+import 'package:einkaufstracker/data/repositories/cooking_session_repository.dart';
 import 'package:einkaufstracker/data/repositories/meal_plan_repository.dart';
 import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
 import 'package:einkaufstracker/domain/recipes/saved_recipe.dart';
@@ -173,6 +174,9 @@ Future<List<Map<String, dynamic>>> _collect() async {
   final planned = await plan.add(day: DateTime(2026, 9, 23), title: 'Linsencurry', ingredients: const [SavedIngredient(productId: null, name: 'Linsen', unit: 'piece')], sourceUrl: 'https://example.com/suche');
   await plan.move(planned.id, DateTime(2026, 9, 24));
   await plan.delete((await plan.add(day: DateTime(2026, 9, 25), title: 'Alt', slot: 'lunch')).id);
+  final sessions = CookingSessionRepository(db, householdId: () async => 'h1');
+  await sessions.add(recipeTitle: 'Linsencurry', startedAt: DateTime.utc(2026, 9, 24, 17), endedAt: DateTime.utc(2026, 9, 24, 17, 50), activeSeconds: 2520);
+  await sessions.delete((await sessions.add(recipeTitle: 'Versehen', startedAt: DateTime.utc(2026, 9, 24, 18), endedAt: DateTime.utc(2026, 9, 24, 18, 2), activeSeconds: 120)).id);
   final prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
   await prefs.set(microReferenceOnPref, true);
   await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
@@ -228,10 +232,12 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries', 'shopping_lists', 'shopping_list_items']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries', 'cooking_sessions', 'shopping_lists', 'shopping_list_items']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 
+    expect(rows('cooking_sessions').any((s) => s['deleted_at'] != null), isTrue, reason: 'Kochzeit zurueckgenommen');
+    expect(rows('cooking_sessions').any((s) => s['active_seconds'] == 2520 && s['recipe_title'] == 'Linsencurry'), isTrue);
     expect(rows('shopping_list_items').any((i) => i['archived_at'] != null), isTrue, reason: 'abgeschlossener Einkauf');
     expect(rows('shopping_list_items').any((i) => i['archived_at'] == null), isTrue, reason: 'offener oder zurueckgeholter Eintrag');
     expect(rows('products').any((p) => p['pieces_per_pack'] == 6 && p['piece_label'] == 'Fläschchen'), isTrue, reason: 'Mehrfachpackung');
