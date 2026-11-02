@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:einkaufstracker/app/providers.dart';
+import 'package:einkaufstracker/core/clock.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/cooking_session_repository.dart';
 import 'package:einkaufstracker/domain/recipes/cooking_timer.dart';
@@ -100,7 +101,8 @@ void main() {
 
     CookingTimerController controller() => container.read(cookingTimerProvider.notifier);
     CookingTimerState state() => container.read(cookingTimerProvider);
-    Future<T> at<T>(Duration offset, Future<T> Function() body) => withClock(Clock.fixed(_t0.add(offset)), body);
+    // appClock rechnet den Zeitversatz der Zukunfts-Laeufe dazu (flutter_test_config.dart): hier herausnehmen, damit die App genau _t0 + offset sieht
+    Future<T> at<T>(Duration offset, Future<T> Function() body) => withClock(Clock.fixed(_t0.add(offset).subtract(appClockOffset)), body);
 
     test('Kochzeit mit Pause wird beim Abschluss gespeichert und der Lauf beendet', () async {
       await at(Duration.zero, () => controller().startRun('Curry'));
