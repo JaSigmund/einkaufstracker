@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/quick_widget_background"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/quick_water"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/quick_widget_button"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/quick_water"
+        android:textColor="@color/quick_widget_text"
+        android:textSize="14sp"/>
+
+    <TextView
+        android:id="@+id/quick_open"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/quick_widget_button"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="@string/quick_supplement"
+        android:textColor="@color/quick_widget_text"
+        android:textSize="14sp"/>
+</LinearLayout>

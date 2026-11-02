@@ -2,7 +2,7 @@
 /// nicht die KI, sondern die verlinkte, echte Rezeptseite (`recipe_search_url.dart`) -- so entsteht
 /// weder eine erfundene, ungeprüfte Anleitung noch eine Kopie fremder Inhalte.
 class RecipeSuggestion {
-  const RecipeSuggestion({required this.title, required this.reason, required this.matchingIngredients});
+  const RecipeSuggestion({required this.title, required this.reason, required this.matchingIngredients, this.missingIngredients = const []});
 
   final String title;
 
@@ -12,6 +12,10 @@ class RecipeSuggestion {
   /// Zutaten aus dem Inventar-Kontext (`buildRecipeSuggestionContext`), auf die sich der Vorschlag
   /// stuetzt -- fuer die Anzeige ("passt zu: Joghurt, Gurke") und fuer `findMissingIngredients`.
   final List<String> matchingIngredients;
+
+  /// Zutaten, die nicht im Inventar-Kontext standen und erst eingekauft werden muessen (ADR-042). Leer, solange der Nutzer nur Vorschlaege
+  /// aus dem Vorhandenen will.
+  final List<String> missingIngredients;
 }
 
 /// Parst die rohe JSON-Antwort der (noch nicht gebauten) Edge Function `suggest-recipes`. Ungueltige
@@ -30,11 +34,14 @@ List<RecipeSuggestion> parseRecipeSuggestions(Object? rawJson) {
     final reason = entry['reason'];
     final ingredientsRaw = entry['matchingIngredients'];
     final ingredients = ingredientsRaw is List ? ingredientsRaw.whereType<String>().toList() : const <String>[];
+    final missingRaw = entry['missingIngredients'];
+    final missing = missingRaw is List ? [for (final m in missingRaw.whereType<String>()) if (m.trim().isNotEmpty) m.trim()] : const <String>[];
 
     result.add(RecipeSuggestion(
       title: title.trim(),
       reason: reason is String ? reason.trim() : '',
       matchingIngredients: ingredients,
+      missingIngredients: missing,
     ));
   }
   return result;

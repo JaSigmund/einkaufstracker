@@ -33,6 +33,12 @@ Regeln:
 - Erfinde KEINE Kochanleitung, keine Mengenangaben, keine Zeiten oder Temperaturen -- das liefert eine andere Quelle.
 - Nenne nur Zutaten aus der uebergebenen Liste als "matchingIngredients", keine erfundenen.`;
 
+// Nur mit allow_missing (ADR-042): Gerichte fuer die Wochenplanung, fuer die erst noch eingekauft wird.
+const SYSTEM_ALLOW_MISSING = `
+- Die Rezeptideen duerfen auch Zutaten brauchen, die NICHT in der Liste stehen. Nenne sie als "missingIngredients", hoechstens 6 je Idee, mit einem einfachen deutschen Namen ohne Menge (z.B. "Sahne").
+- Salz, Pfeffer, Wasser und Oel gelten als vorhanden und werden nicht genannt.
+- Nutze trotzdem moeglichst viel aus der Liste.`;
+
 const TOOL = {
   name: "submit_suggestions",
   description: "Uebergibt die vorgeschlagenen Rezeptideen.",
@@ -47,6 +53,7 @@ const TOOL = {
             title: { type: "string" },
             reason: { type: "string" },
             matchingIngredients: { type: "array", items: { type: "string" } },
+            missingIngredients: { type: "array", items: { type: "string" } },
           },
           required: ["title", "reason", "matchingIngredients"],
         },
@@ -105,8 +112,8 @@ Deno.serve(async (req) => {
   const started = Date.now();
   const reply = await callAnthropic({
     model,
-    max_tokens: 1024,
-    system: SYSTEM,
+    max_tokens: body.allow_missing ? 1536 : 1024,
+    system: body.allow_missing ? SYSTEM + SYSTEM_ALLOW_MISSING : SYSTEM,
     tools: [TOOL],
     tool_choice: { type: "tool", name: "submit_suggestions" },
     messages,

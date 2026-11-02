@@ -12,7 +12,7 @@ export const MAX_QUANTITY = 100_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type Ingredient = { name: string; quantity?: number; unit?: string };
-export type SuggestRequest = { household_id: string; ingredients: Ingredient[]; model?: string };
+export type SuggestRequest = { household_id: string; ingredients: Ingredient[]; model?: string; allow_missing: boolean };
 export type Parsed = { ok: true; value: SuggestRequest } | { ok: false; error: string };
 
 export function parseRequest(body: unknown): Parsed {
@@ -40,7 +40,8 @@ export function parseRequest(body: unknown): Parsed {
     });
   }
   if (b.model != null && typeof b.model !== "string") return { ok: false, error: "invalid_input" };
-  return { ok: true, value: { household_id: b.household_id, ingredients, model: b.model as string | undefined } };
+  if (b.allow_missing != null && typeof b.allow_missing !== "boolean") return { ok: false, error: "invalid_input" };
+  return { ok: true, value: { household_id: b.household_id, ingredients, model: b.model as string | undefined, allow_missing: b.allow_missing === true } };
 }
 
 /// Zutatenzeilen fuer den Prompt, dringlichste zuerst (Reihenfolge der App).

@@ -46,3 +46,11 @@ Deno.test("ingredientLines: Menge und Einheit nur, wenn vorhanden", () => {
   assertEquals(ingredientLines([{ name: "Joghurt", quantity: 2, unit: "Stk" }, { name: "Reis" }, { name: "Milch", quantity: 1 }]),
     "- Joghurt (2 Stk)\n- Reis\n- Milch (1)");
 });
+
+Deno.test("parseRequest: allow_missing ist optional und nur als boolean erlaubt", () => {
+  const off = parseRequest(valid());
+  assertEquals(off.ok && off.value.allow_missing, false);
+  const on = parseRequest({ ...valid(), allow_missing: true });
+  assertEquals(on.ok && on.value.allow_missing, true);
+  assertEquals(parseRequest({ ...valid(), allow_missing: "ja" }).ok, false);
+});

@@ -10,11 +10,13 @@ import '../features/diary/balance_page.dart';
 import '../features/diary/journal_page.dart';
 import '../features/diary/nutrients_page.dart';
 import '../features/diary/product_nutrients_page.dart';
+import '../features/diary/quick_intake_page.dart';
 import '../features/diary/supplement_form_page.dart';
 import '../features/diary/supplements_page.dart';
 import '../features/diary/meal_form_page.dart';
 import '../features/diary/targets_page.dart';
 import '../features/home/home_shell.dart';
+import '../features/recipes/meal_plan_page.dart';
 import '../features/household/accept_invite_page.dart';
 import '../features/household/household_page.dart';
 import '../features/receipt_import/import_review_page.dart';
@@ -139,6 +141,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
       GoRoute(path: '/nutrients', builder: (_, _) => const NutrientsPage()),
       GoRoute(path: '/aisle-order', builder: (_, state) => AisleOrderPage(initialStoreId: state.extra as String?)),
+      GoRoute(path: '/quick-intake', builder: (_, _) => const QuickIntakePage()),
+      GoRoute(path: '/meal-plan', builder: (_, _) => const MealPlanPage()),
       GoRoute(path: '/supplements', builder: (_, _) => const SupplementsPage()),
       GoRoute(path: '/supplement-form', builder: (_, state) => SupplementFormPage(existing: state.extra as Supplement?)),
       GoRoute(
