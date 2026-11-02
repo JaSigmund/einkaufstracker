@@ -19,6 +19,13 @@ class CategoryNames {
   static const haushalt = 'Haushalt & Drogerie';
   static const pfand = 'Pfand';
   static const sonstiges = 'Sonstiges';
+
+  // Selbst angelegt, nicht in der Vorlage fuer neue Haushalte. Fehlt eine davon, greift die naechste passende Regel (alte Kategorie).
+  static const nudeln = 'Nudeln, Reis & Getreide';
+  static const saucen = 'Saucen & Pesto';
+  static const aufstriche = 'Aufstriche & Dips';
+  static const chipsNuesse = 'Chips & Nüsse';
+  static const toGo = 'Snacks to go';
 }
 
 /// Eine Stichwortregel. Die Stichwoerter stehen in normalisierter Form (siehe normalizeItemName: klein,
@@ -54,8 +61,18 @@ class KeywordRule {
 /// Regeln in **Prioritaetsreihenfolge**: die erste passende gewinnt. Die Reihenfolge loest Streitfaelle:
 /// "Karottenbrot" ist Brot (Backwaren vor Gemuese), "Tomatenmark" und "gehackte Tomaten" sind Konserven
 /// (vor Gemuese), "Saftschinken" ist Wurst (vor Getraenken), "Butterkeks" ist ein Keks (Suesses vor Milch).
+/// "Brotaufstrich" ist ein Aufstrich (vor Brot), "Farmer Soft Sandwich" bleibt Brot, nur belegte Namen sind Snacks to go.
+/// "Thunfisch in Tomatensauce" bleibt Fisch: nur "pesto", "sugo" und "salsa" stehen weit vorn, "sauce" erst hinter den Konserven.
 const keywordRules = <KeywordRule>[
   KeywordRule(CategoryNames.pfand, ['pfand', 'leergut', 'flaschenkasten', 'einweg']),
+  KeywordRule(CategoryNames.toGo, [
+    'billa sandwich', 'protein sandwich', 'sandwich lachs', 'sandwich thun', 'sandwich schinken', 'sandwich kaese', 'sandwich ei',
+    'baguette thun', 'baguette lachs', 'baguette schinken', 'baguette salami', 'baguette kaese', 'onigiri', 'sushi',
+  ]),
+  KeywordRule(CategoryNames.aufstriche, [
+    'aufstrich', 'guacamole', 'hummus', '=dip', '=dips', '=honig', 'bluetenhonig', 'waldhonig', 'akazienhonig', 'marmelade', 'konfituere',
+    'nutella', 'margarine', 'sonnenblumenmarg', '=marg',
+  ]),
   KeywordRule(CategoryNames.brot, [
     'brot', 'semmel', 'breze', 'brezel', 'striez', 'gebaeck', 'croissant', 'kipferl', 'toast', 'baguette', '=bag',
     'sandwich', 'weckerl', 'zopf', 'buchtel', 'krapfen', 'kornspitz', 'stangerl', 'fladen', 'brioche', 'laugen',
@@ -63,6 +80,12 @@ const keywordRules = <KeywordRule>[
   ]),
   // Streitfaelle mit Gemuese/Milch
   KeywordRule(CategoryNames.konserven, ['tomatenmark', 'gehackte tomaten', 'passata', 'kokosmilch', 'pizzasauce']),
+  KeywordRule(CategoryNames.saucen, ['pesto', 'sugo', 'salsa', '=sate']),
+  // Instant-Nudeln vor Fleisch ("Instant Nudeln Huhn") und vor den Nudeln
+  KeywordRule(CategoryNames.fertig, ['instant nudel', 'nudelsuppe', 'nudel cup', 'cup nudel', '=ramen', '=ramyun']),
+  // Schokolade mit Nuessen bleibt Suesses, "Erdnussriegel" trifft "erdnuesse" nicht
+  KeywordRule(CategoryNames.suess, ['schoko', 'riegel']),
+  KeywordRule(CategoryNames.chipsNuesse, ['chips', 'riffels', 'erdnuesse', 'nuesse', 'cashew', 'pistazie', '=mandeln', 'popcorn', 'salzstangen', 'cracker']),
   KeywordRule(CategoryNames.suess, [
     'schoko', 'riegel', 'keks', 'gummi', 'bonbon', 'chips', 'erdnuss', 'erdnuesse', 'nuss', 'nuesse', 'honig', 'marmelade', 'konfituere',
     'nutella', 'waffel', 'lakritz', 'snickers', '=mars', 'twix', 'kitkat', 'knoppers', 'airwaves', 'hitschies',
@@ -105,11 +128,16 @@ const keywordRules = <KeywordRule>[
     'himbeer', 'heidelbeer', 'kirsche', 'zwetschk', 'pflaume', 'marille', 'pfirsich', 'nektarine', 'melone',
     'ananas', 'mango', 'kiwi', 'avocado', 'beere', 'obst', 'grapefruit', 'limette', 'feige',
   ]),
+  KeywordRule(CategoryNames.nudeln, [
+    'nudel', 'spaghetti', 'penne', 'fusilli', 'tagliatelle', 'fleckerl', 'lasagneblaett', 'lasagneplatt', 'reis', 'jasmin', 'basmati', 'bulgur',
+    'couscous', 'mehl', 'haferflock', 'muesli', 'cornflakes', 'gries', 'polenta',
+  ]),
   KeywordRule(CategoryNames.konserven, [
     'nudel', 'spaghetti', 'penne', 'fusilli', 'tagliatelle', 'fleckerl', 'reis', 'jasmin', 'basmati', 'bulgur',
     'couscous', 'linsen', 'kichererb', 'bohnen', 'erbsen', 'mais', 'mehl', 'zucker', 'haferflock', 'muesli',
     'cornflakes', 'konserve', 'rosinen', 'trockenfruecht', 'sonnenblumenkerne', 'gries', 'polenta',
   ]),
+  KeywordRule(CategoryNames.saucen, ['sauce', 'sosse', 'bolognese']),
   KeywordRule(CategoryNames.oele, [
     'oel', 'essig', 'senf', 'ketchup', 'mayo', 'sauce', 'sosse', 'pesto', 'dressing', 'gewuerz', 'salz', 'pfeffer',
     'curry', 'marg', 'sojasauce', 'worcester', 'sriracha', 'tabasco', 'bruehe', 'suppenwuerfel', 'gemueseboullion',
