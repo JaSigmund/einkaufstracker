@@ -178,7 +178,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(Key('pick-product-${reis.id}')));
     await tester.pumpAndSettle();
-    expect(find.text('Im Bestand: 0,5 kg'), findsOneWidget);
+    expect(find.text('Im Bestand: 500 g'), findsOneWidget);
   });
 
   testWidgets('ohne Titel: Fehlermeldung statt Speichern', (tester) async {

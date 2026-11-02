@@ -9,6 +9,10 @@ import '../../data/products/off_client.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
 import '../../domain/products/off_quantity.dart';
+import '../../domain/products/packaging.dart';
+import '../../domain/receipt/unit_price.dart';
+import '../../domain/shopping_list/list_quantity.dart';
+import '../common/quantity_dialog.dart';
 
 /// Argumente fuer /product-form: entweder ein unbekannter Barcode (mit optionalem OFF-Vorschlag) oder ein
 /// bestehendes Produkt zum Bearbeiten.
@@ -19,7 +23,7 @@ class ProductFormArgs {
   final Product? existing;
 }
 
-const _units = [('piece', 'Stück'), ('kg', 'kg'), ('l', 'l')];
+const _amountUnits = [QuantityOption.g, QuantityOption.kg, QuantityOption.ml, QuantityOption.l];
 const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer', 'Tiefkühl'), ('other', 'Sonstiges')];
 const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu verbrauchen bis')];
 
@@ -45,12 +49,18 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final _shelfLifeSuggestion = widget.existing == null ? suggestShelfLife(widget.suggestion?.name ?? '') : null;
   late final _name = TextEditingController(text: widget.existing?.name ?? widget.suggestion?.name ?? '');
   late final _brand = TextEditingController(text: widget.existing?.brand ?? widget.suggestion?.brand ?? '');
-  late final _packSize = TextEditingController(text: widget.existing?.packSize?.toString() ?? '');
+  /// Was ueber die Packung schon bekannt ist: das Produkt selbst, sonst die Angabe von Open Food Facts ("6 x 65 ml").
+  late final Packaging _knownPackaging = _initialPackaging();
+  late PackagingKind _kind = widget.existing == null && _offPackaging == null ? PackagingKind.single : PackagingKind.of(_knownPackaging);
+  late final _pieceCount = TextEditingController(text: _knownPackaging.piecesPerPack?.toString() ?? '');
+  late final _pieceLabel = TextEditingController(text: widget.existing?.pieceLabel ?? '');
+  late QuantityOption _amountUnit = _initialAmountUnit();
+  late final _packSize = TextEditingController(text: _initialAmount());
   late final _openedDays =
       TextEditingController(text: (widget.existing?.openedShelfLifeDays ?? _shelfLifeSuggestion?.openedShelfLifeDays)?.toString() ?? '');
   String? _categoryId;
   var _categoryInitialized = false;
-  late String _unit = widget.existing?.baseUnit ?? 'piece';
+  late String _looseUnit = widget.existing?.baseUnit == 'l' ? 'l' : 'kg';
   late String _location = widget.existing?.defaultLocation ?? _shelfLifeSuggestion?.location ?? 'pantry';
   late String _dateKind = widget.existing?.defaultDateKind ?? _shelfLifeSuggestion?.dateKind ?? 'best_before';
   late bool _restock = widget.existing?.restock ?? false;
@@ -63,6 +73,42 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   /// Bonzuordnung": die App soll nicht erst tippen lassen, wenn sie schon Kandidaten kennt).
   List<Product> _unlinked = const [];
   var _linking = false;
+
+  late final _offPackaging = widget.suggestion?.quantityText == null ? null : parsePackagingFromText(widget.suggestion!.quantityText!);
+
+  Packaging _initialPackaging() {
+    final existing = widget.existing;
+    if (existing != null) return packagingOf(existing, existing.baseUnit);
+    final off = _offPackaging;
+    return off == null ? const Packaging(baseUnit: 'piece') : Packaging(baseUnit: off.unit, rawPackSize: off.amount, rawPiecesPerPack: off.pieces);
+  }
+
+  /// Der Inhalt, den das Formular zeigt: je Stueck bei einer Mehrfachpackung, sonst je Packung.
+  double? get _initialContent => _knownPackaging.isMultipack ? _knownPackaging.contentPerPiece : (_knownPackaging.baseUnit == 'piece' ? null : _knownPackaging.contentPerPack);
+
+  QuantityOption _initialAmountUnit() {
+    final best = ListAmountUnit.bestFor(_initialContent ?? 0, _knownPackaging.baseUnit == 'piece' ? 'kg' : _knownPackaging.baseUnit);
+    return _amountUnits.firstWhere((o) => o.label == best.label);
+  }
+
+  String _initialAmount() {
+    final content = _initialContent;
+    return content == null ? '' : formatListNumberExact(content / _amountUnit.toBase);
+  }
+
+  /// In Worten, was eingegeben ist. So faellt auf, wenn "65" als Kilo gemeint waere.
+  String? get _packagingPreview {
+    final r = resolvePackaging(kind: _kind, looseUnit: _looseUnit, count: _pieceCount.text, amount: _packSize.text, amountUnit: _amountUnit, label: _pieceLabel.text);
+    if (r.error != null) return null;
+    final p = Packaging(baseUnit: r.baseUnit, rawPackSize: r.packSize, rawPiecesPerPack: r.piecesPerPack, pieceLabel: r.pieceLabel);
+    return switch (_kind) {
+      PackagingKind.multipack => 'Eine Packung: ${p.piecesPerPack} ${p.pieceName} zu je ${formatListAmount(p.contentPerPiece!, p.baseUnit)}, zusammen ${formatListAmount(p.contentPerPack!, p.baseUnit)}',
+      PackagingKind.countPack => 'Eine Packung: ${p.packDescription}',
+      PackagingKind.contentPack => 'Eine Packung: ${p.packDescription}',
+      PackagingKind.loose => 'Gezählt wird in ${r.baseUnit == 'l' ? 'Litern' : 'Kilogramm'}',
+      PackagingKind.single => 'Gezählt wird in Stück',
+    };
+  }
 
   @override
   void initState() {
@@ -87,6 +133,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _name.dispose();
     _brand.dispose();
     _packSize.dispose();
+    _pieceCount.dispose();
+    _pieceLabel.dispose();
     _openedDays.dispose();
     _search.dispose();
     super.dispose();
@@ -151,7 +199,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       setState(() => _error = 'Bitte einen Namen eingeben.');
       return;
     }
-    final packSize = double.tryParse(_packSize.text.replaceAll(',', '.').trim());
+    final packaging = resolvePackaging(kind: _kind, looseUnit: _looseUnit, count: _pieceCount.text, amount: _packSize.text, amountUnit: _amountUnit, label: _pieceLabel.text);
+    if (packaging.error != null) {
+      setState(() => _error = packaging.error);
+      return;
+    }
     final openedDays = int.tryParse(_openedDays.text.trim());
     setState(() {
       _saving = true;
@@ -165,22 +217,29 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           name: name,
           brand: Value(_brand.text.trim().isEmpty ? null : _brand.text.trim()),
           categoryId: Value(_categoryId),
-          baseUnit: _unit,
-          packSize: Value(packSize),
+          baseUnit: packaging.baseUnit,
+          packSize: Value(packaging.packSize),
+          piecesPerPack: Value(packaging.piecesPerPack),
+          pieceLabel: Value(packaging.pieceLabel),
+          unitWeightG: Value(packaging.pieceWeightG ?? widget.existing!.unitWeightG),
           defaultLocation: _location,
           defaultDateKind: _dateKind,
           openedShelfLifeDays: Value(openedDays),
           restock: _restock,
         );
         await repo.update(updated);
+        // Der Bestand folgt, wenn sich die Einheit geaendert hat oder der Inhalt jetzt erst bekannt ist
+        await ref.read(inventoryRepositoryProvider).normalizeStock(updated);
         product = updated;
       } else {
         product = await repo.create(
           name: name,
           brand: _brand.text.trim(),
           categoryId: _categoryId,
-          baseUnit: _unit,
-          packSize: packSize,
+          baseUnit: packaging.baseUnit,
+          packSize: packaging.packSize,
+          piecesPerPack: packaging.piecesPerPack,
+          pieceLabel: packaging.pieceLabel,
           defaultLocation: _location,
           defaultDateKind: _dateKind,
           openedShelfLifeDays: openedDays,
@@ -189,7 +248,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           nutrientsPer100: widget.suggestion?.nutrientsPer100,
           nutrientsBasis: widget.suggestion?.nutrientsBasis,
           nutrientsSource: widget.suggestion?.nutrientsPer100 == null ? null : 'off',
-          unitWeightG: widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!),
+          unitWeightG: packaging.pieceWeightG ?? (widget.suggestion?.quantityText == null ? null : parseUnitWeightGrams(widget.suggestion!.quantityText!)),
           ean: widget.ean,
         );
       }
@@ -285,31 +344,75 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             onChanged: (v) => setState(() => _categoryId = v),
           ),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                key: const Key('product-pack-size'),
-                controller: _packSize,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Inhalt je Packung (optional)',
-                  helperText: 'z.B. 4 für 4 Stück, 0,15 für 150 g',
-                  helperMaxLines: 2,
+          DropdownButtonFormField<PackagingKind>(
+            key: const Key('product-kind'),
+            isExpanded: true,
+            initialValue: _kind,
+            decoration: InputDecoration(labelText: 'Wie wird es gekauft?', helperText: _kind.example),
+            items: [for (final k in PackagingKind.values) DropdownMenuItem(value: k, child: Text(k.label))],
+            onChanged: (v) => setState(() => _kind = v ?? _kind),
+          ),
+          const SizedBox(height: 12),
+          if (_kind == PackagingKind.loose) ...[
+            SegmentedButton<String>(
+              key: const Key('product-unit'),
+              segments: const [ButtonSegment(value: 'kg', label: Text('Gewicht (kg)')), ButtonSegment(value: 'l', label: Text('Volumen (l)'))],
+              selected: {_looseUnit},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => setState(() => _looseUnit = s.first),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_kind == PackagingKind.countPack || _kind == PackagingKind.multipack) ...[
+            TextField(
+              key: const Key('product-piece-count'),
+              controller: _pieceCount,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Stück je Packung'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (_kind == PackagingKind.contentPack || _kind == PackagingKind.multipack) ...[
+            Row(children: [
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  key: const Key('product-pack-size'),
+                  controller: _packSize,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: _kind == PackagingKind.multipack ? 'Inhalt je Stück' : 'Inhalt der Packung'),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                key: const Key('product-unit'),
-                initialValue: _unit,
-                decoration: const InputDecoration(labelText: 'Einheit'),
-                items: [for (final u in _units) DropdownMenuItem(value: u.$1, child: Text(u.$2))],
-                onChanged: (v) => setState(() => _unit = v ?? _unit),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<QuantityOption>(
+                  key: const Key('product-amount-unit'),
+                  initialValue: _amountUnit,
+                  decoration: const InputDecoration(labelText: 'Einheit'),
+                  items: [for (final o in _amountUnits) DropdownMenuItem(value: o, child: Text(o.label))],
+                  onChanged: (v) => setState(() => _amountUnit = v ?? _amountUnit),
+                ),
               ),
+            ]),
+            const SizedBox(height: 12),
+          ],
+          if (_kind == PackagingKind.countPack || _kind == PackagingKind.multipack) ...[
+            TextField(
+              key: const Key('product-piece-label'),
+              controller: _pieceLabel,
+              maxLength: 30,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(labelText: 'Name der Stücke (optional)', hintText: 'z. B. Fläschchen, Becher, Riegel', counterText: ''),
+              onChanged: (_) => setState(() {}),
             ),
-          ]),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
+          if (_packagingPreview case final text?) ...[
+            Text(text, key: const Key('product-packaging-preview'), style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+          ],
           DropdownButtonFormField<String>(
             key: const Key('product-location'),
             initialValue: _location,

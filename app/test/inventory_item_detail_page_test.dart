@@ -17,7 +17,7 @@ void main() {
 
   setUp(() async {
     db = memoryDb();
-    product = await productRepo(db).create(name: 'Vollmilch', baseUnit: 'l');
+    product = await productRepo(db).create(name: 'Vollmilch');
   });
   tearDown(() => db.close());
 
@@ -51,11 +51,11 @@ void main() {
     await tester.pumpAndSettle();
     GoRouter.of(tester.element(find.text('START'))).push('/item');
     await tester.pumpAndSettle();
-    expect(find.textContaining('2 piece'), findsOneWidget);
+    expect(find.text('2 Stk'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('quantity-plus')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('3 piece'), findsOneWidget);
+    expect(find.text('3 Stk'), findsOneWidget);
     expect((await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle()).quantity, 3);
 
     await tester.tap(find.byKey(const Key('quantity-tap')));
@@ -63,7 +63,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('quantity-input')), '5');
     await tester.tap(find.text('Übernehmen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('5 piece'), findsOneWidget);
+    expect(find.text('5 Stk'), findsOneWidget);
 
     final movements = await db.select(db.inventoryMovements).get();
     expect(movements.where((m) => m.type == 'adjustment'), hasLength(2));
@@ -267,7 +267,7 @@ void main() {
     });
   });
 
-  testWidgets('Menge kann nicht negativ werden', (tester) async {
+  testWidgets('Der letzte Rest macht den Eintrag zu "Aufgebraucht" statt zu einem aktiven Eintrag mit Menge 0', (tester) async {
     final item = await inventoryRepo(db).recordFromScan(productId: product.id, ean: '1', quantity: 1, now: DateTime.utc(2026, 9, 27));
     await tester.pumpWidget(app(item));
     await tester.pumpAndSettle();
@@ -275,11 +275,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('quantity-minus')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('quantity-minus')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('0 piece'), findsOneWidget);
+    expect(find.text('START'), findsOneWidget);
+    expect(find.text('Als aufgebraucht markiert'), findsOneWidget);
     final row = await (db.select(db.inventoryItems)..where((i) => i.id.equals(item.id))).getSingle();
-    expect(row.quantity, 0);
+    expect(row.status, 'consumed');
+    expect(row.quantity, 1, reason: 'Stand fuer Rueckgaengig');
   });
 
   testWidgets('Lagerort und Datumsart per Antippen wechseln, ohne Ledger-Bewegung', (tester) async {

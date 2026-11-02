@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/providers.dart';
 import '../../core/clock.dart';
 import '../../core/format.dart';
+import '../common/quantity_dialog.dart' show describeStock;
 import '../../data/cloud/cooking_cloud.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/meal_repository.dart';
@@ -669,7 +670,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   String? _stockHint(Product p) {
     final active = ref.read(activeInventoryStreamProvider).value ?? const <InventoryItem>[];
     final total = active.where((i) => i.productId == p.id).fold<double>(0, (s, i) => s + i.quantity);
-    return total <= 0 ? 'Nicht im Bestand: der Eintrag zählt trotzdem für die Nährwerte.' : 'Im Bestand: ${formatQuantity(total)} ${p.baseUnit}';
+    return total <= 0 ? 'Nicht im Bestand: der Eintrag zählt trotzdem für die Nährwerte.' : 'Im Bestand: ${describeStock(total, p.baseUnit, p)}';
   }
 
   Future<void> _addIngredient() async {

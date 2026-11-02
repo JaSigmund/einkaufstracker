@@ -157,9 +157,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('shopping-item-quantity-i1')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Menge').last);
+    expect(tester.widget<TextField>(find.byKey(const Key('shopping-item-quantity-input'))).controller!.text, '1', reason: 'eine Packung');
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-unit')));
     await tester.pumpAndSettle();
-    expect(tester.widget<TextField>(find.byKey(const Key('shopping-item-quantity-input'))).controller!.text, '500');
+    await tester.tap(find.text('g').last);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('shopping-item-quantity-input'))).controller!.text, '500', reason: 'dieselbe Menge in der neuen Einheit');
     await tester.enterText(find.byKey(const Key('shopping-item-quantity-input')), '150');
     await tester.tap(find.text('Übernehmen'));
     await tester.pumpAndSettle();
@@ -167,6 +170,30 @@ void main() {
     final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals('i1'))).getSingle();
     expect(row.quantity, 0.3);
     expect(row.unit, 'kg');
+  });
+
+  testWidgets('Mehrfachpackung: zwei Flaeschchen sind ein Drittel Packung und werden so angezeigt', (tester) async {
+    final product = Product(id: 'p1', householdId: 'h1', name: 'Yakult', baseUnit: 'l', packSize: 0.39, piecesPerPack: 6, pieceLabel: 'Fläschchen', restock: false, defaultDateKind: 'best_before', defaultLocation: 'pantry', updatedAt: DateTime.utc(2026));
+    final item = ShoppingListItem(id: 'i1', householdId: 'h1', listId: 'l1', productId: 'p1', quantity: 1, unit: 'l', checked: false, source: 'manual', isSuggestion: false, updatedAt: DateTime.utc(2026));
+    await db.into(db.shoppingLists).insert(ShoppingList(id: 'l1', householdId: 'h1', name: 'Einkaufsliste', isDefault: true, updatedAt: DateTime.utc(2026)));
+    await db.into(db.shoppingListItems).insert(item);
+    await tester.pumpWidget(app(items: [item], products: [product]));
+    await tester.pumpAndSettle();
+    expect(find.text('1 Packung (6 × 65 ml)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-i1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('shopping-item-quantity-unit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fläschchen').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('shopping-item-quantity-input')), '2');
+    await tester.tap(find.text('Übernehmen'));
+    await tester.pumpAndSettle();
+
+    final row = await (db.select(db.shoppingListItems)..where((i) => i.id.equals('i1'))).getSingle();
+    expect(row.quantity, 0.333);
+    expect(row.unit, 'l');
   });
 
   testWidgets('Frei getippter Eintrag: Einheit waehlbar, 0 wird abgelehnt', (tester) async {

@@ -44,7 +44,7 @@ class ShoppingArchivePage extends ConsumerWidget {
                             dense: true,
                             title: Text(i.freeText ?? products[i.productId]?.name ?? 'Unbekanntes Produkt'),
                             trailing: Text(
-                              describeListQuantity(quantity: i.quantity, unit: i.unit, packSize: products[i.productId]?.packSize, productBaseUnit: products[i.productId]?.baseUnit).primary,
+                              describeListQuantity(quantity: i.quantity, unit: i.unit, packSize: products[i.productId]?.packSize, productBaseUnit: products[i.productId]?.baseUnit, piecesPerPack: products[i.productId]?.piecesPerPack, pieceLabel: products[i.productId]?.pieceLabel).primary,
                               style: t.textTheme.bodyMedium,
                             ),
                           ),

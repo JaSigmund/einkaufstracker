@@ -8,6 +8,7 @@ import '../../domain/categorization/name_similarity.dart';
 import '../../domain/categorization/normalize_name.dart';
 import '../../domain/categorization/off_category_map.dart';
 import '../../domain/inventory/shelf_life_rules.dart';
+import '../../domain/receipt/unit_price.dart';
 import '../local/database.dart';
 import '../nutrition/bls_food_search.dart';
 import '../products/off_client.dart';
@@ -141,10 +142,14 @@ class ProductRepository {
     // Haltbarkeit nach dem Oeffnen, Lagerort und Datumsart aus den Startwerten der Roadmap-Phase 3
     // (Doku 06 §3.2) vorbelegen, damit nicht jedes Bon-Produkt erst manuell nachgepflegt werden muss.
     final shelfLife = suggestShelfLife(rawText);
+    // Steht der Inhalt im Bon-Text ("Tyrolini mild 4x40g"), ist die Packung gleich richtig angelegt (ADR-045). Gewogenes bleibt, wie es ist.
+    final packaging = baseUnit == 'piece' ? parsePackagingFromText(rawText) : null;
     final product = await create(
       name: _cleanName(rawText),
       categoryId: categoryId,
-      baseUnit: baseUnit,
+      baseUnit: packaging?.unit ?? baseUnit,
+      packSize: packaging?.amount,
+      piecesPerPack: packaging?.pieces,
       openedShelfLifeDays: shelfLife?.openedShelfLifeDays,
       defaultLocation: shelfLife?.location ?? 'pantry',
       defaultDateKind: shelfLife?.dateKind ?? 'best_before',
@@ -209,6 +214,8 @@ class ProductRepository {
     String? categoryId,
     String baseUnit = 'piece',
     double? packSize,
+    int? piecesPerPack,
+    String? pieceLabel,
     int? sealedShelfLifeDays,
     int? openedShelfLifeDays,
     String defaultDateKind = 'best_before',
@@ -240,6 +247,8 @@ class ProductRepository {
       categoryId: categoryId,
       baseUnit: baseUnit,
       packSize: packSize,
+      piecesPerPack: piecesPerPack,
+      pieceLabel: pieceLabel,
       sealedShelfLifeDays: sealedShelfLifeDays,
       openedShelfLifeDays: openedShelfLifeDays,
       defaultDateKind: defaultDateKind,

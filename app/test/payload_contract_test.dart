@@ -177,6 +177,12 @@ Future<List<Map<String, dynamic>>> _collect() async {
   await prefs.set(microReferenceOnPref, true);
   await prefs.set(microReferenceOverridesPref, {'vit_c_mg': 100.0});
 
+  // Mehrfachpackung (ADR-045): Produkt mit Stueckzahl und Namen, ein Flaeschchen verbraucht
+  final mehrfach = await productRepo(db).create(name: 'Yakult Drink', baseUnit: 'l', packSize: 0.39, piecesPerPack: 6, pieceLabel: 'Fläschchen', unitWeightG: 65);
+  final inventory = inventoryRepo(db);
+  final flaeschchen = await inventory.recordFromScan(productId: mehrfach.id, ean: '9001234567891', quantity: 0.39, unit: 'l', now: DateTime.utc(2026, 9, 1));
+  await inventory.consumePart(flaeschchen.id, 0.065, opens: false, now: DateTime.utc(2026, 9, 2));
+
   // Einkaufsliste mit abgeschlossenem Einkauf (ADR-043): archiviert, zurueckgeholt, wieder archiviert
   final shopping = shoppingListRepo(db);
   final bought = await shopping.addManual(productId: reis.id, unit: 'kg');
@@ -228,6 +234,8 @@ void main() {
 
     expect(rows('shopping_list_items').any((i) => i['archived_at'] != null), isTrue, reason: 'abgeschlossener Einkauf');
     expect(rows('shopping_list_items').any((i) => i['archived_at'] == null), isTrue, reason: 'offener oder zurueckgeholter Eintrag');
+    expect(rows('products').any((p) => p['pieces_per_pack'] == 6 && p['piece_label'] == 'Fläschchen'), isTrue, reason: 'Mehrfachpackung');
+    expect(rows('inventory_movements').any((m) => m['type'] == 'consumed' && m['quantity_delta'] == -0.065), isTrue, reason: 'ein Flaeschchen verbraucht');
     final movementTypes = {for (final m in rows('inventory_movements')) m['type']};
     expect(movementTypes, containsAll(['purchase', 'meal', 'adjustment']), reason: 'Abzug und Gegenbuchung');
     expect(rows('inventory_movements').any((m) => m['meal_id'] != null), isTrue);

@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,9 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/clock.dart';
-import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/label_dates.dart';
+import '../../domain/products/packaging.dart';
+import '../common/quantity_dialog.dart';
 import 'product_form_page.dart';
 
 class StockEntryArgs {
@@ -20,7 +22,6 @@ String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month
 
 const _dateKinds = [('best_before', 'Mindestens haltbar bis'), ('use_by', 'Zu verbrauchen bis')];
 const _locations = [('pantry', 'Vorrat'), ('fridge', 'Kühlschrank'), ('freezer', 'Tiefkühl'), ('other', 'Sonstiges')];
-const _units = [('piece', 'Stück'), ('kg', 'kg'), ('l', 'l')];
 
 /// Nach dem Barcode-Scan eines bekannten Produkts: MHD/Verbrauchsdatum, Lagerort, Menge erfassen und als
 /// Bestand speichern (Doku 06 §3.5). Ist bereits Bestand vorhanden, bietet die Seite oben die Schnellaktionen
@@ -43,9 +44,19 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
   DateTime? _date;
   late String _dateKind = widget.product.defaultDateKind;
   late String _location = widget.product.defaultLocation;
-  late String _unit = widget.product.baseUnit;
+  late final Packaging _packaging = packagingOf(widget.product, widget.product.baseUnit);
+
+  /// Was man eingeben kann: passend zum Produkt, danach die uebrigen Einheiten, falls das Produkt bisher falsch angelegt ist ("Für dieses Produkt
+  /// merken"). Vorbelegt ist eine Packung, das ist fast immer, was gerade in der Hand liegt.
+  late final List<QuantityOption> _options = [
+    ..._packaging.options,
+    for (final o in QuantityOption.free)
+      if (!_packaging.options.any((p) => p.label == o.label)) o,
+  ];
+  late QuantityOption _option = _options.first;
   late final _quantity = TextEditingController(text: '1');
   var _rememberUnit = false;
+  String? _quantityError;
   var _saving = false;
   var _scanning = false;
 
@@ -95,17 +106,29 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
   }
 
   Future<void> _save() async {
-    final qty = double.tryParse(_quantity.text.replaceAll(',', '.').trim()) ?? 1;
-    setState(() => _saving = true);
+    final typed = parseQuantityInput(_quantity.text);
+    final qty = typed == null ? 0.0 : roundQuantity(typed * _option.toBase);
+    if (qty <= 0) {
+      setState(() => _quantityError = 'Bitte eine Menge größer als 0 eingeben');
+      return;
+    }
+    final unit = _option.baseUnit;
+    setState(() {
+      _quantityError = null;
+      _saving = true;
+    });
     try {
-      if (_rememberUnit && _unit != widget.product.baseUnit) {
-        await ref.read(productRepositoryProvider).update(widget.product.copyWith(baseUnit: _unit));
+      if (_rememberUnit && unit != widget.product.baseUnit) {
+        // Die Packungsdaten galten fuer die alte Einheit
+        final updated = widget.product.copyWith(baseUnit: unit, packSize: const Value(null), piecesPerPack: const Value(null));
+        await ref.read(productRepositoryProvider).update(updated);
+        await ref.read(inventoryRepositoryProvider).normalizeStock(updated);
       }
       await ref.read(inventoryRepositoryProvider).recordFromScan(
             productId: widget.product.id,
             ean: widget.ean,
             quantity: qty,
-            unit: _unit,
+            unit: unit,
             bestBefore: _date,
             dateKind: _dateKind,
             location: _location,
@@ -140,6 +163,13 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
     }
   }
 
+  /// Was die Eingabe ergibt, nur wenn es mehr sagt als die Eingabe selbst.
+  String? get _preview {
+    final typed = parseQuantityInput(_quantity.text);
+    if (typed == null || typed <= 0 || _option.kind == QuantityKind.amount) return null;
+    return 'Das sind ${_packaging.describe(roundQuantity(typed * _option.toBase))}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -166,7 +196,7 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
             for (final item in existing)
               Card(
                 child: ListTile(
-                  title: Text('${formatQuantity(item.quantity)} ${item.unit}'),
+                  title: Text(describeStock(item.quantity, item.unit, widget.product)),
                   subtitle: Text(item.status == 'opened' ? 'Geöffnet' : 'Ungeöffnet'),
                   trailing: Wrap(spacing: 4, children: [
                     if (item.status == 'sealed')
@@ -232,21 +262,25 @@ class _StockEntryPageState extends ConsumerState<StockEntryPage> {
                 key: const Key('stock-quantity'),
                 controller: _quantity,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Menge'),
+                decoration: InputDecoration(labelText: 'Menge', errorText: _quantityError),
+                onChanged: (_) => setState(() {}),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: DropdownButtonFormField<String>(
+              flex: 2,
+              child: DropdownButtonFormField<QuantityOption>(
                 key: const Key('stock-unit'),
-                initialValue: _unit,
+                isExpanded: true,
+                initialValue: _option,
                 decoration: const InputDecoration(labelText: 'Einheit'),
-                items: [for (final u in _units) DropdownMenuItem(value: u.$1, child: Text(u.$2))],
-                onChanged: (v) => setState(() => _unit = v ?? _unit),
+                items: [for (final o in _options) DropdownMenuItem(value: o, child: Text(o.label, overflow: TextOverflow.ellipsis))],
+                onChanged: (v) => setState(() => _option = v ?? _option),
               ),
             ),
           ]),
-          if (_unit != widget.product.baseUnit)
+          if (_preview case final text?) Padding(padding: const EdgeInsets.only(top: 4), child: Text(text, key: const Key('stock-preview'), style: t.textTheme.bodySmall)),
+          if (_option.baseUnit != widget.product.baseUnit)
             CheckboxListTile(
               key: const Key('stock-remember-unit'),
               controlAffinity: ListTileControlAffinity.leading,
