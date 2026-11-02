@@ -3,13 +3,15 @@
     {
       "table": "products",
       "payload": {
-        "id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "household_id": "h1",
         "name": "Reis",
         "brand": null,
         "category_id": null,
         "base_unit": "kg",
         "pack_size": null,
+        "pieces_per_pack": null,
+        "piece_label": null,
         "sealed_shelf_life_days": null,
         "opened_shelf_life_days": null,
         "default_date_kind": "best_before",
@@ -29,16 +31,16 @@
         "nutrients_source": "manual",
         "bls_code": null,
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.134172Z",
+        "updated_at": "2026-11-02T15:21:12.806785Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 1.0,
@@ -52,31 +54,31 @@
         "status": "sealed",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.245468Z",
+        "updated_at": "2026-11-02T15:21:12.896623Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "c9d3399a-26c7-4167-8004-1b3c67b3e898",
+        "id": "b4fd5e4b-9029-4647-849c-158f20647a48",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "occurred_at": "2026-09-01T00:00:00.000Z",
         "type": "purchase",
         "quantity_delta": 1.0,
         "unit": "kg",
         "note": null,
         "meal_id": null,
-        "updated_at": "2026-11-02T15:02:04.248463Z",
+        "updated_at": "2026-11-02T15:21:12.899622Z",
         "deleted_at": null
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "household_id": "h1",
         "eaten_at": "2026-09-22T17:30:00.000Z",
         "meal_type": "dinner",
@@ -88,16 +90,16 @@
         "servings_made": 4.0,
         "source": "photo_ai",
         "is_estimate": true,
-        "updated_at": "2026-11-02T15:02:04.251467Z",
+        "updated_at": "2026-11-02T15:21:12.903144Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.8,
@@ -111,16 +113,16 @@
         "status": "sealed",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.265476Z",
+        "updated_at": "2026-11-02T15:21:12.916713Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.8,
@@ -134,35 +136,35 @@
         "status": "opened",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.266475Z",
+        "updated_at": "2026-11-02T15:21:12.918713Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "b0c2923c-e2c3-4539-85a0-a9d5cc181895",
+        "id": "d1120208-f36b-477f-ba28-6a13fd8f52da",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "occurred_at": "2026-09-22T17:30:00.000Z",
         "type": "meal",
         "quantity_delta": -0.2,
         "unit": "kg",
         "note": "Durch die Mahlzeit geoeffnet",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
-        "updated_at": "2026-11-02T15:02:04.267985Z",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
+        "updated_at": "2026-11-02T15:21:12.918713Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "9f2f221d-8813-4e3f-ab56-2b1499163ae0",
+        "id": "b6763076-9fdd-4474-83d7-843b0825ae54",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "free_text": null,
         "quantity": 0.2,
         "unit": "kg",
@@ -180,16 +182,16 @@
         "sugar_g": 1.0,
         "fiber_g": 3.0,
         "salt_g": 0.02,
-        "updated_at": "2026-11-02T15:02:04.268997Z",
+        "updated_at": "2026-11-02T15:21:12.919713Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "59b03e99-1928-4c1e-bcb2-408f72645f55",
+        "id": "f1a39972-f1c0-406c-b7c7-505181595896",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Gemüsepaprika rot, roh",
@@ -209,16 +211,16 @@
         "sugar_g": 3.36,
         "fiber_g": 2.88,
         "salt_g": 0.008,
-        "updated_at": "2026-11-02T15:02:04.272Z",
+        "updated_at": "2026-11-02T15:21:12.922732Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "e28f2f95-a87e-4325-8bd7-f7a7e34a86df",
+        "id": "3e7bf671-03f2-48c3-98df-95fa58202ade",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Quark",
@@ -238,16 +240,16 @@
         "sugar_g": null,
         "fiber_g": null,
         "salt_g": null,
-        "updated_at": "2026-11-02T15:02:04.272998Z",
+        "updated_at": "2026-11-02T15:21:12.923726Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "09275aa1-3e00-4e33-af06-dafc4a6d54a0",
+        "id": "92393001-f859-4bc9-8265-cb0f591b26b0",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Gewürzmischung",
@@ -267,16 +269,16 @@
         "sugar_g": null,
         "fiber_g": null,
         "salt_g": null,
-        "updated_at": "2026-11-02T15:02:04.272998Z",
+        "updated_at": "2026-11-02T15:21:12.923726Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "bc47abce-72c9-4863-99af-af15acc15651",
+        "id": "fe3d317f-c30a-47b4-b94b-bfd9e26304a4",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Weizenbrot/Weißbrot",
@@ -300,16 +302,16 @@
         "sugar_g": null,
         "fiber_g": null,
         "salt_g": null,
-        "updated_at": "2026-11-02T15:02:04.273996Z",
+        "updated_at": "2026-11-02T15:21:12.924714Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "1ffdcd58-4be5-4fd2-a44d-014a37ef88ac",
+        "id": "e014b272-39fa-4ca2-836c-7814e7d554cd",
         "household_id": "h1",
-        "meal_id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "meal_id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Nachspeise im Restaurant",
@@ -329,33 +331,33 @@
         "sugar_g": null,
         "fiber_g": null,
         "salt_g": null,
-        "updated_at": "2026-11-02T15:02:04.274994Z",
+        "updated_at": "2026-11-02T15:21:12.925714Z",
         "deleted_at": null
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "63fbc9ac-fc33-4cd9-a56a-60c8de068141",
+        "id": "8a88d654-0cec-40d7-9015-448d8d38e9ff",
         "household_id": "h1",
         "eaten_at": "2026-09-22T17:30:00.000Z",
         "meal_type": "dinner",
         "title": "Reispfanne",
         "note": "mit Paprika",
-        "photo_path": "h/63fbc9ac-fc33-4cd9-a56a-60c8de068141.jpg",
+        "photo_path": "h/8a88d654-0cec-40d7-9015-448d8d38e9ff.jpg",
         "recipe_id": null,
         "servings_eaten": 1.0,
         "servings_made": 4.0,
         "source": "photo_ai",
         "is_estimate": true,
-        "updated_at": "2026-11-02T15:02:04.277995Z",
+        "updated_at": "2026-11-02T15:21:12.928713Z",
         "deleted_at": null
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
+        "id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
         "household_id": "h1",
         "eaten_at": "2026-09-23T12:00:00.000Z",
         "meal_type": "lunch",
@@ -367,16 +369,16 @@
         "servings_made": 1.0,
         "source": "manual",
         "is_estimate": false,
-        "updated_at": "2026-11-02T15:02:04.278998Z",
+        "updated_at": "2026-11-02T15:21:12.928713Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.7,
@@ -390,35 +392,35 @@
         "status": "opened",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.279998Z",
+        "updated_at": "2026-11-02T15:21:12.931262Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "74b94f2b-dbe4-4dc4-ac45-2dbeb4374a99",
+        "id": "6be6535b-74f2-4413-bc1e-93bd57d3ffa4",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "occurred_at": "2026-09-23T12:00:00.000Z",
         "type": "meal",
         "quantity_delta": -0.1,
         "unit": "kg",
         "note": null,
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "updated_at": "2026-11-02T15:02:04.280995Z",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "updated_at": "2026-11-02T15:21:12.931262Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "23a9055f-b782-4978-aaad-5818ef387db5",
+        "id": "3d9d1172-68ed-45de-a6ce-a28e8d430bf4",
         "household_id": "h1",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "free_text": null,
         "quantity": 0.1,
         "unit": "kg",
@@ -436,16 +438,16 @@
         "sugar_g": 0.5,
         "fiber_g": 1.5,
         "salt_g": 0.01,
-        "updated_at": "2026-11-02T15:02:04.280995Z",
+        "updated_at": "2026-11-02T15:21:12.932276Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.8,
@@ -459,35 +461,35 @@
         "status": "opened",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.285998Z",
+        "updated_at": "2026-11-02T15:21:12.935874Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "c2905b56-38bc-4818-bbdd-ff2c24978a98",
+        "id": "053ae3dc-20b1-4f58-b3a8-bd424ba7178f",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "occurred_at": "2026-11-02T15:02:04.285998Z",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "occurred_at": "2026-11-02T15:21:12.934847Z",
         "type": "adjustment",
         "quantity_delta": 0.1,
         "unit": "kg",
         "note": "Gegenbuchung zur Mahlzeit",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "updated_at": "2026-11-02T15:02:04.287003Z",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "updated_at": "2026-11-02T15:21:12.936876Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "23a9055f-b782-4978-aaad-5818ef387db5",
+        "id": "3d9d1172-68ed-45de-a6ce-a28e8d430bf4",
         "household_id": "h1",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "free_text": null,
         "quantity": 0.1,
         "unit": "kg",
@@ -505,14 +507,14 @@
         "sugar_g": 0.5,
         "fiber_g": 1.5,
         "salt_g": 0.01,
-        "updated_at": "2026-11-02T15:02:04.283996Z",
-        "deleted_at": "2026-11-02T15:02:04.283996Z"
+        "updated_at": "2026-11-02T15:21:12.933287Z",
+        "deleted_at": "2026-11-02T15:21:12.933287Z"
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
+        "id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
         "household_id": "h1",
         "eaten_at": "2026-09-23T12:00:00.000Z",
         "meal_type": "lunch",
@@ -524,16 +526,16 @@
         "servings_made": 1.0,
         "source": "manual",
         "is_estimate": false,
-        "updated_at": "2026-11-02T15:02:04.283996Z",
+        "updated_at": "2026-11-02T15:21:12.933287Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.65,
@@ -547,35 +549,35 @@
         "status": "opened",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.291003Z",
+        "updated_at": "2026-11-02T15:21:12.940846Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "4736387b-af33-4160-b540-bf513b2970ba",
+        "id": "d28323a4-2761-4642-a30b-4b2480aa04d0",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "occurred_at": "2026-09-23T12:00:00.000Z",
         "type": "meal",
         "quantity_delta": -0.15,
         "unit": "kg",
         "note": null,
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "updated_at": "2026-11-02T15:02:04.291003Z",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "updated_at": "2026-11-02T15:21:12.940846Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "37eb3241-c37e-4a02-b590-a9af812d1934",
+        "id": "9447330f-7bfb-4f63-8f88-f979815aae0f",
         "household_id": "h1",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "free_text": null,
         "quantity": 0.15,
         "unit": "kg",
@@ -593,16 +595,16 @@
         "sugar_g": 0.75,
         "fiber_g": 2.25,
         "salt_g": 0.015,
-        "updated_at": "2026-11-02T15:02:04.291003Z",
+        "updated_at": "2026-11-02T15:21:12.941846Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_items",
       "payload": {
-        "id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "receipt_item_id": null,
         "ean": "9001234567890",
         "quantity": 0.8,
@@ -616,35 +618,35 @@
         "status": "opened",
         "is_suggestion": false,
         "closed_at": null,
-        "updated_at": "2026-11-02T15:02:04.293001Z",
+        "updated_at": "2026-11-02T15:21:12.943846Z",
         "deleted_at": null
       }
     },
     {
       "table": "inventory_movements",
       "payload": {
-        "id": "75b95b8e-2edd-4376-9fc5-0659a81ea081",
+        "id": "a851e2cd-a399-4c64-b6d1-6e30c2272c62",
         "household_id": "h1",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "occurred_at": "2026-11-02T15:02:04.293001Z",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "occurred_at": "2026-11-02T15:21:12.942846Z",
         "type": "adjustment",
         "quantity_delta": 0.15,
         "unit": "kg",
         "note": "Gegenbuchung zur Mahlzeit",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "updated_at": "2026-11-02T15:02:04.293999Z",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "updated_at": "2026-11-02T15:21:12.943846Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "37eb3241-c37e-4a02-b590-a9af812d1934",
+        "id": "9447330f-7bfb-4f63-8f88-f979815aae0f",
         "household_id": "h1",
-        "meal_id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
-        "inventory_item_id": "73058aeb-e906-41eb-a1ab-ff28ef6b390d",
+        "meal_id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
+        "inventory_item_id": "aa78f42c-6912-4c4d-be7b-1bd8f39aba9e",
         "free_text": null,
         "quantity": 0.15,
         "unit": "kg",
@@ -662,14 +664,14 @@
         "sugar_g": 0.75,
         "fiber_g": 2.25,
         "salt_g": 0.015,
-        "updated_at": "2026-11-02T15:02:04.292003Z",
-        "deleted_at": "2026-11-02T15:02:04.292003Z"
+        "updated_at": "2026-11-02T15:21:12.942846Z",
+        "deleted_at": "2026-11-02T15:21:12.942846Z"
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "b95294d6-1b25-41b8-9f9d-ba25ac54407b",
+        "id": "651c485c-09f1-43f2-8c93-d5852ec6130f",
         "household_id": "h1",
         "eaten_at": "2026-09-23T12:00:00.000Z",
         "meal_type": "lunch",
@@ -681,8 +683,8 @@
         "servings_made": 1.0,
         "source": "manual",
         "is_estimate": false,
-        "updated_at": "2026-11-02T15:02:04.292003Z",
-        "deleted_at": "2026-11-02T15:02:04.292003Z"
+        "updated_at": "2026-11-02T15:21:12.942846Z",
+        "deleted_at": "2026-11-02T15:21:12.942846Z"
       }
     },
     {
@@ -698,19 +700,21 @@
             "max": 6.0
           }
         },
-        "updated_at": "2026-11-02T15:02:04.297002Z"
+        "updated_at": "2026-11-02T15:21:12.946846Z"
       }
     },
     {
       "table": "products",
       "payload": {
-        "id": "47ae7bd2-3c41-4719-8406-02f5d8f9aa70",
+        "id": "89735893-f77d-482b-bacb-a5728daea038",
         "household_id": "h1",
         "name": "Milch",
         "brand": null,
         "category_id": null,
         "base_unit": "l",
         "pack_size": null,
+        "pieces_per_pack": null,
+        "piece_label": null,
         "sealed_shelf_life_days": null,
         "opened_shelf_life_days": null,
         "default_date_kind": "best_before",
@@ -722,20 +726,22 @@
         "nutrients_source": null,
         "bls_code": null,
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.297999Z",
+        "updated_at": "2026-11-02T15:21:12.947846Z",
         "deleted_at": null
       }
     },
     {
       "table": "products",
       "payload": {
-        "id": "47ae7bd2-3c41-4719-8406-02f5d8f9aa70",
+        "id": "89735893-f77d-482b-bacb-a5728daea038",
         "household_id": "h1",
         "name": "Milch",
         "brand": null,
         "category_id": null,
         "base_unit": "l",
         "pack_size": null,
+        "pieces_per_pack": null,
+        "piece_label": null,
         "sealed_shelf_life_days": null,
         "opened_shelf_life_days": null,
         "default_date_kind": "best_before",
@@ -758,68 +764,70 @@
         "nutrients_source": "bls",
         "bls_code": "M111300",
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.300003Z",
+        "updated_at": "2026-11-02T15:21:12.948846Z",
         "deleted_at": null
       }
     },
     {
       "table": "household_food_links",
       "payload": {
-        "id": "5c8cc928-08a9-44c8-9d31-0b51f90e77f3",
+        "id": "b935d7a5-9440-456a-b190-207202fc27d7",
         "household_id": "h1",
         "name_norm": "Quark",
         "bls_code": "M713300",
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.301516Z",
+        "updated_at": "2026-11-02T15:21:12.949846Z",
         "deleted_at": null
       }
     },
     {
       "table": "household_food_links",
       "payload": {
-        "id": "5cfabe7f-c747-4ab8-adbd-6ce82ee65bd8",
+        "id": "03c630cf-2cec-4487-91ab-e179fbca8824",
         "household_id": "h1",
         "name_norm": "Skyr",
         "bls_code": "M710100",
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.303519Z",
+        "updated_at": "2026-11-02T15:21:12.952858Z",
         "deleted_at": null
       }
     },
     {
       "table": "household_food_links",
       "payload": {
-        "id": "5cfabe7f-c747-4ab8-adbd-6ce82ee65bd8",
+        "id": "03c630cf-2cec-4487-91ab-e179fbca8824",
         "household_id": "h1",
         "name_norm": "Skyr",
         "bls_code": "M710100",
         "unit_weight_g": null,
-        "updated_at": "2026-11-02T15:02:04.305904Z",
-        "deleted_at": "2026-11-02T15:02:04.305904Z"
+        "updated_at": "2026-11-02T15:21:12.953887Z",
+        "deleted_at": "2026-11-02T15:21:12.953887Z"
       }
     },
     {
       "table": "household_food_links",
       "payload": {
-        "id": "087212bc-5b69-4ee4-a2c3-90ff81965d43",
+        "id": "0141690a-3832-4fc8-b78f-6d67ff872276",
         "household_id": "h1",
         "name_norm": "Banane",
         "bls_code": "F503100",
         "unit_weight_g": 135.0,
-        "updated_at": "2026-11-02T15:02:04.306914Z",
+        "updated_at": "2026-11-02T15:21:12.954874Z",
         "deleted_at": null
       }
     },
     {
       "table": "products",
       "payload": {
-        "id": "47ae7bd2-3c41-4719-8406-02f5d8f9aa70",
+        "id": "89735893-f77d-482b-bacb-a5728daea038",
         "household_id": "h1",
         "name": "Milch",
         "brand": null,
         "category_id": null,
         "base_unit": "l",
         "pack_size": null,
+        "pieces_per_pack": null,
+        "piece_label": null,
         "sealed_shelf_life_days": null,
         "opened_shelf_life_days": null,
         "default_date_kind": "best_before",
@@ -842,66 +850,66 @@
         "nutrients_source": "bls",
         "bls_code": "M111300",
         "unit_weight_g": 250.0,
-        "updated_at": "2026-11-02T15:02:04.307914Z",
+        "updated_at": "2026-11-02T15:21:12.956874Z",
         "deleted_at": null
       }
     },
     {
       "table": "product_online_links",
       "payload": {
-        "id": "5911c189-ac00-435c-b5f4-a1d4fc0c72fb",
+        "id": "1ccaba6d-275e-429d-baec-aef5b51feef2",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "store": "billa",
         "external_id": "00-1",
         "linked_name": "Clever Vollmilch",
-        "updated_at": "2026-11-02T15:02:04.309439Z",
+        "updated_at": "2026-11-02T15:21:12.957886Z",
         "deleted_at": null
       }
     },
     {
       "table": "product_online_links",
       "payload": {
-        "id": "ed80f5a1-e0cb-45c0-9bdc-72cc501f34fc",
+        "id": "7e004b52-1381-4d8c-ac53-02bb9b8b721e",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "store": "billa",
         "external_id": "00-2",
         "linked_name": "Ja! Natürlich Vollmilch",
-        "updated_at": "2026-11-02T15:02:04.313441Z",
+        "updated_at": "2026-11-02T15:21:12.962873Z",
         "deleted_at": null
       }
     },
     {
       "table": "product_online_links",
       "payload": {
-        "id": "6efafa1f-d272-4d4a-8258-66a2c124f308",
+        "id": "0e3ad150-e64c-40a4-b024-728e349a3517",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "store": "spar",
         "external_id": "2020",
         "linked_name": "A-zwei Vollmilch",
-        "updated_at": "2026-11-02T15:02:04.314435Z",
+        "updated_at": "2026-11-02T15:21:12.963885Z",
         "deleted_at": null
       }
     },
     {
       "table": "product_online_links",
       "payload": {
-        "id": "6efafa1f-d272-4d4a-8258-66a2c124f308",
+        "id": "0e3ad150-e64c-40a4-b024-728e349a3517",
         "household_id": "h1",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "store": "spar",
         "external_id": "2020",
         "linked_name": "A-zwei Vollmilch",
-        "updated_at": "2026-11-02T15:02:04.316440Z",
-        "deleted_at": "2026-11-02T15:02:04.316440Z"
+        "updated_at": "2026-11-02T15:21:12.965874Z",
+        "deleted_at": "2026-11-02T15:21:12.965874Z"
       }
     },
     {
       "table": "meals",
       "payload": {
-        "id": "8df17d83-e44e-4dd9-ad29-996bf3ab32b6",
+        "id": "ec4c5620-c150-45b7-a343-b23814b27085",
         "household_id": "h1",
         "eaten_at": "2026-09-24T12:00:00.000Z",
         "meal_type": "lunch",
@@ -913,16 +921,16 @@
         "servings_made": 1.0,
         "source": "manual",
         "is_estimate": false,
-        "updated_at": "2026-11-02T15:02:04.317450Z",
+        "updated_at": "2026-11-02T15:21:12.965874Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_ingredients",
       "payload": {
-        "id": "42c147bc-04fd-4edd-90f6-f684c1eee6f7",
+        "id": "65b14f71-cce1-462e-9d7d-64afda38fab8",
         "household_id": "h1",
-        "meal_id": "8df17d83-e44e-4dd9-ad29-996bf3ab32b6",
+        "meal_id": "ec4c5620-c150-45b7-a343-b23814b27085",
         "product_id": null,
         "inventory_item_id": null,
         "free_text": "Gemüsepaprika rot, roh",
@@ -945,14 +953,14 @@
         "sugar_g": null,
         "fiber_g": null,
         "salt_g": null,
-        "updated_at": "2026-11-02T15:02:04.318447Z",
+        "updated_at": "2026-11-02T15:21:12.966874Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplements",
       "payload": {
-        "id": "d81c0a73-9bde-4aa1-b081-f560415877ad",
+        "id": "8de4c7a0-0949-4838-b428-746ba8ec02b8",
         "household_id": "h1",
         "name": "Vitamin D3",
         "serving_label": "Tablette",
@@ -960,14 +968,14 @@
           "vit_d_ug": 20.0
         },
         "note": null,
-        "updated_at": "2026-11-02T15:02:04.319454Z",
+        "updated_at": "2026-11-02T15:21:12.968410Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplements",
       "payload": {
-        "id": "d81c0a73-9bde-4aa1-b081-f560415877ad",
+        "id": "8de4c7a0-0949-4838-b428-746ba8ec02b8",
         "household_id": "h1",
         "name": "Vitamin D3",
         "serving_label": "Tablette",
@@ -975,14 +983,14 @@
           "vit_d_ug": 25.0
         },
         "note": "zum Frühstück",
-        "updated_at": "2026-11-02T15:02:04.322447Z",
+        "updated_at": "2026-11-02T15:21:12.971030Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplements",
       "payload": {
-        "id": "4094c6bd-a1c5-4bd4-b4f9-b2a55dce9a3e",
+        "id": "acb24df5-42e7-4fd6-a7be-f4931c58e2d3",
         "household_id": "h1",
         "name": "Multi",
         "serving_label": "Kapsel",
@@ -991,32 +999,32 @@
           "iron_mg": 14.0
         },
         "note": null,
-        "updated_at": "2026-11-02T15:02:04.324450Z",
+        "updated_at": "2026-11-02T15:21:12.973029Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplement_intakes",
       "payload": {
-        "id": "82753c66-65b2-4fbf-88f9-52a2f4cd8f40",
+        "id": "33c7f3e6-de0c-4ac9-be51-887971e706cb",
         "household_id": "h1",
-        "supplement_id": "d81c0a73-9bde-4aa1-b081-f560415877ad",
+        "supplement_id": "8de4c7a0-0949-4838-b428-746ba8ec02b8",
         "name": "Vitamin D3",
         "taken_at": "2026-09-22T06:30:00.000Z",
         "servings": 1.0,
         "micros": {
           "vit_d_ug": 20.0
         },
-        "updated_at": "2026-11-02T15:02:04.325449Z",
+        "updated_at": "2026-11-02T15:21:12.973029Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplement_intakes",
       "payload": {
-        "id": "63051cba-f922-4844-973e-7bdd37d4d8b8",
+        "id": "e379a150-925f-4f5e-a54f-02c6759f6166",
         "household_id": "h1",
-        "supplement_id": "4094c6bd-a1c5-4bd4-b4f9-b2a55dce9a3e",
+        "supplement_id": "acb24df5-42e7-4fd6-a7be-f4931c58e2d3",
         "name": "Multi",
         "taken_at": "2026-09-22T06:31:00.000Z",
         "servings": 2.0,
@@ -1024,16 +1032,16 @@
           "vit_c_mg": 160.0,
           "iron_mg": 28.0
         },
-        "updated_at": "2026-11-02T15:02:04.327448Z",
+        "updated_at": "2026-11-02T15:21:12.975029Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplement_intakes",
       "payload": {
-        "id": "63051cba-f922-4844-973e-7bdd37d4d8b8",
+        "id": "e379a150-925f-4f5e-a54f-02c6759f6166",
         "household_id": "h1",
-        "supplement_id": "4094c6bd-a1c5-4bd4-b4f9-b2a55dce9a3e",
+        "supplement_id": "acb24df5-42e7-4fd6-a7be-f4931c58e2d3",
         "name": "Multi",
         "taken_at": "2026-09-22T06:31:00.000Z",
         "servings": 2.0,
@@ -1041,14 +1049,14 @@
           "vit_c_mg": 160.0,
           "iron_mg": 28.0
         },
-        "updated_at": "2026-11-02T15:02:04.333984Z",
-        "deleted_at": "2026-11-02T15:02:04.333984Z"
+        "updated_at": "2026-11-02T15:21:12.977579Z",
+        "deleted_at": "2026-11-02T15:21:12.977579Z"
       }
     },
     {
       "table": "supplements",
       "payload": {
-        "id": "4af66b3d-0657-4f81-baca-8837df9e4201",
+        "id": "07d2e124-bc40-4c9c-be75-9de94e930784",
         "household_id": "h1",
         "name": "Alt",
         "serving_label": "Tropfen",
@@ -1056,14 +1064,14 @@
           "zinc_mg": 1.0
         },
         "note": null,
-        "updated_at": "2026-11-02T15:02:04.336496Z",
+        "updated_at": "2026-11-02T15:21:12.978591Z",
         "deleted_at": null
       }
     },
     {
       "table": "supplements",
       "payload": {
-        "id": "4af66b3d-0657-4f81-baca-8837df9e4201",
+        "id": "07d2e124-bc40-4c9c-be75-9de94e930784",
         "household_id": "h1",
         "name": "Alt",
         "serving_label": "Tropfen",
@@ -1071,14 +1079,14 @@
           "zinc_mg": 1.0
         },
         "note": null,
-        "updated_at": "2026-11-02T15:02:04.339113Z",
-        "deleted_at": "2026-11-02T15:02:04.339113Z"
+        "updated_at": "2026-11-02T15:21:12.979591Z",
+        "deleted_at": "2026-11-02T15:21:12.979591Z"
       }
     },
     {
       "table": "meal_plan_entries",
       "payload": {
-        "id": "5b960ba3-76bb-4f2e-9333-8edc386c1f53",
+        "id": "64a84bb5-e8ec-44a4-91c1-06c233696543",
         "household_id": "h1",
         "planned_on": "2026-09-23",
         "slot": "dinner",
@@ -1091,14 +1099,14 @@
           }
         ],
         "source_url": "https://example.com/suche",
-        "updated_at": "2026-11-02T15:02:04.340109Z",
+        "updated_at": "2026-11-02T15:21:12.980603Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_plan_entries",
       "payload": {
-        "id": "5b960ba3-76bb-4f2e-9333-8edc386c1f53",
+        "id": "64a84bb5-e8ec-44a4-91c1-06c233696543",
         "household_id": "h1",
         "planned_on": "2026-09-24",
         "slot": "dinner",
@@ -1111,36 +1119,36 @@
           }
         ],
         "source_url": "https://example.com/suche",
-        "updated_at": "2026-11-02T15:02:04.344115Z",
+        "updated_at": "2026-11-02T15:21:12.983591Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_plan_entries",
       "payload": {
-        "id": "a9132779-daa9-4acb-8047-c5d9378a9763",
+        "id": "8cce8699-5b68-4998-a68b-3634cc058acc",
         "household_id": "h1",
         "planned_on": "2026-09-25",
         "slot": "lunch",
         "title": "Alt",
         "ingredients": [],
         "source_url": null,
-        "updated_at": "2026-11-02T15:02:04.345114Z",
+        "updated_at": "2026-11-02T15:21:12.984603Z",
         "deleted_at": null
       }
     },
     {
       "table": "meal_plan_entries",
       "payload": {
-        "id": "a9132779-daa9-4acb-8047-c5d9378a9763",
+        "id": "8cce8699-5b68-4998-a68b-3634cc058acc",
         "household_id": "h1",
         "planned_on": "2026-09-25",
         "slot": "lunch",
         "title": "Alt",
         "ingredients": [],
         "source_url": null,
-        "updated_at": "2026-11-02T15:02:04.345114Z",
-        "deleted_at": "2026-11-02T15:02:04.345114Z"
+        "updated_at": "2026-11-02T15:21:12.985591Z",
+        "deleted_at": "2026-11-02T15:21:12.985591Z"
       }
     },
     {
@@ -1149,7 +1157,7 @@
         "household_id": "h1",
         "key": "micro_reference_on",
         "value": true,
-        "updated_at": "2026-11-02T15:02:04.347640Z"
+        "updated_at": "2026-11-02T15:21:12.987591Z"
       }
     },
     {
@@ -1160,27 +1168,134 @@
         "value": {
           "vit_c_mg": 100.0
         },
-        "updated_at": "2026-11-02T15:02:04.349638Z"
+        "updated_at": "2026-11-02T15:21:12.988603Z"
+      }
+    },
+    {
+      "table": "products",
+      "payload": {
+        "id": "8b038d6b-87c8-48ae-bde0-a4203600e956",
+        "household_id": "h1",
+        "name": "Yakult Drink",
+        "brand": null,
+        "category_id": null,
+        "base_unit": "l",
+        "pack_size": 0.39,
+        "pieces_per_pack": 6,
+        "piece_label": "Fläschchen",
+        "sealed_shelf_life_days": null,
+        "opened_shelf_life_days": null,
+        "default_date_kind": "best_before",
+        "default_location": "pantry",
+        "restock": false,
+        "off_code": null,
+        "nutrients_per_100": null,
+        "nutrients_basis": null,
+        "nutrients_source": null,
+        "bls_code": null,
+        "unit_weight_g": 65.0,
+        "updated_at": "2026-11-02T15:21:12.989603Z",
+        "deleted_at": null
+      }
+    },
+    {
+      "table": "inventory_items",
+      "payload": {
+        "id": "190f8db3-9842-4072-85a3-fe72c0dcee1c",
+        "household_id": "h1",
+        "product_id": "8b038d6b-87c8-48ae-bde0-a4203600e956",
+        "receipt_item_id": null,
+        "ean": "9001234567891",
+        "quantity": 0.39,
+        "unit": "l",
+        "location": "pantry",
+        "purchased_on": "2026-09-01",
+        "best_before": null,
+        "date_kind": "best_before",
+        "opened_on": null,
+        "open_shelf_life_days": null,
+        "status": "sealed",
+        "is_suggestion": false,
+        "closed_at": null,
+        "updated_at": "2026-11-02T15:21:12.990590Z",
+        "deleted_at": null
+      }
+    },
+    {
+      "table": "inventory_movements",
+      "payload": {
+        "id": "3b581a46-6fef-4c33-8708-9fffca52a1d5",
+        "household_id": "h1",
+        "inventory_item_id": "190f8db3-9842-4072-85a3-fe72c0dcee1c",
+        "product_id": "8b038d6b-87c8-48ae-bde0-a4203600e956",
+        "occurred_at": "2026-09-01T00:00:00.000Z",
+        "type": "purchase",
+        "quantity_delta": 0.39,
+        "unit": "l",
+        "note": null,
+        "meal_id": null,
+        "updated_at": "2026-11-02T15:21:12.990590Z",
+        "deleted_at": null
+      }
+    },
+    {
+      "table": "inventory_items",
+      "payload": {
+        "id": "190f8db3-9842-4072-85a3-fe72c0dcee1c",
+        "household_id": "h1",
+        "product_id": "8b038d6b-87c8-48ae-bde0-a4203600e956",
+        "receipt_item_id": null,
+        "ean": "9001234567891",
+        "quantity": 0.325,
+        "unit": "l",
+        "location": "pantry",
+        "purchased_on": "2026-09-01",
+        "best_before": null,
+        "date_kind": "best_before",
+        "opened_on": null,
+        "open_shelf_life_days": null,
+        "status": "sealed",
+        "is_suggestion": false,
+        "closed_at": null,
+        "updated_at": "2026-11-02T15:21:12.991590Z",
+        "deleted_at": null
+      }
+    },
+    {
+      "table": "inventory_movements",
+      "payload": {
+        "id": "164e87a7-3b30-49a4-8878-f7097159f670",
+        "household_id": "h1",
+        "inventory_item_id": "190f8db3-9842-4072-85a3-fe72c0dcee1c",
+        "product_id": "8b038d6b-87c8-48ae-bde0-a4203600e956",
+        "occurred_at": "2026-09-02T00:00:00.000Z",
+        "type": "consumed",
+        "quantity_delta": -0.065,
+        "unit": "l",
+        "note": null,
+        "meal_id": null,
+        "updated_at": "2026-11-02T15:21:12.991590Z",
+        "deleted_at": null
       }
     },
     {
       "table": "shopping_lists",
       "payload": {
-        "id": "69177c4f-b618-4802-a465-aed5c65ea42e",
+        "id": "2c6f5170-a866-4f74-9857-3be0116ec617",
         "household_id": "h1",
         "name": "Einkaufsliste",
         "is_default": true,
-        "updated_at": "2026-11-02T15:02:04.351638Z",
+        "updated_at": "2026-11-02T15:21:12.993603Z",
         "deleted_at": null
       }
     },
     {
       "table": "shopping_list_items",
       "payload": {
-        "id": "0092049b-1c92-4135-a03f-031ca983293e",
+        "id": "a040d0c6-fc96-4239-9500-fdbb908c665b",
         "household_id": "h1",
-        "list_id": "69177c4f-b618-4802-a465-aed5c65ea42e",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "list_id": "2c6f5170-a866-4f74-9857-3be0116ec617",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "free_text": null,
         "quantity": 1.0,
         "unit": "kg",
@@ -1188,17 +1303,17 @@
         "source": "manual",
         "is_suggestion": false,
         "archived_at": null,
-        "updated_at": "2026-11-02T15:02:04.353642Z",
+        "updated_at": "2026-11-02T15:21:12.995591Z",
         "deleted_at": null
       }
     },
     {
       "table": "shopping_list_items",
       "payload": {
-        "id": "0092049b-1c92-4135-a03f-031ca983293e",
+        "id": "a040d0c6-fc96-4239-9500-fdbb908c665b",
         "household_id": "h1",
-        "list_id": "69177c4f-b618-4802-a465-aed5c65ea42e",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "list_id": "2c6f5170-a866-4f74-9857-3be0116ec617",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "free_text": null,
         "quantity": 1.0,
         "unit": "kg",
@@ -1206,35 +1321,35 @@
         "source": "manual",
         "is_suggestion": false,
         "archived_at": null,
-        "updated_at": "2026-11-02T15:02:04.357638Z",
+        "updated_at": "2026-11-02T15:21:12.998604Z",
         "deleted_at": null
       }
     },
     {
       "table": "shopping_list_items",
       "payload": {
-        "id": "0092049b-1c92-4135-a03f-031ca983293e",
+        "id": "a040d0c6-fc96-4239-9500-fdbb908c665b",
         "household_id": "h1",
-        "list_id": "69177c4f-b618-4802-a465-aed5c65ea42e",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "list_id": "2c6f5170-a866-4f74-9857-3be0116ec617",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "free_text": null,
         "quantity": 1.0,
         "unit": "kg",
         "checked": true,
         "source": "manual",
         "is_suggestion": false,
-        "archived_at": "2026-11-02T15:02:04.358637Z",
-        "updated_at": "2026-11-02T15:02:04.358637Z",
+        "archived_at": "2026-11-02T15:21:12.999603Z",
+        "updated_at": "2026-11-02T15:21:12.999603Z",
         "deleted_at": null
       }
     },
     {
       "table": "shopping_list_items",
       "payload": {
-        "id": "0092049b-1c92-4135-a03f-031ca983293e",
+        "id": "a040d0c6-fc96-4239-9500-fdbb908c665b",
         "household_id": "h1",
-        "list_id": "69177c4f-b618-4802-a465-aed5c65ea42e",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "list_id": "2c6f5170-a866-4f74-9857-3be0116ec617",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "free_text": null,
         "quantity": 1.0,
         "unit": "kg",
@@ -1242,25 +1357,25 @@
         "source": "manual",
         "is_suggestion": false,
         "archived_at": null,
-        "updated_at": "2026-11-02T15:02:04.359639Z",
+        "updated_at": "2026-11-02T15:21:13.000603Z",
         "deleted_at": null
       }
     },
     {
       "table": "shopping_list_items",
       "payload": {
-        "id": "0092049b-1c92-4135-a03f-031ca983293e",
+        "id": "a040d0c6-fc96-4239-9500-fdbb908c665b",
         "household_id": "h1",
-        "list_id": "69177c4f-b618-4802-a465-aed5c65ea42e",
-        "product_id": "cd1f834d-04be-4c08-8ab5-ccd3e778e331",
+        "list_id": "2c6f5170-a866-4f74-9857-3be0116ec617",
+        "product_id": "f2845ea1-e79a-4c6e-b76a-a28207b75301",
         "free_text": null,
         "quantity": 1.0,
         "unit": "kg",
         "checked": true,
         "source": "manual",
         "is_suggestion": false,
-        "archived_at": "2026-11-02T15:02:04.360639Z",
-        "updated_at": "2026-11-02T15:02:04.360639Z",
+        "archived_at": "2026-11-02T15:21:13.001603Z",
+        "updated_at": "2026-11-02T15:21:13.001603Z",
         "deleted_at": null
       }
     }

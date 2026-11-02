@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/clock.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/nutrition/fefo_deduction.dart';
+import '../../domain/products/packaging.dart';
 import '../local/database.dart';
 import '../../core/vienna_time.dart';
 import '../sync/mappers.dart';
@@ -301,9 +302,12 @@ class InventoryRepository {
         updatedAt: appClock.now().toUtc(),
       );
       await _putItem(updated);
-      final delta = quantity - refine.quantity;
-      if (delta != 0) {
-        await _addMovement(inventoryItemId: updated.id, productId: productId, type: 'adjustment', delta: delta, unit: unit, now: now);
+      if (refine.unit != unit) {
+        // Der Vorschlag zaehlte in einer anderen Einheit: dieselbe Ware, die Kaufbuchung bekommt die neue Einheit, sonst stuenden Stueck und kg
+        // nebeneinander im Ledger.
+        if (refine.quantity > 0) await _convertMovements(updated, refine.unit, quantity / refine.quantity, unit);
+      } else if (quantity != refine.quantity) {
+        await _addMovement(inventoryItemId: updated.id, productId: productId, type: 'adjustment', delta: quantity - refine.quantity, unit: unit, now: now);
       }
       onChanged?.call();
       return updated;
@@ -377,6 +381,58 @@ class InventoryRepository {
       if (remaining.isEmpty) await onDepleted!(item.productId);
     }
     onChanged?.call();
+  }
+
+  /// Ein Teil ist verbraucht (ADR-045), zum Beispiel ein Flaeschchen aus dem Sechserpack: eine Abgangsbuchung wie "Aufgebraucht", damit es in
+  /// Vorhersage und Bilanz als Verbrauch zaehlt, nicht als Korrektur. Bleibt nichts uebrig, ist der Eintrag aufgebraucht (Rueckgabe `true`), und
+  /// [reopen] holt den letzten Stand zurueck. Eine angebrochene Packung gilt als geoeffnet, ausser sie ist einzeln verpackt ([opens] falsch).
+  Future<bool> consumePart(String id, double amount, {bool opens = true, int? openedShelfLifeDays, DateTime? now}) async {
+    final item = await _get(id);
+    final remaining = _round3(item.quantity - amount);
+    if (remaining <= 0) {
+      await _close(id, 'consumed', now: now);
+      return true;
+    }
+    final taken = _round3(item.quantity - remaining);
+    if (taken <= 0) return false;
+    await _putItem(item.copyWith(quantity: remaining, updatedAt: appClock.now().toUtc()));
+    await _addMovement(inventoryItemId: item.id, productId: item.productId, type: 'consumed', delta: -taken, unit: item.unit, now: now);
+    if (opens && item.status == 'sealed') await open(id, productDefaultOpenShelfLifeDays: openedShelfLifeDays, now: now);
+    onChanged?.call();
+    return false;
+  }
+
+  /// Bringt den Bestand eines Produkts auf seine Grundeinheit (ADR-045), nachdem sein Inhalt oder seine Einheit geaendert wurde. Was sich nicht
+  /// eindeutig umrechnen laesst, bleibt, wie es ist, und wird in seiner eigenen Einheit angezeigt. Die Buchungen des Eintrags wandern mit, statt
+  /// Korrekturen anzulegen: es ist dieselbe Ware, Bilanz und Vorhersage sollen keinen Zu- oder Abgang sehen.
+  Future<int> normalizeStock(Product product) async {
+    final packaging = Packaging(baseUnit: product.baseUnit, rawPackSize: product.packSize, rawPiecesPerPack: product.piecesPerPack, pieceLabel: product.pieceLabel);
+    final items = await (_db.select(_db.inventoryItems)
+          ..where((i) => i.productId.equals(product.id) & i.deletedAt.isNull() & i.status.isIn(['sealed', 'opened']) & i.unit.equals(product.baseUnit).not()))
+        .get();
+    var changed = 0;
+    for (final item in items) {
+      final factor = packaging.stockConversionFactor(item.unit, isSuggestion: item.isSuggestion);
+      if (factor == null) continue;
+      final updated = item.copyWith(quantity: _round3(item.quantity * factor), unit: product.baseUnit, updatedAt: appClock.now().toUtc());
+      await _putItem(updated);
+      await _convertMovements(updated, item.unit, factor, product.baseUnit);
+      changed++;
+    }
+    if (changed > 0) onChanged?.call();
+    return changed;
+  }
+
+  Future<void> _convertMovements(InventoryItem item, String fromUnit, double factor, String toUnit) async {
+    final movements = await (_db.select(_db.inventoryMovements)
+          ..where((m) => m.inventoryItemId.equals(item.id) & m.deletedAt.isNull() & m.unit.equals(fromUnit)))
+        .get();
+    final now = appClock.now().toUtc();
+    for (final m in movements) {
+      final converted = m.copyWith(quantityDelta: _round3(m.quantityDelta * factor), unit: toUnit, updatedAt: now);
+      await _put('inventory_movements', m.id, inventoryMovementToRemote(converted),
+          () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(converted.toCompanion(false)));
+    }
   }
 
   /// Macht "Aufgebraucht"/"Weggeworfen" rueckgaengig, z.B. nach einem verwischten Wisch (Fehlerbericht
@@ -548,6 +604,9 @@ class InventoryRepository {
               i.unit.equals(unit)))
         .get();
     final byId = {for (final i in active) i.id: i};
+    final product = await (_db.select(_db.products)..where((p) => p.id.equals(productId))).getSingleOrNull();
+    // Ein Flaeschchen aus dem Sechserpack oeffnet die anderen nicht (ADR-045)
+    final individuallyPacked = product != null && Packaging(baseUnit: product.baseUnit, rawPackSize: product.packSize, rawPiecesPerPack: product.piecesPerPack).isIndividuallyPacked;
     final result = allocateFefo(
       [for (final i in active) FefoCandidate(inventoryItemId: i.id, availableQuantity: i.quantity, expiresOn: i.expiresOn)],
       quantity,
@@ -563,7 +622,7 @@ class InventoryRepository {
       // er bis Migration 0032 ab, und die Aenderung hing fuer immer in der Outbox (Fehlerbericht 2026-11-02).
       if (taken <= 0) continue;
       final remaining = _round3(item.quantity - taken);
-      final opensItem = remaining > 0 && item.status == 'sealed';
+      final opensItem = remaining > 0 && item.status == 'sealed' && !individuallyPacked;
       if (remaining <= 0) {
         await _putItem(item.copyWith(quantity: 0, status: 'consumed', closedAt: Value(nowUtc), updatedAt: nowUtc));
       } else {

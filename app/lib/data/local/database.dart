@@ -29,7 +29,14 @@ class Products extends Table {
 
   /// 'kg' | 'l' | 'piece'
   TextColumn get baseUnit => text().withDefault(const Constant('piece'))();
+  /// Gesamtinhalt einer Packung in [baseUnit].
   RealColumn get packSize => real().nullable()();
+
+  /// Mehrfachpackung (ADR-045): in wie viele Stuecke sich [packSize] teilt, nur bei kg und l. Regeln in `domain/products/packaging.dart`.
+  IntColumn get piecesPerPack => integer().nullable()();
+
+  /// Name der Stuecke in der Mehrzahl ("Fläschchen"), ohne Angabe "Stk".
+  TextColumn get pieceLabel => text().nullable()();
 
   /// Standardhaltbarkeit ab Kauf (Tage), falls kein MHD bekannt ist.
   IntColumn get sealedShelfLifeDays => integer().nullable()();
@@ -653,7 +660,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -779,6 +786,11 @@ class AppDatabase extends _$AppDatabase {
           // 22 -> 23: Einkaeufe archivieren (ADR-043). Installationen vor 10 legen die Tabelle oben schon mit der Spalte an.
           if (from >= 10 && from < 23) {
             await m.addColumn(shoppingListItems, shoppingListItems.archivedAt);
+          }
+          // 23 -> 24: Mehrfachpackungen (ADR-045)
+          if (from < 24) {
+            await m.addColumn(products, products.piecesPerPack);
+            await m.addColumn(products, products.pieceLabel);
           }
         },
       );

@@ -8,7 +8,10 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/notifications/expiry_stages.dart';
+import '../../domain/products/packaging.dart';
+import '../../domain/shopping_list/list_quantity.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../common/quantity_dialog.dart';
 import '../products/product_form_page.dart';
 import '../settings/expiry_stages_dialog.dart';
 
@@ -81,39 +84,63 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     if (fresh != null && mounted) setState(() => _item = fresh);
   }
 
-  Future<void> _changeQuantity(double delta) async {
-    final next = (_item.quantity + delta).clamp(0, 999999).toDouble();
-    if (next == _item.quantity) return;
-    await _repo.adjustQuantity(_item.id, next);
+  Packaging get _packaging => packagingOf(_product, _item.unit).forStockUnit(_item.unit);
+
+  /// Plus ist eine Korrektur (es ist mehr da als gedacht), Minus ein Verbrauch (ADR-045). Der letzte Rest macht den Eintrag zu "Aufgebraucht".
+  Future<void> _addStep() async {
+    await _repo.adjustQuantity(_item.id, roundQuantity(_item.quantity + _packaging.step.amount));
     await _refresh();
   }
 
-  Future<void> _enterQuantity() async {
-    final ctrl = TextEditingController(text: formatQuantity(_item.quantity));
-    final value = await showDialog<double>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Menge'),
-        content: TextField(
-          key: const Key('quantity-input'),
-          controller: ctrl,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(suffixText: _item.unit),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.').trim())),
-            child: const Text('Übernehmen'),
-          ),
-        ],
-      ),
+  Future<void> _consumeStep() async {
+    final emptied = await _repo.consumePart(
+      _item.id,
+      _packaging.step.amount,
+      opens: !_packaging.isIndividuallyPacked,
+      openedShelfLifeDays: _product?.openedShelfLifeDays,
     );
-    if (value != null && value >= 0) {
-      await _repo.adjustQuantity(_item.id, value);
+    if (emptied) {
+      _leaveEmptied();
+    } else {
       await _refresh();
     }
+  }
+
+  void _leaveEmptied() {
+    if (!mounted) return;
+    final repo = _repo;
+    final id = _item.id;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        key: const Key('item-emptied'),
+        content: const Text('Als aufgebraucht markiert'),
+        persist: false,
+        action: SnackBarAction(label: 'Rückgängig', onPressed: () => repo.reopen(id)),
+      ));
+    context.pop();
+  }
+
+  /// Die Menge eintippen ist eine Inventur, keine Entnahme. 0 heisst aufgebraucht: ein aktiver Eintrag ohne Menge hilft niemandem.
+  Future<void> _enterQuantity() async {
+    final packaging = _packaging;
+    final result = await showQuantityDialog(
+      context,
+      keyPrefix: 'quantity',
+      initialAmount: _item.quantity,
+      initialOption: packaging.bestOption(_item.quantity),
+      options: packaging.options,
+      preview: (amount, _) => packaging.describe(amount),
+      allowZero: true,
+    );
+    if (result == null) return;
+    if (result.amount == 0) {
+      await _repo.markConsumed(_item.id);
+      _leaveEmptied();
+      return;
+    }
+    await _repo.adjustQuantity(_item.id, result.amount);
+    await _refresh();
   }
 
   Future<void> _changeDate() async {
@@ -176,7 +203,10 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     final product = _product;
     if (product == null) return;
     final updated = await context.push<Product>('/product-form', extra: ProductFormArgs(existing: product));
-    if (updated != null && mounted) setState(() => _product = updated);
+    if (updated != null && mounted) {
+      setState(() => _product = updated);
+      await _refresh(); // das Formular kann den Bestand auf eine neue Einheit umgerechnet haben
+    }
   }
 
   /// Bonzuordnung loesen oder neu setzen (Fehlerbericht "Bonzuordnung anzeigen", erweitert 2026-09-28: soll
@@ -317,18 +347,18 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                IconButton(key: const Key('quantity-minus'), tooltip: 'Menge verringern', iconSize: 32, onPressed: () => _changeQuantity(-1), icon: const Icon(Icons.remove_circle_outline)),
+                IconButton(key: const Key('quantity-minus'), tooltip: '${_packaging.step.label} verbraucht', iconSize: 32, onPressed: _consumeStep, icon: const Icon(Icons.remove_circle_outline)),
                 Expanded(
                   child: InkWell(
                     key: const Key('quantity-tap'),
                     onTap: _enterQuantity,
                     child: Column(children: [
-                      Text('${formatQuantity(_item.quantity)} ${_item.unit}', style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
-                      Text('Menge antippen zum Eingeben', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+                      Text(describeStock(_item.quantity, _item.unit, _product), key: const Key('quantity-text'), style: t.textTheme.headlineSmall, textAlign: TextAlign.center),
+                      Text('Minus: ${_packaging.step.label} verbraucht · antippen: genaue Menge', style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
                     ]),
                   ),
                 ),
-                IconButton(key: const Key('quantity-plus'), tooltip: 'Menge erhöhen', iconSize: 32, onPressed: () => _changeQuantity(1), icon: const Icon(Icons.add_circle_outline)),
+                IconButton(key: const Key('quantity-plus'), tooltip: '${_packaging.step.label} mehr', iconSize: 32, onPressed: _addStep, icon: const Icon(Icons.add_circle_outline)),
               ]),
             ),
           ),
@@ -454,7 +484,7 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
                 contentPadding: EdgeInsets.zero,
                 title: Text(_movementLabels[m.type] ?? m.type),
                 subtitle: Text(_formatDate(m.occurredAt)),
-                trailing: Text('${m.quantityDelta > 0 ? '+' : ''}${formatQuantity(m.quantityDelta)} ${m.unit}'),
+                trailing: Text('${m.quantityDelta > 0 ? '+' : '−'}${formatListAmount(m.quantityDelta.abs(), m.unit)}'),
               ),
           ],
         ],

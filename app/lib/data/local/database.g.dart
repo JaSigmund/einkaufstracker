@@ -643,6 +643,28 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _piecesPerPackMeta = const VerificationMeta(
+    'piecesPerPack',
+  );
+  @override
+  late final GeneratedColumn<int> piecesPerPack = GeneratedColumn<int>(
+    'pieces_per_pack',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pieceLabelMeta = const VerificationMeta(
+    'pieceLabel',
+  );
+  @override
+  late final GeneratedColumn<String> pieceLabel = GeneratedColumn<String>(
+    'piece_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _sealedShelfLifeDaysMeta =
       const VerificationMeta('sealedShelfLifeDays');
   @override
@@ -799,6 +821,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     categoryId,
     baseUnit,
     packSize,
+    piecesPerPack,
+    pieceLabel,
     sealedShelfLifeDays,
     openedShelfLifeDays,
     defaultDateKind,
@@ -871,6 +895,21 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       context.handle(
         _packSizeMeta,
         packSize.isAcceptableOrUnknown(data['pack_size']!, _packSizeMeta),
+      );
+    }
+    if (data.containsKey('pieces_per_pack')) {
+      context.handle(
+        _piecesPerPackMeta,
+        piecesPerPack.isAcceptableOrUnknown(
+          data['pieces_per_pack']!,
+          _piecesPerPackMeta,
+        ),
+      );
+    }
+    if (data.containsKey('piece_label')) {
+      context.handle(
+        _pieceLabelMeta,
+        pieceLabel.isAcceptableOrUnknown(data['piece_label']!, _pieceLabelMeta),
       );
     }
     if (data.containsKey('sealed_shelf_life_days')) {
@@ -1014,6 +1053,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.double,
         data['${effectivePrefix}pack_size'],
       ),
+      piecesPerPack: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pieces_per_pack'],
+      ),
+      pieceLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}piece_label'],
+      ),
       sealedShelfLifeDays: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sealed_shelf_life_days'],
@@ -1084,7 +1131,15 @@ class Product extends DataClass implements Insertable<Product> {
 
   /// 'kg' | 'l' | 'piece'
   final String baseUnit;
+
+  /// Gesamtinhalt einer Packung in [baseUnit].
   final double? packSize;
+
+  /// Mehrfachpackung (ADR-045): in wie viele Stuecke sich [packSize] teilt, nur bei kg und l. Regeln in `domain/products/packaging.dart`.
+  final int? piecesPerPack;
+
+  /// Name der Stuecke in der Mehrzahl ("Fläschchen"), ohne Angabe "Stk".
+  final String? pieceLabel;
 
   /// Standardhaltbarkeit ab Kauf (Tage), falls kein MHD bekannt ist.
   final int? sealedShelfLifeDays;
@@ -1127,6 +1182,8 @@ class Product extends DataClass implements Insertable<Product> {
     this.categoryId,
     required this.baseUnit,
     this.packSize,
+    this.piecesPerPack,
+    this.pieceLabel,
     this.sealedShelfLifeDays,
     this.openedShelfLifeDays,
     required this.defaultDateKind,
@@ -1156,6 +1213,12 @@ class Product extends DataClass implements Insertable<Product> {
     map['base_unit'] = Variable<String>(baseUnit);
     if (!nullToAbsent || packSize != null) {
       map['pack_size'] = Variable<double>(packSize);
+    }
+    if (!nullToAbsent || piecesPerPack != null) {
+      map['pieces_per_pack'] = Variable<int>(piecesPerPack);
+    }
+    if (!nullToAbsent || pieceLabel != null) {
+      map['piece_label'] = Variable<String>(pieceLabel);
     }
     if (!nullToAbsent || sealedShelfLifeDays != null) {
       map['sealed_shelf_life_days'] = Variable<int>(sealedShelfLifeDays);
@@ -1206,6 +1269,12 @@ class Product extends DataClass implements Insertable<Product> {
       packSize: packSize == null && nullToAbsent
           ? const Value.absent()
           : Value(packSize),
+      piecesPerPack: piecesPerPack == null && nullToAbsent
+          ? const Value.absent()
+          : Value(piecesPerPack),
+      pieceLabel: pieceLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pieceLabel),
       sealedShelfLifeDays: sealedShelfLifeDays == null && nullToAbsent
           ? const Value.absent()
           : Value(sealedShelfLifeDays),
@@ -1253,6 +1322,8 @@ class Product extends DataClass implements Insertable<Product> {
       categoryId: serializer.fromJson<String?>(json['categoryId']),
       baseUnit: serializer.fromJson<String>(json['baseUnit']),
       packSize: serializer.fromJson<double?>(json['packSize']),
+      piecesPerPack: serializer.fromJson<int?>(json['piecesPerPack']),
+      pieceLabel: serializer.fromJson<String?>(json['pieceLabel']),
       sealedShelfLifeDays: serializer.fromJson<int?>(
         json['sealedShelfLifeDays'],
       ),
@@ -1283,6 +1354,8 @@ class Product extends DataClass implements Insertable<Product> {
       'categoryId': serializer.toJson<String?>(categoryId),
       'baseUnit': serializer.toJson<String>(baseUnit),
       'packSize': serializer.toJson<double?>(packSize),
+      'piecesPerPack': serializer.toJson<int?>(piecesPerPack),
+      'pieceLabel': serializer.toJson<String?>(pieceLabel),
       'sealedShelfLifeDays': serializer.toJson<int?>(sealedShelfLifeDays),
       'openedShelfLifeDays': serializer.toJson<int?>(openedShelfLifeDays),
       'defaultDateKind': serializer.toJson<String>(defaultDateKind),
@@ -1307,6 +1380,8 @@ class Product extends DataClass implements Insertable<Product> {
     Value<String?> categoryId = const Value.absent(),
     String? baseUnit,
     Value<double?> packSize = const Value.absent(),
+    Value<int?> piecesPerPack = const Value.absent(),
+    Value<String?> pieceLabel = const Value.absent(),
     Value<int?> sealedShelfLifeDays = const Value.absent(),
     Value<int?> openedShelfLifeDays = const Value.absent(),
     String? defaultDateKind,
@@ -1328,6 +1403,10 @@ class Product extends DataClass implements Insertable<Product> {
     categoryId: categoryId.present ? categoryId.value : this.categoryId,
     baseUnit: baseUnit ?? this.baseUnit,
     packSize: packSize.present ? packSize.value : this.packSize,
+    piecesPerPack: piecesPerPack.present
+        ? piecesPerPack.value
+        : this.piecesPerPack,
+    pieceLabel: pieceLabel.present ? pieceLabel.value : this.pieceLabel,
     sealedShelfLifeDays: sealedShelfLifeDays.present
         ? sealedShelfLifeDays.value
         : this.sealedShelfLifeDays,
@@ -1365,6 +1444,12 @@ class Product extends DataClass implements Insertable<Product> {
           : this.categoryId,
       baseUnit: data.baseUnit.present ? data.baseUnit.value : this.baseUnit,
       packSize: data.packSize.present ? data.packSize.value : this.packSize,
+      piecesPerPack: data.piecesPerPack.present
+          ? data.piecesPerPack.value
+          : this.piecesPerPack,
+      pieceLabel: data.pieceLabel.present
+          ? data.pieceLabel.value
+          : this.pieceLabel,
       sealedShelfLifeDays: data.sealedShelfLifeDays.present
           ? data.sealedShelfLifeDays.value
           : this.sealedShelfLifeDays,
@@ -1407,6 +1492,8 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('categoryId: $categoryId, ')
           ..write('baseUnit: $baseUnit, ')
           ..write('packSize: $packSize, ')
+          ..write('piecesPerPack: $piecesPerPack, ')
+          ..write('pieceLabel: $pieceLabel, ')
           ..write('sealedShelfLifeDays: $sealedShelfLifeDays, ')
           ..write('openedShelfLifeDays: $openedShelfLifeDays, ')
           ..write('defaultDateKind: $defaultDateKind, ')
@@ -1425,7 +1512,7 @@ class Product extends DataClass implements Insertable<Product> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     householdId,
     name,
@@ -1433,6 +1520,8 @@ class Product extends DataClass implements Insertable<Product> {
     categoryId,
     baseUnit,
     packSize,
+    piecesPerPack,
+    pieceLabel,
     sealedShelfLifeDays,
     openedShelfLifeDays,
     defaultDateKind,
@@ -1446,7 +1535,7 @@ class Product extends DataClass implements Insertable<Product> {
     unitWeightG,
     updatedAt,
     deletedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1458,6 +1547,8 @@ class Product extends DataClass implements Insertable<Product> {
           other.categoryId == this.categoryId &&
           other.baseUnit == this.baseUnit &&
           other.packSize == this.packSize &&
+          other.piecesPerPack == this.piecesPerPack &&
+          other.pieceLabel == this.pieceLabel &&
           other.sealedShelfLifeDays == this.sealedShelfLifeDays &&
           other.openedShelfLifeDays == this.openedShelfLifeDays &&
           other.defaultDateKind == this.defaultDateKind &&
@@ -1481,6 +1572,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String?> categoryId;
   final Value<String> baseUnit;
   final Value<double?> packSize;
+  final Value<int?> piecesPerPack;
+  final Value<String?> pieceLabel;
   final Value<int?> sealedShelfLifeDays;
   final Value<int?> openedShelfLifeDays;
   final Value<String> defaultDateKind;
@@ -1503,6 +1596,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.categoryId = const Value.absent(),
     this.baseUnit = const Value.absent(),
     this.packSize = const Value.absent(),
+    this.piecesPerPack = const Value.absent(),
+    this.pieceLabel = const Value.absent(),
     this.sealedShelfLifeDays = const Value.absent(),
     this.openedShelfLifeDays = const Value.absent(),
     this.defaultDateKind = const Value.absent(),
@@ -1526,6 +1621,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.categoryId = const Value.absent(),
     this.baseUnit = const Value.absent(),
     this.packSize = const Value.absent(),
+    this.piecesPerPack = const Value.absent(),
+    this.pieceLabel = const Value.absent(),
     this.sealedShelfLifeDays = const Value.absent(),
     this.openedShelfLifeDays = const Value.absent(),
     this.defaultDateKind = const Value.absent(),
@@ -1552,6 +1649,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? categoryId,
     Expression<String>? baseUnit,
     Expression<double>? packSize,
+    Expression<int>? piecesPerPack,
+    Expression<String>? pieceLabel,
     Expression<int>? sealedShelfLifeDays,
     Expression<int>? openedShelfLifeDays,
     Expression<String>? defaultDateKind,
@@ -1575,6 +1674,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (categoryId != null) 'category_id': categoryId,
       if (baseUnit != null) 'base_unit': baseUnit,
       if (packSize != null) 'pack_size': packSize,
+      if (piecesPerPack != null) 'pieces_per_pack': piecesPerPack,
+      if (pieceLabel != null) 'piece_label': pieceLabel,
       if (sealedShelfLifeDays != null)
         'sealed_shelf_life_days': sealedShelfLifeDays,
       if (openedShelfLifeDays != null)
@@ -1602,6 +1703,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<String?>? categoryId,
     Value<String>? baseUnit,
     Value<double?>? packSize,
+    Value<int?>? piecesPerPack,
+    Value<String?>? pieceLabel,
     Value<int?>? sealedShelfLifeDays,
     Value<int?>? openedShelfLifeDays,
     Value<String>? defaultDateKind,
@@ -1625,6 +1728,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       categoryId: categoryId ?? this.categoryId,
       baseUnit: baseUnit ?? this.baseUnit,
       packSize: packSize ?? this.packSize,
+      piecesPerPack: piecesPerPack ?? this.piecesPerPack,
+      pieceLabel: pieceLabel ?? this.pieceLabel,
       sealedShelfLifeDays: sealedShelfLifeDays ?? this.sealedShelfLifeDays,
       openedShelfLifeDays: openedShelfLifeDays ?? this.openedShelfLifeDays,
       defaultDateKind: defaultDateKind ?? this.defaultDateKind,
@@ -1665,6 +1770,12 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     }
     if (packSize.present) {
       map['pack_size'] = Variable<double>(packSize.value);
+    }
+    if (piecesPerPack.present) {
+      map['pieces_per_pack'] = Variable<int>(piecesPerPack.value);
+    }
+    if (pieceLabel.present) {
+      map['piece_label'] = Variable<String>(pieceLabel.value);
     }
     if (sealedShelfLifeDays.present) {
       map['sealed_shelf_life_days'] = Variable<int>(sealedShelfLifeDays.value);
@@ -1721,6 +1832,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('categoryId: $categoryId, ')
           ..write('baseUnit: $baseUnit, ')
           ..write('packSize: $packSize, ')
+          ..write('piecesPerPack: $piecesPerPack, ')
+          ..write('pieceLabel: $pieceLabel, ')
           ..write('sealedShelfLifeDays: $sealedShelfLifeDays, ')
           ..write('openedShelfLifeDays: $openedShelfLifeDays, ')
           ..write('defaultDateKind: $defaultDateKind, ')
@@ -17036,6 +17149,8 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   Value<String?> categoryId,
   Value<String> baseUnit,
   Value<double?> packSize,
+  Value<int?> piecesPerPack,
+  Value<String?> pieceLabel,
   Value<int?> sealedShelfLifeDays,
   Value<int?> openedShelfLifeDays,
   Value<String> defaultDateKind,
@@ -17059,6 +17174,8 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<String?> categoryId,
   Value<String> baseUnit,
   Value<double?> packSize,
+  Value<int?> piecesPerPack,
+  Value<String?> pieceLabel,
   Value<int?> sealedShelfLifeDays,
   Value<int?> openedShelfLifeDays,
   Value<String> defaultDateKind,
@@ -17116,6 +17233,16 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<double> get packSize => $composableBuilder(
     column: $table.packSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get piecesPerPack => $composableBuilder(
+    column: $table.piecesPerPack,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pieceLabel => $composableBuilder(
+    column: $table.pieceLabel,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -17229,6 +17356,16 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get piecesPerPack => $composableBuilder(
+    column: $table.piecesPerPack,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pieceLabel => $composableBuilder(
+    column: $table.pieceLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sealedShelfLifeDays => $composableBuilder(
     column: $table.sealedShelfLifeDays,
     builder: (column) => ColumnOrderings(column),
@@ -17329,6 +17466,16 @@ class $$ProductsTableAnnotationComposer
   GeneratedColumn<double> get packSize =>
       $composableBuilder(column: $table.packSize, builder: (column) => column);
 
+  GeneratedColumn<int> get piecesPerPack => $composableBuilder(
+    column: $table.piecesPerPack,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pieceLabel => $composableBuilder(
+    column: $table.pieceLabel,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get sealedShelfLifeDays => $composableBuilder(
     column: $table.sealedShelfLifeDays,
     builder: (column) => column,
@@ -17420,6 +17567,8 @@ class $$ProductsTableTableManager
                 Value<String?> categoryId = const Value.absent(),
                 Value<String> baseUnit = const Value.absent(),
                 Value<double?> packSize = const Value.absent(),
+                Value<int?> piecesPerPack = const Value.absent(),
+                Value<String?> pieceLabel = const Value.absent(),
                 Value<int?> sealedShelfLifeDays = const Value.absent(),
                 Value<int?> openedShelfLifeDays = const Value.absent(),
                 Value<String> defaultDateKind = const Value.absent(),
@@ -17442,6 +17591,8 @@ class $$ProductsTableTableManager
                 categoryId: categoryId,
                 baseUnit: baseUnit,
                 packSize: packSize,
+                piecesPerPack: piecesPerPack,
+                pieceLabel: pieceLabel,
                 sealedShelfLifeDays: sealedShelfLifeDays,
                 openedShelfLifeDays: openedShelfLifeDays,
                 defaultDateKind: defaultDateKind,
@@ -17466,6 +17617,8 @@ class $$ProductsTableTableManager
                 Value<String?> categoryId = const Value.absent(),
                 Value<String> baseUnit = const Value.absent(),
                 Value<double?> packSize = const Value.absent(),
+                Value<int?> piecesPerPack = const Value.absent(),
+                Value<String?> pieceLabel = const Value.absent(),
                 Value<int?> sealedShelfLifeDays = const Value.absent(),
                 Value<int?> openedShelfLifeDays = const Value.absent(),
                 Value<String> defaultDateKind = const Value.absent(),
@@ -17488,6 +17641,8 @@ class $$ProductsTableTableManager
                 categoryId: categoryId,
                 baseUnit: baseUnit,
                 packSize: packSize,
+                piecesPerPack: piecesPerPack,
+                pieceLabel: pieceLabel,
                 sealedShelfLifeDays: sealedShelfLifeDays,
                 openedShelfLifeDays: openedShelfLifeDays,
                 defaultDateKind: defaultDateKind,

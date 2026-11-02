@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/clock.dart';
-import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
 import '../../domain/inventory/usage_forecast.dart';
+import '../common/quantity_dialog.dart';
 import '../products/barcode_flow.dart';
 import 'inventory_item_detail_page.dart';
 
@@ -104,7 +104,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                         ListTile(
                           dense: true,
                           title: Text(products[s.productId]?.name ?? 'Unbekanntes Produkt'),
-                          subtitle: Text('${formatQuantity(s.quantity)} ${s.unit}'),
+                          subtitle: Text(describeStock(s.quantity, s.unit, products[s.productId])),
                           trailing: TextButton(
                             key: Key('discard-suggestion-${s.id}'),
                             onPressed: () => ref.read(inventoryRepositoryProvider).discardSuggestion(s.id),
@@ -215,7 +215,7 @@ class _InventoryTile extends ConsumerWidget {
         subtitle: Text([
           _expiryText(item, level, today),
           if (item.status == 'opened') 'geöffnet',
-          '${formatQuantity(item.quantity)} ${item.unit}',
+          describeStock(item.quantity, item.unit, product),
           // nur wenn es bald knapp wird: sonst waere die Zeile bei jedem Artikel voll von Prognosen
           if (forecast != null && forecast!.daysLeft <= forecastShowDays && forecast!.text != null) forecast!.text!,
         ].join(' · ')),

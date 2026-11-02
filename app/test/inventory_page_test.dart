@@ -110,7 +110,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Joghurt'), findsOneWidget);
     expect(find.text('Vollmilch'), findsOneWidget);
-    expect(find.textContaining('2 piece'), findsOneWidget);
+    expect(find.textContaining('2 Stk'), findsOneWidget);
   });
 
   testWidgets('Ampeltexte: morgen, heute, abgelaufen, kein Datum, in Gruppen', (tester) async {

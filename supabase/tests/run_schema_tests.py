@@ -862,6 +862,41 @@ def main():
     check("Vertrag: Gegenbuchung der geloeschten Mahlzeit ist mit meal_id verknuepft",
           one("select count(*) from inventory_movements where type='adjustment' and meal_id = any(%s::uuid[])", (meal_ids,)) >= 1)
 
+    # --- Mehrfachpackungen (Migration 0035) ------------------------------------------------------------------------------
+    check("Mehrfachpackung: das Produkt aus dem Fixture traegt Stueckzahl und Namen",
+          one("select count(*) from products where household_id = %s and pieces_per_pack = 6 and piece_label = 'Fläschchen'", (ha,)) == 1)
+    upd_pack = "update products set pieces_per_pack = %s where household_id = %s and pieces_per_pack = 6"
+    check("Mehrfachpackung: eine Stueckzahl unter 2 wird abgelehnt", raises(upd_pack, (1, ha)))
+    check("Mehrfachpackung: ein leerer Name wird abgelehnt",
+          raises("update products set piece_label = '  ' where household_id = %s and pieces_per_pack = 6", (ha,)))
+
+    # Bereinigung (tools/mengenkonzept_bereinigung_2026-11-02.sql): Yakult wie bisher gespeichert, ein Bon-Vorschlag in Stueck auf einem kg-Produkt
+    alt = one("insert into products (household_id, name, base_unit, pack_size) values (%s, 'Yakult Drink', 'piece', 0.39) returning id", (hb,))
+    nudeln = one("insert into products (household_id, name, base_unit, pack_size) values (%s, 'Nudeln alt', 'kg', 0.5) returning id", (hb,))
+    lose = one("insert into products (household_id, name, base_unit) values (%s, 'Aepfel alt', 'kg') returning id", (hb,))
+    ins_item = "insert into inventory_items (household_id, product_id, quantity, unit, is_suggestion) values (%s,%s,%s,'piece',%s) returning id"
+    i_alt = one(ins_item, (hb, alt, 6, False))
+    i_nudeln = one(ins_item, (hb, nudeln, 2, True))
+    i_lose = one(ins_item, (hb, lose, 3, True))
+    ins_move = "insert into inventory_movements (household_id, inventory_item_id, product_id, type, quantity_delta, unit) values (%s,%s,%s,%s,%s,'piece')"
+    db(ins_move, (hb, i_alt, alt, "purchase", 1))
+    db(ins_move, (hb, i_alt, alt, "adjustment", 5))
+    db(ins_move, (hb, i_nudeln, nudeln, "purchase", 2))
+    script = (pathlib.Path(__file__).parents[2] / "tools" / "mengenkonzept_bereinigung_2026-11-02.sql").read_text(encoding="utf-8")
+    for _ in range(2):  # zweimal: mehrfach ausfuehrbar
+        db(script)
+    stand = lambda i: db("select quantity::float8, unit::text from inventory_items where id = %s", (i,))[0][0]
+    check("Bereinigung: 6 Flaeschchen werden zu 0,39 l", stand(i_alt) == (0.39, "l"), str(stand(i_alt)))
+    check("Bereinigung: 2 Packungen aus dem Bon werden zu 1 kg", stand(i_nudeln) == (1.0, "kg"), str(stand(i_nudeln)))
+    check("Bereinigung: ohne bekannten Inhalt bleibt der Bestand", stand(i_lose) == (3.0, "piece"), str(stand(i_lose)))
+    check("Bereinigung: das Produkt ist eine Mehrfachpackung",
+          db("select base_unit::text, pieces_per_pack, piece_label from products where id = %s", (alt,))[0][0] == ("l", 6, "Fläschchen"))
+    check("Bereinigung: die Buchungen wandern mit, ihre Summe ist der Bestand",
+          db("select sum(quantity_delta)::float8, min(unit::text), count(*) from inventory_movements where inventory_item_id = %s", (i_alt,))[0][0] == (0.39, "l", 2))
+    db("delete from inventory_movements where inventory_item_id = any(%s::uuid[])", ([i_alt, i_nudeln, i_lose],))
+    db("delete from inventory_items where id = any(%s::uuid[])", ([i_alt, i_nudeln, i_lose],))
+    db("delete from products where id = any(%s::uuid[])", ([alt, nudeln, lose],))
+
     # --- Einkaufsliste archivieren (Migration 0034) ---------------------------------------------------------------------
     check("Archiv: der abgeschlossene Einkauf aus dem Fixture traegt seinen Zeitstempel",
           one("select count(*) from shopping_list_items where household_id = %s and archived_at is not null and checked", (ha,)) >= 1)

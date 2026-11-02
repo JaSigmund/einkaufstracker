@@ -48,6 +48,13 @@ String formatListNumber(double v) {
 }
 
 /// Eine Menge in Grundeinheit als Text: 0.29 l -> "290 ml", 1.5 kg -> "1,5 kg", 3 piece -> "3 Stk".
+/// Eine Zahl, wie sie in ein Eingabefeld gehoert: bis zu drei Nachkommastellen, nichts wird weggerundet ("0,065"), mit deutschem Komma.
+String formatListNumberExact(double v) {
+  final rounded = _round3(v);
+  final s = rounded == rounded.roundToDouble() ? rounded.toInt().toString() : rounded.toString();
+  return s.replaceAll('.', ',');
+}
+
 String formatListAmount(double baseQuantity, String baseUnit) {
   final unit = ListAmountUnit.bestFor(baseQuantity, baseUnit);
   return '${formatListNumber(_round3(baseQuantity) / unit.toBase)} ${unit.label}';
@@ -57,10 +64,25 @@ String formatListAmount(double baseQuantity, String baseUnit) {
 typedef ListQuantityText = ({String primary, String? total});
 
 /// Der Text zu einem Eintrag. [packSize] und [productBaseUnit] kommen vom Produkt, beide `null` bei frei getippten Eintraegen.
-ListQuantityText describeListQuantity({required double quantity, required String unit, double? packSize, String? productBaseUnit}) {
+///
+/// Mehrfachpackung ([piecesPerPack], ADR-045): ganze Packungen als "2 Packungen (6 × 65 ml)", darunter die Stuecke und die Menge. Ein Teil einer
+/// Packung, der aufgeht, heisst "2 Fläschchen", alles andere ist eine Menge.
+ListQuantityText describeListQuantity({required double quantity, required String unit, double? packSize, String? productBaseUnit, int? piecesPerPack, String? pieceLabel}) {
   final baseUnit = productBaseUnit ?? unit;
-  if (packSize == null || packSize <= 0) return (primary: formatListAmount(quantity, unit), total: null);
+  // Aeltere Produkte haben "0,39 Stueck" je Packung stehen, siehe Packaging.contentPerPack
+  if (packSize == null || packSize <= 0 || (baseUnit == 'piece' && packSize != packSize.roundToDouble())) return (primary: formatListAmount(quantity, unit), total: null);
   final total = formatListAmount(quantity * packSize, baseUnit);
+  if (baseUnit != 'piece' && piecesPerPack != null && piecesPerPack >= 2) {
+    final label = pieceLabel == null || pieceLabel.trim().isEmpty ? 'Stk' : pieceLabel.trim();
+    final pieces = quantity * piecesPerPack;
+    final wholePieces = pieces.roundToDouble();
+    final goesUp = wholePieces >= 1 && (pieces - wholePieces).abs() < 0.02;
+    if (quantity == quantity.roundToDouble()) {
+      final contents = '$piecesPerPack × ${formatListAmount(packSize / piecesPerPack, baseUnit)}';
+      return (primary: '${quantity.toInt()} ${quantity == 1 ? 'Packung' : 'Packungen'} ($contents)', total: quantity == 1 ? total : '${wholePieces.toInt()} $label · $total');
+    }
+    return goesUp ? (primary: '${wholePieces.toInt()} $label', total: total) : (primary: total, total: null);
+  }
   // Ein Stueck je Packung: "3 Stk" sagt alles
   if (baseUnit == 'piece' && packSize == 1) return (primary: total, total: null);
   // Ein Bruchteil einer Packung ("0,3 × 500 g") liest niemand gern, also gleich die Menge

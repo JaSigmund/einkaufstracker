@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../core/format.dart';
+import '../common/quantity_dialog.dart' show describeStock;
 import '../../data/local/database.dart';
 import '../../data/nutrition/bls_food_search.dart';
 import '../../domain/nutrition/food_unit.dart';
@@ -452,7 +453,7 @@ class _IngredientPickerSheetState extends ConsumerState<_IngredientPickerSheet> 
 
   String _stockText(Product p, List<InventoryItem> active) {
     final total = active.where((i) => i.productId == p.id).fold<double>(0, (s, i) => s + i.quantity);
-    return total <= 0 ? 'nicht im Bestand' : 'Bestand: ${formatQuantity(total)} ${p.baseUnit}';
+    return total <= 0 ? 'nicht im Bestand' : 'Bestand: ${describeStock(total, p.baseUnit, p)}';
   }
 
   @override

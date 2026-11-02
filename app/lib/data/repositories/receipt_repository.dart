@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/clock.dart';
 import '../../domain/categorization/categorizer.dart';
 import '../../domain/categorization/normalize_name.dart';
+import '../../domain/products/packaging.dart';
 import '../../domain/receipt/parsed_receipt.dart';
 import '../../domain/receipt/unit_price.dart';
 import '../local/database.dart';
@@ -299,11 +300,14 @@ class ReceiptRepository {
         // Bon-Vorschlag im Inventar fuer lagerbare Kategorien (Doku 06 §2 Punkt 1): kein MHD, hoechstens
         // eine Schaetzung aus der Standardhaltbarkeit des Produkts.
         if (product != null && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
+          // Der Bon zaehlt Packungen, der Bestand die Menge (ADR-045): 1 × Yakult sind 0,39 l
+          final stock = Packaging(baseUnit: product.baseUnit, rawPackSize: product.packSize, rawPiecesPerPack: product.piecesPerPack)
+              .stockFromPurchase(quantity: i.quantity, quantityUnit: i.quantityUnit, rawText: i.rawText);
           await inventoryRepo!.createSuggestionFromReceipt(
             productId: product.id,
             receiptItemId: _itemId(receiptId, lineNo),
-            quantity: i.quantity,
-            unit: i.quantityUnit,
+            quantity: stock.quantity,
+            unit: stock.unit,
             purchasedOn: purchasedOn,
             sealedShelfLifeDays: product.sealedShelfLifeDays,
             dateKind: product.defaultDateKind,

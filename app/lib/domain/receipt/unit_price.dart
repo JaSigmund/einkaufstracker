@@ -79,3 +79,11 @@ ReceiptPackSize? parsePackSizeFromReceiptText(String rawText) {
   }
   return found != null && found.amount > 0 ? found : null;
 }
+
+/// Wie [parsePackSizeFromReceiptText], dazu die Stueckzahl einer Mehrfachpackung: "6 x 65 ml" ergibt 0,39 l in 6 Stuecken.
+({double amount, String unit, int? pieces})? parsePackagingFromText(String text) {
+  final size = parsePackSizeFromReceiptText(text);
+  if (size == null) return null;
+  final count = int.tryParse(_packSizePattern.firstMatch(text)?.group(1) ?? '');
+  return (amount: (size.amount * 1000).roundToDouble() / 1000, unit: size.unit, pieces: count != null && count >= 2 ? count : null);
+}
