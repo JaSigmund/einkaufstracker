@@ -77,6 +77,7 @@ void main() {
       expect(find.text('Heute genommen'), findsOneWidget);
       expect(find.byKey(Key('intake-${rows.single.id}')), findsOneWidget);
       expect(find.text('12:00 · 1 × Tablette'), findsOneWidget, reason: 'Wiener Zeit (UTC+2)');
+      expect(tester.widget<SnackBar>(find.byType(SnackBar)).persist, isFalse, reason: 'Fehlerbericht: der Banner blieb stehen');
 
       await tester.tap(find.text('Rückgängig'));
       await tester.pumpAndSettle();

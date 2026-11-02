@@ -292,6 +292,8 @@ def main():
               "values (%s,%s,%s,%s,'kg',%s)")
     check("Bewegung: Einkauf mit negativer Menge wird abgelehnt", raises(ins_mv, (ha, pid, "purchase", -1, "2026-09-21 10:00+02")))
     check("Bewegung: Verbrauch mit positiver Menge wird abgelehnt", raises(ins_mv, (ha, pid, "meal", 1, "2026-09-21 10:00+02")))
+    check("Bewegung: was auf 0 rundet, bleibt nicht in der Outbox haengen (0032)",
+          not raises(ins_mv, (ha, pid, "meal", -0.0004, "2026-09-21 10:00+02")) and not raises(ins_mv, (ha, pid, "purchase", 0, "2026-09-21 10:00+02")))
     db(ins_mv, (ha, pid, "purchase", 2, "2026-09-21 10:00+02"))
     db(ins_mv, (ha, pid, "meal", -0.5, "2026-09-22 19:00+02"))
     db(ins_mv, (ha, pid, "discarded", -0.25, "2026-09-23 08:00+02"))

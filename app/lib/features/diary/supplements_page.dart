@@ -133,6 +133,8 @@ class SupplementsPage extends ConsumerWidget {
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(
         content: Text('${s.name}: ${formatServings(servings, s.servingLabel)} eingetragen'),
+        // mit Aktion bliebe die SnackBar sonst stehen, bis man sie wegwischt
+        persist: false,
         action: SnackBarAction(label: 'Rückgängig', onPressed: () => ref.read(supplementRepositoryProvider).deleteIntake(intake.id)),
       ));
     } catch (_) {

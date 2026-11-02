@@ -10,6 +10,7 @@ import '../../domain/inventory/usage_forecast.dart';
 import '../../domain/receipt/price_history.dart';
 import '../../domain/shopping_list/aisle_order.dart';
 import '../../domain/shopping_list/list_price_estimate.dart';
+import '../../domain/shopping_list/list_quantity.dart';
 import 'aisle_order_page.dart' show storeLabel;
 
 /// KV-Schluessel: Markt, nach dessen Regal-Reihenfolge die Einkaufsliste sortiert wird (leer = alphabetisch).
@@ -22,20 +23,10 @@ String _sourceLabel(String source) => switch (source) {
       _ => 'Vorschlag',
     };
 
-/// Gesamtmenge (Anzahl × Inhalt je Packung, `products.pack_size`) als Text, z.B. "4 Stück" oder "300 g".
-/// `null`, wenn das Produkt keinen Inhalt hinterlegt hat oder es sich um einen frei getippten Eintrag
-/// handelt — dann ist die Anzahl selbst schon die ganze Information (Wunsch "Inhalt je Produkt", 2026-09-28).
-String? _totalContentLabel(ShoppingListItem item, Product? product) {
-  final packSize = product?.packSize;
-  if (packSize == null) return null;
-  return '${formatQuantity(item.quantity * packSize)} ${product!.baseUnit}';
-}
-
 /// Einkaufsliste (Doku 06 §6/§7, Doku 08 §3.6, Lastenheft LH-SHO-01/02, Roadmap Phase 3): manuell pflegen,
 /// im Markt ohne Netz abhaken, dazu Vorschlaege aus dem Inventar ("Leer"/"Ablauf") zur Bestaetigung oben.
 /// Gruppiert nach Kategorie, abgehakte Artikel wandern nach unten in "Erledigt". Jeder Eintrag zeigt die
-/// Anzahl (wie viele Packungen/Stueck) und, wenn das Produkt einen Inhalt hinterlegt hat, zusaetzlich die
-/// Gesamtmenge — wichtig, wenn mal ein anderes Packungsformat gekauft wird.
+/// Menge nach dem Konzept in `list_quantity.dart`: "2 × 290 ml" bei Produkten mit Inhalt, sonst z.B. "250 g".
 class ShoppingListPage extends ConsumerStatefulWidget {
   const ShoppingListPage({super.key});
 
@@ -559,35 +550,18 @@ class _ItemTile extends ConsumerWidget {
   }
 
   Future<void> _editQuantity(BuildContext context, WidgetRef ref) async {
-    final ctrl = TextEditingController(text: formatQuantity(item.quantity));
-    final value = await showDialog<double>(
+    final value = await showDialog<({double quantity, String unit})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Anzahl'),
-        content: TextField(
-          key: const Key('shopping-item-quantity-input'),
-          controller: ctrl,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(suffixText: item.unit),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.').trim())),
-            child: const Text('Übernehmen'),
-          ),
-        ],
-      ),
+      builder: (_) => _QuantityDialog(item: item, product: product),
     );
-    if (value != null && value > 0) {
-      await ref.read(shoppingListRepositoryProvider).setQuantity(item.id, value);
+    if (value != null) {
+      await ref.read(shoppingListRepositoryProvider).setQuantity(item.id, value.quantity, unit: value.unit);
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final totalContent = _totalContentLabel(item, product);
+    final quantity = describeListQuantity(quantity: item.quantity, unit: item.unit, packSize: product?.packSize, productBaseUnit: product?.baseUnit);
     return Dismissible(
       key: ValueKey(item.id),
       direction: DismissDirection.endToStart,
@@ -614,18 +588,139 @@ class _ItemTile extends ConsumerWidget {
         value: item.checked,
         onChanged: (v) => ref.read(shoppingListRepositoryProvider).setChecked(item.id, v ?? false),
         title: Text(label, style: item.checked ? const TextStyle(decoration: TextDecoration.lineThrough) : null),
-        subtitle: totalContent == null ? null : Text('insgesamt $totalContent', key: Key('shopping-item-total-${item.id}')),
+        subtitle: quantity.total == null ? null : Text('insgesamt ${quantity.total}', key: Key('shopping-item-total-${item.id}')),
         secondary: InkWell(
           key: Key('shopping-item-quantity-${item.id}'),
           onTap: () => _editQuantity(context, ref),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text('${formatQuantity(item.quantity)} ${item.unit}', style: Theme.of(context).textTheme.bodyMedium),
+            child: Text(quantity.primary, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ),
       ),
       ),
       ),
+    );
+  }
+}
+
+/// Menge eines Eintrags aendern. Bei Produkten mit Inhalt wahlweise als Anzahl Packungen oder als Menge ("150 g"), sonst als Menge in einer
+/// Einheit, die zum Produkt passt; frei getippte Eintraege duerfen jede Einheit haben (ADR-040).
+class _QuantityDialog extends StatefulWidget {
+  const _QuantityDialog({required this.item, required this.product});
+
+  final ShoppingListItem item;
+  final Product? product;
+
+  @override
+  State<_QuantityDialog> createState() => _QuantityDialogState();
+}
+
+class _QuantityDialogState extends State<_QuantityDialog> {
+  late final double? _packSize = widget.product?.packSize != null && widget.product!.packSize! > 0 ? widget.product!.packSize : null;
+  late final String _baseUnit = widget.product?.baseUnit ?? widget.item.unit;
+  late final List<ListAmountUnit> _units = ListAmountUnit.forBaseUnit(widget.product?.baseUnit);
+  late bool _packs = _packSize != null;
+  late ListAmountUnit _unit;
+  late final TextEditingController _ctrl;
+  String? _error;
+
+  /// Packung und Menge sind dasselbe, wenn eine Packung genau ein Stueck ist: dann entfaellt die Wahl.
+  bool get _canChooseMode => _packSize != null && !(_baseUnit == 'piece' && _packSize == 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _unit = _units.first;
+    _ctrl = TextEditingController();
+    if (_packs) {
+      _ctrl.text = formatQuantity(widget.item.quantity);
+    } else {
+      _showAmount();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// Traegt die aktuelle Menge in die handlichste erlaubte Einheit ein.
+  void _showAmount() {
+    final base = widget.item.quantity * (_packSize ?? 1);
+    final best = ListAmountUnit.bestFor(base, _packSize != null ? _baseUnit : widget.item.unit);
+    _unit = _units.contains(best) ? best : _units.first;
+    _ctrl.text = formatListNumber(base / _unit.toBase);
+  }
+
+  void _submit() {
+    final value = double.tryParse(_ctrl.text.replaceAll(',', '.').trim());
+    final result = value == null
+        ? null
+        : _packs
+            ? listQuantityFromAmount(value, ListAmountUnit.piece)
+            : listQuantityFromAmount(value, _unit, packSize: _packSize);
+    if (result == null) {
+      setState(() => _error = 'Bitte eine Menge größer als 0 eingeben');
+      return;
+    }
+    // Packungen behalten die Einheit des Eintrags, die Zahl zaehlt ja nur Packungen; dasselbe gilt fuer eine Menge, die in Packungen umgerechnet wurde
+    Navigator.pop(context, (quantity: result.quantity, unit: _packSize != null ? widget.item.unit : result.unit));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Menge'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_canChooseMode) ...[
+          SegmentedButton<bool>(
+            key: const Key('shopping-item-quantity-mode'),
+            segments: [
+              ButtonSegment(value: true, label: Text('Packungen à ${formatListAmount(_packSize!, _baseUnit)}')),
+              const ButtonSegment(value: false, label: Text('Menge')),
+            ],
+            selected: {_packs},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) => setState(() {
+              _packs = s.first;
+              _error = null;
+              if (_packs) {
+                _ctrl.text = formatQuantity(widget.item.quantity);
+              } else {
+                _showAmount();
+              }
+            }),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Row(children: [
+          Expanded(
+            child: TextField(
+              key: const Key('shopping-item-quantity-input'),
+              controller: _ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: _packs ? 'Anzahl' : 'Menge', errorText: _error),
+              onSubmitted: (_) => _submit(),
+            ),
+          ),
+          if (!_packs) ...[
+            const SizedBox(width: 12),
+            DropdownButton<ListAmountUnit>(
+              key: const Key('shopping-item-quantity-unit'),
+              value: _unit,
+              items: [for (final u in _units) DropdownMenuItem(value: u, child: Text(u.label))],
+              onChanged: _units.length < 2 ? null : (u) => setState(() => _unit = u ?? _unit),
+            ),
+          ],
+        ]),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(onPressed: _submit, child: const Text('Übernehmen')),
+      ],
     );
   }
 }

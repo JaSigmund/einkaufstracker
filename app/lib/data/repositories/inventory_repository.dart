@@ -359,7 +359,7 @@ class InventoryRepository {
     final nowUtc = appClock.now().toUtc();
     final updated = item.copyWith(status: status, closedAt: Value(nowUtc), updatedAt: nowUtc);
     await _putItem(updated);
-    if (item.quantity != 0) {
+    if (_round3(item.quantity) != 0) {
       await _addMovement(
         inventoryItemId: item.id,
         productId: item.productId,
@@ -559,6 +559,9 @@ class InventoryRepository {
       // Wie die Datenbank (numeric(10,3)): ohne Runden stuende lokal z.B. -0.30000000000000004 im Ledger, am Server -0.3
       // (Codereview-Fund 2026-10-16).
       final taken = _round3(a.quantity);
+      // Unter einem halben Gramm oder Milliliter bleibt nichts zu buchen: der Server speichert drei Stellen, eine Bewegung mit 0 lehnte
+      // er bis Migration 0032 ab, und die Aenderung hing fuer immer in der Outbox (Fehlerbericht 2026-11-02).
+      if (taken <= 0) continue;
       final remaining = _round3(item.quantity - taken);
       final opensItem = remaining > 0 && item.status == 'sealed';
       if (remaining <= 0) {

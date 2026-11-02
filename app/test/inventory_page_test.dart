@@ -151,6 +151,7 @@ void main() {
     final updated = await (db.select(db.inventoryItems)..where((i) => i.id.equals(real.id))).getSingle();
     expect(updated.status, 'consumed');
     expect(find.text('Rückgängig'), findsOneWidget); // sofortiger Rueckweg fuer einen Fehlgriff
+    expect(tester.widget<SnackBar>(find.byType(SnackBar)).persist, isFalse);
 
     await tester.tap(find.text('Rückgängig'));
     await tester.pumpAndSettle();
