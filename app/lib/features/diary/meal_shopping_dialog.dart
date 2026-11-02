@@ -4,18 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
+import '../../domain/nutrition/food_unit.dart';
 import '../../domain/nutrition/ingredient_nutrition.dart';
 import '../../domain/nutrition/meal_shortage.dart';
 
 /// Menge einer gespeicherten Zutat in der Basiseinheit des Produkts, `null`, wenn sie sich nicht umrechnen laesst (Stueck ohne Gewicht).
 double? neededInBaseUnit(MealIngredient i, Product p) {
   // Bei Stueckmengen steckt das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl), sonst gilt das Gewicht am Produkt
-  final weight = i.unit == 'piece' && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : p.unitWeightG;
+  final weight = i.unit == 'piece' && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null;
   return resolveIngredientAmount(
     quantity: i.quantity,
     entryUnit: EntryUnit.fromDb(i.unit),
     baseUnit: p.baseUnit,
     unitWeightG: weight,
+    productPieceWeightG: p.unitWeightG,
+    unitKey: FoodUnitKey.fromDb(i.unitKey),
   ).inventoryQuantity;
 }
 

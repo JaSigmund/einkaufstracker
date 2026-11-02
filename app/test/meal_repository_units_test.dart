@@ -1,5 +1,6 @@
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
+import 'package:einkaufstracker/domain/nutrition/food_unit.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -89,6 +90,81 @@ void main() {
       expect(i.amountG, isNull);
       expect(i.kcal, isNull);
       expect(await stock(), closeTo(1, 1e-9));
+    });
+  });
+
+  group('Haushaltseinheit auf Stueckware', () {
+    Future<double> stock() async => (await db.select(db.inventoryItems).get()).fold<double>(0, (s, i) => s + i.quantity);
+
+    Future<Product> brot({double? unitWeightG}) async {
+      final p = await productRepo(db).create(
+        name: 'Brot',
+        baseUnit: 'piece',
+        unitWeightG: unitWeightG,
+        nutrientsPer100: {'kcal': 260},
+        nutrientsBasis: 'g',
+        nutrientsSource: 'manual',
+      );
+      await inventoryRepo(db).recordFromScan(productId: p.id, ean: '1', quantity: 2, unit: 'piece', bestBefore: DateTime.utc(2026, 12, 1), now: DateTime.utc(2026, 9, 1));
+      return p;
+    }
+
+    test('mit Stueckgewicht wird anteilig abgezogen: 2 Scheiben a 28 g von 1 Brot zu 560 g sind 0,1 Stueck', () async {
+      final p = await brot(unitWeightG: 560);
+      final m = await meals.create(draft([IngredientDraft(productId: p.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28)]));
+      final i = (await meals.ingredientsOf(m.id)).single;
+      expect([i.quantity, i.unit, i.amountG, i.source], [2, 'piece', 56, 'inventory']);
+      expect(i.kcal, closeTo(145.6, 1e-9));
+      expect(await stock(), closeTo(1.9, 1e-9));
+      final movement = await db.select(db.inventoryMovements).get();
+      expect(movement.last.quantityDelta, closeTo(-0.1, 1e-9));
+    });
+
+    test('ohne Stueckgewicht kein Abzug, aber Naehrwerte, und die Zeile bleibt ohne Bestandsbezug', () async {
+      final p = await brot();
+      final m = await meals.create(draft([IngredientDraft(productId: p.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28)]));
+      final i = (await meals.ingredientsOf(m.id)).single;
+      expect(i.amountG, 56);
+      expect(i.kcal, closeTo(145.6, 1e-9));
+      expect(i.inventoryItemId, isNull);
+      expect(i.source, 'manual');
+      expect(await stock(), 2);
+    });
+
+    test('ganze Stueck bleiben ganze Stueck, auch wenn das Gewicht der Zeile vom Produkt abweicht oder fehlt', () async {
+      final mitGewicht = await brot(unitWeightG: 560);
+      await meals.create(draft([IngredientDraft(productId: mitGewicht.id, quantity: 1, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.piece, unitWeightG: 600)]));
+      expect(await stock(), 1);
+      await meals.create(draft([IngredientDraft(productId: mitGewicht.id, quantity: 1, entryUnit: EntryUnit.piece)]));
+      expect(await stock(), 0);
+    });
+
+    test('Scheibe ohne eigenes Gewicht nimmt nicht das Gewicht des ganzen Stuecks', () async {
+      final p = await brot(unitWeightG: 560);
+      final m = await meals.create(draft([IngredientDraft(productId: p.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice)]));
+      expect((await meals.ingredientsOf(m.id)).single.amountG, isNull);
+      expect(await stock(), 2);
+    });
+
+    test('die Einheit wird gespeichert, bei Gramm nicht', () async {
+      final p = await brot(unitWeightG: 560);
+      final m = await meals.create(draft([
+        IngredientDraft(productId: p.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28),
+        IngredientDraft(productId: p.id, quantity: 1, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.piece),
+        IngredientDraft(productId: p.id, quantity: 1, entryUnit: EntryUnit.piece),
+        IngredientDraft(productId: p.id, quantity: 50, entryUnit: EntryUnit.g, unitKey: FoodUnitKey.slice),
+      ]));
+      expect((await meals.ingredientsOf(m.id)).map((i) => i.unitKey).toSet(), {'slice', 'piece', null});
+      final inGrams = (await meals.ingredientsOf(m.id)).firstWhere((i) => i.unit == 'kg');
+      expect(inGrams.unitKey, isNull);
+    });
+
+    test('Bearbeiten bucht den anteiligen Abzug zurueck und neu', () async {
+      final p = await brot(unitWeightG: 560);
+      IngredientDraft scheiben(double n) => IngredientDraft(productId: p.id, quantity: n, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28);
+      final m = await meals.create(draft([scheiben(2)]));
+      await meals.update(m.id, draft([scheiben(4)]));
+      expect(await stock(), closeTo(1.8, 1e-9));
     });
   });
 

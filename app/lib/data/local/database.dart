@@ -344,6 +344,10 @@ class MealIngredients extends Table {
   /// Zubereitung der Zutat, auf die sich die Garfaktoren stuetzen (Phase N4, ADR-037): `kategorie:zubereitung`, z.B. `veg_other:boiled`.
   /// `null` = roh oder nicht angegeben. Die gespeicherten [micros] sind dann schon um die Verluste gemindert.
   TextColumn get preparation => text().nullable()();
+
+  /// Haushaltseinheit einer Stueckmenge (ADR-033): Wert aus `food_units.unit_key`, z.B. `slice`. Alles ausser `piece` zaehlt Teile eines Stuecks,
+  /// der Bestandsabzug rechnet dann ueber das Stueckgewicht. `null` = ganze Stueck, keine Stueckmenge oder Zeile aus einer aelteren Version.
+  TextColumn get unitKey => text().nullable()();
   RealColumn get kcal => real().nullable()();
   RealColumn get proteinG => real().nullable()();
   RealColumn get fatG => real().nullable()();
@@ -679,7 +683,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -818,6 +822,10 @@ class AppDatabase extends _$AppDatabase {
           // 25 -> 26: Trinkbare Produkte (ADR-048)
           if (from < 26) {
             await m.addColumn(products, products.isDrink);
+          }
+          // 26 -> 27: Haushaltseinheit je Zutat (ADR-033). Installationen vor 14 legen die Zutaten-Tabelle oben schon mit der Spalte an.
+          if (from >= 14 && from < 27) {
+            await m.addColumn(mealIngredients, mealIngredients.unitKey);
           }
         },
       );

@@ -11,6 +11,7 @@ import 'package:einkaufstracker/data/repositories/meal_plan_repository.dart';
 import 'package:einkaufstracker/domain/nutrition/drink_mix.dart';
 import 'package:einkaufstracker/data/repositories/supplement_repository.dart';
 import 'package:einkaufstracker/domain/recipes/saved_recipe.dart';
+import 'package:einkaufstracker/domain/nutrition/food_unit.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrition_targets.dart';
@@ -86,6 +87,7 @@ Future<List<Map<String, dynamic>>> _collect() async {
         blsCode: 'B311000',
         nutrientBasis: 'bls_exact',
         unitWeightG: 28,
+        unitKey: FoodUnitKey.slice,
         microsPer100: {'iron_mg': 2.0, 'vit_b1_mg': 0.18, 'iodine_ug': 0.0},
       ),
       const IngredientDraft(
@@ -271,7 +273,7 @@ void main() {
     expect(rows('household_food_links').any((l) => l['deleted_at'] != null), isTrue, reason: 'Zuordnung vergessen (Soft-Delete)');
     expect({for (final l in rows('household_food_links')) l['bls_code']}, {'M713300', 'M710100', 'F503100'}, reason: 'Quark gelernt, Skyr gelernt und wieder vergessen, Banane mit eigenem Gewicht');
     expect(rows('household_food_links').any((l) => l['unit_weight_g'] == 135), isTrue);
-    expect(rows('meal_ingredients').any((i) => i['unit'] == 'piece' && i['amount_g'] == 56), isTrue, reason: '2 Scheiben a 28 g');
+    expect(rows('meal_ingredients').any((i) => i['unit'] == 'piece' && i['amount_g'] == 56 && i['unit_key'] == 'slice'), isTrue, reason: '2 Scheiben a 28 g');
     expect(rows('meal_ingredients').any((i) => i['micros'] is Map && (i['micros'] as Map)['iron_mg'] == 1.12), isTrue, reason: 'Mikronaehrstoffe der verzehrten Menge als Objekt');
     expect(rows('meal_ingredients').any((i) => i['micros'] == null), isTrue, reason: 'Zutaten ohne Daten schicken null');
     expect(rows('products').any((p) => (p['nutrients_per_100'] as Map?)?['calcium_mg'] == 117), isTrue, reason: 'Profil aus der BLS mit Mikronaehrstoffen');

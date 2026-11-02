@@ -6,7 +6,7 @@
 library;
 
 /// Die Einheiten der Tabelle `food_units`. In der Datenbank der Mahlzeiten stehen sie alle als `piece` (mit dem Gewicht einer
-/// Einheit im Snapshot); der Name bleibt nur in der Oberflaeche.
+/// Einheit im Snapshot), der Name steht daneben in `meal_ingredients.unit_key`.
 enum FoodUnitKey {
   piece('piece', 'Stk', 'Stk'),
   slice('slice', 'Scheibe', 'Scheiben'),

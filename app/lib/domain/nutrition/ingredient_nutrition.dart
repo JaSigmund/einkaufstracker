@@ -3,6 +3,7 @@
 /// FEFO-Abzug) und die Menge in g bzw. ml (Basis der Naehrwertrechnung).
 library;
 
+import 'food_unit.dart';
 import 'nutrient_scaling.dart';
 import 'unit_conversion.dart';
 
@@ -65,14 +66,20 @@ class IngredientAmount {
 /// Bringt [quantity] in [entryUnit] auf die Einheit des Inventars ([baseUnit]: `kg`, `l` oder `piece`) und auf
 /// die Naehrwert-Basis ([nutrientsBasis]: `g`, `ml` oder `null`, wenn das Produkt keine Naehrwerte hat).
 ///
-/// [unitWeightG] wird gebraucht, sobald zwischen Stueck und Gewicht/Volumen gewechselt werden muss,
+/// [unitWeightG] ist das Gewicht einer erfassten Einheit, [productPieceWeightG] das eines ganzen Stuecks des Produkts; es springt ein,
+/// wenn die Zeile kein eigenes Gewicht hat. Gebraucht werden sie, sobald zwischen Stueck und Gewicht/Volumen gewechselt werden muss,
 /// [densityGPerMl] (Standard 1,0) beim Wechsel zwischen Gewicht und Volumen.
+///
+/// [unitKey] nennt die Haushaltseinheit einer Stueckmenge. Scheibe, EL und Co. zaehlen Teile, keine ganzen Stuecke: Bei Stueckware ergibt
+/// sich der Abzug aus dem Verhaeltnis der Gewichte, ohne [productPieceWeightG] ist [IngredientAmount.inventoryQuantity] `null`.
 IngredientAmount resolveIngredientAmount({
   required double quantity,
   required EntryUnit entryUnit,
   required String baseUnit,
   String? nutrientsBasis,
   double? unitWeightG,
+  double? productPieceWeightG,
+  FoodUnitKey? unitKey,
   double densityGPerMl = 1.0,
 }) {
   // Eingabe auf die drei Inventar-Einheiten normieren (g -> kg, ml -> l).
@@ -83,14 +90,19 @@ IngredientAmount resolveIngredientAmount({
     EntryUnit.l => (quantity, 'l'),
     EntryUnit.piece => (quantity, 'piece'),
   };
+  final countsParts = entryUnit == EntryUnit.piece && unitKey != null && unitKey != FoodUnitKey.piece;
+  // Das Gewicht eines ganzen Stuecks gilt nicht fuer eine Scheibe
+  final weight = unitWeightG ?? (countsParts ? null : productPieceWeightG);
 
   return IngredientAmount(
     quantity: q,
     unit: u,
-    inventoryQuantity: _toBaseUnit(q, u, baseUnit, unitWeightG, densityGPerMl),
+    inventoryQuantity: countsParts && baseUnit == 'piece'
+        ? (weight == null || productPieceWeightG == null || productPieceWeightG <= 0 ? null : q * weight / productPieceWeightG)
+        : _toBaseUnit(q, u, baseUnit, weight, densityGPerMl),
     nutrientBasisAmount: nutrientsBasis == null
         ? null
-        : convertToNutrientBasis(quantity: q, quantityUnit: u, basis: nutrientsBasis, unitWeightG: unitWeightG, densityGPerMl: densityGPerMl),
+        : convertToNutrientBasis(quantity: q, quantityUnit: u, basis: nutrientsBasis, unitWeightG: weight, densityGPerMl: densityGPerMl),
   );
 }
 

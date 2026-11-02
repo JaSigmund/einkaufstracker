@@ -21,8 +21,8 @@ void main() {
   late SchemaVerifier verifier;
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0, 20 ab 1.13.0, 21 ab 1.15.0, 22 ab 1.17.0, 24 ab 1.18.0, 25 ab 1.19.0).
-  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25];
+  /// Vorherige Staende, auf denen Installationen stehen koennen (14 war nie in einem Release, 15 ab 1.8.0, 16 ab 1.9.0, 17 ab 1.10.0, 18 ab 1.10.1, 19 ab 1.11.0, 20 ab 1.13.0, 21 ab 1.15.0, 22 ab 1.17.0, 24 ab 1.18.0, 25 ab 1.19.0, 26 ab 1.20.0).
+  const olderVersions = [9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 24, 25, 26];
 
   for (final from in olderVersions) {
     test('Schema $from -> aktuelle Version stimmt mit dem Sollschema ueberein', () async {
@@ -230,5 +230,8 @@ void main() {
     expect(ingredient.preparation, isNull, reason: 'bestehende Zutaten sind roh bzw. ohne Angabe');
     await (db.update(db.mealIngredients)..where((i) => i.id.equals('i1'))).write(const MealIngredientsCompanion(preparation: Value('veg_other:boiled')));
     expect((await db.select(db.mealIngredients).getSingle()).preparation, 'veg_other:boiled');
+    expect((await db.select(db.mealIngredients).getSingle()).unitKey, isNull, reason: 'bestehende Zutaten zaehlen als ganze Stueck');
+    await (db.update(db.mealIngredients)..where((i) => i.id.equals('i1'))).write(const MealIngredientsCompanion(unitKey: Value('slice')));
+    expect((await db.select(db.mealIngredients).getSingle()).unitKey, 'slice');
   });
 }

@@ -1,6 +1,7 @@
 import 'package:einkaufstracker/app/providers.dart';
 import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/repositories/meal_repository.dart';
+import 'package:einkaufstracker/domain/nutrition/food_unit.dart';
 import 'package:einkaufstracker/domain/nutrition/ingredient_nutrition.dart';
 import 'package:einkaufstracker/domain/nutrition/meal_shortage.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
@@ -246,6 +247,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(await shoppingListRepo(db).openItems(), isEmpty);
     });
+  });
+
+  test('neededInBaseUnit: gespeicherte Scheiben zaehlen anteilig, ohne Stueckgewicht ist der Bedarf unbekannt', () async {
+    final db = memoryDb();
+    addTearDown(db.close);
+    final mitGewicht = await productRepo(db).create(name: 'Brot', baseUnit: 'piece', unitWeightG: 560, nutrientsPer100: {'kcal': 260}, nutrientsBasis: 'g', nutrientsSource: 'manual');
+    final ohneGewicht = await productRepo(db).create(name: 'Zopf', baseUnit: 'piece', nutrientsPer100: {'kcal': 300}, nutrientsBasis: 'g', nutrientsSource: 'manual');
+    final m = await mealRepo(db).create(MealDraft(title: 'x', eatenAt: DateTime.utc(2026, 10, 3, 12), ingredients: [
+      IngredientDraft(productId: mitGewicht.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28, deduct: false),
+      IngredientDraft(productId: ohneGewicht.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28, deduct: false),
+    ]));
+    final rows = await mealRepo(db).ingredientsOf(m.id);
+    double? of(Product p) => neededInBaseUnit(rows.firstWhere((r) => r.productId == p.id), p);
+    expect(of(mitGewicht), closeTo(0.1, 1e-9));
+    expect(of(ohneGewicht), isNull);
   });
 
   test('neededInBaseUnit rechnet g und ml in kg und l um, Stueck ueber das Gewicht im Snapshot oder am Produkt', () async {
