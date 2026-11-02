@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../domain/notifications/expiry_reminders.dart';
+import '../../domain/recipes/cooking_timer.dart' show kitchenTimerSlots;
 
 /// Plant lokale Ablauf-Erinnerungen (Doku 06 §5, ADR-007: `flutter_local_notifications` statt Server-Push).
 /// Als Interface, damit Widget-/Repository-Tests eine Attrappe einsetzen koennen (keine Plattform-Kanaele
@@ -17,6 +18,20 @@ abstract class NotificationScheduler {
   /// Verwirft alle geplanten Ablauf-Erinnerungen, ohne neue zu planen (Abmelden, Konto loeschen): sonst kaeme nach dem
   /// Abmelden noch eine Erinnerung mit den Produktnamen des alten Kontos (Codereview-Fund 2026-10-16).
   Future<void> cancelExpiryReminders();
+
+  /// Plant den Alarm eines Kurzzeitmessers (ADR-046) oder ersetzt den bisherigen in diesem [slot].
+  Future<void> scheduleKitchenTimer({required int slot, required String label, required DateTime at});
+
+  Future<void> cancelKitchenTimer(int slot);
+
+  /// Verwirft alle Alarme der Kurzzeitmesser (Abmelden): Sie tragen selbst gewaehlte Bezeichnungen.
+  Future<void> cancelKitchenTimers();
+
+  /// Ob Android den Alarm auf die Sekunde genau ausloesen darf. Ohne diese Erlaubnis kann er sich im Hintergrund um Minuten verspaeten.
+  Future<bool> canScheduleExactAlarms();
+
+  /// Oeffnet die Systemeinstellung "Wecker und Erinnerungen".
+  Future<void> requestExactAlarms();
 }
 
 /// Reservierter ID-Bereich, damit `cancel`/`schedule` nur die eigenen Ablauf-Erinnerungen betreffen
@@ -24,6 +39,10 @@ abstract class NotificationScheduler {
 const _idBase = 5000;
 const _horizonDays = 14;
 const _channelId = 'expiry_reminders';
+
+/// Eigener ID-Bereich und Kanal der Kurzzeitmesser: ein Timer soll laut sein, eine Ablauf-Erinnerung nicht.
+const _timerIdBase = 6000;
+const _timerChannelId = 'kitchen_timers';
 
 class FlutterLocalNotificationsScheduler implements NotificationScheduler {
   FlutterLocalNotificationsScheduler({required this.onAddToList});
@@ -150,5 +169,64 @@ class FlutterLocalNotificationsScheduler implements NotificationScheduler {
     for (var i = 0; i < _horizonDays; i++) {
       await _plugin.cancel(_idBase + i);
     }
+  }
+
+  AndroidFlutterLocalNotificationsPlugin? get _android => _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  @override
+  Future<void> scheduleKitchenTimer({required int slot, required String label, required DateTime at}) async {
+    // Browser koennen keine zeitgesteuerten Benachrichtigungen, siehe scheduleExpiryReminders: Das Ende steht dort nur in der App.
+    if (kIsWeb) return;
+    await initialize();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _timerChannelId,
+        'Koch-Timer',
+        channelDescription: 'Meldet sich, wenn ein Timer abgelaufen ist',
+        importance: Importance.max,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.alarm,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    final exact = await _android?.canScheduleExactNotifications() ?? false;
+    await _plugin.zonedSchedule(
+      _timerIdBase + slot,
+      label,
+      'Die Zeit ist um.',
+      tz.TZDateTime.from(at, tz.local),
+      details,
+      androidScheduleMode: exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  @override
+  Future<void> cancelKitchenTimer(int slot) async {
+    if (kIsWeb) return;
+    await _initializePlugin();
+    await _plugin.cancel(_timerIdBase + slot);
+  }
+
+  @override
+  Future<void> cancelKitchenTimers() async {
+    if (kIsWeb) return;
+    await _initializePlugin();
+    for (var i = 0; i < kitchenTimerSlots; i++) {
+      await _plugin.cancel(_timerIdBase + i);
+    }
+  }
+
+  @override
+  Future<bool> canScheduleExactAlarms() async {
+    if (kIsWeb) return true;
+    await _initializePlugin();
+    return await _android?.canScheduleExactNotifications() ?? true;
+  }
+
+  @override
+  Future<void> requestExactAlarms() async {
+    if (kIsWeb) return;
+    await _initializePlugin();
+    await _android?.requestExactAlarmsPermission();
   }
 }

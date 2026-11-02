@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'cooking_chat_panel.dart';
+import 'cooking_timer_panel.dart';
 
 /// Argumente fuer die Route `/recipe-viewer` (per `extra`, siehe `router.dart`).
 class RecipeViewerArgs {
@@ -74,12 +75,17 @@ class _RecipeViewerPageState extends State<RecipeViewerPage> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.recipeTitle)),
       body: widget.useEmbeddedWebView ? WebViewWidget(controller: _controller!) : _ExternalFallback(widget: widget),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('recipe-chat-button'),
-        icon: const Icon(Icons.chat_bubble_outline),
-        label: const Text('Koch-Chat'),
-        onPressed: () => _openChat(context),
-      ),
+      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        CookingTimerFab(recipeTitle: widget.recipeTitle),
+        const SizedBox(height: 12),
+        FloatingActionButton.extended(
+          key: const Key('recipe-chat-button'),
+          heroTag: 'recipe-chat-fab',
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: const Text('Koch-Chat'),
+          onPressed: () => _openChat(context),
+        ),
+      ]),
     );
   }
 

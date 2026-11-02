@@ -10,6 +10,7 @@ import '../../core/vienna_time.dart';
 import '../../data/local/database.dart';
 import '../../domain/nutrition/micros.dart';
 import '../../domain/nutrition/supplements.dart';
+import '../recipes/cooking_timer_panel.dart';
 
 /// Schnell eintragen (ADR-041): ein Glas Wasser und jede Nahrungsergaenzung mit einem Tipp, erreichbar aus jedem Tab, vom Widget auf dem
 /// Startbildschirm und ueber langes Druecken auf das App-Symbol.
@@ -116,6 +117,17 @@ class QuickIntakePage extends ConsumerWidget {
               label: const Text('Nahrungsergänzung anlegen'),
             ),
           ),
+        // Von jedem Tab aus erreichbar, deshalb auch hier: der Timer fuer zwischendurch (ADR-046)
+        Card(
+          child: ListTile(
+            key: const Key('quick-timer'),
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Timer'),
+            subtitle: const Text('Für den Ofen oder die Nudeln'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => showCookingTimerPanel(context),
+          ),
+        ),
         if (!kIsWeb)
           Padding(
             padding: const EdgeInsets.only(top: 12),

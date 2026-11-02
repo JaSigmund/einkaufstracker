@@ -8,7 +8,9 @@ import '../../core/vienna_time.dart';
 import '../../data/local/database.dart';
 import '../../domain/recipes/meal_plan.dart';
 import '../../domain/recipes/saved_recipe.dart';
+import '../diary/meal_form_page.dart';
 import '../diary/meal_labels.dart';
+import '../diary/recipe_picker.dart';
 import 'plan_recipe.dart';
 import 'recipe_viewer_page.dart';
 
@@ -168,6 +170,8 @@ class _MealPlanPageState extends ConsumerState<MealPlanPage> {
                     key: Key('meal-plan-menu-${e.id}'),
                     onSelected: (v) async {
                       switch (v) {
+                        case 'diary':
+                          await context.push('/meal-form', extra: MealFormArgs(recipe: RecipeForMeal.fromPlan(e)));
                         case 'missing':
                           await addMissingToList(context, ref, ingredients, active: active, products: products);
                         case 'move':
@@ -177,6 +181,7 @@ class _MealPlanPageState extends ConsumerState<MealPlanPage> {
                       }
                     },
                     itemBuilder: (_) => [
+                      PopupMenuItem(key: Key('meal-plan-diary-${e.id}'), value: 'diary', child: const Text('Ins Tagebuch eintragen')),
                       if (missing.isNotEmpty) PopupMenuItem(key: Key('meal-plan-missing-${e.id}'), value: 'missing', child: const Text('Fehlendes auf die Liste')),
                       PopupMenuItem(key: Key('meal-plan-move-${e.id}'), value: 'move', child: const Text('Verschieben')),
                       PopupMenuItem(key: Key('meal-plan-delete-${e.id}'), value: 'delete', child: const Text('Entfernen')),

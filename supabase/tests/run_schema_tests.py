@@ -853,7 +853,7 @@ def main():
             contract_failures.append(f"{table}: {str(ex).splitlines()[0]}")
     tables_in_fixture = {e["table"] for e in entries}
     check("Vertrag: Fixture enthaelt Tagebuch, Ledger, Richtwerte, Ergaenzungen und Einstellungen",
-          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets", "supplements", "supplement_intakes", "household_prefs", "meal_plan_entries"} <= tables_in_fixture,
+          {"meals", "meal_ingredients", "inventory_movements", "nutrition_targets", "supplements", "supplement_intakes", "household_prefs", "meal_plan_entries", "cooking_sessions"} <= tables_in_fixture,
           str(tables_in_fixture))
     check(f"Vertrag: alle {len(entries)} Zeilen der App werden vom echten Schema angenommen", not contract_failures, "; ".join(contract_failures[:3]))
     meal_ids = [e["payload"]["id"] for e in entries if e["table"] == "meals"]
@@ -912,6 +912,16 @@ def main():
     check("Wochenplan: B kann nicht in Haushalt A schreiben", raises(ins_plan, (ha, "dinner", "Fremd"), user=B))
     check("Wochenplan: unbekannte Tageszeit wird abgelehnt", raises(ins_plan, (ha, "drink", "Tee"), user=A))
     check("Wochenplan: leerer Titel wird abgelehnt", raises(ins_plan, (ha, "dinner", "  "), user=A))
+
+    # --- Kochzeiten (Migration 0036) ----------------------------------------------------------------------------------
+    check("Kochzeiten: Fixture-Zeilen sind da", one("select count(*) from cooking_sessions where household_id = %s and active_seconds > 0", (ha,)) >= 2)
+    check("Kochzeiten: B sieht nichts von Haushalt A", one("select count(*) from cooking_sessions", user=B) == 0)
+    ins_session = "insert into cooking_sessions (household_id, recipe_title, started_at, ended_at, active_seconds) values (%s,%s,%s,%s,%s)"
+    check("Kochzeiten: A kann speichern", not raises(ins_session, (ha, "Curry", "2026-11-02 17:00+00", "2026-11-02 17:40+00", 2400), user=A))
+    check("Kochzeiten: B kann nicht in Haushalt A schreiben", raises(ins_session, (ha, "Fremd", "2026-11-02 17:00+00", "2026-11-02 17:40+00", 2400), user=B))
+    check("Kochzeiten: Dauer 0 wird abgelehnt", raises(ins_session, (ha, "Curry", "2026-11-02 17:00+00", "2026-11-02 17:40+00", 0), user=A))
+    check("Kochzeiten: Ende vor dem Start wird abgelehnt", raises(ins_session, (ha, "Curry", "2026-11-02 17:40+00", "2026-11-02 17:00+00", 60), user=A))
+    check("Kochzeiten: leerer Name wird abgelehnt", raises(ins_session, (ha, "  ", "2026-11-02 17:00+00", "2026-11-02 17:40+00", 60), user=A))
 
     # --- Nahrungsergaenzung und gemeinsame Einstellungen (Phase N4, Migration 0026) -----------------------------------
     check("Ergaenzungen: Fixture-Zeilen sind da (angelegt, geaendert, geloescht)",

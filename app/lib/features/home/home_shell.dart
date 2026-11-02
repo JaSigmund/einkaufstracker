@@ -6,6 +6,7 @@ import '../diary/diary_page.dart';
 import '../inventory/inventory_page.dart';
 import '../receipt_import/scan_page.dart';
 import '../receipts/receipts_overview.dart';
+import '../recipes/cooking_timer_panel.dart';
 import '../report/report_page.dart';
 import '../shopping_list/shopping_list_page.dart';
 
@@ -105,6 +106,7 @@ class HomeShell extends StatelessWidget {
     final body = Column(
       children: [
         const AppUpdateBanner(),
+        const CookingTimerBanner(),
         Expanded(
           child: Center(
             child: ConstrainedBox(

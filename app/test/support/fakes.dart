@@ -448,6 +448,30 @@ class FakeNotificationScheduler implements NotificationScheduler {
     lastNotifyTime = notifyTime;
     lastLeadDays = leadDays;
   }
+
+  /// Geplante Alarme der Kurzzeitmesser je Slot.
+  final kitchenTimers = <int, ({String label, DateTime at})>{};
+  var exactAlarmsAllowed = true;
+  var exactAlarmRequests = 0;
+  var scheduleCalls = 0;
+
+  @override
+  Future<void> scheduleKitchenTimer({required int slot, required String label, required DateTime at}) async {
+    scheduleCalls++;
+    kitchenTimers[slot] = (label: label, at: at);
+  }
+
+  @override
+  Future<void> cancelKitchenTimer(int slot) async => kitchenTimers.remove(slot);
+
+  @override
+  Future<void> cancelKitchenTimers() async => kitchenTimers.clear();
+
+  @override
+  Future<bool> canScheduleExactAlarms() async => exactAlarmsAllowed;
+
+  @override
+  Future<void> requestExactAlarms() async => exactAlarmRequests++;
 }
 
 /// Barcode-Scanner-Attrappe: liefert immer denselben Code (oder null bei Abbruch).

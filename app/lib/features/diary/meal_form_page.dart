@@ -23,21 +23,24 @@ import '../../domain/nutrition/retention.dart';
 import '../../domain/nutrition/usual_ingredients.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../../core/vienna_time.dart';
+import '../../domain/recipes/cooking_timer.dart' show normalizeRecipeTitle;
 import 'ingredient_picker.dart';
 import 'manual_nutrients_dialog.dart';
 import 'meal_labels.dart';
 import 'meal_photo.dart';
+import 'recipe_picker.dart';
 
 /// Argumente fuer `/meal-form`: ohne [existing] wird eine neue Mahlzeit angelegt, sonst diese bearbeitet.
 ///
 /// Mit [template] entsteht eine NEUE Mahlzeit als Kopie einer frueheren ("Nochmal essen", Doku 15 §3.2): Titel,
 /// Portionen und Zutaten werden uebernommen, Zeitpunkt ist jetzt. Mit [leftover] ist es ein Rest vom Vortag: gleiche
-/// Naehrwerte, aber ohne erneuten Abzug vom Bestand.
+/// Naehrwerte, aber ohne erneuten Abzug vom Bestand. Mit [recipe] entsteht sie aus einem Rezept oder geplanten Gericht (ADR-047).
 class MealFormArgs {
-  const MealFormArgs({this.existing, this.template, this.leftover = false});
+  const MealFormArgs({this.existing, this.template, this.leftover = false, this.recipe});
   final Meal? existing;
   final Meal? template;
   final bool leftover;
+  final RecipeForMeal? recipe;
 }
 
 /// Eine Zutat im Formular, noch nicht gespeichert.
@@ -170,11 +173,12 @@ class _Row {
 /// dem Inventar, aus der Lebensmitteldatenbank oder als Freitext. Beim Speichern wird der Bestand FEFO abgezogen,
 /// beim Bearbeiten der alte Abzug per Gegenbuchung zurueckgenommen und neu gerechnet.
 class MealFormPage extends ConsumerStatefulWidget {
-  const MealFormPage({super.key, this.existing, this.template, this.leftover = false, this.photosAvailable = !kIsWeb});
+  const MealFormPage({super.key, this.existing, this.template, this.leftover = false, this.recipe, this.photosAvailable = !kIsWeb});
 
   final Meal? existing;
   final Meal? template;
   final bool leftover;
+  final RecipeForMeal? recipe;
 
   /// Mahlzeitenfotos brauchen lokalen Dateispeicher (`MealPhotoService`), den es in der Web-Version (PWA) nicht gibt.
   /// Dort fehlt der Foto-Bereich samt Foto-Analyse, statt bei jedem Speichern zu scheitern. Als Parameter statt einer
@@ -213,6 +217,10 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   /// "Fehlt etwas?": uebliche Zutaten aus aehnlichen frueheren Mahlzeiten, die auf dem Foto nicht zu sehen sind (Ausbau 1.12).
   List<UsualIngredient> _usual = const [];
 
+  /// Ein Rezept wurde uebernommen (ADR-047), und wann dieses Gericht zuletzt gegessen wurde, falls die Mengen von dort stammen.
+  var _recipeApplied = false;
+  DateTime? _recipeAmountsFrom;
+
   /// `manual` | `photo_ai` | `recipe`: woher die Mahlzeit stammt. Nach einem angewendeten KI-Vorschlag `photo_ai`.
   late String _source = widget.existing?.source ?? widget.template?.source ?? 'manual';
   String? _error;
@@ -243,6 +251,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
       _estimate = tpl.isEstimate;
       _loadExistingIngredients(tpl, noDeduction: widget.leftover);
     }
+    if (widget.recipe != null) _applyRecipe(widget.recipe!);
   }
 
   @override
@@ -257,6 +266,89 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
   Future<void> _loadExistingIngredients(Meal m, {bool noDeduction = false}) async {
     final ingredients = await ref.read(mealRepositoryProvider).ingredientsOf(m.id);
     final products = {for (final p in await ref.read(productRepositoryProvider).allSnapshot()) p.id: p};
+    final rows = _rowsFrom(ingredients, products, noDeduction: noDeduction);
+    if (mounted) setState(() => _rows..clear()..addAll(rows));
+    _resolveBlsNames();
+  }
+
+  /// Uebernimmt ein Rezept (ADR-047). Rezepte kennen bewusst keine Mengen (ADR-021). Gab es das Gericht schon einmal im Tagebuch, stehen dort die
+  /// Mengen, die der Haushalt wirklich nimmt: deshalb die Zeilen der letzten Mahlzeit mit diesem Namen als Vorlage, dazu was im Rezept sonst noch steht.
+  Future<void> _applyRecipe(RecipeForMeal recipe) async {
+    final allProducts = await ref.read(productRepositoryProvider).allSnapshot();
+    final products = {for (final p in allProducts) p.id: p};
+    final history = await ref.read(mealRepositoryProvider).recentHistory(excludeMealId: widget.existing?.id);
+    final key = normalizeRecipeTitle(recipe.title);
+    final previous = history.where((h) => normalizeRecipeTitle(h.$1.title) == key).firstOrNull;
+    // Aus initState heraus hat der Stream noch keinen Wert (siehe Kommentar in build), deshalb auf ihn warten
+    final active = await ref.read(activeInventoryStreamProvider.future).timeout(const Duration(seconds: 3), onTimeout: () => const <InventoryItem>[]);
+    final inStock = {for (final i in active) if (i.quantity > 0) i.productId};
+
+    final added = previous == null ? <_Row>[] : _rowsFrom(previous.$2, products);
+    final names = {for (final r in [..._rows, ...added]) r.label.trim().toLowerCase()};
+    final productIds = {for (final r in [..._rows, ...added]) ?r.product?.id};
+    for (final i in recipe.ingredients) {
+      final lower = i.name.trim().toLowerCase();
+      final byId = products[i.productId];
+      final product = byId != null && byId.deletedAt == null ? byId : allProducts.where((p) => p.deletedAt == null && p.name.trim().toLowerCase() == lower).firstOrNull;
+      if (lower.isEmpty || names.contains(lower) || (product != null && productIds.contains(product.id))) continue;
+      names.add(lower);
+      if (product != null) productIds.add(product.id);
+      added.add(_Row(
+        product: product,
+        freeText: product == null ? i.name.trim() : null,
+        quantity: 0,
+        unit: product != null ? EntryUnit.naturalFor(product.baseUnit) : EntryUnit.g,
+        deduct: product != null && inStock.contains(product.id),
+      ));
+    }
+    await _fillKnownFoods(added);
+    if (!mounted) return;
+    setState(() {
+      final firstRows = _rows.isEmpty;
+      _rows.addAll(added);
+      if (_title.text.trim().isEmpty) _title.text = recipe.title;
+      if (recipe.mealType != null && !_typeChosen) _type = recipe.mealType!;
+      if (previous != null && firstRows) {
+        _eaten.text = formatQuantity(previous.$1.servingsEaten);
+        _made.text = formatQuantity(previous.$1.servingsMade);
+        _estimate = previous.$1.isEstimate;
+      }
+      _source = 'recipe';
+      _recipeApplied = true;
+      _recipeAmountsFrom = previous?.$1.eatenAt;
+    });
+    _resolveBlsNames();
+  }
+
+  /// Zutaten, deren Name dem Haushalt schon bekannt ist, bekommen ihre Naehrwerte sofort. Ohne Netz oder bei einem Fehler bleibt die Lupe in der Zeile.
+  Future<void> _fillKnownFoods(List<_Row> rows) async {
+    try {
+      final links = {for (final l in await ref.read(foodLinkRepositoryProvider).all()) l.nameNorm.trim().toLowerCase(): l.blsCode};
+      final open = [for (final r in rows) if (r.product == null && r.per100 == null && r.manual == null && links.containsKey(r.label.trim().toLowerCase())) r];
+      if (open.isEmpty) return;
+      final foods = {for (final f in await ref.read(blsFoodSearchProvider).byCodes({for (final r in open) links[r.label.trim().toLowerCase()]!})) f.code: f};
+      for (final r in open) {
+        final food = foods[links[r.label.trim().toLowerCase()]];
+        if (food == null) continue;
+        r
+          ..per100 = food.per100
+          ..per100Basis = 'g'
+          ..blsCode = food.code
+          ..matchName = food.nameDe
+          ..microsPer100 = food.micros;
+      }
+    } catch (_) {
+      // die Naehrwerte sind eine Zugabe
+    }
+  }
+
+  Future<void> _pickRecipe() async {
+    final picked = await showRecipePicker(context);
+    if (picked != null && mounted) await _applyRecipe(picked);
+  }
+
+  /// Zeilen aus gespeicherten Zutaten einer Mahlzeit.
+  List<_Row> _rowsFrom(List<MealIngredient> ingredients, Map<String, Product> products, {bool noDeduction = false}) {
     final rows = <_Row>[];
     for (final i in ingredients) {
       final (qty, unit) = switch (i.unit) {
@@ -307,8 +399,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         preparation: product == null && retentionFromStorage(i.preparation) != null ? i.preparation : null,
       ));
     }
-    if (mounted) setState(() => _rows..clear()..addAll(rows));
-    _resolveBlsNames();
+    return rows;
   }
 
   /// Zeilen aus frueheren Mahlzeiten kennen nur den BLS-Code, nicht den Namen des Eintrags. Fuer die Garfaktoren braucht die Zeile ihn: aus
@@ -989,12 +1080,14 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text('Noch keine Zutat. Aus dem Inventar, der Lebensmitteldatenbank oder als Freitext.', style: t.textTheme.bodySmall),
           ),
+        if (_recipeApplied) _recipeHint(t),
         if (_rows.isNotEmpty) _trustSummary(t),
         for (var i = 0; i < _rows.length; i++) _ingredientTile(i, t),
         Align(
           alignment: Alignment.centerLeft,
           child: Wrap(spacing: 8, children: [
             TextButton.icon(key: const Key('meal-add-ingredient'), onPressed: _addIngredient, icon: const Icon(Icons.add), label: const Text('Zutat hinzufügen')),
+            TextButton.icon(key: const Key('meal-from-recipe'), onPressed: _pickRecipe, icon: const Icon(Icons.bookmark_outline), label: const Text('Aus Rezept')),
             TextButton.icon(key: const Key('meal-add-manual'), onPressed: _addManual, icon: const Icon(Icons.edit_note), label: const Text('Nährwerte eintragen')),
             if (_rows.isNotEmpty)
               TextButton.icon(key: const Key('meal-scale'), onPressed: _scalePortions, icon: const Icon(Icons.scale_outlined), label: const Text('Portionen umrechnen')),
@@ -1010,6 +1103,31 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
           onChanged: (v) => setState(() => _estimate = v),
         ),
         TextField(key: const Key('meal-note'), controller: _note, decoration: const InputDecoration(labelText: 'Notiz (optional)'), maxLines: 2),
+      ]),
+    );
+  }
+
+  /// Woher die Mengen kommen, und der kurze Weg, wenn man sie gar nicht eintragen will.
+  Widget _recipeHint(ThemeData t) {
+    final from = _recipeAmountsFrom;
+    final missing = _rows.where((r) => r.quantity <= 0).length;
+    if (from == null && missing == 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (from != null) Text('Mengen vom letzten Mal (${formatViennaDateTime(from)}), bitte prüfen.', key: const Key('meal-recipe-amounts-from'), style: t.textTheme.bodySmall),
+        if (missing > 0) ...[
+          Text(
+            missing == 1 ? 'Rezepte kennen keine Mengen: Bei einer Zutat fehlt sie noch. Beim nächsten Mal steht sie schon da.' : 'Rezepte kennen keine Mengen: Bei $missing Zutaten fehlt sie noch. Beim nächsten Mal stehen sie schon da.',
+            key: const Key('meal-recipe-missing'),
+            style: t.textTheme.bodySmall,
+          ),
+          TextButton(
+            key: const Key('meal-recipe-drop-empty'),
+            onPressed: () => setState(() => _rows.removeWhere((r) => r.quantity <= 0)),
+            child: const Text('Zutaten ohne Menge weglassen'),
+          ),
+        ],
       ]),
     );
   }

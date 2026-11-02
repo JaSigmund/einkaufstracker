@@ -12,6 +12,7 @@ import '../../domain/recipes/recipe_search_url.dart';
 import '../../domain/recipes/recipe_suggestion.dart';
 import '../../domain/recipes/recipe_suggestion_context.dart';
 import '../../domain/recipes/saved_recipe.dart';
+import 'cooking_timer_panel.dart';
 import 'plan_recipe.dart';
 import 'recipe_viewer_page.dart';
 
@@ -184,6 +185,12 @@ class _RecipeSuggestionsPageState extends ConsumerState<RecipeSuggestionsPage> {
       appBar: AppBar(
         title: const Text('Rezepte'),
         actions: [
+          IconButton(
+            key: const Key('open-cooking-timer'),
+            tooltip: 'Timer',
+            icon: const Icon(Icons.timer_outlined),
+            onPressed: () => showCookingTimerPanel(context),
+          ),
           IconButton(
             key: const Key('open-meal-plan'),
             tooltip: 'Wochenplan',

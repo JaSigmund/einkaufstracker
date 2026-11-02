@@ -634,6 +634,28 @@ MealPlanEntriesCompanion mealPlanEntryFromRemote(Map<String, dynamic> j) => Meal
       deletedAt: Value(_dt(j['deleted_at'])),
     );
 
+Map<String, dynamic> cookingSessionToRemote(CookingSession s) => {
+      'id': s.id,
+      'household_id': s.householdId,
+      'recipe_title': s.recipeTitle,
+      'started_at': s.startedAt.toUtc().toIso8601String(),
+      'ended_at': s.endedAt.toUtc().toIso8601String(),
+      'active_seconds': s.activeSeconds,
+      'updated_at': s.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': s.deletedAt?.toUtc().toIso8601String(),
+    };
+
+CookingSessionsCompanion cookingSessionFromRemote(Map<String, dynamic> j) => CookingSessionsCompanion(
+      id: Value(j['id'] as String),
+      householdId: Value(j['household_id'] as String),
+      recipeTitle: Value(j['recipe_title'] as String),
+      startedAt: Value(_dt(j['started_at'])!),
+      endedAt: Value(_dt(j['ended_at'])!),
+      activeSeconds: Value((j['active_seconds'] as num).toInt()),
+      updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
+    );
+
 Map<String, dynamic> householdPrefToRemote(HouseholdPref p) => {
       'household_id': p.householdId,
       'key': p.key,

@@ -614,6 +614,22 @@ class MealPlanEntries extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Eine abgeschlossene Kochzeit (Spiegel von public.cooking_sessions, ADR-046). `activeSeconds` zaehlt ohne Pausen.
+@DataClassName('CookingSession')
+class CookingSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get householdId => text()();
+  TextColumn get recipeTitle => text()();
+  DateTimeColumn get startedAt => dateTime()();
+  DateTimeColumn get endedAt => dateTime()();
+  IntColumn get activeSeconds => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Gemeinsame Einstellungen des Haushalts als Schluessel-Wert-Zeilen (Spiegel von public.household_prefs, Phase N4, ADR-035).
 @DataClassName('HouseholdPref')
 class HouseholdPrefs extends Table {
@@ -641,7 +657,7 @@ class KeyValues extends Table {
 @DriftDatabase(tables: [
   Categories, Products, ProductBarcodes, ProductAliases, Stores, Receipts, ReceiptItems, CategoryAliases,
   ReceiptFiles, InventoryItems, InventoryMovements, Meals, MealIngredients, NutritionTargetRows, BugReports,
-  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Supplements, SupplementIntakes, HouseholdPrefs, MealPlanEntries, Outbox, SyncStates, KeyValues,
+  ShoppingLists, ShoppingListItems, ProductOnlineLinks, OnlinePriceCache, HouseholdFoodLinks, Supplements, SupplementIntakes, HouseholdPrefs, MealPlanEntries, CookingSessions, Outbox, SyncStates, KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -660,7 +676,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -791,6 +807,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 24) {
             await m.addColumn(products, products.piecesPerPack);
             await m.addColumn(products, products.pieceLabel);
+          }
+          // 24 -> 25: Kochzeiten (ADR-046)
+          if (from < 25) {
+            await m.createTable(cookingSessions);
           }
         },
       );
