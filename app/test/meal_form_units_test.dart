@@ -272,6 +272,50 @@ void main() {
       expect(await stock(tester), closeTo(0.9, 1e-9));
     });
 
+    Future<Meal> savedBrot(WidgetTester tester, {required double? unitWeightG, FoodUnitKey? key = FoodUnitKey.slice}) async {
+      final created = await productRepo(db).create(name: 'Brot', baseUnit: 'piece', unitWeightG: unitWeightG);
+      final brot = (await productRepo(db).setBlsProfile(created.id, const BlsFood(code: 'B311000', nameDe: 'Weizenbrot/Weißbrot', per100: NutrientsPer100(kcal: 260))))!;
+      await inventoryRepo(db).recordFromScan(productId: brot.id, ean: '1', quantity: 5, unit: 'piece', bestBefore: DateTime.utc(2026, 12, 1), now: DateTime.utc(2026, 9, 1));
+      products = [brot];
+      return meals.create(MealDraft(title: 'Brot', eatenAt: DateTime.utc(2026, 10, 3, 8), ingredients: [
+        IngredientDraft(productId: brot.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: key, unitWeightG: 28),
+      ]));
+    }
+
+    formTest('Bearbeiten: Die Scheiben kommen zurueck, unveraendert Speichern laesst den Bestand gleich', (tester) async {
+      final meal = await savedBrot(tester, unitWeightG: 560);
+      await open(tester, existing: meal);
+      expect(subtitleOf(tester, 0), '2 Scheiben · ≈ 56 g · 146 kcal · vom Bestand');
+      await tester.tap(find.byKey(const Key('meal-save')));
+      await tester.pumpAndSettle();
+      expect(await stock(tester), closeTo(4.9, 1e-9));
+      final ing = (await tester.runAsync(() => meals.ingredientsOf(meal.id)))!.single;
+      expect(ing.unitKey, 'slice');
+    });
+
+    formTest('Bearbeiten: Der Dialog zeigt die Scheibe, neue Anzahl rechnet anteilig', (tester) async {
+      final meal = await savedBrot(tester, unitWeightG: 560);
+      await open(tester, existing: meal);
+      await tester.tap(find.byKey(const Key('ingredient-row-0')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<ChoiceChip>(find.byKey(const Key('ingredient-unit-slice'))).selected, isTrue);
+      await enterQuantity(tester, '4');
+      expect(subtitleOf(tester, 0), '4 Scheiben · ≈ 112 g · 291 kcal · vom Bestand');
+      await tester.tap(find.byKey(const Key('meal-save')));
+      await tester.pumpAndSettle();
+      expect(await stock(tester), closeTo(4.8, 1e-9));
+    });
+
+    formTest('Zeile aus einer aelteren Version ohne Einheit: bleibt ganze Stueck', (tester) async {
+      final meal = await savedBrot(tester, unitWeightG: 560, key: null);
+      expect((await tester.runAsync(() => meals.ingredientsOf(meal.id)))!.single.unitKey, isNull);
+      await open(tester, existing: meal);
+      expect(subtitleOf(tester, 0), '2 Stk · ≈ 56 g · 146 kcal · vom Bestand');
+      await tester.tap(find.byKey(const Key('meal-save')));
+      await tester.pumpAndSettle();
+      expect(await stock(tester), 3);
+    });
+
     formTest('ohne Stueckgewicht: die Zeile sagt, dass nichts abgezogen wird, und der Bestand bleibt', (tester) async {
       await addBrot(tester);
       expect(subtitleOf(tester, 0), '2 Scheiben · ≈ 56 g · 146 kcal · kein Bestandsabzug: Stückgewicht fehlt');

@@ -146,6 +146,19 @@ void main() {
       expect(await stock(), 2);
     });
 
+    test('die Einheit wird gespeichert, bei Gramm nicht', () async {
+      final p = await brot(unitWeightG: 560);
+      final m = await meals.create(draft([
+        IngredientDraft(productId: p.id, quantity: 2, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28),
+        IngredientDraft(productId: p.id, quantity: 1, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.piece),
+        IngredientDraft(productId: p.id, quantity: 1, entryUnit: EntryUnit.piece),
+        IngredientDraft(productId: p.id, quantity: 50, entryUnit: EntryUnit.g, unitKey: FoodUnitKey.slice),
+      ]));
+      expect((await meals.ingredientsOf(m.id)).map((i) => i.unitKey).toSet(), {'slice', 'piece', null});
+      final inGrams = (await meals.ingredientsOf(m.id)).firstWhere((i) => i.unit == 'kg');
+      expect(inGrams.unitKey, isNull);
+    });
+
     test('Bearbeiten bucht den anteiligen Abzug zurueck und neu', () async {
       final p = await brot(unitWeightG: 560);
       IngredientDraft scheiben(double n) => IngredientDraft(productId: p.id, quantity: n, entryUnit: EntryUnit.piece, unitKey: FoodUnitKey.slice, unitWeightG: 28);

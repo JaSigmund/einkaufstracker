@@ -410,6 +410,7 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         matchTrust: i.nutrientBasis == 'bls_matched' ? MatchTrust.auto : MatchTrust.sure,
         // Bei Stueckmengen steht das Gewicht einer Einheit im Snapshot (Menge in g durch Anzahl)
         unitWeightG: unit == EntryUnit.piece && i.amountG != null && i.quantity > 0 ? i.amountG! / i.quantity : null,
+        unitKey: unit == EntryUnit.piece ? FoodUnitKey.fromDb(i.unitKey) : null,
         microsPer100: fromSnapshot ? undoRetention(micros100From(parseMicros(i.micros), i.amountG), retentionFromStorage(i.preparation)) : null,
         preparation: product == null && retentionFromStorage(i.preparation) != null ? i.preparation : null,
         lineProfileWins: product != null && per100 != null,

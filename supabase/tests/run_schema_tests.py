@@ -969,6 +969,16 @@ def main():
     db("delete from household_prefs where key = 'test_key'")
 
 
+    # --- Haushaltseinheit (ADR-033, Migration 0038) ------------------------------------------------------------------------
+    check("Haushaltseinheit: die Zeile aus der App (2 Scheiben) ist in der Datenbank",
+          one("select count(*) from meal_ingredients where unit_key = 'slice' and household_id = %s", (ha,)) >= 1)
+    meal_for_unit = one("select id from meals where household_id = %s and deleted_at is null limit 1", (ha,))
+    ins_unit = "insert into meal_ingredients (household_id, meal_id, free_text, quantity, unit, unit_key) values (%s,%s,'x',1,'piece',%s)"
+    check("Haushaltseinheit: tbsp wird angenommen", not raises(ins_unit, (ha, meal_for_unit, "tbsp"), user=A))
+    check("Haushaltseinheit: unbekannte Einheit wird abgelehnt", raises(ins_unit, (ha, meal_for_unit, "tasse"), user=A))
+    db("delete from meal_ingredients where free_text = 'x' and unit_key = 'tbsp'")
+
+
     # --- Garfaktoren (Phase N4, Migration 0027): Zubereitung je Zutat ----------------------------------------------------
     check("Zubereitung: die Zeile aus der App (gekochtes Gemuese) ist in der Datenbank",
           one("select count(*) from meal_ingredients where preparation = 'veg_other:boiled' and household_id = %s", (ha,)) >= 1)

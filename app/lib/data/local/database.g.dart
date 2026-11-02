@@ -8790,6 +8790,17 @@ class $MealIngredientsTable extends MealIngredients
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _unitKeyMeta = const VerificationMeta(
+    'unitKey',
+  );
+  @override
+  late final GeneratedColumn<String> unitKey = GeneratedColumn<String>(
+    'unit_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _kcalMeta = const VerificationMeta('kcal');
   @override
   late final GeneratedColumn<double> kcal = GeneratedColumn<double>(
@@ -8894,6 +8905,7 @@ class $MealIngredientsTable extends MealIngredients
     nutrientBasis,
     micros,
     preparation,
+    unitKey,
     kcal,
     proteinG,
     fatG,
@@ -9025,6 +9037,12 @@ class $MealIngredientsTable extends MealIngredients
         ),
       );
     }
+    if (data.containsKey('unit_key')) {
+      context.handle(
+        _unitKeyMeta,
+        unitKey.isAcceptableOrUnknown(data['unit_key']!, _unitKeyMeta),
+      );
+    }
     if (data.containsKey('kcal')) {
       context.handle(
         _kcalMeta,
@@ -9150,6 +9168,10 @@ class $MealIngredientsTable extends MealIngredients
         DriftSqlType.string,
         data['${effectivePrefix}preparation'],
       ),
+      unitKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit_key'],
+      ),
       kcal: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}kcal'],
@@ -9230,6 +9252,10 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
   /// Zubereitung der Zutat, auf die sich die Garfaktoren stuetzen (Phase N4, ADR-037): `kategorie:zubereitung`, z.B. `veg_other:boiled`.
   /// `null` = roh oder nicht angegeben. Die gespeicherten [micros] sind dann schon um die Verluste gemindert.
   final String? preparation;
+
+  /// Haushaltseinheit einer Stueckmenge (ADR-033): Wert aus `food_units.unit_key`, z.B. `slice`. Alles ausser `piece` zaehlt Teile eines Stuecks,
+  /// der Bestandsabzug rechnet dann ueber das Stueckgewicht. `null` = ganze Stueck, keine Stueckmenge oder Zeile aus einer aelteren Version.
+  final String? unitKey;
   final double? kcal;
   final double? proteinG;
   final double? fatG;
@@ -9255,6 +9281,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     this.nutrientBasis,
     this.micros,
     this.preparation,
+    this.unitKey,
     this.kcal,
     this.proteinG,
     this.fatG,
@@ -9300,6 +9327,9 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     }
     if (!nullToAbsent || preparation != null) {
       map['preparation'] = Variable<String>(preparation);
+    }
+    if (!nullToAbsent || unitKey != null) {
+      map['unit_key'] = Variable<String>(unitKey);
     }
     if (!nullToAbsent || kcal != null) {
       map['kcal'] = Variable<double>(kcal);
@@ -9364,6 +9394,9 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       preparation: preparation == null && nullToAbsent
           ? const Value.absent()
           : Value(preparation),
+      unitKey: unitKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitKey),
       kcal: kcal == null && nullToAbsent ? const Value.absent() : Value(kcal),
       proteinG: proteinG == null && nullToAbsent
           ? const Value.absent()
@@ -9409,6 +9442,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       nutrientBasis: serializer.fromJson<String?>(json['nutrientBasis']),
       micros: serializer.fromJson<String?>(json['micros']),
       preparation: serializer.fromJson<String?>(json['preparation']),
+      unitKey: serializer.fromJson<String?>(json['unitKey']),
       kcal: serializer.fromJson<double?>(json['kcal']),
       proteinG: serializer.fromJson<double?>(json['proteinG']),
       fatG: serializer.fromJson<double?>(json['fatG']),
@@ -9439,6 +9473,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       'nutrientBasis': serializer.toJson<String?>(nutrientBasis),
       'micros': serializer.toJson<String?>(micros),
       'preparation': serializer.toJson<String?>(preparation),
+      'unitKey': serializer.toJson<String?>(unitKey),
       'kcal': serializer.toJson<double?>(kcal),
       'proteinG': serializer.toJson<double?>(proteinG),
       'fatG': serializer.toJson<double?>(fatG),
@@ -9467,6 +9502,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     Value<String?> nutrientBasis = const Value.absent(),
     Value<String?> micros = const Value.absent(),
     Value<String?> preparation = const Value.absent(),
+    Value<String?> unitKey = const Value.absent(),
     Value<double?> kcal = const Value.absent(),
     Value<double?> proteinG = const Value.absent(),
     Value<double?> fatG = const Value.absent(),
@@ -9496,6 +9532,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
         : this.nutrientBasis,
     micros: micros.present ? micros.value : this.micros,
     preparation: preparation.present ? preparation.value : this.preparation,
+    unitKey: unitKey.present ? unitKey.value : this.unitKey,
     kcal: kcal.present ? kcal.value : this.kcal,
     proteinG: proteinG.present ? proteinG.value : this.proteinG,
     fatG: fatG.present ? fatG.value : this.fatG,
@@ -9533,6 +9570,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
       preparation: data.preparation.present
           ? data.preparation.value
           : this.preparation,
+      unitKey: data.unitKey.present ? data.unitKey.value : this.unitKey,
       kcal: data.kcal.present ? data.kcal.value : this.kcal,
       proteinG: data.proteinG.present ? data.proteinG.value : this.proteinG,
       fatG: data.fatG.present ? data.fatG.value : this.fatG,
@@ -9563,6 +9601,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
           ..write('nutrientBasis: $nutrientBasis, ')
           ..write('micros: $micros, ')
           ..write('preparation: $preparation, ')
+          ..write('unitKey: $unitKey, ')
           ..write('kcal: $kcal, ')
           ..write('proteinG: $proteinG, ')
           ..write('fatG: $fatG, ')
@@ -9593,6 +9632,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
     nutrientBasis,
     micros,
     preparation,
+    unitKey,
     kcal,
     proteinG,
     fatG,
@@ -9622,6 +9662,7 @@ class MealIngredient extends DataClass implements Insertable<MealIngredient> {
           other.nutrientBasis == this.nutrientBasis &&
           other.micros == this.micros &&
           other.preparation == this.preparation &&
+          other.unitKey == this.unitKey &&
           other.kcal == this.kcal &&
           other.proteinG == this.proteinG &&
           other.fatG == this.fatG &&
@@ -9649,6 +9690,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
   final Value<String?> nutrientBasis;
   final Value<String?> micros;
   final Value<String?> preparation;
+  final Value<String?> unitKey;
   final Value<double?> kcal;
   final Value<double?> proteinG;
   final Value<double?> fatG;
@@ -9675,6 +9717,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     this.nutrientBasis = const Value.absent(),
     this.micros = const Value.absent(),
     this.preparation = const Value.absent(),
+    this.unitKey = const Value.absent(),
     this.kcal = const Value.absent(),
     this.proteinG = const Value.absent(),
     this.fatG = const Value.absent(),
@@ -9702,6 +9745,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     this.nutrientBasis = const Value.absent(),
     this.micros = const Value.absent(),
     this.preparation = const Value.absent(),
+    this.unitKey = const Value.absent(),
     this.kcal = const Value.absent(),
     this.proteinG = const Value.absent(),
     this.fatG = const Value.absent(),
@@ -9734,6 +9778,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     Expression<String>? nutrientBasis,
     Expression<String>? micros,
     Expression<String>? preparation,
+    Expression<String>? unitKey,
     Expression<double>? kcal,
     Expression<double>? proteinG,
     Expression<double>? fatG,
@@ -9761,6 +9806,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
       if (nutrientBasis != null) 'nutrient_basis': nutrientBasis,
       if (micros != null) 'micros': micros,
       if (preparation != null) 'preparation': preparation,
+      if (unitKey != null) 'unit_key': unitKey,
       if (kcal != null) 'kcal': kcal,
       if (proteinG != null) 'protein_g': proteinG,
       if (fatG != null) 'fat_g': fatG,
@@ -9790,6 +9836,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     Value<String?>? nutrientBasis,
     Value<String?>? micros,
     Value<String?>? preparation,
+    Value<String?>? unitKey,
     Value<double?>? kcal,
     Value<double?>? proteinG,
     Value<double?>? fatG,
@@ -9817,6 +9864,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
       nutrientBasis: nutrientBasis ?? this.nutrientBasis,
       micros: micros ?? this.micros,
       preparation: preparation ?? this.preparation,
+      unitKey: unitKey ?? this.unitKey,
       kcal: kcal ?? this.kcal,
       proteinG: proteinG ?? this.proteinG,
       fatG: fatG ?? this.fatG,
@@ -9878,6 +9926,9 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
     if (preparation.present) {
       map['preparation'] = Variable<String>(preparation.value);
     }
+    if (unitKey.present) {
+      map['unit_key'] = Variable<String>(unitKey.value);
+    }
     if (kcal.present) {
       map['kcal'] = Variable<double>(kcal.value);
     }
@@ -9929,6 +9980,7 @@ class MealIngredientsCompanion extends UpdateCompanion<MealIngredient> {
           ..write('nutrientBasis: $nutrientBasis, ')
           ..write('micros: $micros, ')
           ..write('preparation: $preparation, ')
+          ..write('unitKey: $unitKey, ')
           ..write('kcal: $kcal, ')
           ..write('proteinG: $proteinG, ')
           ..write('fatG: $fatG, ')
@@ -21611,6 +21663,7 @@ typedef $$MealIngredientsTableCreateCompanionBuilder =
       Value<String?> nutrientBasis,
       Value<String?> micros,
       Value<String?> preparation,
+      Value<String?> unitKey,
       Value<double?> kcal,
       Value<double?> proteinG,
       Value<double?> fatG,
@@ -21639,6 +21692,7 @@ typedef $$MealIngredientsTableUpdateCompanionBuilder =
       Value<String?> nutrientBasis,
       Value<String?> micros,
       Value<String?> preparation,
+      Value<String?> unitKey,
       Value<double?> kcal,
       Value<double?> proteinG,
       Value<double?> fatG,
@@ -21732,6 +21786,11 @@ class $$MealIngredientsTableFilterComposer
 
   ColumnFilters<String> get preparation => $composableBuilder(
     column: $table.preparation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unitKey => $composableBuilder(
+    column: $table.unitKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21865,6 +21924,11 @@ class $$MealIngredientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get unitKey => $composableBuilder(
+    column: $table.unitKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get kcal => $composableBuilder(
     column: $table.kcal,
     builder: (column) => ColumnOrderings(column),
@@ -21975,6 +22039,9 @@ class $$MealIngredientsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get unitKey =>
+      $composableBuilder(column: $table.unitKey, builder: (column) => column);
+
   GeneratedColumn<double> get kcal =>
       $composableBuilder(column: $table.kcal, builder: (column) => column);
 
@@ -22055,6 +22122,7 @@ class $$MealIngredientsTableTableManager
                 Value<String?> nutrientBasis = const Value.absent(),
                 Value<String?> micros = const Value.absent(),
                 Value<String?> preparation = const Value.absent(),
+                Value<String?> unitKey = const Value.absent(),
                 Value<double?> kcal = const Value.absent(),
                 Value<double?> proteinG = const Value.absent(),
                 Value<double?> fatG = const Value.absent(),
@@ -22081,6 +22149,7 @@ class $$MealIngredientsTableTableManager
                 nutrientBasis: nutrientBasis,
                 micros: micros,
                 preparation: preparation,
+                unitKey: unitKey,
                 kcal: kcal,
                 proteinG: proteinG,
                 fatG: fatG,
@@ -22109,6 +22178,7 @@ class $$MealIngredientsTableTableManager
                 Value<String?> nutrientBasis = const Value.absent(),
                 Value<String?> micros = const Value.absent(),
                 Value<String?> preparation = const Value.absent(),
+                Value<String?> unitKey = const Value.absent(),
                 Value<double?> kcal = const Value.absent(),
                 Value<double?> proteinG = const Value.absent(),
                 Value<double?> fatG = const Value.absent(),
@@ -22135,6 +22205,7 @@ class $$MealIngredientsTableTableManager
                 nutrientBasis: nutrientBasis,
                 micros: micros,
                 preparation: preparation,
+                unitKey: unitKey,
                 kcal: kcal,
                 proteinG: proteinG,
                 fatG: fatG,

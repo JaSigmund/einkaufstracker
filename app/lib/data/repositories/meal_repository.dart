@@ -353,6 +353,7 @@ class MealRepository {
         nutrientBasis: nutrientBasis,
         micros: encodeMicros(micros),
         preparation: retention?.storageKey,
+        unitKey: amount.unit == 'piece' ? d.unitKey?.db : null,
         kcal: nutrients?.kcal,
         proteinG: nutrients?.proteinG,
         fatG: nutrients?.fatG,
