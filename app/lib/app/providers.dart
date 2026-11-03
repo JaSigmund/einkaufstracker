@@ -338,6 +338,11 @@ final allBarcodesStreamProvider = StreamProvider((ref) => ref.watch(productRepos
 
 final allProductAliasesStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAllAliases());
 
+/// Gedaechtnis des Haushalts und gelernte Bon-Texte, fuer die Seite "Gelernte Begriffe" (Doku 27 Etappe E4).
+final foodLinksStreamProvider = StreamProvider((ref) => ref.watch(foodLinkRepositoryProvider).watchAll());
+
+final categoryAliasesStreamProvider = StreamProvider((ref) => ref.watch(receiptRepositoryProvider).watchCategoryAliases());
+
 final allOnlineLinksStreamProvider = StreamProvider((ref) => ref.watch(onlinePriceRepositoryProvider).watchActiveLinks());
 
 /// Was jedem Produkt zugeordnet ist (Doku 27), fuer die Ansichten der Produktliste.

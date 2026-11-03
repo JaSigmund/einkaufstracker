@@ -221,6 +221,31 @@ class InventoryRepository {
     onChanged?.call();
   }
 
+  /// Haengt eine Bon-Position an ein anderes Produkt (Doku 27 Etappe E3), aus dem Bon-Detail oder von der Produktseite. Grundpreis und
+  /// gelernter Bon-Text folgen wie in [setReceiptLink]. Ein noch unbestaetigter Bon-Vorschlag dieser Position zieht mit um, eine
+  /// bestaetigte Bonzuordnung eines anderen Produkts wird geloest, sonst zeigte dessen Bestand auf einen fremden Einkauf.
+  Future<void> moveReceiptItemTo(String receiptItemId, String productId) async {
+    final now = appClock.now().toUtc();
+    final linked = await (_db.select(_db.inventoryItems)
+          ..where((i) => i.receiptItemId.equals(receiptItemId) & i.deletedAt.isNull() & i.productId.equals(productId).not()))
+        .get();
+    for (final item in linked) {
+      if (item.isSuggestion) {
+        await _putItem(item.copyWith(productId: productId, updatedAt: now));
+        final movements = await (_db.select(_db.inventoryMovements)..where((m) => m.inventoryItemId.equals(item.id) & m.deletedAt.isNull())).get();
+        for (final m in movements) {
+          final moved = m.copyWith(productId: productId, updatedAt: now);
+          await _put('inventory_movements', m.id, inventoryMovementToRemote(moved),
+              () => _db.into(_db.inventoryMovements).insertOnConflictUpdate(moved.toCompanion(false)));
+        }
+      } else {
+        await _putItem(item.copyWith(receiptItemId: const Value(null), updatedAt: now));
+      }
+    }
+    await _moveReceiptItemTo(receiptItemId, productId, now);
+    onChanged?.call();
+  }
+
   Future<void> _moveReceiptItemTo(String receiptItemId, String productId, DateTime now) async {
     final position = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(receiptItemId))).getSingleOrNull();
     if (position == null || position.productId == productId) return;

@@ -189,6 +189,9 @@ Future<List<Map<String, dynamic>>> _collect() async {
   // Trinkbar von Hand entschieden (ADR-048), ein gespritzter Saft mit Wasseranteil ohne Abzug
   final saft = await productRepo(db).create(name: 'Orangensaft', baseUnit: 'l', packSize: 1, isDrink: true, nutrientsPer100: const {'kcal': 45.0}, nutrientsBasis: 'g', nutrientsSource: 'off');
   await productRepo(db).setIsDrink((await productRepo(db).create(name: 'Grünkernöl', baseUnit: 'l')).id, false);
+  // Barcode zuordnen und wieder loesen (ADR-052): die Zeile traegt deleted_at
+  await productRepo(db).linkBarcode('9001234567893', saft.id);
+  await productRepo(db).unlinkBarcode('9001234567893');
   await inventoryRepo(db).recordFromScan(productId: saft.id, ean: '9001234567892', quantity: 1, unit: 'l', now: DateTime.utc(2026, 9, 1));
   final drink = DrinkDraft(title: 'Orangensaft gespritzt', parts: [DrinkPart(name: 'Orangensaft', amount: 125, productId: saft.id), DrinkPart.water(125)]);
   await DrinkRepository(mealRepo(db)).book(drink, at: DateTime.utc(2026, 9, 24, 12), inStock: {saft.id});
@@ -243,7 +246,7 @@ void main() {
   test('das Fixture deckt die wichtigen Faelle ab (sonst prueft der Schema-Test zu wenig)', () async {
     final entries = await _collect();
     final tables = {for (final e in entries) e['table'] as String};
-    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries', 'cooking_sessions', 'shopping_lists', 'shopping_list_items']));
+    expect(tables, containsAll(['products', 'inventory_items', 'inventory_movements', 'meals', 'meal_ingredients', 'nutrition_targets', 'product_online_links', 'household_food_links', 'supplements', 'supplement_intakes', 'household_prefs', 'meal_plan_entries', 'cooking_sessions', 'shopping_lists', 'shopping_list_items', 'product_barcodes']));
 
     List<Map<String, dynamic>> rows(String table) => [for (final e in entries) if (e['table'] == table) (e['payload'] as Map).cast<String, dynamic>()];
 

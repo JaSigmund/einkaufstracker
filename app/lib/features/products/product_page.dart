@@ -16,6 +16,7 @@ import '../report/product_price_page.dart';
 import '../settings/expiry_stages_dialog.dart';
 import 'nutrient_assignment.dart';
 import 'product_actions.dart';
+import 'receipt_position_actions.dart';
 import 'product_form_page.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
@@ -116,7 +117,7 @@ class _StockSection extends ConsumerWidget {
   }
 }
 
-/// Erkennung: woran die App das Produkt erkennt. Barcodes verwalten kommt mit Etappe E3, hier stehen sie erst einmal.
+/// Erkennung: woran die App das Produkt erkennt. Barcodes und Bon-Positionen lassen sich hier zuordnen und loesen (Etappe E3).
 class _RecognitionSection extends ConsumerWidget {
   const _RecognitionSection({required this.product});
   final Product product;
@@ -136,6 +137,53 @@ class _RecognitionSection extends ConsumerWidget {
     if (ok == true) await ref.read(productRepositoryProvider).removeAlias(alias.id);
   }
 
+  /// Barcode scannen und zuordnen (Doku 27 Etappe E3). Gehoert er schon einem anderen Produkt, wird nachgefragt.
+  Future<void> _scanBarcode(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(productRepositoryProvider);
+    String? ean;
+    try {
+      ean = await ref.read(barcodeScannerProvider).scan(context);
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Barcode-Scan nicht möglich: $e')));
+      return;
+    }
+    if (ean == null || !context.mounted) return;
+    final owner = await repo.productForBarcode(ean);
+    if (owner?.id == product.id || !context.mounted) return;
+    if (owner != null) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Barcode umhängen?'),
+          content: Text('$ean gehört bisher zu „${owner.name}“. Künftig erkennt die App ihn als „${product.name}“.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+            FilledButton(key: const Key('barcode-move-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Umhängen')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await repo.linkBarcode(ean, product.id);
+    final off = await repo.offSuggestion(ean);
+    if (context.mounted) await offerOffNutrients(context, ref, product, off);
+  }
+
+  Future<void> _unlinkBarcode(BuildContext context, WidgetRef ref, String ean) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Barcode lösen?'),
+        content: Text('Beim nächsten Scan von $ean fragt die App wieder, welches Produkt das ist.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(key: const Key('barcode-unlink-confirm'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Lösen')),
+        ],
+      ),
+    );
+    if (ok == true) await ref.read(productRepositoryProvider).unlinkBarcode(ean);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context);
@@ -148,7 +196,28 @@ class _RecognitionSection extends ConsumerWidget {
       if (barcodes.isEmpty)
         Padding(padding: const EdgeInsets.fromLTRB(16, 2, 16, 4), child: Text('Noch keiner', key: const Key('product-barcodes-empty'), style: muted))
       else
-        for (final b in barcodes) ListTile(key: Key('product-barcode-${b.ean}'), dense: true, leading: const Icon(Icons.qr_code_2), title: Text(b.ean)),
+        for (final b in barcodes)
+          ListTile(
+            key: Key('product-barcode-${b.ean}'),
+            dense: true,
+            leading: const Icon(Icons.qr_code_2),
+            title: Text(b.ean),
+            trailing: IconButton(
+              key: Key('barcode-unlink-${b.ean}'),
+              icon: const Icon(Icons.link_off),
+              tooltip: 'Barcode lösen',
+              onPressed: () => _unlinkBarcode(context, ref, b.ean),
+            ),
+          ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: TextButton.icon(
+          key: const Key('product-barcode-add'),
+          onPressed: () => _scanBarcode(context, ref),
+          icon: const Icon(Icons.qr_code_scanner, size: 18),
+          label: const Text('Barcode scannen'),
+        ),
+      ),
       Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Text('Bon-Texte', style: t.textTheme.labelLarge)),
       if (aliases.isEmpty)
         Padding(padding: const EdgeInsets.fromLTRB(16, 2, 16, 4), child: Text('Noch keiner', key: const Key('product-aliases-empty'), style: muted))
@@ -166,6 +235,15 @@ class _RecognitionSection extends ConsumerWidget {
               onPressed: () => _removeAlias(context, ref, a),
             ),
           ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: TextButton.icon(
+          key: const Key('product-receipt-add'),
+          onPressed: () => addReceiptPositionTo(context, ref, product),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Bon-Position zuordnen'),
+        ),
+      ),
     ]);
   }
 }

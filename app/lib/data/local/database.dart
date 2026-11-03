@@ -87,6 +87,9 @@ class ProductBarcodes extends Table {
   TextColumn get productId => text()();
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// Geloest (Doku 27 Etappe E3). Wird derselbe Barcode wieder zugeordnet, steht hier wieder `null`.
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {householdId, ean};
 }
@@ -683,7 +686,7 @@ class AppDatabase extends _$AppDatabase {
         ));
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -826,6 +829,10 @@ class AppDatabase extends _$AppDatabase {
           // 26 -> 27: Haushaltseinheit je Zutat (ADR-033). Installationen vor 14 legen die Zutaten-Tabelle oben schon mit der Spalte an.
           if (from >= 14 && from < 27) {
             await m.addColumn(mealIngredients, mealIngredients.unitKey);
+          }
+          // 27 -> 28: Barcodes loesen (ADR-052). Installationen vor 5 legen die Tabelle oben schon mit der Spalte an.
+          if (from >= 5 && from < 28) {
+            await m.addColumn(productBarcodes, productBarcodes.deletedAt);
           }
         },
       );

@@ -27,6 +27,7 @@ import '../features/receipts/receipt_file_page.dart';
 import '../domain/products/product_assignment.dart';
 import '../features/products/product_form_page.dart';
 import '../features/products/product_page.dart';
+import '../features/products/learned_terms_page.dart';
 import '../features/products/products_list_page.dart';
 import '../features/report/product_price_page.dart';
 import '../features/bugreport/bug_report_list_page.dart';
@@ -93,6 +94,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           initialOpenOnly: state.uri.queryParameters['open'] == '1',
         ),
       ),
+      GoRoute(path: '/learned-terms', builder: (_, _) => const LearnedTermsPage()),
       GoRoute(path: '/product/:id', builder: (_, state) => ProductPage(productId: state.pathParameters['id']!)),
       GoRoute(
         path: '/receipt-file',

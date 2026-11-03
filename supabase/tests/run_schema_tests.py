@@ -843,7 +843,7 @@ def main():
             row["household_id"] = str(ha)
         cols = list(row)
         vals = [Jsonb(row[c]) if (table, c) in jsonb_cols and row[c] is not None else row[c] for c in cols]
-        key_cols = {"nutrition_targets": ["household_id"], "household_prefs": ["household_id", "key"]}.get(table, ["id"])
+        key_cols = {"nutrition_targets": ["household_id"], "household_prefs": ["household_id", "key"], "product_barcodes": ["household_id", "ean"]}.get(table, ["id"])
         updates = ", ".join(f"{c}=excluded.{c}" for c in cols if c not in key_cols)
         sql = (f"insert into public.{table} ({', '.join(cols)}) values ({', '.join(['%s'] * len(cols))}) "
                f"on conflict ({', '.join(key_cols)}) do update set {updates}")
@@ -912,6 +912,12 @@ def main():
     check("Wochenplan: B kann nicht in Haushalt A schreiben", raises(ins_plan, (ha, "dinner", "Fremd"), user=B))
     check("Wochenplan: unbekannte Tageszeit wird abgelehnt", raises(ins_plan, (ha, "drink", "Tee"), user=A))
     check("Wochenplan: leerer Titel wird abgelehnt", raises(ins_plan, (ha, "dinner", "  "), user=A))
+
+    # --- Barcodes loesen (Migration 0039) ---------------------------------------------------------------------------
+    check("Barcode loesen: Spalte deleted_at ist da",
+          one("select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'product_barcodes' and column_name = 'deleted_at'") == 1)
+    check("Barcode loesen: A kann einen eigenen Barcode als geloest markieren",
+          not raises("update product_barcodes set deleted_at = now() where household_id = %s", (ha,), user=A))
 
     # --- Trinkbare Produkte (Migration 0037) ---------------------------------------------------------------------------
     check("Trinkbar: true, false und null aus dem Fixture sind da",

@@ -55,15 +55,34 @@ class _ImportReviewPageState extends ConsumerState<ImportReviewPage> {
     }
     setState(() => _saving = true);
     try {
+      final before = await _productIds();
       await ref.read(receiptImportServiceProvider).save(p);
+      final after = before == null ? null : await _productIds();
+      final added = after == null ? 0 : after.where((id) => !before!.contains(id)).length;
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bon gespeichert')));
+      final router = GoRouter.of(context);
+      // Der natuerliche Moment, neue Produkte zu pruefen (Doku 27 Etappe E3): der Import zeigt keine Produktzuordnung
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        key: const Key('receipt-saved'),
+        content: Text(added == 0 ? 'Bon gespeichert' : (added == 1 ? 'Bon gespeichert, 1 neues Produkt' : 'Bon gespeichert, $added neue Produkte')),
+        persist: false,
+        action: added == 0 ? null : SnackBarAction(label: 'Prüfen', onPressed: () => router.push('/products?open=1')),
+      ));
       context.go('/');
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Speichern nicht möglich: $e')));
       }
+    }
+  }
+
+  /// Produkte vor und nach dem Speichern, fuer den Hinweis auf neue. Nur eine Zugabe: scheitert das, gibt es keinen Hinweis.
+  Future<Set<String>?> _productIds() async {
+    try {
+      return {for (final p in await ref.read(productRepositoryProvider).allSnapshot()) p.id};
+    } catch (_) {
+      return null;
     }
   }
 

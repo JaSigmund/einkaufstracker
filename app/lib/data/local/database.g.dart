@@ -1955,12 +1955,24 @@ class $ProductBarcodesTable extends ProductBarcodes
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     householdId,
     ean,
     productId,
     updatedAt,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2009,6 +2021,12 @@ class $ProductBarcodesTable extends ProductBarcodes
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -2034,6 +2052,10 @@ class $ProductBarcodesTable extends ProductBarcodes
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -2048,11 +2070,15 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
   final String ean;
   final String productId;
   final DateTime updatedAt;
+
+  /// Geloest (Doku 27 Etappe E3). Wird derselbe Barcode wieder zugeordnet, steht hier wieder `null`.
+  final DateTime? deletedAt;
   const ProductBarcode({
     required this.householdId,
     required this.ean,
     required this.productId,
     required this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2061,6 +2087,9 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     map['ean'] = Variable<String>(ean);
     map['product_id'] = Variable<String>(productId);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -2070,6 +2099,9 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       ean: Value(ean),
       productId: Value(productId),
       updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -2083,6 +2115,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       ean: serializer.fromJson<String>(json['ean']),
       productId: serializer.fromJson<String>(json['productId']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -2093,6 +2126,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       'ean': serializer.toJson<String>(ean),
       'productId': serializer.toJson<String>(productId),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -2101,11 +2135,13 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     String? ean,
     String? productId,
     DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => ProductBarcode(
     householdId: householdId ?? this.householdId,
     ean: ean ?? this.ean,
     productId: productId ?? this.productId,
     updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   ProductBarcode copyWithCompanion(ProductBarcodesCompanion data) {
     return ProductBarcode(
@@ -2115,6 +2151,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       ean: data.ean.present ? data.ean.value : this.ean,
       productId: data.productId.present ? data.productId.value : this.productId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -2124,13 +2161,15 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
           ..write('householdId: $householdId, ')
           ..write('ean: $ean, ')
           ..write('productId: $productId, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(householdId, ean, productId, updatedAt);
+  int get hashCode =>
+      Object.hash(householdId, ean, productId, updatedAt, deletedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2138,7 +2177,8 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
           other.householdId == this.householdId &&
           other.ean == this.ean &&
           other.productId == this.productId &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
@@ -2146,12 +2186,14 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
   final Value<String> ean;
   final Value<String> productId;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const ProductBarcodesCompanion({
     this.householdId = const Value.absent(),
     this.ean = const Value.absent(),
     this.productId = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProductBarcodesCompanion.insert({
@@ -2159,6 +2201,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     required String ean,
     required String productId,
     required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : householdId = Value(householdId),
        ean = Value(ean),
@@ -2169,6 +2212,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     Expression<String>? ean,
     Expression<String>? productId,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2176,6 +2220,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
       if (ean != null) 'ean': ean,
       if (productId != null) 'product_id': productId,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2185,6 +2230,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     Value<String>? ean,
     Value<String>? productId,
     Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return ProductBarcodesCompanion(
@@ -2192,6 +2238,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
       ean: ean ?? this.ean,
       productId: productId ?? this.productId,
       updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2211,6 +2258,9 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2224,6 +2274,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
           ..write('ean: $ean, ')
           ..write('productId: $productId, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -18352,6 +18403,7 @@ typedef $$ProductBarcodesTableCreateCompanionBuilder =
       required String ean,
       required String productId,
       required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$ProductBarcodesTableUpdateCompanionBuilder =
@@ -18360,6 +18412,7 @@ typedef $$ProductBarcodesTableUpdateCompanionBuilder =
       Value<String> ean,
       Value<String> productId,
       Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -18389,6 +18442,11 @@ class $$ProductBarcodesTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -18421,6 +18479,11 @@ class $$ProductBarcodesTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProductBarcodesTableAnnotationComposer
@@ -18445,6 +18508,9 @@ class $$ProductBarcodesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 }
 
 class $$ProductBarcodesTableTableManager
@@ -18488,12 +18554,14 @@ class $$ProductBarcodesTableTableManager
                 Value<String> ean = const Value.absent(),
                 Value<String> productId = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductBarcodesCompanion(
                 householdId: householdId,
                 ean: ean,
                 productId: productId,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -18502,12 +18570,14 @@ class $$ProductBarcodesTableTableManager
                 required String ean,
                 required String productId,
                 required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductBarcodesCompanion.insert(
                 householdId: householdId,
                 ean: ean,
                 productId: productId,
                 updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

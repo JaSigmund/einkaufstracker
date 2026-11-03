@@ -7,6 +7,7 @@ import '../../app/providers.dart';
 import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../../data/nutrition/bls_food_search.dart';
+import '../../data/products/off_client.dart';
 import '../../domain/nutrition/food_match.dart';
 import '../../domain/nutrition/nutrient_scaling.dart';
 import '../diary/ingredient_picker.dart';
@@ -78,6 +79,29 @@ Future<void> markNutrientsNotNeeded(BuildContext context, WidgetRef ref, Product
     await ref.read(productRepositoryProvider).clearNutrients(product.id);
   }
   await ref.read(householdPrefsRepositoryProvider).setNutrientsNotNeeded(product.id, true);
+}
+
+/// Ein Barcode wurde an ein bestehendes Produkt gehaengt und Open Food Facts kennt Naehrwerte (Doku 27 Etappe E3): anbieten, wenn das
+/// Produkt keine oder nur Werte aus der Lebensmitteldatenbank hat. Automatisch wird nichts ueberschrieben.
+Future<void> offerOffNutrients(BuildContext context, WidgetRef ref, Product product, OffProduct? off) async {
+  final per100 = off?.nutrientsPer100;
+  if (per100 == null || per100.isEmpty || product.nutrientsSource == 'off' || product.nutrientsSource == 'manual') return;
+  if (product.nutrientsPer100 != null && product.nutrientsSource != 'bls') return;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Nährwerte übernehmen?'),
+      content: Text(
+        'Open Food Facts kennt die Nährwerte dieser Packung${per100['kcal'] != null ? ' (${formatKcal(per100['kcal']!)} je 100 ${off!.nutrientsBasis ?? 'g'})' : ''}. '
+        '${product.nutrientsPer100 == null ? '„${product.name}“ hat noch keine.' : 'Sie ersetzen die Werte aus der Lebensmitteldatenbank.'}',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Nein')),
+        FilledButton(key: const Key('off-nutrients-accept'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Übernehmen')),
+      ],
+    ),
+  );
+  if (ok == true) await ref.read(productRepositoryProvider).setOffProfile(product.id, per100, basis: off!.nutrientsBasis);
 }
 
 class _ConfirmNutrientsDialog extends StatefulWidget {

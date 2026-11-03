@@ -162,6 +162,7 @@ void main() {
           storesStreamProvider.overrideWith((ref) => Stream.value(const <Store>[])),
           receiptRepositoryProvider.overrideWithValue(repo),
           inventoryRepositoryProvider.overrideWithValue(inventoryRepo(db)),
+          productsStreamProvider.overrideWith((ref) => Stream.value(const <Product>[])),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [
