@@ -71,6 +71,7 @@ List<Override> homeShellOverrides(AppDatabase db) => [
       databaseProvider.overrideWithValue(db),
       householdSettingsProvider.overrideWith((ref) async => _settings),
       householdPrefsOnceProvider.overrideWith((ref) async => const <String, Object?>{}),
+      householdPrefsProvider.overrideWith((ref) => Stream.value(const <String, Object?>{})),
       receiptsStreamProvider.overrideWith((ref) => Stream.value(const <Receipt>[])),
       storesStreamProvider.overrideWith((ref) => Stream.value(const <Store>[])),
       allItemsStreamProvider.overrideWith((ref) => Stream.value(const <ReceiptItem>[])),
