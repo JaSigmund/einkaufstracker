@@ -31,6 +31,15 @@ const nutrientsLimitsText = 'Die Werte stammen aus dem Bundeslebensmittelschlüs
 const nutrientsReferenceText = 'Referenzmengen laut Lebensmittelkennzeichnung (Verordnung (EU) Nr. 1169/2011) für einen durchschnittlichen Erwachsenen. '
     'Das ist keine Empfehlung für dich: Kinder, Schwangere, Sportler und ältere Menschen haben anderen Bedarf.';
 
+/// Name einer Zutat in der Aufschluesselung: Zutaten mit Produkt haben keinen Freitext, dann zaehlt der Produktname (vorher stand dort
+/// nur "Zutat").
+String microIngredientName(MealIngredient i, Map<String, String> productNames) {
+  final free = i.freeText?.trim();
+  if (free != null && free.isNotEmpty) return free;
+  if (i.productId != null) return productNames[i.productId] ?? 'Gelöschtes Produkt';
+  return 'Zutat ohne Namen';
+}
+
 /// Mikronaehrstoffe pro Tag und Woche (Phase N3, ADR-032): Gruppen, Datenabdeckung je Naehrstoff, "Woher kommt das?" und optional die
 /// Kennzeichnungs-Referenzmengen. Keine Ampel, keine Bewertung.
 class NutrientsPage extends ConsumerStatefulWidget {
@@ -247,9 +256,12 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
 
   Widget _content(BuildContext context, ThemeData t, List<Meal> meals, List<MealIngredient> ingredients) {
     final intakes = ref.watch(supplementIntakesStreamProvider).value ?? const <SupplementIntake>[];
+    // Produkte (Namen, Profil und BLS-Verknuepfung); ohne geladene Produkte gibt es nur die BLS-Zeilen
+    final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
+    final productNames = {for (final p in products) p.id: p.name};
     final micros = buildDailyMicros(
       [for (final m in meals) (id: m.id, title: m.title, eatenAtUtc: m.eatenAt, servingsEaten: m.servingsEaten, servingsMade: m.servingsMade)],
-      [for (final i in ingredients) (mealId: i.mealId, name: i.freeText ?? 'Zutat', micros: parseMicros(i.micros))],
+      [for (final i in ingredients) (mealId: i.mealId, name: microIngredientName(i, productNames), micros: parseMicros(i.micros))],
       isEstimate: (id) => meals.where((m) => m.id == id).any((m) => m.isEstimate),
       intakes: [
         for (final i in intakes)
@@ -264,8 +276,6 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
     final MicroValue Function(String key) valueOf = _week ? (k) => week!.valueOf(k) : (k) => byDay[_day]!.valueOf(k);
     final estimates = _week ? false : (byDay[_day]?.hasEstimates ?? false);
 
-    // Produkte (Profil und BLS-Verknuepfung) fuer das Nachrechnen; ohne geladene Produkte gibt es nur die BLS-Zeilen
-    final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
     final productMicros = <String, Micros>{};
     for (final p in products) {
       final m = parseMicros(p.nutrientsPer100);
@@ -385,7 +395,15 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
     );
   }
 
-  /// "Woher kommt das?": die groessten Beitraege, die Abdeckung und der Referenzwert.
+  /// Unterzeile eines Beitrags: Mahlzeit oder Nahrungsergaenzung, in der Woche mit der Zahl der Vorkommen.
+  String _contributionSource(MicroContribution c) {
+    final base = c.supplement ? 'Nahrungsergänzung' : c.mealTitle;
+    // "3 Mahlzeiten" nennt die Zahl schon selbst
+    if (c.occurrences < 2 || c.mealTitle.startsWith('${c.occurrences} ')) return base;
+    return '$base · ${c.occurrences}×';
+  }
+
+  /// "Woher kommt das?": alle Beitraege mit ihrem Anteil, die Zutaten ohne Wert, die Abdeckung und der Referenzwert.
   void _showSources(BuildContext context, NutrientDef def, MicroValue v) {
     final t = Theme.of(context);
     final ref = _referenceOf(def);
@@ -394,9 +412,9 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          child: ListView(key: const Key('nutrient-sheet'), shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
             Text(def.label, key: const Key('nutrient-sheet-title'), style: t.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
@@ -415,16 +433,38 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
                 style: t.textTheme.bodySmall,
               ),
             const SizedBox(height: 12),
-            if (v.contributions.isNotEmpty) Text('Woher kommt das?', style: t.textTheme.titleSmall),
-            for (var i = 0; i < v.contributions.length && i < 3; i++)
+            if (v.contributions.isNotEmpty) ...[
+              Text('Woher kommt das?', style: t.textTheme.titleSmall),
+              if (_week) Text('Durchschnitt je erfasstem Tag, dieselbe Zutat der Woche zusammengefasst', style: t.textTheme.bodySmall),
+            ],
+            for (var i = 0; i < v.contributions.length; i++)
               ListTile(
                 key: Key('nutrient-contrib-$i'),
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 title: Text(v.contributions[i].ingredient),
-                subtitle: Text(v.contributions[i].mealTitle),
-                trailing: Text(formatMicro(def, v.contributions[i].amount)),
+                subtitle: Text(_contributionSource(v.contributions[i])),
+                trailing: Text(
+                  [formatMicro(def, v.contributions[i].amount), ?shareText(v.contributions[i].amount, v.total)].join(' · '),
+                ),
               ),
+            if (v.missing.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Ohne Wert für ${def.label}', key: const Key('nutrient-missing-title'), style: t.textTheme.titleSmall),
+              Text(
+                'Für diese Zutaten nennt die Quelle keinen Wert. Sie fehlen in der Summe, deshalb steht dort „mindestens“.',
+                style: t.textTheme.bodySmall,
+              ),
+              for (var i = 0; i < v.missing.length; i++)
+                ListTile(
+                  key: Key('nutrient-missing-$i'),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(v.missing[i].ingredient),
+                  subtitle: Text(v.missing[i].mealTitle),
+                  trailing: Text('unbekannt', style: t.textTheme.bodySmall),
+                ),
+            ],
             const Divider(),
             Text(
               def.euReference == null

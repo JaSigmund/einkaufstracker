@@ -133,10 +133,49 @@ void main() {
       expect(w.valueOf('iodine_ug').unknown, isTrue);
     });
 
-    test('groesste Beitraege der Woche, hoechstens fuenf', () {
-      final w = buildWeeklyMicros(days).first;
-      expect(w.valueOf('vit_c_mg').contributions.map((c) => c.ingredient), ['y', 'x']);
+    test('Beitraege der Woche als Durchschnitt je erfasstem Tag: zusammen ergeben sie den Wochenwert', () {
+      final c = buildWeeklyMicros(days).first.valueOf('vit_c_mg').contributions;
+      expect(c.map((c) => c.ingredient), ['y', 'x']);
+      expect(c.map((c) => c.amount), [30, 15]);
     });
+
+    test('Zutaten ohne Wert stehen auch in der Woche da', () {
+      final missing = buildWeeklyMicros(days).first.valueOf('vit_c_mg').missing;
+      expect(missing.map((m) => m.ingredient), ['z']);
+    });
+
+    test('dieselbe Zutat an mehreren Tagen ist eine Zeile mit der Zahl der Mahlzeiten', () {
+      final w = buildWeeklyMicros(buildDailyMicros([
+        meal('a', DateTime.utc(2026, 9, 28, 10), title: 'Müsli'),
+        meal('b', DateTime.utc(2026, 9, 29, 10), title: 'Müsli'),
+        meal('c', DateTime.utc(2026, 9, 30, 10), title: 'Kakao'),
+      ], [
+        ing('a', 'Milch', {'calcium_mg': 240}),
+        ing('b', 'Milch', {'calcium_mg': 240}),
+        ing('c', 'Milch', {'calcium_mg': 120}),
+      ])).single;
+      final c = w.valueOf('calcium_mg').contributions.single;
+      expect([c.ingredient, c.amount, c.occurrences, c.mealTitle], ['Milch', 200, 3, '3 Mahlzeiten']);
+    });
+  });
+
+  test('Zutaten ohne Wert je Naehrstoff, mit Mahlzeit, nach Name sortiert; dieselbe Zutat einer Mahlzeit einmal', () {
+    final d = buildDailyMicros([meal('m1', noon, title: 'Lasagne')], [
+      ing('m1', 'Zwiebel', {'iron_mg': 0.2}),
+      ing('m1', 'Zwiebel', {'iron_mg': 0.2}),
+      ing('m1', 'Basilikum', null),
+      ing('m1', 'Karotte', {'vit_a_ug': 800}),
+    ]).single;
+    final a = d.valueOf('vit_a_ug');
+    expect(a.missing.map((m) => '${m.ingredient}/${m.mealTitle}/${m.occurrences}'), ['Basilikum/Lasagne/1', 'Zwiebel/Lasagne/2']);
+    final iron = d.valueOf('iron_mg').contributions.single;
+    expect([iron.ingredient, iron.amount, iron.occurrences], ['Zwiebel', closeTo(0.4, 1e-9), 2]);
+  });
+
+  test('Anteil am Wert', () {
+    expect(shareText(120, 133), '90 %');
+    expect(shareText(0.1, 133), '< 1 %');
+    expect(shareText(5, 0), isNull);
   });
 
   group('Referenz', () {

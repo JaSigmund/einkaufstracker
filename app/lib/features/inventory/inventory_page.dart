@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/clock.dart';
 import '../../data/local/database.dart';
 import '../../domain/inventory/expiry.dart';
+import '../../domain/inventory/inventory_grouping.dart';
 import '../../domain/inventory/usage_forecast.dart';
 import '../common/quantity_dialog.dart';
 import '../products/barcode_flow.dart';
@@ -43,8 +46,19 @@ String _expiryText(InventoryItem item, ExpiryLevel level, DateTime today) {
   return '$label: seit $overdue Tag${overdue == 1 ? '' : 'en'} abgelaufen';
 }
 
-/// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4): aktiver Bestand nach Dringlichkeit gruppiert (abgelaufen/
-/// bald faellig zuerst, wie auf der Uebersicht), Filter nach Lagerort, Vorschlaege aus Bons einklappbar oben.
+/// Geraete-Einstellungen der Inventar-Ansicht (lokaler KV-Speicher, nicht im Haushalt geteilt: jeder sortiert fuer sich).
+const inventoryViewKey = 'inventory_view';
+const inventoryOpenCategoriesKey = 'inventory_open_categories';
+
+/// Ansicht des Inventars: nach Produktkategorie (Standard seit 1.22) oder nach Dringlichkeit (bisherige Liste).
+enum InventoryView { categories, expiry }
+
+/// Inhalt des Tabs "Inventar" (Doku 06, 08 §3.4). Zwei Ansichten:
+/// - **Kategorien** (Standard): einklappbare Abschnitte je Produktkategorie, die Kopfzeile zaehlt Abgelaufenes und bald Faelliges, damit
+///   nichts Dringendes in einem zugeklappten Abschnitt verschwindet. Oben ein Hinweis "Zuerst verbrauchen", der zur Ablauf-Ansicht fuehrt.
+///   Welche Abschnitte offen sind, merkt sich das Geraet.
+/// - **Ablauf**: der Bestand nach Dringlichkeit gruppiert (abgelaufen/bald faellig zuerst, wie auf der Uebersicht).
+/// Fuer beide gelten die Suche (Name, Marke, Kategorie) und der Filter nach Lagerort; die Vorschlaege aus Bons stehen einklappbar oben.
 /// Der FAB startet direkt den Barcode-Scan, ohne Umweg ueber die Seite "Scannen". Der zweite Reiter ist die Produktliste, der eine Ort
 /// fuer alle Zuordnungen (Doku 27, Q-36): der Bestand sagt, was da ist, die Produkte, was die App darueber weiss.
 class InventoryPage extends ConsumerStatefulWidget {
@@ -63,12 +77,63 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 
   /// Erst beim ersten Oeffnen aufbauen, danach behaelt die Produktliste Filter und Scrollposition.
   var _productsVisited = false;
+  var _view = InventoryView.categories;
+  var _open = <String>{};
+  var _query = '';
+  final _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPrefs() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final view = await db.getKv(inventoryViewKey);
+      final open = await db.getKv(inventoryOpenCategoriesKey);
+      if (!mounted) return;
+      setState(() {
+        if (view == InventoryView.expiry.name) _view = InventoryView.expiry;
+        if (open != null) _open = {for (final k in jsonDecode(open) as List) k as String};
+      });
+    } catch (_) {
+      // ohne lesbare Ablage gilt die Standardansicht
+    }
+  }
+
+  Future<void> _savePref(String key, String value) async {
+    try {
+      await ref.read(databaseProvider).setKv(key, value);
+    } catch (_) {
+      // nur eine Komfortfunktion
+    }
+  }
+
+  void _setView(InventoryView v) {
+    setState(() => _view = v);
+    _savePref(inventoryViewKey, v.name);
+  }
+
+  void _setOpen(Set<String> open) {
+    setState(() => _open = open);
+    _savePref(inventoryOpenCategoriesKey, jsonEncode(open.toList()..sort()));
+  }
 
   @override
   Widget build(BuildContext context) {
     final active = ref.watch(activeInventoryStreamProvider);
     final suggestions = ref.watch(inventorySuggestionsStreamProvider).value ?? const <InventoryItem>[];
     final products = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p};
+    final categories = ref.watch(categoriesStreamProvider).value ?? const <Category>[];
+    final categoryNames = {for (final c in categories) c.id: c.name};
     final today = widget.now ?? appClock.now();
     final t = Theme.of(context);
     final forecasts = ref.watch(usageForecastProvider);
@@ -79,11 +144,33 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       error: (e, _) => Center(child: Text('Fehler: $e')),
       data: (all) {
         final locations = {for (final i in all) i.location}.toList()..sort((a, b) => _locationOrder.indexOf(a).compareTo(_locationOrder.indexOf(b)));
-        final shown = _location == null ? all : all.where((i) => i.location == _location).toList();
+        final shown = [
+          for (final i in all)
+            if ((_location == null || i.location == _location) &&
+                matchesInventorySearch(
+                  _query,
+                  name: products[i.productId]?.name ?? '',
+                  brand: products[i.productId]?.brand,
+                  category: categoryNames[products[i.productId]?.categoryId],
+                ))
+              i,
+        ];
+        ExpiryLevel levelOf(InventoryItem item) => expiryLevel(expiresOn: item.expiresOn, dateKind: item.dateKind, today: today);
         final groups = <ExpiryLevel, List<InventoryItem>>{};
         for (final item in shown) {
-          groups.putIfAbsent(expiryLevel(expiresOn: item.expiresOn, dateKind: item.dateKind, today: today), () => []).add(item);
+          groups.putIfAbsent(levelOf(item), () => []).add(item);
         }
+        final byCategory = groupByCategory<InventoryItem>(
+          [
+            for (final i in shown)
+              (item: i, categoryId: products[i.productId]?.categoryId, name: products[i.productId]?.name ?? '', level: levelOf(i), expiresOn: i.expiresOn),
+          ],
+          [for (final c in categories) (id: c.id, name: c.name)],
+        );
+        final searching = _query.trim().isNotEmpty;
+        // dringend zaehlt ueber den ganzen Bestand, nicht nur ueber die Auswahl: der Hinweis soll nichts verschweigen
+        final expiredAll = all.where((i) => levelOf(i) == ExpiryLevel.expired).length;
+        final soonAll = all.where((i) => levelOf(i) == ExpiryLevel.soon).length;
 
         return Scaffold(
           floatingActionButton: _showProducts ? null : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -134,7 +221,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
             ),
             Expanded(
               child: IndexedStack(index: _showProducts ? 1 : 0, children: [
-                _stockList(t, all, shown, locations, groups, suggestions, products, today, forecasts),
+                _stockList(t, all, shown, locations, groups, suggestions, products, today, forecasts,
+                    byCategory: byCategory, searching: searching, expiredAll: expiredAll, soonAll: soonAll),
                 if (_productsVisited) const ProductsView() else const SizedBox.shrink(),
               ]),
             ),
@@ -153,8 +241,12 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     List<InventoryItem> suggestions,
     Map<String, Product> products,
     DateTime today,
-    Map<String, UsageForecast> forecasts,
-  ) =>
+    Map<String, UsageForecast> forecasts, {
+    required List<InventoryCategoryGroup<InventoryItem>> byCategory,
+    required bool searching,
+    required int expiredAll,
+    required int soonAll,
+  }) =>
       ListView(
             padding: const EdgeInsets.only(bottom: 168),
             children: [
@@ -186,6 +278,47 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                         ),
                   ]),
                 ),
+              if (all.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: SegmentedButton<InventoryView>(
+                    key: const Key('inventory-view'),
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: InventoryView.categories, label: Text('Kategorien'), icon: Icon(Icons.category_outlined)),
+                      ButtonSegment(value: InventoryView.expiry, label: Text('Ablauf'), icon: Icon(Icons.schedule)),
+                    ],
+                    selected: {_view},
+                    onSelectionChanged: (s) => _setView(s.first),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: TextField(
+                    key: const Key('inventory-search'),
+                    controller: _search,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: 'Im Bestand suchen',
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('inventory-search-clear'),
+                              tooltip: 'Suche löschen',
+                              icon: const Icon(Icons.close),
+                              onPressed: () => setState(() {
+                                _search.clear();
+                                _query = '';
+                              }),
+                            ),
+                    ),
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
+                ),
+              ],
               if (locations.length > 1)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -205,13 +338,57 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   padding: const EdgeInsets.all(32),
                   child: Center(
                     child: Text(
-                      all.isEmpty ? 'Noch kein Bestand. Tippe unten auf „Scannen“, um den ersten Artikel zu erfassen.' : 'Keine Einträge für diese Auswahl',
+                      all.isEmpty
+                          ? 'Noch kein Bestand. Tippe unten auf „Scannen“, um den ersten Artikel zu erfassen.'
+                          : searching
+                              ? 'Nichts im Bestand passt zu „${_query.trim()}“'
+                              : 'Keine Einträge für diese Auswahl',
                       key: const Key('inventory-empty'),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 )
-              else
+              else if (_view == InventoryView.categories) ...[
+                if (expiredAll + soonAll > 0 && !searching)
+                  Card(
+                    key: const Key('inventory-urgent'),
+                    margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    color: (expiredAll > 0 ? t.colorScheme.errorContainer : t.colorScheme.secondaryContainer),
+                    child: ListTile(
+                      leading: Icon(Icons.priority_high, color: expiredAll > 0 ? t.colorScheme.onErrorContainer : null),
+                      title: const Text('Zuerst verbrauchen'),
+                      subtitle: Text([
+                        if (expiredAll > 0) '$expiredAll abgelaufen',
+                        if (soonAll > 0) '$soonAll ${soonAll == 1 ? 'läuft' : 'laufen'} bald ab',
+                      ].join(', ')),
+                      trailing: const Text('Anzeigen'),
+                      onTap: () => _setView(InventoryView.expiry),
+                    ),
+                  ),
+                if (!searching && byCategory.length > 1)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: TextButton(
+                        key: const Key('inventory-toggle-all'),
+                        onPressed: () => _setOpen(byCategory.every((g) => _open.contains(g.key)) ? {} : {for (final g in byCategory) g.key}),
+                        child: Text(byCategory.every((g) => _open.contains(g.key)) ? 'Alle zuklappen' : 'Alle aufklappen'),
+                      ),
+                    ),
+                  ),
+                for (final g in byCategory) ...[
+                  _CategoryHeader(
+                    group: g,
+                    // beim Suchen ist jeder Abschnitt mit Treffern offen
+                    open: searching || _open.contains(g.key),
+                    onTap: searching ? null : () => _setOpen(_open.contains(g.key) ? ({..._open}..remove(g.key)) : {..._open, g.key}),
+                  ),
+                  if (searching || _open.contains(g.key))
+                    for (final i in g.items)
+                      _InventoryTile(item: i.item, product: products[i.item.productId], level: i.level, today: today, forecast: forecasts[i.item.productId]),
+                ],
+              ] else
                 for (final level in _groupOrder)
                   if (groups[level] case final items? when items.isNotEmpty) ...[
                     Padding(
@@ -225,6 +402,45 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   ],
             ],
           );
+}
+
+/// Kopfzeile eines Kategorie-Abschnitts: Name, Anzahl und, auch zugeklappt, die abgelaufenen und bald faelligen Positionen als Punkte.
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({required this.group, required this.open, this.onTap});
+
+  final InventoryCategoryGroup<InventoryItem> group;
+  final bool open;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    Widget badge(int n, ExpiryLevel level, String what) => Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Tooltip(
+            message: '$n $what',
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 4), decoration: BoxDecoration(color: _dotColor(level, t.colorScheme), shape: BoxShape.circle)),
+              Text('$n', style: t.textTheme.labelMedium),
+            ]),
+          ),
+        );
+    return ListTile(
+      key: Key('inventory-category-${group.key}'),
+      dense: true,
+      title: Text(group.name, style: t.textTheme.titleSmall),
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (group.expired > 0) badge(group.expired, ExpiryLevel.expired, 'abgelaufen'),
+        if (group.soon > 0) badge(group.soon, ExpiryLevel.soon, 'bald fällig'),
+        Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Text('${group.items.length}', key: Key('inventory-category-count-${group.key}'), style: t.textTheme.labelLarge),
+        ),
+        if (onTap != null) Icon(open ? Icons.expand_less : Icons.expand_more),
+      ]),
+      onTap: onTap,
+    );
+  }
 }
 
 /// Bis zu dieser Reichweite (Tage) zeigt die Bestandsliste die Vorhersage.
