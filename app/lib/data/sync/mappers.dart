@@ -91,6 +91,7 @@ Map<String, dynamic> productBarcodeToRemote(ProductBarcode b) => {
       'ean': b.ean,
       'product_id': b.productId,
       'updated_at': b.updatedAt.toUtc().toIso8601String(),
+      'deleted_at': b.deletedAt?.toUtc().toIso8601String(),
     };
 
 ProductBarcodesCompanion productBarcodeFromRemote(Map<String, dynamic> j) => ProductBarcodesCompanion(
@@ -98,6 +99,7 @@ ProductBarcodesCompanion productBarcodeFromRemote(Map<String, dynamic> j) => Pro
       ean: Value(j['ean'] as String),
       productId: Value(j['product_id'] as String),
       updatedAt: Value(_dt(j['updated_at'])!),
+      deletedAt: Value(_dt(j['deleted_at'])),
     );
 
 Map<String, dynamic> storeToRemote(Store s) => {

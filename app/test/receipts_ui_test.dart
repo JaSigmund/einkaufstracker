@@ -192,6 +192,7 @@ void main() {
             storesStreamProvider.overrideWith((ref) => Stream.value([_store])),
             receiptRepositoryProvider.overrideWithValue(h.repo),
             inventoryRepositoryProvider.overrideWithValue(h.inventory),
+            productsStreamProvider.overrideWith((ref) => Stream.value(const <Product>[])),
           ],
           child: MaterialApp.router(
             routerConfig: GoRouter(initialLocation: '/', routes: [
@@ -359,6 +360,8 @@ void main() {
       expect(find.text('Nicht zugeordnet'), findsOneWidget);
 
       await tester.tap(find.text('scharfer Aufstrich'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('item-category')));
       await tester.pumpAndSettle();
       final pick = find.byKey(const Key('pick-Öle, Gewürze & Saucen'));
       await tester.scrollUntilVisible(pick, 100, scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)));

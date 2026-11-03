@@ -201,6 +201,9 @@ class ReceiptRepository {
     final now = appClock.now().toUtc();
     final categorizer = await _buildCategorizer(hid);
     final storableIds = productRepo != null && inventoryRepo != null ? await _storableCategoryIds(hid) : const <String>{};
+    final validCategoryIds = {
+      for (final c in await (_db.select(_db.categories)..where((c) => c.householdId.equals(hid) & c.deletedAt.isNull())).get()) c.id,
+    };
     final purchasedOn = _viennaDate(r.purchasedAtUtc!);
 
     final existing = await findDuplicate(r);
@@ -262,8 +265,14 @@ class ReceiptRepository {
         // Kategorien: Preisvergleich/-verlauf sollen z.B. auch fuer Brot funktionieren, das nicht im
         // Inventar gefuehrt wird.
         Product? product;
+        var category = suggestion.categoryId;
         if (i.kind == ReceiptItemKind.article && productRepo != null) {
           product = await productRepo!.findOrCreateForReceiptItem(i.rawText, categoryId: suggestion.categoryId, baseUnit: i.quantityUnit);
+          // Das Produkt fuehrt (Q-37, ADR-052): hat es eine Kategorie, gilt die, nicht die Stichwortregel oder der gelernte Bon-Text
+          if (product.categoryId != null && validCategoryIds.contains(product.categoryId)) {
+            category = product.categoryId;
+            lastArticleCategory = category;
+          }
         }
         final unitPriceNormCents = product == null
             ? null
@@ -292,14 +301,14 @@ class ReceiptRepository {
           lineTotalCents: i.lineTotalCents,
           unitPriceNormCents: unitPriceNormCents,
           taxCode: i.taxCode,
-          categoryId: suggestion.categoryId,
-          needsReview: i.kind == ReceiptItemKind.article && suggestion.categoryId == null,
+          categoryId: category,
+          needsReview: i.kind == ReceiptItemKind.article && category == null,
           updatedAt: now,
         ));
 
         // Bon-Vorschlag im Inventar fuer lagerbare Kategorien (Doku 06 §2 Punkt 1): kein MHD, hoechstens
         // eine Schaetzung aus der Standardhaltbarkeit des Produkts.
-        if (product != null && suggestion.categoryId != null && storableIds.contains(suggestion.categoryId)) {
+        if (product != null && category != null && storableIds.contains(category)) {
           // Der Bon zaehlt Packungen, der Bestand die Menge (ADR-045): 1 × Yakult sind 0,39 l
           final stock = Packaging(baseUnit: product.baseUnit, rawPackSize: product.packSize, rawPiecesPerPack: product.piecesPerPack)
               .stockFromPurchase(quantity: i.quantity, quantityUnit: i.quantityUnit, rawText: i.rawText);
@@ -386,9 +395,75 @@ class ReceiptRepository {
           if (normalizeItemName(o.rawText) == key && o.categoryId != categoryId) await assign(o);
         }
       }
+
+      // Das Produkt der Position bekommt dieselbe Kategorie (Q-37, ADR-052), sonst liefen Auswertung und Einkaufsliste auseinander
+      if (item.productId case final productId?) await _setProductCategory(productId, categoryId, now);
     });
     onChanged?.call();
     return changed;
+  }
+
+  Future<void> _setProductCategory(String productId, String? categoryId, DateTime now) async {
+    final product = await (_db.select(_db.products)..where((p) => p.id.equals(productId))).getSingleOrNull();
+    if (product == null || product.categoryId == categoryId) return;
+    final updated = product.copyWith(categoryId: Value(categoryId), updatedAt: now);
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+  }
+
+  /// Die Kategorie eines Produkts gilt auch fuer seine Bon-Positionen (Q-37, ADR-052). Liefert die vorherigen Kategorien je Position,
+  /// damit sich das mit [restoreItemCategories] zuruecknehmen laesst. Rabattzeilen haben kein Produkt und bleiben, wie sie sind.
+  Future<Map<String, String?>> setProductItemsCategory(String productId, String? categoryId) async {
+    final now = appClock.now().toUtc();
+    final previous = <String, String?>{};
+    await _db.transaction(() async {
+      final items = await (_db.select(_db.receiptItems)..where((i) => i.productId.equals(productId) & i.deletedAt.isNull())).get();
+      for (final it in items.where((i) => i.categoryId != categoryId)) {
+        previous[it.id] = it.categoryId;
+        final updated = it.copyWith(categoryId: Value(categoryId), needsReview: categoryId == null && it.kind == 'article', updatedAt: now);
+        await _put('receipt_items', it.id, receiptItemToRemote(updated), () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+    });
+    if (previous.isNotEmpty) onChanged?.call();
+    return previous;
+  }
+
+  /// Gegenstueck zu [setProductItemsCategory] fuer "Rückgängig".
+  Future<void> restoreItemCategories(Map<String, String?> previous) async {
+    final now = appClock.now().toUtc();
+    await _db.transaction(() async {
+      for (final e in previous.entries) {
+        final it = await (_db.select(_db.receiptItems)..where((i) => i.id.equals(e.key))).getSingleOrNull();
+        if (it == null) continue;
+        final updated = it.copyWith(categoryId: Value(e.value), needsReview: e.value == null && it.kind == 'article', updatedAt: now);
+        await _put('receipt_items', it.id, receiptItemToRemote(updated), () => _db.into(_db.receiptItems).insertOnConflictUpdate(updated.toCompanion(false)));
+      }
+    });
+    onChanged?.call();
+  }
+
+  /// Gelernte Bon-Texte -> Kategorie, fuer die Seite "Gelernte Begriffe" (Doku 27 Etappe E4).
+  Stream<List<CategoryAlias>> watchCategoryAliases() => (_db.select(_db.categoryAliases)
+        ..where((a) => a.deletedAt.isNull())
+        ..orderBy([(a) => OrderingTerm.asc(a.aliasText)]))
+      .watch();
+
+  /// Ein gelernter Bon-Text gilt kuenftig fuer eine andere Kategorie. Bestehende Positionen bleiben, wie sie sind.
+  Future<void> setCategoryAlias(String aliasId, String categoryId) async {
+    final alias = await (_db.select(_db.categoryAliases)..where((a) => a.id.equals(aliasId))).getSingleOrNull();
+    if (alias == null || alias.categoryId == categoryId) return;
+    final updated = alias.copyWith(categoryId: categoryId, hits: 1, updatedAt: appClock.now().toUtc());
+    await _put('category_aliases', alias.id, categoryAliasToRemote(updated), () => _db.into(_db.categoryAliases).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+  }
+
+  /// Vergisst einen gelernten Bon-Text: beim naechsten Bon entscheiden wieder die Stichwortregeln.
+  Future<void> forgetCategoryAlias(String aliasId) async {
+    final alias = await (_db.select(_db.categoryAliases)..where((a) => a.id.equals(aliasId))).getSingleOrNull();
+    if (alias == null || alias.deletedAt != null) return;
+    final now = appClock.now().toUtc();
+    final updated = alias.copyWith(deletedAt: Value(now), updatedAt: now);
+    await _put('category_aliases', alias.id, categoryAliasToRemote(updated), () => _db.into(_db.categoryAliases).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
   }
 
   /// Markiert eine Bon-Position als "von jemand anderem bezahlt" (ADR-020 "Rechnungen teilen") oder hebt das

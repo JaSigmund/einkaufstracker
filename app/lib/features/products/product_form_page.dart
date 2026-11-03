@@ -17,6 +17,7 @@ import '../../domain/products/packaging.dart';
 import '../../domain/receipt/unit_price.dart';
 import '../../domain/shopping_list/list_quantity.dart';
 import '../common/quantity_dialog.dart';
+import 'nutrient_assignment.dart';
 
 /// Argumente fuer /product-form: entweder ein unbekannter Barcode (mit optionalem OFF-Vorschlag) oder ein
 /// bestehendes Produkt zum Bearbeiten.
@@ -201,6 +202,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     setState(() => _linking = true);
     try {
       await ref.read(productRepositoryProvider).linkBarcode(widget.ean!, product.id);
+      if (!mounted) return;
+      await offerOffNutrients(context, ref, product, widget.suggestion);
       if (mounted) context.pop(product);
     } catch (e) {
       if (mounted) {

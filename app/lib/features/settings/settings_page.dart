@@ -316,6 +316,14 @@ class SettingsPage extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/products'),
           ),
+          ListTile(
+            key: const Key('settings-learned-terms'),
+            leading: const Icon(Icons.psychology_outlined),
+            title: const Text('Gelernte Begriffe'),
+            subtitle: const Text('Zutaten und Bon-Texte, die die App sich gemerkt hat'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/learned-terms'),
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

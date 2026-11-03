@@ -163,19 +163,25 @@ class _ProductsViewState extends ConsumerState<ProductsView> {
             ),
         ]),
       ),
-      if (_view != ProductView.duplicates)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: FilterChip(
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 4, 0),
+        child: Row(children: [
+          if (_view != ProductView.duplicates)
+            FilterChip(
               key: const Key('products-open-only'),
               label: const Text('Nur offene'),
               selected: _openOnly,
               onSelected: (v) => setState(() => _openOnly = v),
             ),
+          const Spacer(),
+          TextButton.icon(
+            key: const Key('products-learned'),
+            onPressed: () => context.push('/learned-terms'),
+            icon: const Icon(Icons.psychology_outlined, size: 18),
+            label: const Text('Gelernte Begriffe'),
           ),
-        ),
+        ]),
+      ),
       Expanded(
         child: _view == ProductView.duplicates
             ? _duplicatesList(t, duplicates.where((d) => matches(d.$1) || matches(d.$2)).toList())

@@ -71,8 +71,26 @@ class ProductRepository {
         ..orderBy([(a) => OrderingTerm.desc(a.updatedAt)]))
       .watch();
 
-  /// Alle Barcodes des Haushalts.
-  Stream<List<ProductBarcode>> watchAllBarcodes() => _db.select(_db.productBarcodes).watch();
+  /// Alle aktiven Barcodes des Haushalts.
+  Stream<List<ProductBarcode>> watchAllBarcodes() => (_db.select(_db.productBarcodes)..where((b) => b.deletedAt.isNull())).watch();
+
+  /// Zu welchem aktiven Produkt ein Barcode gehoert, `null` ohne Zuordnung.
+  Future<Product?> productForBarcode(String ean) async {
+    final hid = await householdId();
+    final mapping = await (_db.select(_db.productBarcodes)..where((b) => b.householdId.equals(hid) & b.ean.equals(ean) & b.deletedAt.isNull())).getSingleOrNull();
+    if (mapping == null) return null;
+    final p = await byId(mapping.productId);
+    return p == null || p.deletedAt != null ? null : p;
+  }
+
+  /// Was Open Food Facts zu einem Barcode weiss, ohne lokale Zuordnung. `null` ohne Netz oder ohne Treffer.
+  Future<OffProduct?> offSuggestion(String ean) async {
+    try {
+      return await off?.lookup(ean);
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<Product?> byId(String id) => (_db.select(_db.products)..where((p) => p.id.equals(id))).getSingleOrNull();
 
@@ -95,7 +113,7 @@ class ProductRepository {
     final hid = await householdId();
     final linked = _db.selectOnly(_db.productBarcodes)
       ..addColumns([_db.productBarcodes.productId])
-      ..where(_db.productBarcodes.householdId.equals(hid));
+      ..where(_db.productBarcodes.householdId.equals(hid) & _db.productBarcodes.deletedAt.isNull());
     final linkedIds = (await linked.map((r) => r.read(_db.productBarcodes.productId)!).get()).toSet();
     final all = await (_db.select(_db.products)
           ..where((p) => p.householdId.equals(hid) & p.deletedAt.isNull())
@@ -123,7 +141,7 @@ class ProductRepository {
   /// immer Vorrang, auch offline verfuegbar; OFF wird nur befragt, wenn nichts gefunden wurde.
   Future<BarcodeLookupResult> lookup(String ean) async {
     final hid = await householdId();
-    final mapping = await (_db.select(_db.productBarcodes)..where((b) => b.householdId.equals(hid) & b.ean.equals(ean))).getSingleOrNull();
+    final mapping = await (_db.select(_db.productBarcodes)..where((b) => b.householdId.equals(hid) & b.ean.equals(ean) & b.deletedAt.isNull())).getSingleOrNull();
     if (mapping != null) {
       final p = await byId(mapping.productId);
       if (p != null && p.deletedAt == null) return BarcodeLookupResult(product: p);
@@ -492,10 +510,39 @@ class ProductRepository {
   /// Verknuepft einen EAN dauerhaft mit einem Produkt (Doku 06 §4: "bleibt danach dauerhaft erhalten").
   Future<void> linkBarcode(String ean, String productId) async {
     final hid = await householdId();
-    final b = ProductBarcode(householdId: hid, ean: ean, productId: productId, updatedAt: appClock.now().toUtc());
+    final b = ProductBarcode(householdId: hid, ean: ean, productId: productId, updatedAt: appClock.now().toUtc(), deletedAt: null);
     await _put('product_barcodes', '$hid:$ean', productBarcodeToRemote(b),
         () => _db.into(_db.productBarcodes).insertOnConflictUpdate(b.toCompanion(false)));
     onChanged?.call();
+  }
+
+  /// Loest einen Barcode (Doku 27 Etappe E3): der naechste Scan fragt wieder, welches Produkt das ist.
+  Future<void> unlinkBarcode(String ean) async {
+    final hid = await householdId();
+    final b = await (_db.select(_db.productBarcodes)..where((b) => b.householdId.equals(hid) & b.ean.equals(ean))).getSingleOrNull();
+    if (b == null || b.deletedAt != null) return;
+    final now = appClock.now().toUtc();
+    final updated = b.copyWith(deletedAt: Value(now), updatedAt: now);
+    await _put('product_barcodes', '$hid:$ean', productBarcodeToRemote(updated),
+        () => _db.into(_db.productBarcodes).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+  }
+
+  /// Nimmt die Naehrwerte von Open Food Facts ins Produkt (packungsgenau), z.B. wenn ein Barcode an ein Bon-Produkt gehaengt wird.
+  /// Liefert das geaenderte Produkt, `null` ohne Werte oder ohne Produkt.
+  Future<Product?> setOffProfile(String productId, Map<String, double> per100, {String? basis}) async {
+    final product = await byId(productId);
+    if (product == null || product.deletedAt != null || per100.isEmpty) return null;
+    final updated = product.copyWith(
+      nutrientsPer100: Value(jsonEncode(per100)),
+      nutrientsBasis: Value(basis ?? 'g'),
+      nutrientsSource: const Value('off'),
+      blsCode: const Value(null),
+      updatedAt: appClock.now().toUtc(),
+    );
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+    return updated;
   }
 
   Future<void> _put(String remoteTable, String rowId, Map<String, dynamic> payload, Future<void> Function() writeLocal) async {

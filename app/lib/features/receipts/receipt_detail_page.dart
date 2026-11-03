@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../data/local/database.dart';
 import '../receipt_import/receipt_import_service.dart';
 import '../common/domain_format.dart';
+import '../products/receipt_position_actions.dart';
 
 /// Einzelner gespeicherter Bon mit allen Positionen. Loeschen ueber das Menue oben rechts.
 class ReceiptDetailPage extends ConsumerWidget {
@@ -74,6 +75,7 @@ class ReceiptDetailPage extends ConsumerWidget {
     final categories = (ref.watch(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
     final categoryName = {for (final c in categories) c.id: c.name};
     final comparison = ref.watch(listComparisonProvider(receiptId)).value;
+    final productName = {for (final p in ref.watch(productsStreamProvider).value ?? const <Product>[]) p.id: p.name};
     final t = Theme.of(context);
 
     if (receipt == null || receipt.deletedAt != null) {
@@ -140,7 +142,7 @@ class ReceiptDetailPage extends ConsumerWidget {
               title: Text(i.rawText, style: i.excluded ? _excludedStyle(t) : null),
               subtitle: _sub(i, categoryName) == null ? null : Text(_sub(i, categoryName)!),
               // Rabatte auf Bon-Ebene haben keine Kategorie und werden anteilig verrechnet
-              onTap: i.kind == 'bill_discount' || (i.kind == 'discount' && i.categoryId == null) ? null : () => _pickCategory(context, ref, i, categories),
+              onTap: i.kind == 'bill_discount' || (i.kind == 'discount' && i.categoryId == null) ? null : () => _itemSheet(context, ref, i, categories, productName),
               trailing: Text(
                 formatEuro(i.lineTotalCents),
                 style: i.excluded ? _excludedStyle(t) : TextStyle(color: i.lineTotalCents < 0 ? t.colorScheme.primary : null),
@@ -179,6 +181,55 @@ class ReceiptDetailPage extends ConsumerWidget {
     }
   }
 
+  /// Eine Position (Doku 27 Etappe E3): Produkt, Kategorie und "von anderem bezahlt" an einer Stelle. Vorher fuehrte der Tipp direkt in die
+  /// Kategorien, und das Produkt einer Position war weder zu sehen noch zu aendern.
+  Future<void> _itemSheet(BuildContext context, WidgetRef ref, ReceiptItem item, List<Category> categories, Map<String, String> productName) async {
+    final categoryName = {for (final c in categories) c.id: c.name};
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(title: Text(item.rawText, style: Theme.of(ctx).textTheme.titleMedium), trailing: Text(formatEuro(item.lineTotalCents))),
+          const Divider(height: 1),
+          if (item.kind == 'article')
+            ListTile(
+              key: const Key('item-product'),
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: const Text('Produkt'),
+              subtitle: Text(productName[item.productId] ?? 'Kein Produkt'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pop(ctx, 'product'),
+            ),
+          ListTile(
+            key: const Key('item-category'),
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('Kategorie'),
+            subtitle: Text(categoryName[item.categoryId] ?? 'Nicht zugeordnet'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.pop(ctx, 'category'),
+          ),
+          SwitchListTile(
+            key: const Key('item-excluded-switch'),
+            value: item.excluded,
+            title: const Text('Von jemand anderem bezahlt'),
+            subtitle: const Text('Zählt nicht zu deinen Ausgaben, bleibt aber auf dem Bon und im Inventar.'),
+            onChanged: (v) {
+              Navigator.pop(ctx);
+              _toggleExcluded(context, ref, item, v);
+            },
+          ),
+        ]),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (action) {
+      case 'product':
+        await moveReceiptPosition(context, ref, item);
+      case 'category':
+        await _pickCategory(context, ref, item, categories);
+    }
+  }
+
   Future<void> _pickCategory(BuildContext context, WidgetRef ref, ReceiptItem item, List<Category> categories) async {
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -189,18 +240,10 @@ class ReceiptDetailPage extends ConsumerWidget {
           child: ListView(
             shrinkWrap: true,
             children: [
-              SwitchListTile(
-                key: const Key('item-excluded-switch'),
-                value: item.excluded,
-                title: const Text('Von jemand anderem bezahlt'),
-                subtitle: const Text('Zählt nicht zu deinen Ausgaben, bleibt aber auf dem Bon und im Inventar.'),
-                onChanged: (v) {
-                  Navigator.pop(ctx);
-                  _toggleExcluded(context, ref, item, v);
-                },
+              ListTile(
+                title: Text(item.rawText, style: Theme.of(ctx).textTheme.titleMedium),
+                subtitle: const Text('Kategorie wählen. Die App merkt sich das für gleiche Artikel und für das Produkt.'),
               ),
-              const Divider(height: 1),
-              ListTile(title: Text(item.rawText, style: Theme.of(ctx).textTheme.titleMedium), subtitle: const Text('Kategorie wählen. Die App merkt sich die Zuordnung für gleiche Artikel.')),
               for (final c in categories)
                 ListTile(
                   key: Key('pick-${c.name}'),

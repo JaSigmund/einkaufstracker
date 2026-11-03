@@ -92,9 +92,10 @@ Future<void> confirmProductMerge(BuildContext context, WidgetRef ref, {required 
   if (confirmed == true) await ref.read(productRepositoryProvider).mergeInto(drop.id, keep.id);
 }
 
-/// Kategorie eines Produkts waehlen. Die Kategorie der Bon-Positionen bleibt davon unberuehrt, bis Etappe E4 sie zusammenfuehrt (Q-37).
+/// Kategorie eines Produkts waehlen. Das Produkt fuehrt (Q-37, ADR-052): seine Bon-Positionen ziehen nach, mit "Rückgängig".
 Future<void> pickProductCategory(BuildContext context, WidgetRef ref, Product product) async {
   final categories = (ref.read(categoriesStreamProvider).value ?? const <Category>[]).where((c) => c.deletedAt == null).toList();
+  final messenger = ScaffoldMessenger.maybeOf(context);
   final picked = await showModalBottomSheet<({String? id})>(
     context: context,
     isScrollControlled: true,
@@ -121,5 +122,23 @@ Future<void> pickProductCategory(BuildContext context, WidgetRef ref, Product pr
     ),
   );
   if (picked == null || picked.id == product.categoryId) return;
-  await ref.read(productRepositoryProvider).update(product.copyWith(categoryId: Value(picked.id)));
+  final products = ref.read(productRepositoryProvider);
+  final receipts = ref.read(receiptRepositoryProvider);
+  await products.update(product.copyWith(categoryId: Value(picked.id)));
+  final previous = await receipts.setProductItemsCategory(product.id, picked.id);
+  if (previous.isEmpty || messenger == null) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      key: const Key('category-items-changed'),
+      content: Text(previous.length == 1 ? 'Auch 1 Bon-Position geändert' : 'Auch ${previous.length} Bon-Positionen geändert'),
+      persist: false,
+      action: SnackBarAction(
+        label: 'Rückgängig',
+        onPressed: () async {
+          await products.update(product.copyWith(categoryId: Value(product.categoryId)));
+          await receipts.restoreItemCategories(previous);
+        },
+      ),
+    ));
 }
