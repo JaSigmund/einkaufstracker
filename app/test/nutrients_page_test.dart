@@ -177,9 +177,39 @@ void main() {
     expect(text(tester, 'nutrient-sheet-coverage'), 'Aus 2 von 3 Zutaten mit Daten, der Rest ist unbekannt.');
     expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-0')), matching: find.text('Paprika')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-0')), matching: find.text('Mittag')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-0')), matching: find.text('120 mg · 90 %')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-1')), matching: find.text('Banane')), findsOneWidget);
     expect(find.byKey(const Key('nutrient-contrib-2')), findsNothing);
+    // die Zutat ohne Wert steht mit Mahlzeit da, statt still zu fehlen
+    expect(find.byKey(const Key('nutrient-missing-title')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('nutrient-missing-0')), matching: find.text('Gewürz')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('nutrient-missing-0')), matching: find.text('Frühstück')), findsOneWidget);
     expect(text(tester, 'nutrient-sheet-reference'), 'Kennzeichnungs-Referenzmenge: 80 mg pro Tag');
+  });
+
+  pageTest('"Woher kommt das?": alle Beitraege, nicht nur die drei groessten', (tester) async {
+    await meal('Salat', today, [
+      for (final (name, c) in const [('Paprika', 120.0), ('Tomate', 20.0), ('Gurke', 8.0), ('Zwiebel', 7.0), ('Petersilie', 3.0)])
+        food(name, 100, {'vit_c_mg': c}),
+    ]);
+    await open(tester);
+    await tester.tap(find.byKey(const Key('nutrient-row-vit_c_mg')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-4')), matching: find.text('Petersilie')), findsOneWidget);
+    expect(find.byKey(const Key('nutrient-missing-title')), findsNothing, reason: 'alle Zutaten haben einen Wert');
+  });
+
+  pageTest('Zutat mit Produkt heisst wie das Produkt, nicht "Zutat"', (tester) async {
+    await db.into(db.products).insert(ProductsCompanion.insert(id: 'p1', householdId: 'h1', name: 'Karotten Bio', updatedAt: DateTime.utc(2026)));
+    await meal('Lasagne', today, [food('wird ersetzt', 100, const {'vit_a_ug': 800.0})]);
+    // so speichert die App eine Zutat aus dem Bestand: Produkt statt Freitext
+    await db.update(db.mealIngredients).write(const MealIngredientsCompanion(productId: Value('p1'), freeText: Value(null)));
+    await open(tester);
+    await tester.tap(find.byKey(const Key('nutrient-row-vit_a_ug')));
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-0')), matching: find.text('Karotten Bio')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('nutrient-contrib-0')), matching: find.text('Lasagne')), findsOneWidget);
+    expect(find.text('Zutat'), findsNothing);
   });
 
   pageTest('Quelle ohne Daten: das Blatt sagt es ehrlich', (tester) async {
