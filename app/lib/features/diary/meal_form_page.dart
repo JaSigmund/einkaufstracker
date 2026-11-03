@@ -1296,6 +1296,8 @@ class _MealFormPageState extends ConsumerState<MealFormPage> {
         // Ohne bekannte Naehrwerte: direkt ein Produkt oder einen Datenbank-Treffer dazu suchen
         if (n == null)
           IconButton(key: Key('ingredient-lookup-$i'), tooltip: 'Nährwerte suchen', icon: const Icon(Icons.search), onPressed: () => _lookupNutrients(i)),
+        if (r.product case final product?)
+          IconButton(key: Key('ingredient-product-$i'), tooltip: 'Produkt öffnen', icon: const Icon(Icons.inventory_2_outlined), onPressed: () => context.push('/product/${product.id}')),
         IconButton(key: Key('ingredient-remove-$i'), tooltip: 'Entfernen', icon: const Icon(Icons.close), onPressed: () => setState(() => _rows.removeAt(i))),
       ]),
       onTap: () => _editIngredient(i),

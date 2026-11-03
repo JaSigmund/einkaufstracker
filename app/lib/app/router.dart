@@ -9,7 +9,6 @@ import '../features/categories/categories_page.dart';
 import '../features/diary/balance_page.dart';
 import '../features/diary/journal_page.dart';
 import '../features/diary/nutrients_page.dart';
-import '../features/diary/product_nutrients_page.dart';
 import '../features/diary/quick_intake_page.dart';
 import '../features/diary/supplement_form_page.dart';
 import '../features/diary/supplements_page.dart';
@@ -25,7 +24,9 @@ import '../features/receipt_import/receipt_import_service.dart';
 import '../data/local/database.dart';
 import '../features/receipts/receipt_detail_page.dart';
 import '../features/receipts/receipt_file_page.dart';
+import '../domain/products/product_assignment.dart';
 import '../features/products/product_form_page.dart';
+import '../features/products/product_page.dart';
 import '../features/products/products_list_page.dart';
 import '../features/report/product_price_page.dart';
 import '../features/bugreport/bug_report_list_page.dart';
@@ -85,7 +86,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       scanRoute(),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/categories', builder: (_, _) => const CategoriesPage()),
-      GoRoute(path: '/products', builder: (_, _) => const ProductsListPage()),
+      GoRoute(
+        path: '/products',
+        builder: (_, state) => ProductsListPage(
+          initialView: ProductView.fromParam(state.uri.queryParameters['view']),
+          initialOpenOnly: state.uri.queryParameters['open'] == '1',
+        ),
+      ),
+      GoRoute(path: '/product/:id', builder: (_, state) => ProductPage(productId: state.pathParameters['id']!)),
       GoRoute(
         path: '/receipt-file',
         builder: (_, state) => ReceiptFilePage(file: state.extra as ReceiptFile),
@@ -142,7 +150,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/nutrition-targets', builder: (_, _) => const TargetsPage()),
       GoRoute(path: '/balance', builder: (_, _) => const BalancePage()),
       GoRoute(path: '/journal', builder: (_, _) => const JournalPage()),
-      GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
+      GoRoute(path: '/products-nutrients', redirect: (_, _) => '/products?view=nutrients&open=1'),
       GoRoute(path: '/nutrients', builder: (_, _) => const NutrientsPage()),
       GoRoute(path: '/aisle-order', builder: (_, state) => AisleOrderPage(initialStoreId: state.extra as String?)),
       GoRoute(path: '/shopping-archive', builder: (_, _) => const ShoppingArchivePage()),

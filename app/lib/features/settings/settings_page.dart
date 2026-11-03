@@ -312,7 +312,7 @@ class SettingsPage extends ConsumerWidget {
             key: const Key('settings-products'),
             leading: const Icon(Icons.inventory_2_outlined),
             title: const Text('Meine Produkte'),
-            subtitle: const Text('Bearbeiten, gelernte Bon-Zuordnungen lösen'),
+            subtitle: const Text('Nährwerte, Barcodes, Bon-Texte, Online-Preise'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/products'),
           ),

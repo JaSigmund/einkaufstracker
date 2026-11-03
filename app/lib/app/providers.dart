@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/clock.dart';
 import '../data/app_config/app_config_repository.dart';
 import '../domain/inventory/usage_forecast.dart';
+import '../domain/products/product_assignment.dart';
 import '../domain/notifications/expiry_stages.dart';
 import '../data/files/meal_photo_service.dart';
 import '../data/ocr/label_text_reader.dart';
@@ -327,10 +328,61 @@ final productRepositoryProvider = Provider<ProductRepository>((ref) {
     householdId: () => requireHouseholdId(ref),
     off: ref.watch(offClientProvider),
     onChanged: () => ref.read(syncControllerProvider.notifier).sync(),
+    onMerged: (sourceId, targetId) => ref.read(householdPrefsRepositoryProvider).moveNutrientsNotNeeded(sourceId, targetId),
   );
 });
 
 final productsStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAll());
+
+final allBarcodesStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAllBarcodes());
+
+final allProductAliasesStreamProvider = StreamProvider((ref) => ref.watch(productRepositoryProvider).watchAllAliases());
+
+final allOnlineLinksStreamProvider = StreamProvider((ref) => ref.watch(onlinePriceRepositoryProvider).watchActiveLinks());
+
+/// Was jedem Produkt zugeordnet ist (Doku 27), fuer die Ansichten der Produktliste.
+final productAssignmentsProvider = Provider<Map<String, ProductAssignment>>((ref) {
+  final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
+  final prefs = ref.watch(householdPrefsProvider).value ?? const <String, Object?>{};
+  final barcodes = ref.watch(allBarcodesStreamProvider).value ?? const <ProductBarcode>[];
+  final aliases = ref.watch(allProductAliasesStreamProvider).value ?? const <ProductAlias>[];
+  final links = ref.watch(allOnlineLinksStreamProvider).value ?? const <ProductOnlineLink>[];
+  return {
+    for (final p in products)
+      p.id: ProductAssignment(
+        hasNutrients: p.nutrientsPer100 != null,
+        nutrientsNotNeeded: nutrientsNotNeeded(prefs, p.id),
+        hasCategory: p.categoryId != null,
+        isLoose: isLooseProduct(baseUnit: p.baseUnit, packSize: p.packSize),
+        barcodes: [for (final b in barcodes) if (b.productId == p.id) b.ean],
+        receiptTexts: [for (final a in aliases) if (a.productId == p.id) a.aliasText],
+        onlineArticles: [for (final l in links) if (l.productId == p.id) l.linkedName],
+      ),
+  };
+});
+
+/// Zahl am Reiter "Produkte": offene Naehrwerte und Kategorien. Barcodes und Online-Artikel sind freiwillig, die Zahl kaeme sonst nie auf null.
+final openAssignmentCountProvider = Provider<int>((ref) {
+  final products = ref.watch(productsStreamProvider).value ?? const <Product>[];
+  final prefs = ref.watch(householdPrefsProvider).value ?? const <String, Object?>{};
+  var open = 0;
+  for (final p in products) {
+    if (p.nutrientsPer100 == null && !nutrientsNotNeeded(prefs, p.id)) open++;
+    if (p.categoryId == null) open++;
+  }
+  return open;
+});
+
+/// Namen zu BLS-Codes (durch Komma getrennt), damit ein gespeichertes Profil lesbar ist. Ohne Netz leer, dann steht dort die Quelle.
+final blsNamesProvider = FutureProvider.autoDispose.family<Map<String, String>, String>((ref, String codes) async {
+  if (codes.isEmpty) return const {};
+  try {
+    final foods = await ref.watch(blsFoodSearchProvider).byCodes(codes.split(','));
+    return {for (final f in foods) f.code: f.nameDe};
+  } on BlsSearchUnavailable {
+    return const {};
+  }
+});
 
 /// Gedaechtnis des Haushalts: Name -> BLS-Eintrag (Phase N1, ADR-031).
 final foodLinkRepositoryProvider = Provider<FoodLinkRepository>((ref) {

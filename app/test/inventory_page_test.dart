@@ -71,6 +71,7 @@ void main() {
           balanceMovementsProvider.overrideWith((ref) => Stream.value(movements)),
           if (scanner != null) barcodeScannerProvider.overrideWithValue(scanner),
           productRepositoryProvider.overrideWithValue(productRepo(db)),
+          householdPrefsProvider.overrideWith((ref) => Stream.value(const <String, Object?>{})),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(initialLocation: '/', routes: [

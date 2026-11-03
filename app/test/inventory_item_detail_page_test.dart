@@ -34,6 +34,7 @@ void main() {
           routerConfig: GoRouter(initialLocation: '/', routes: [
             GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('START'))),
             GoRoute(path: '/item', builder: (_, _) => InventoryItemDetailPage(item: item, product: p ?? product)),
+            GoRoute(path: '/product/:id', builder: (_, s) => Scaffold(body: Text('PRODUKTSEITE ${s.pathParameters['id']}'))),
             GoRoute(
               path: '/product-form',
               builder: (_, s) {
@@ -156,10 +157,11 @@ void main() {
 
     await tester.tap(find.byKey(const Key('action-edit-product')));
     await tester.pumpAndSettle();
-    expect(find.text('Produkt bearbeiten'), findsOneWidget);
+    expect(find.text('PRODUKTSEITE ${product.id}'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('product-name')), 'Bio-Vollmilch');
-    await tester.tap(find.byKey(const Key('product-save')));
+    // Auf der Produktseite kann sich alles aendern, der Eintrag zeigt danach den neuen Stand
+    await productRepo(db).update(product.copyWith(name: 'Bio-Vollmilch'));
+    GoRouter.of(tester.element(find.text('PRODUKTSEITE ${product.id}'))).pop();
     await tester.pumpAndSettle();
 
     expect(find.text('Bio-Vollmilch'), findsOneWidget);

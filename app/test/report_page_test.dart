@@ -44,7 +44,7 @@ void main() {
           routerConfig: GoRouter(routes: [
             GoRoute(path: '/', builder: (_, _) => Scaffold(body: ReportPage(now: DateTime.utc(2026, 9, 26, 12)))),
             GoRoute(path: '/receipt/:id', builder: (_, s) => Scaffold(body: Text('DETAIL ${s.pathParameters['id']}'))),
-            GoRoute(path: '/product-price', builder: (_, s) => Scaffold(body: Text('PREIS ${(s.extra as Product).id}'))),
+            GoRoute(path: '/product/:id', builder: (_, s) => Scaffold(body: Text('PREIS ${s.pathParameters['id']}'))),
           ]),
         ),
       );

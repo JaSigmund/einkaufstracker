@@ -9,7 +9,7 @@ import 'online_price_section.dart';
 
 const _baseUnitLabels = {'piece': 'Stk', 'kg': 'kg', 'l': 'l'};
 
-String _baseUnitLabel(String baseUnit) => _baseUnitLabels[baseUnit] ?? baseUnit;
+String priceBaseUnitLabel(String baseUnit) => _baseUnitLabels[baseUnit] ?? baseUnit;
 
 /// Artikel-Detail (Doku 07 §2): Preisverlauf und Haendlervergleich eines einzelnen Produkts, auf Basis
 /// des am jeweiligen Bon-Artikel berechneten Grundpreises (Doku 07 §3.1).
@@ -27,7 +27,7 @@ class ProductPricePage extends ConsumerWidget {
     final receipts = ref.watch(receiptsStreamProvider).value ?? const <Receipt>[];
     final stores = ref.watch(storesStreamProvider).value ?? const <Store>[];
     final t = Theme.of(context);
-    final unitLabel = _baseUnitLabel(product.baseUnit);
+    final unitLabel = priceBaseUnitLabel(product.baseUnit);
 
     final historyItems = [
       for (final i in items) (receiptId: i.receiptId, productId: i.productId, unitPriceNormCents: i.unitPriceNormCents, quantity: i.quantity, quantityUnit: i.quantityUnit),

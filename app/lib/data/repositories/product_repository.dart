@@ -31,7 +31,7 @@ class BarcodeLookupResult {
 /// Produkte, Barcode-Zuordnung und der OFF-Lookup (Doku 06 §4). Schreibt immer lokal zuerst und stellt die
 /// Aenderung in die Outbox (offline-first, wie die anderen Repositories).
 class ProductRepository {
-  ProductRepository(this._db, {required this.householdId, this.off, this.onChanged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
+  ProductRepository(this._db, {required this.householdId, this.off, this.onChanged, this.onMerged, Uuid? uuid}) : _uuid = uuid ?? const Uuid();
 
   final AppDatabase _db;
   final Future<String> Function() householdId;
@@ -39,6 +39,9 @@ class ProductRepository {
   /// Null = nur lokaler Cache, kein Netz-Lookup (z.B. in Tests).
   final OffClient? off;
   final void Function()? onChanged;
+
+  /// Nach dem Zusammenfuehren: was ausserhalb der Produkt-Tabellen am Produkt haengt (Einstellung "Nicht nötig"), wandert mit.
+  final Future<void> Function(String sourceId, String targetId)? onMerged;
   final Uuid _uuid;
 
   Stream<List<Product>> watchAll() => (_db.select(_db.products)..where((p) => p.deletedAt.isNull())).watch();
@@ -61,6 +64,15 @@ class ProductRepository {
     await _put('product_aliases', updated.id, productAliasToRemote(updated), () => _db.into(_db.productAliases).insertOnConflictUpdate(updated.toCompanion(false)));
     onChanged?.call();
   }
+
+  /// Alle aktiven Bon-Texte des Haushalts, fuer die Produktliste.
+  Stream<List<ProductAlias>> watchAllAliases() => (_db.select(_db.productAliases)
+        ..where((a) => a.deletedAt.isNull())
+        ..orderBy([(a) => OrderingTerm.desc(a.updatedAt)]))
+      .watch();
+
+  /// Alle Barcodes des Haushalts.
+  Stream<List<ProductBarcode>> watchAllBarcodes() => _db.select(_db.productBarcodes).watch();
 
   Future<Product?> byId(String id) => (_db.select(_db.products)..where((p) => p.id.equals(id))).getSingleOrNull();
 
@@ -346,6 +358,21 @@ class ProductRepository {
     return updated;
   }
 
+  /// Entfernt das Profil wieder (Produkt ist kein Lebensmittel, Doku 27). Bisherige Mahlzeiten behalten ihren Snapshot.
+  Future<void> clearNutrients(String productId) async {
+    final product = await byId(productId);
+    if (product == null || product.nutrientsPer100 == null) return;
+    final updated = product.copyWith(
+      nutrientsPer100: const Value(null),
+      nutrientsBasis: const Value(null),
+      nutrientsSource: const Value(null),
+      blsCode: const Value(null),
+      updatedAt: appClock.now().toUtc(),
+    );
+    await _put('products', updated.id, productToRemote(updated), () => _db.into(_db.products).insertOnConflictUpdate(updated.toCompanion(false)));
+    onChanged?.call();
+  }
+
   /// Loescht ein Produkt aus "Meine Produkte" (Fehlerbericht "Produkt löschen", 2026-09-28). Bestehende
   /// Bons, Inventar-Eintraege und Einkaufslisten-Positionen behalten ihre `product_id` und zeigen den Namen
   /// weiter an; nur Suche, Autovervollstaendigung und Barcode-Zuordnung ignorieren das Produkt danach.
@@ -459,6 +486,7 @@ class ProductRepository {
 
       await softDelete(sourceId);
     });
+    await onMerged?.call(sourceId, targetId);
   }
 
   /// Verknuepft einen EAN dauerhaft mit einem Produkt (Doku 06 §4: "bleibt danach dauerhaft erhalten").

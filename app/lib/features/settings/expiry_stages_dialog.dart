@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/providers.dart';
 import '../../domain/notifications/expiry_stages.dart';
 
 String _stageLabel(int days) => switch (days) {
@@ -23,6 +25,29 @@ Future<List<int>?> showExpiryStagesDialog(
     context: context,
     builder: (ctx) => _ExpiryStagesDialog(initial: initial, title: title, helper: helper, allowInherit: allowInherit),
   );
+}
+
+/// Eigene Erinnerungsstufen fuer ein Produkt (Ausbau 1.14). "Wie Standard" entfernt sie wieder (leere Liste).
+Future<void> editProductExpiryStages(BuildContext context, WidgetRef ref, String productId, {required List<int> standard, List<int>? own}) async {
+  final picked = await showExpiryStagesDialog(
+    context,
+    initial: own ?? standard,
+    title: 'Erinnerungen für dieses Produkt',
+    helper: 'Gilt für alle Packungen dieses Produkts. „Wie Standard“ nimmt die Zeitpunkte aus den Einstellungen.',
+    allowInherit: true,
+  );
+  if (picked == null) return;
+  try {
+    await ref.read(householdPrefsRepositoryProvider).set(expiryStagesPrefFor(productId), picked);
+    ref.invalidate(householdPrefsOnceProvider);
+  } catch (_) {
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich.')));
+    return;
+  }
+  // sofort neu planen; scheitert das, gilt es beim naechsten App-Start
+  try {
+    await rescheduleExpiryReminders(ref);
+  } catch (_) {}
 }
 
 class _ExpiryStagesDialog extends StatefulWidget {

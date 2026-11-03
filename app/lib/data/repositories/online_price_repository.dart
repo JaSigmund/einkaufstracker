@@ -31,6 +31,9 @@ class OnlinePriceRepository {
   Stream<List<ProductOnlineLink>> watchLinksFor(String productId) =>
       (_db.select(_db.productOnlineLinks)..where((l) => l.productId.equals(productId) & l.deletedAt.isNull())).watch();
 
+  /// Alle aktiven Verknuepfungen, fuer die Produktliste.
+  Stream<List<ProductOnlineLink>> watchActiveLinks() => (_db.select(_db.productOnlineLinks)..where((l) => l.deletedAt.isNull())).watch();
+
   /// Alle aktiven Verknuepfungen (fuer den Abruf).
   Future<List<ProductOnlineLink>> activeLinks() => (_db.select(_db.productOnlineLinks)..where((l) => l.deletedAt.isNull())).get();
 

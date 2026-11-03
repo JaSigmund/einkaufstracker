@@ -12,7 +12,6 @@ import '../../domain/products/packaging.dart';
 import '../../domain/shopping_list/list_quantity.dart';
 import '../../data/repositories/inventory_repository.dart';
 import '../common/quantity_dialog.dart';
-import '../products/product_form_page.dart';
 import '../settings/expiry_stages_dialog.dart';
 
 const _locationLabels = {'pantry': 'Vorrat', 'fridge': 'Kühlschrank', 'freezer': 'Tiefkühl', 'other': 'Sonstiges'};
@@ -198,15 +197,15 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     if (mounted) setState(() => _product = updated);
   }
 
-  /// Fuer seltenere Aenderungen (Kategorie, Einheit, Haltbarkeit, Aliase) weiterhin das volle Formular.
-  Future<void> _editProduct() async {
+  /// Alles Weitere zum Produkt steht auf der Produktseite (Doku 27). Dort kann sich der Name oder, ueber das Formular, die Einheit aendern.
+  Future<void> _openProduct() async {
     final product = _product;
     if (product == null) return;
-    final updated = await context.push<Product>('/product-form', extra: ProductFormArgs(existing: product));
-    if (updated != null && mounted) {
-      setState(() => _product = updated);
-      await _refresh(); // das Formular kann den Bestand auf eine neue Einheit umgerechnet haben
-    }
+    await context.push('/product/${product.id}');
+    if (!mounted) return;
+    final fresh = await ref.read(productRepositoryProvider).byId(product.id);
+    if (fresh != null && mounted) setState(() => _product = fresh);
+    await _refresh();
   }
 
   /// Bonzuordnung loesen oder neu setzen (Fehlerbericht "Bonzuordnung anzeigen", erweitert 2026-09-28: soll
@@ -304,28 +303,7 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
     if (mounted) context.pop();
   }
 
-  /// Eigene Erinnerungsstufen fuer dieses Produkt (Ausbau 1.14). "Wie Standard" entfernt sie wieder (leere Liste).
-  Future<void> _editStages(List<int> standard, List<int>? own) async {
-    final picked = await showExpiryStagesDialog(
-      context,
-      initial: own ?? standard,
-      title: 'Erinnerungen für dieses Produkt',
-      helper: 'Gilt für alle Packungen dieses Produkts. „Wie Standard“ nimmt die Zeitpunkte aus den Einstellungen.',
-      allowInherit: true,
-    );
-    if (picked == null) return;
-    try {
-      await ref.read(householdPrefsRepositoryProvider).set(expiryStagesPrefFor(_item.productId), picked);
-      ref.invalidate(householdPrefsOnceProvider);
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Speichern nicht möglich.')));
-      return;
-    }
-    // sofort neu planen; scheitert das, gilt es beim naechsten App-Start
-    try {
-      await rescheduleExpiryReminders(ref);
-    } catch (_) {}
-  }
+  Future<void> _editStages(List<int> standard, List<int>? own) => editProductExpiryStages(context, ref, _item.productId, standard: standard, own: own);
 
   @override
   Widget build(BuildContext context) {
@@ -355,9 +333,9 @@ class _InventoryItemDetailPageState extends ConsumerState<InventoryItemDetailPag
           if (_product != null)
             IconButton(
               key: const Key('action-edit-product'),
-              tooltip: 'Weitere Produktdetails bearbeiten',
+              tooltip: 'Produktseite',
               icon: const Icon(Icons.tune),
-              onPressed: _editProduct,
+              onPressed: _openProduct,
             ),
           IconButton(
             key: const Key('action-delete'),

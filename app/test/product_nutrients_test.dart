@@ -5,7 +5,9 @@ import 'package:einkaufstracker/data/local/database.dart';
 import 'package:einkaufstracker/data/nutrition/bls_food_search.dart';
 import 'package:einkaufstracker/domain/nutrition/nutrient_scaling.dart';
 import 'package:einkaufstracker/features/diary/product_nutrients_card.dart';
-import 'package:einkaufstracker/features/diary/product_nutrients_page.dart';
+import 'package:einkaufstracker/data/repositories/household_prefs_repository.dart';
+import 'package:einkaufstracker/domain/products/product_assignment.dart';
+import 'package:einkaufstracker/features/products/products_list_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,7 +15,7 @@ import 'package:go_router/go_router.dart';
 
 import 'support/fakes.dart';
 
-/// Produkte ohne Naehrwerte (Phase N1, ADR-031): die Hinweiskarte im Tagebuch und die Seite "Nährwerte zuordnen".
+/// Produkte ohne Naehrwerte (Phase N1, ADR-031): die Hinweiskarte im Tagebuch und die Ansicht Naehrwerte der Produktliste (Doku 27).
 BlsFood _food(String code, String name, double kcal, {String confidence = 'sure', String method = 'synonym'}) =>
     BlsFood(code: code, nameDe: name, per100: NutrientsPer100(kcal: kcal, proteinG: 1), method: method, confidence: confidence);
 
@@ -31,9 +33,11 @@ void main() {
   late Product quark;
   late Product gewuerz;
   late Product reis;
+  late HouseholdPrefsRepository prefs;
 
   setUp(() async {
     db = memoryDb();
+    prefs = HouseholdPrefsRepository(db, householdId: () async => 'h1');
     bls = FakeBlsFoodSearch(resolved: {
       'milch': [_food('M111300', 'Vollmilch frisch, 3,5 % Fett', 65)],
       'quark': [_food('M713300', 'Speisequark Halbfettstufe', 100, confidence: 'auto', method: 'search')],
@@ -51,13 +55,19 @@ void main() {
         productRepositoryProvider.overrideWithValue(productRepo(db)),
         foodLinkRepositoryProvider.overrideWithValue(foodLinkRepo(db)),
         blsFoodSearchProvider.overrideWithValue(bls),
+        householdPrefsRepositoryProvider.overrideWithValue(prefs),
+        categoriesStreamProvider.overrideWith((ref) => Stream.value(const <Category>[])),
+        allOnlineLinksStreamProvider.overrideWith((ref) => Stream.value(const <ProductOnlineLink>[])),
       ];
 
-  Future<void> openPage(WidgetTester tester) async {
+  const open = ProductsListPage(initialView: ProductView.nutrients, initialOpenOnly: true);
+  const all = ProductsListPage(initialView: ProductView.nutrients);
+
+  Future<void> openPage(WidgetTester tester, {Widget page = open}) async {
     tester.view.physicalSize = const Size(900, 3000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(ProviderScope(overrides: overrides(), child: const MaterialApp(home: ProductNutrientsPage())));
+    await tester.pumpWidget(ProviderScope(overrides: overrides(), child: MaterialApp(home: page)));
     await tester.pumpAndSettle();
   }
 
@@ -99,18 +109,24 @@ void main() {
       expect(find.byKey(Key('nutrients-row-${quark.id}')), findsOneWidget);
     });
 
-    pageTest('"Alle uebernehmen" nimmt sichere und automatische Vorschlaege, Produkte ohne Vorschlag bleiben', (tester) async {
+    pageTest('sichere und automatische Vorschlaege sind zwei Schritte, gelernt werden nur die sicheren (Doku 25, Q-38)', (tester) async {
       await openPage(tester);
-      expect(find.text('Alle sicheren und automatischen übernehmen (2)'), findsOneWidget);
+      expect(find.text('Alle sicheren übernehmen (1)'), findsOneWidget);
+      expect(find.text('Auch automatische übernehmen (1)'), findsOneWidget);
+
       await tester.tap(find.byKey(const Key('nutrients-apply-all')));
       await tester.pumpAndSettle();
-
       expect((await reload(milch)).blsCode, 'M111300');
+      expect((await reload(quark)).nutrientsPer100, isNull);
+      expect(find.byKey(const Key('nutrients-apply-all')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('nutrients-apply-auto')));
+      await tester.pumpAndSettle();
       expect((await reload(quark)).blsCode, 'M713300');
       expect((await reload(gewuerz)).nutrientsPer100, isNull);
       expect(find.byKey(Key('nutrients-row-${gewuerz.id}')), findsOneWidget);
-      expect(find.byKey(const Key('nutrients-apply-all')), findsNothing, reason: 'nichts mehr zu uebernehmen');
-      expect(await foodLinkRepo(db).all(), hasLength(2));
+      expect(find.byKey(const Key('nutrients-apply-auto')), findsNothing, reason: 'nichts mehr zu uebernehmen');
+      expect({for (final l in await foodLinkRepo(db).all()) l.nameNorm}, {'Milch'});
     });
 
     pageTest('unsichere Vorschlaege zaehlen nicht zu "Alle uebernehmen", lassen sich aber einzeln uebernehmen', (tester) async {
@@ -124,32 +140,41 @@ void main() {
       await tester.tap(find.byKey(Key('nutrients-apply-${milch.id}')));
       await tester.pumpAndSettle();
       expect((await reload(milch)).blsCode, 'M111300');
+      expect(await foodLinkRepo(db).all(), isEmpty, reason: 'ein unsicherer Treffer verfaelscht sonst Foto-Zuordnungen');
     });
 
-    pageTest('Ueberspringen: Zeile verschwindet, bleibt weg (auch nach erneutem Oeffnen) und aendert das Produkt nicht', (tester) async {
+    pageTest('Nicht noetig: Zeile verschwindet, bleibt weg (auch nach erneutem Oeffnen), gilt im Haushalt und aendert das Produkt nicht', (tester) async {
       await openPage(tester);
       await tester.tap(find.byKey(Key('nutrients-skip-${quark.id}')));
       await tester.pumpAndSettle();
       expect(find.byKey(Key('nutrients-row-${quark.id}')), findsNothing);
       expect((await reload(quark)).nutrientsPer100, isNull);
-      expect(jsonDecode((await db.getKv(productsNutrientsSkippedKey))!), [quark.id]);
+      expect(await prefs.load(), {noNutrientsPrefFor(quark.id): true});
 
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 1));
-      await tester.pumpWidget(ProviderScope(overrides: overrides(), child: const MaterialApp(home: ProductNutrientsPage())));
+      await tester.pumpWidget(ProviderScope(overrides: overrides(), child: const MaterialApp(home: open)));
       await tester.pumpAndSettle();
       expect(find.byKey(Key('nutrients-row-${quark.id}')), findsNothing);
       expect(find.byKey(Key('nutrients-row-${milch.id}')), findsOneWidget);
     });
 
-    pageTest('Anderen waehlen: der Picker startet mit dem Namen, der gewaehlte Eintrag wird uebernommen und gelernt', (tester) async {
+    pageTest('Anderen waehlen: der Picker startet mit dem Namen und zeigt nur Lebensmittel, gelernt wird nur auf ausdruecklichen Wunsch', (tester) async {
       bls.foods = const [BlsFood(code: 'M120000', nameDe: 'Quark mager', per100: NutrientsPer100(kcal: 67, proteinG: 12))];
       await openPage(tester);
       await tester.tap(find.byKey(Key('nutrients-change-${quark.id}')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(find.byKey(const Key('picker-search'))).controller!.text, 'Quark');
 
+      expect(find.byKey(Key('pick-product-${quark.id}')), findsNothing);
+      expect(find.byKey(const Key('pick-freetext')), findsNothing);
+
       await tester.tap(find.byKey(const Key('pick-bls-M120000')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('nutrients-confirm-learn'))).value, isFalse, reason: 'kein sicherer Treffer');
+      await tester.tap(find.byKey(const Key('nutrients-confirm-learn')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('nutrients-confirm-ok')));
       await tester.pumpAndSettle();
 
       final p = await reload(quark);
@@ -169,9 +194,11 @@ void main() {
     });
 
     pageTest('alles zugeordnet oder uebersprungen: Hinweis statt Liste', (tester) async {
-      await db.setKv(productsNutrientsSkippedKey, jsonEncode([milch.id, quark.id, gewuerz.id]));
+      for (final p in [milch, quark, gewuerz]) {
+        await prefs.setNutrientsNotNeeded(p.id, true);
+      }
       await openPage(tester);
-      expect(tester.widget<Text>(find.byKey(const Key('nutrients-empty'))).data, 'Alle Produkte haben Nährwerte oder wurden übersprungen.');
+      expect(tester.widget<Text>(find.byKey(const Key('nutrients-empty'))).data, 'Alle Produkte haben Nährwerte oder sind als „nicht nötig“ markiert.');
     });
 
     pageTest('geloeschte Produkte erscheinen nicht', (tester) async {
@@ -179,6 +206,69 @@ void main() {
       await openPage(tester);
       expect(find.byKey(Key('nutrients-row-${gewuerz.id}')), findsNothing);
       expect(find.byKey(Key('nutrients-row-${milch.id}')), findsOneWidget);
+    });
+
+    pageTest('Ohne "Nur offene" stehen alle Produkte da: mit Eintrag und Quelle, Nicht noetig laesst sich zuruecknehmen', (tester) async {
+      await prefs.setNutrientsNotNeeded(gewuerz.id, true);
+      await openPage(tester, page: all);
+
+      expect(tester.widget<Text>(find.byKey(Key('nutrients-current-${reis.id}'))).data, 'Eigene Werte · 350 kcal je 100 g');
+      expect(find.byKey(Key('nutrients-not-needed-${gewuerz.id}')), findsOneWidget);
+      expect(find.byKey(Key('nutrients-suggestion-${milch.id}')), findsOneWidget);
+
+      await tester.tap(find.byKey(Key('nutrients-undo-${gewuerz.id}')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('nutrients-not-needed-${gewuerz.id}')), findsNothing);
+      expect(find.byKey(Key('nutrients-none-${gewuerz.id}')), findsOneWidget);
+    });
+
+    pageTest('gespeichertes Profil zeigt den Namen des Eintrags, damit ein falscher auffaellt', (tester) async {
+      bls.foods = const [BlsFood(code: 'X1', nameDe: 'Zitrone roh', per100: NutrientsPer100(kcal: 36, proteinG: 1))];
+      await productRepo(db).setBlsProfile(reis.id, bls.foods.first, overwrite: true);
+      await openPage(tester, page: all);
+      expect(tester.widget<Text>(find.byKey(Key('nutrients-current-${reis.id}'))).data, 'Zitrone roh · 36 kcal je 100 g');
+    });
+
+    pageTest('Aendern ersetzt ein vorhandenes Profil, Open Food Facts wird dabei angesprochen', (tester) async {
+      final off = await productRepo(db).create(name: 'Römerquelle', baseUnit: 'l', nutrientsPer100: {'kcal': 1}, nutrientsBasis: 'ml', nutrientsSource: 'off');
+      bls.foods = const [BlsFood(code: 'N110000', nameDe: 'Römerquelle still', per100: NutrientsPer100(kcal: 0, proteinG: 0))];
+      await openPage(tester, page: all);
+
+      await tester.tap(find.byKey(Key('nutrients-change-${off.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pick-bls-N110000')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('nutrients-confirm-off')), findsOneWidget);
+      expect(find.text('Gilt für neue Einträge, bisherige Mahlzeiten behalten ihre Werte.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('nutrients-confirm-ok')));
+      await tester.pumpAndSettle();
+
+      final p = await reload(off);
+      expect(p.blsCode, 'N110000');
+      expect(p.nutrientsSource, 'bls');
+      expect(await foodLinkRepo(db).all(), isEmpty);
+    });
+
+    pageTest('Abbrechen im Bestaetigen-Dialog laesst das Profil unveraendert', (tester) async {
+      bls.foods = const [BlsFood(code: 'N110000', nameDe: 'Reis gekocht', per100: NutrientsPer100(kcal: 0, proteinG: 0))];
+      await openPage(tester, page: all);
+      await tester.tap(find.byKey(Key('nutrients-change-${reis.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pick-bls-N110000')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Abbrechen'));
+      await tester.pumpAndSettle();
+      expect((await reload(reis)).blsCode, isNull);
+      expect(jsonDecode((await reload(reis)).nutrientsPer100!)['kcal'], 350);
+    });
+
+    pageTest('die fruehere lokale Liste "Ueberspringen" wird einmalig uebernommen', (tester) async {
+      await db.setKv(productsNutrientsSkippedKey, jsonEncode([quark.id]));
+      await openPage(tester);
+      expect(find.byKey(Key('nutrients-row-${quark.id}')), findsNothing);
+      expect(find.byKey(Key('nutrients-row-${milch.id}')), findsOneWidget);
+      expect(await db.getKv(productsNutrientsSkippedKey), '[]');
+      expect(await prefs.load(), {noNutrientsPrefFor(quark.id): true});
     });
 
     pageTest('unlesbare Ablage der uebersprungenen Produkte: nichts ist uebersprungen', (tester) async {
@@ -197,7 +287,7 @@ void main() {
       addTearDown(tester.view.reset);
       final router = GoRouter(routes: [
         GoRoute(path: '/', builder: (_, _) => Scaffold(body: ProductNutrientsCard(now: now))),
-        GoRoute(path: '/products-nutrients', builder: (_, _) => const ProductNutrientsPage()),
+        GoRoute(path: '/products-nutrients', builder: (_, _) => const Scaffold(body: Text('ANSICHT NAEHRWERTE'))),
       ]);
       await tester.pumpWidget(ProviderScope(overrides: overrides(), child: MaterialApp.router(routerConfig: router)));
       await tester.pumpAndSettle();
@@ -215,8 +305,10 @@ void main() {
       expect(find.text('1 Produkt ohne Nährwerte'), findsOneWidget);
     });
 
-    pageTest('keine Karte, wenn alle Produkte Naehrwerte haben oder uebersprungen wurden', (tester) async {
-      await db.setKv(productsNutrientsSkippedKey, jsonEncode([milch.id, quark.id, gewuerz.id]));
+    pageTest('keine Karte, wenn alle Produkte Naehrwerte haben oder nicht noetig sind', (tester) async {
+      for (final p in [milch, quark, gewuerz]) {
+        await prefs.setNutrientsNotNeeded(p.id, true);
+      }
       await openCard(tester);
       expect(find.byKey(const Key('products-nutrients-card')), findsNothing);
     });
@@ -225,7 +317,7 @@ void main() {
       await openCard(tester);
       await tester.tap(find.byKey(const Key('products-nutrients-open')));
       await tester.pumpAndSettle();
-      expect(find.text('Nährwerte zuordnen'), findsOneWidget);
+      expect(find.text('ANSICHT NAEHRWERTE'), findsOneWidget);
     });
 
     pageTest('Später blendet die Karte zwei Wochen aus und merkt sich das', (tester) async {
