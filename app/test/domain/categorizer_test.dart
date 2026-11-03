@@ -149,6 +149,71 @@ void main() {
     });
   });
 
+  group('Eigene Kategorien des Haushalts', () {
+    Categorizer withOwn() => Categorizer(categoryIdByName: {
+          for (final n in [
+            ..._allNames, CategoryNames.nudeln, CategoryNames.saucen, CategoryNames.aufstriche, CategoryNames.chipsNuesse, CategoryNames.toGo,
+          ])
+            n: n,
+        });
+
+    // Echte Bon-Texte, dazu Streitfaelle, die nicht in die neue Kategorie gehoeren
+    final expected = <String, String>{
+      'IC Billa gew. Bandnudeln': CategoryNames.nudeln,
+      'Billa Bio Bulgur': CategoryNames.nudeln,
+      'BILLA IMMER GUT JASMINREI': CategoryNames.nudeln,
+      'IC Clever Penne': CategoryNames.nudeln,
+      'Billa Spaghetti Bronze': CategoryNames.nudeln,
+      'IC CV Weizenmehl univers.': CategoryNames.nudeln,
+      'Lasagneblätter': CategoryNames.nudeln,
+      'Lasagne Bolognese': CategoryNames.saucen, // "bolognese" vor "lasagne": gelernte Zuordnung korrigiert das
+      'BARILLA PESTO RUSTICO BAS': CategoryNames.saucen,
+      'IC Barilla Sugo Arrab.': CategoryNames.saucen,
+      'IC Chunky Salsa Med': CategoryNames.saucen,
+      'BILLA IMMER GUT SATE ERDN': CategoryNames.saucen,
+      'Sojasauce': CategoryNames.saucen,
+      'BM GUACAMOLE 150 G': CategoryNames.aufstriche,
+      'scharfer Aufstrich': CategoryNames.aufstriche,
+      'Scharfer Brotaufstrich': CategoryNames.aufstriche,
+      'IC CV Sonnenblumenmarg.': CategoryNames.aufstriche,
+      'Clever Blütenhonig': CategoryNames.aufstriche,
+      'Chips Papr i ka 250g': CategoryNames.chipsNuesse,
+      "IC Kelly's Chips Ketch.": CategoryNames.chipsNuesse,
+      'IC Kellys Riffels SC': CategoryNames.chipsNuesse,
+      'Billa Immer Gut Erdnüsse': CategoryNames.chipsNuesse,
+      'Baguette Thunfisch': CategoryNames.toGo,
+      'BILLA SANDWICH LACHS/EI': CategoryNames.toGo,
+      'Protein Sandwich Thunfisc': CategoryNames.toGo,
+      'Onigiri Wakame 100g': CategoryNames.toGo,
+      // Bleiben, wo sie sind
+      'Farmer Soft Sandwich': CategoryNames.brot,
+      'IC Clever Knobl.Bag.': CategoryNames.brot,
+      'IC Knoppers Erdnussr. 3er': CategoryNames.suess,
+      'Knoppers Nussriegel': CategoryNames.suess,
+      'Schokolade Haselnüsse': CategoryNames.suess,
+      'Erdnussbutter': CategoryNames.suess,
+      'Thunfisch in Tomatensauce': CategoryNames.fisch,
+      'IC CV gehackte Tomaten': CategoryNames.konserven,
+      'IC Billa getr. Kichererbs': CategoryNames.konserven,
+      'Sonnenblumenöl': CategoryNames.oele,
+      'TAFELESSIG': CategoryNames.oele,
+      'BILLA Instant Nudeln Huhn': CategoryNames.fertig,
+      'Shin Ramen Toomba 137g': CategoryNames.fertig,
+    };
+    expected.forEach((name, category) {
+      test('"$name" -> $category', () => expect(withOwn().categorize(name).categoryId, category));
+    });
+
+    test('Ohne die eigenen Kategorien greift die alte Regel', () {
+      final c = _categorizer();
+      expect(c.categorize('IC Clever Penne').categoryId, CategoryNames.konserven);
+      expect(c.categorize('CLEVER PESTO GENOVESE').categoryId, CategoryNames.oele);
+      expect(c.categorize('Billa Immer Gut Erdnüsse').categoryId, CategoryNames.suess);
+      expect(c.categorize('Baguette Thunfisch').categoryId, CategoryNames.brot);
+      expect(c.categorize('Onigiri Wakame 100g').categoryId, CategoryNames.fertig);
+    });
+  });
+
   group('Alias, Pfand und Sonderfaelle', () {
     test('Gelernte Zuordnung schlaegt die Regel', () {
       final c = _categorizer(aliases: {'dkih paprika tricolore': CategoryNames.sonstiges});
