@@ -445,7 +445,7 @@ class _NutrientsPageState extends ConsumerState<NutrientsPage> {
                 title: Text(v.contributions[i].ingredient),
                 subtitle: Text(_contributionSource(v.contributions[i])),
                 trailing: Text(
-                  [formatMicro(def, v.contributions[i].amount), if (shareText(v.contributions[i].amount, v.total) case final s?) s].join(' · '),
+                  [formatMicro(def, v.contributions[i].amount), ?shareText(v.contributions[i].amount, v.total)].join(' · '),
                 ),
               ),
             if (v.missing.isNotEmpty) ...[
